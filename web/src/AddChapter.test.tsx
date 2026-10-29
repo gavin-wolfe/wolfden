@@ -47,7 +47,11 @@ function added(extra: Partial<ChapterAddResult> = {}): ChapterAddResult {
 }
 
 /** Answers /api/book/chapters and the add, recording each add's body. */
-function stubAdd(post: (body: Record<string, unknown>) => Response | ChapterAddResult = () => added(), tree: HierarchyResult = hierarchy) {
+function stubAdd(
+  post: (body: Record<string, unknown>) => Response | ChapterAddResult = () => added(),
+  tree: HierarchyResult = hierarchy,
+  book: () => BookChapters = () => chapters,
+) {
   const posted: Record<string, unknown>[] = []
   const api = stubApi({
     override: (path, params, init) => {
@@ -61,7 +65,7 @@ function stubAdd(post: (body: Record<string, unknown>) => Response | ChapterAddR
 
       if (path === '/api/book/chapters') {
         expect(params.get('book')).toBe('dracula')
-        return chapters
+        return book()
       }
 
       if (path === '/api/hierarchy') {
@@ -93,6 +97,8 @@ describe('SC-WEB-71: I add and insert chapters on a book page', () => {
     expect(within(form).getByRole('heading', { name: 'Add a chapter to Dracula' })).toBeTruthy()
     const title = within(form).getByLabelText('Title') as HTMLInputElement
     await waitFor(() => expect(document.activeElement).toBe(title))
+    // With no error, the title points at its hint.
+    expect(document.getElementById(title.getAttribute('aria-describedby')!)?.textContent).toContain('Optional; leave it empty for none.')
 
     // The place is the end by default, and the list names every chapter but the last, by number, title, and key.
     const place = (await within(form).findByLabelText('Place')) as HTMLSelectElement
@@ -177,7 +183,10 @@ describe('SC-WEB-72: adding a chapter is guarded', () => {
   })
 
   it("a refusal is shown, a stale book.md says so in the form's words, and Escape returns focus", async () => {
-    let answer: Response = new Response(JSON.stringify({ code: 'frozen', message: "Book 'dracula' is final (frozen), so no chapter can be added to it until it's unfrozen (F-BOOK-1)." }), { status: 409 })
+    // The server's words for the web page (WriteEndpoints.Words, #209) say how to unfreeze it; the form shows them as they are.
+    const frozen =
+      "Book 'dracula' is final (frozen), so no chapter can be added to it until it's unfrozen (F-BOOK-1). Unfreeze… on the page of book 'dracula' opens it for editing again."
+    let answer: Response = new Response(JSON.stringify({ code: 'frozen', message: frozen }), { status: 409 })
     const { posted, calls } = stubAdd(() => answer)
     renderApp('/u/dracula/b/dracula')
     const opener = await screen.findByRole('button', { name: 'Add chapter to Dracula' })
@@ -187,7 +196,7 @@ describe('SC-WEB-72: adding a chapter is guarded', () => {
     await within(form).findByLabelText('Place')
     fireEvent.click(within(form).getByRole('button', { name: 'Add' }))
 
-    expect((await within(form).findByRole('alert')).textContent).toContain('is final (frozen)')
+    expect((await within(form).findByRole('alert')).textContent).toBe(frozen)
     expect(posted).toHaveLength(1)
 
     // A stale file: the form asks for the chapters again.
@@ -200,5 +209,32 @@ describe('SC-WEB-72: adding a chapter is guarded', () => {
     fireEvent.keyDown(form, { key: 'Escape' })
     expect(screen.queryByRole('dialog')).toBeNull()
     await waitFor(() => expect(document.activeElement).toBe(opener))
+  })
+
+  it('a chosen chapter that is gone after a stale refetch falls back to the end, and the form says so', async () => {
+    let book = chapters
+    stubAdd(
+      () => new Response(JSON.stringify({ code: 'stale_file', message: 'book.md has changed since it was read' }), { status: 409 }),
+      hierarchy,
+      () => book,
+    )
+    renderApp('/u/dracula/b/dracula')
+    fireEvent.click(await screen.findByRole('button', { name: 'Insert chapter in Dracula' }))
+    const form = screen.getByRole('dialog')
+    const place = (await within(form).findByLabelText('Place')) as HTMLSelectElement
+    fireEvent.change(place, { target: { value: '2' } })
+
+    // Meanwhile chapter 2 was taken out of book.md in another program.
+    book = { ...chapters, hash: 'h-later', chapters: chapters.chapters.filter((c) => c.key !== '2') }
+    fireEvent.click(within(form).getByRole('button', { name: 'Add' }))
+
+    await waitFor(() => expect(place.value).toBe(''))
+    const note = within(form).getByText(/^Chapter 2 can't be chosen now/)
+    expect(note.textContent).toContain('so the new chapter goes at the end')
+    expect(place.getAttribute('aria-describedby')).toBe(note.id)
+
+    // Choosing a place again clears it.
+    fireEvent.change(place, { target: { value: '3' } })
+    expect(within(form).queryByText(/^Chapter 2 can't be chosen now/)).toBeNull()
   })
 })

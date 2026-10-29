@@ -232,13 +232,17 @@ for none. Wolfden writes it into the `chapters` list in the book's
   as needed. `ember:3` still names the chapter it named before. A
   chapter with no number, such as a prologue, keeps none, and in a book
   whose chapters have no numbers, the new one has none either.
+- **Before an epilogue.** Add chapter always goes at the very end, after
+  an unnumbered epilogue too. To add a chapter before the epilogue, use
+  **Insert chapter…** after the last numbered chapter (`--after` its key
+  from the command line).
 
 A final book has neither button: unfreeze it first. From the command
 line:
 
 ```text
 wolfden new chapter --in ember
-wolfden new chapter "The Long Watch" --in ember --after 2
+wolfden new chapter "Signal Fires" --in ember --after 2
 ```
 
 `--in` is the book's key (`<universe>/<book>` if two universes have a

@@ -2164,8 +2164,12 @@ docs/
     every other key are kept. A `book.md` without an id gets one
     (F-ID-6). It's checked as the den reads it, and the result must
     read back as planned (the same keys, the new one in its place, only
-    the planned numbers changed), or nothing is written. A final book
-    is refused (`frozen`), as any edit of its `book.md` is (F-BOOK-1),
+    the planned numbers changed), or nothing is written. Blank lines
+    between items and after the last one, and comment lines that group
+    them (`# Part One`), stay where they were: the new item goes right
+    after the one before it. A final book is refused (`frozen`), as any
+    edit of its `book.md` is (F-BOOK-1), saying how to unfreeze it in
+    the caller's words (`ToolWords.Unfreeze`, #209),
     and so is an `after` the book doesn't list (`unknown_chapter`) and a
     title that isn't one line of at most 200 characters, the limits for
     a name (`bad_argument`).
@@ -2185,7 +2189,9 @@ docs/
     the default for Insert) and **Title**, which is focused for Add
     (Place for Insert); a title over 200 characters is refused before
     anything is sent. A stale file says the chapters changed in another
-    program and asks for them again. After an add every cached answer is
+    program and asks for them again; if the chapter chosen in **Place**
+    is no longer one of the choices then, Place goes back to the end and
+    the form says so. After an add every cached answer is
     asked again, the form closes, and a notice under the list says what
     it did, including the renumbering, and takes focus until dismissed.
     Escape or Cancel closes the form and returns focus to the button.

@@ -130,6 +130,8 @@ function AddChapterDialog({
   const placeId = useId()
   const nameId = useId()
   const nameErrorId = useId()
+  const hintId = useId()
+  const goneId = useId()
   const dialogRef = useRef<HTMLDivElement>(null)
   const nameRef = useRef<HTMLInputElement>(null)
   const placeRef = useRef<HTMLSelectElement>(null)
@@ -150,9 +152,11 @@ function AddChapterDialog({
     ;(insert ? placeRef.current : nameRef.current)?.focus()
   }, [insert, current.isSuccess])
 
-  // A chapter that's gone since the form opened falls back to the end.
+  // A chapter that's gone since the form opened (or is the last now) falls back to the end, and the form says so.
+  const [gone, setGone] = useState<string | null>(null)
   useEffect(() => {
     if (after && current.data && !choices.some((c) => c.key === after)) {
+      setGone(after)
       setAfter('')
     }
   }, [after, current.data, choices])
@@ -258,8 +262,10 @@ function AddChapterDialog({
                 ref={placeRef}
                 value={place}
                 disabled={busy}
+                aria-describedby={gone ? goneId : undefined}
                 onChange={(e) => {
                   setAfter(e.currentTarget.value)
+                  setGone(null)
                   changed()
                 }}
               >
@@ -270,6 +276,12 @@ function AddChapterDialog({
                   </option>
                 ))}
               </select>
+              {gone && (
+                <p id={goneId} className="field-error" role="status">
+                  Chapter {gone} can't be chosen now (book.md changed: it's gone, or it's the last chapter), so the new chapter goes at the end. Choose
+                  another place if that's not where it belongs.
+                </p>
+              )}
             </>
           ) : (
             current.isSuccess && <p className="muted new-entity-hint">{bookName} has no chapters yet, so this is chapter 1.</p>
@@ -283,7 +295,7 @@ function AddChapterDialog({
             type="text"
             autoComplete="off"
             aria-invalid={tooLong}
-            aria-describedby={tooLong ? nameErrorId : undefined}
+            aria-describedby={tooLong ? nameErrorId : hintId}
             value={title}
             disabled={busy}
             onChange={(e) => {
@@ -297,7 +309,7 @@ function AddChapterDialog({
               A title is at most {MAX_TITLE} characters.
             </p>
           ) : (
-            <p className="muted new-entity-hint">Optional; leave it empty for none. You can change it in book.md later.</p>
+            <p id={hintId} className="muted new-entity-hint">Optional; leave it empty for none. You can change it in book.md later.</p>
           )}
           {error && (
             <div className="error" role="alert">

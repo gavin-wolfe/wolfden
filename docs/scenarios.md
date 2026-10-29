@@ -1368,7 +1368,9 @@ dracula`.
 - No `--in`, a book or universe that isn't there, an `--after` the book
   doesn't list, a title that isn't one line of at most 200 characters,
   `--first`, `--chapters`, `--slug`, `--from`, `--allow-relinks`, or a
-  final book exits 2 and writes nothing.
+  final book exits 2 and writes nothing. For a final book, the message
+  ends with the `wolfden unfreeze` command to run, with the den's
+  `--den`.
 
 Spec: design.md §7 (#215). Covered by:
 `NewChapterCommandTests.ANewChapterGoesAtTheEndOrAfterTheChapterNamed`,
@@ -4364,7 +4366,9 @@ with no title.
 - A hand-set gap absorbs an insert: after `1` in 1, 2, 3, 10, the new
   chapter is 2, the next two move up to 3 and 4, and 10 stays.
 - `book.md` keeps everything else: its comments (`# added in revision`),
-  flow or block items, and the quoting of the item before. `check` finds
+  flow or block items, the quoting of the item before, and blank lines
+  between items and after the last one, with comment lines that group
+  them (`# Part Two`) staying above the item they head. `check` finds
   nothing new. A `book.md` without an id gets one.
 - The form closes, the chapter list asks again and shows the new one in
   its place, and a notice says what was added and renumbered, and takes
@@ -4374,7 +4378,12 @@ Spec: format.md §6.4, F-BOOK-3..6, design.md §9 (#215). Covered by:
 `AddChapterTests.AnInsertedChapterGetsALetterKeyAndTheNumbersAfterItMoveUp`,
 `AddChapterTests.AddingAtTheEndGivesTheNextWholeNumberInTheListsOwnStyle`,
 `AddChapterTests.ABookWithNoChaptersGetsChapterOne`,
-`AddChapterTests.ABookMdWithNoIdGetsOne` (MCP project, the write tools),
+`AddChapterTests.ABookMdWithNoIdGetsOne`,
+`AddChapterTests.BlankLinesAndGroupingCommentsInTheChaptersStay` (MCP project, the write tools),
+`BlockListBlankLineTests.BlankLinesBetweenItemsAndAfterTheLastStay`,
+`BlockListBlankLineTests.AnInsertedItemGoesRightAfterTheOneBeforeItAndTheGroupingCommentStaysWithTheNext`,
+`BlockListBlankLineTests.BlockMappingItemsKeepTheirBlankLinesToo`,
+`BlockListBlankLineTests.AScalarAliasListKeepsItsBlankLines` (Core),
 `NewChapterTests.AnInsertedChapterGetsTheFirstUnusedLetterSuffix`,
 `NewChapterTests.AtTheEndItsTheNextWholeNumber`,
 `NewChapterTests.AnEmptyBookGetsChapterOneNumberedOne`,
@@ -4388,7 +4397,9 @@ Spec: format.md §6.4, F-BOOK-3..6, design.md §9 (#215). Covered by:
 
 - A final book (`status: final`) has neither button, and the API refuses
   an add to it (`frozen`, 409) as it refuses any edit of its `book.md`
-  (F-BOOK-1).
+  (F-BOOK-1). The refusal ends by saying how to unfreeze it, in the
+  caller's words (#209): **Unfreeze…** on the book's page for the web,
+  `wolfden unfreeze` for the CLI, and asking the writer for an agent.
 - An `after` the book doesn't list (`unknown_chapter`, naming its
   chapters; for a book with no chapters, saying so), a title of more than
   one line (U+2028 and U+2029 included) or over 200 characters
@@ -4396,7 +4407,9 @@ Spec: format.md §6.4, F-BOOK-3..6, design.md §9 (#215). Covered by:
   `book` or `expectedHash`, a member the endpoint doesn't take, and a
   `book.md` that changed since the form read it (`stale_file`, 409) are
   refused and write nothing. The form shows why, in its own words for a
-  stale file, and asks for the chapters again; Escape closes it and
+  stale file, and asks for the chapters again. If the chapter chosen in
+  **Place** isn't a choice any more (it's gone, or it's the last), Place
+  goes back to the end and the form says so. Escape closes it and
   returns focus to the button.
 - A blank title is no title, and one of exactly 200 characters is taken.
 - The endpoints take JSON only; `/api/book/chapters` answers GET only,

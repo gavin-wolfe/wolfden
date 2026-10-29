@@ -347,29 +347,45 @@ public sealed class AutoCheckpointTests : IDisposable
         // The checkpoint waits, as on a passphrase prompt. It and the save run
         // on threads of their own, and nothing below waits on a short timer:
         // on a busy CI machine the thread pool can take longer than that to
-        // start a work item (#219). The minute-long waits only stop a hang.
+        // start a work item (#219).
         var token = TestContext.Current.CancellationToken;
-        var checkpoint = OwnThread(() => ledger.Checkpoint(history, new CheckpointRequest("Notes pass after drafting ch 12")), token);
-        if (await Task.WhenAny(checkpoint, history.Committing.Task).WaitAsync(TimeSpan.FromMinutes(1), token) == checkpoint)
+        Task<LedgerCheckpoint> checkpoint;
+        try
         {
-            await checkpoint;
-            Assert.Fail("The checkpoint finished without reaching git.");
+            checkpoint = OwnThread(() => ledger.Checkpoint(history, new CheckpointRequest("Notes pass after drafting ch 12")), token);
+            if (await Task.WhenAny(checkpoint, history.Committing.Task).WaitAsync(TimeSpan.FromMinutes(1), token) == checkpoint)
+            {
+                await checkpoint;
+                Assert.Fail("The checkpoint finished without reaching git.");
+            }
+
+            // A save, and a status, meanwhile: neither waits for git. Git is
+            // held until the test lets go (the fake gives up only after
+            // FakeHistory.HoldLimit, longer than this wait), so a save that
+            // waited for it would still be waiting after a minute.
+            var save = OwnThread(
+                () =>
+                {
+                    File.WriteAllText(Path.Combine(_root, "b.md"), "two\n");
+                    ledger.Wrote("b.md", Encoding.UTF8.GetBytes("two\n"));
+                    return ledger.IsOwn(new HistoryFileChange(HistoryChangeKind.Modified, "b.md"));
+                },
+                token);
+            try
+            {
+                Assert.True(await save.WaitAsync(TimeSpan.FromMinutes(1), token));
+            }
+            catch (TimeoutException)
+            {
+                Assert.Fail("A save waited on a running checkpoint.");
+            }
+        }
+        finally
+        {
+            // Lets the checkpoint's thread go, even when the test has failed.
+            hold.Set();
         }
 
-        // A save, and a status, meanwhile: neither waits for git, which is
-        // still held. A save that waited would end only once git let go.
-        var save = OwnThread(
-            () =>
-            {
-                File.WriteAllText(Path.Combine(_root, "b.md"), "two\n");
-                ledger.Wrote("b.md", Encoding.UTF8.GetBytes("two\n"));
-                return ledger.IsOwn(new HistoryFileChange(HistoryChangeKind.Modified, "b.md"));
-            },
-            token);
-        Assert.True(await save.WaitAsync(TimeSpan.FromMinutes(1), token));
-        Assert.False(history.Released, "A save waited on a running checkpoint.");
-
-        hold.Set();
         var done = await checkpoint;
         Assert.Equal(["a.md"], done.Written);
 
@@ -498,8 +514,6 @@ public sealed class AutoCheckpointTests : IDisposable
     /// <summary>A history that records what it was asked to checkpoint.</summary>
     internal sealed class FakeHistory : IHistoryProvider
     {
-        private bool _released;
-
         public IReadOnlyList<HistoryFileChange> Pending { get; set; } = [];
 
         public bool Writing { get; set; }
@@ -522,14 +536,14 @@ public sealed class AutoCheckpointTests : IDisposable
 
         public string? InterruptedOperation => Interrupted;
 
-        /// <summary>When set, a checkpoint waits for it, as git waits on a passphrase prompt.</summary>
+        /// <summary>The longest a checkpoint waits for <see cref="Hold"/>: longer than any test waits for anything, so only a hung test meets it.</summary>
+        public static readonly TimeSpan HoldLimit = TimeSpan.FromMinutes(3);
+
+        /// <summary>When set, a checkpoint waits for it (up to <see cref="HoldLimit"/>), as git waits on a passphrase prompt.</summary>
         public ManualResetEventSlim? Hold { get; set; }
 
         /// <summary>Done once a checkpoint has reached the history, before it waits for <see cref="Hold"/>.</summary>
         public TaskCompletionSource Committing { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        /// <summary>True once a checkpoint has stopped waiting for <see cref="Hold"/>.</summary>
-        public bool Released => Volatile.Read(ref _released);
 
         HistoryResult<IReadOnlyList<HistoryFileChange>> IHistoryProvider.Pending(CancellationToken cancellationToken) =>
             HistoryResult<IReadOnlyList<HistoryFileChange>>.Done(Pending);
@@ -538,8 +552,7 @@ public sealed class AutoCheckpointTests : IDisposable
         {
             Checkpoints++;
             Committing.TrySetResult();
-            Hold?.Wait(TimeSpan.FromSeconds(30));
-            Volatile.Write(ref _released, true);
+            Hold?.Wait(HoldLimit);
             if (Refuse is { } why)
             {
                 throw new HistoryException(why);

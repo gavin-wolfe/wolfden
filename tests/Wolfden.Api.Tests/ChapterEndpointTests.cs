@@ -105,7 +105,7 @@ public sealed class ChapterEndpointTests : IDisposable
         before = den.Read(Ember);
         var final = await server.GetJsonAsync("/api/book/chapters?universe=starfall&book=ember", HttpStatusCode.OK);
         Assert.True(final.GetProperty("final").GetBoolean());
-        await Refused(new { book = "ember", universe = "starfall", expectedHash = final.GetProperty("hash").GetString() }, HttpStatusCode.Conflict, "frozen", "is final (frozen)");
+        await Refused(new { book = "ember", universe = "starfall", expectedHash = final.GetProperty("hash").GetString() }, HttpStatusCode.Conflict, "frozen", "is final (frozen), so no chapter can be added to it until it's unfrozen (F-BOOK-1). Unfreeze… on the page of book 'ember' opens it for editing again.");
     }
 
     [Fact]

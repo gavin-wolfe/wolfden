@@ -86,6 +86,6 @@ public sealed class NewChapterCommandTests : IDisposable
 
         _den.Write(Book, before.Replace("status: draft", "status: final", StringComparison.Ordinal));
         before = _den.Read(Book);
-        Refused("Book 'dracula' is final (frozen), so no chapter can be added to it", "chapter", "--in", "dracula");
+        Refused("Book 'dracula' is final (frozen), so no chapter can be added to it until it's unfrozen (F-BOOK-1). To open the book for editing again, run: wolfden unfreeze dracula --universe dracula --den ", "chapter", "--in", "dracula");
     }
 }

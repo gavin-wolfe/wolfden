@@ -79,7 +79,7 @@ public sealed partial class DenTools
             if (target.Status == BookStatus.Final)
             {
                 throw new DenToolException(
-                    ToolErrorCodes.Frozen, $"Book '{target.Key}' is final (frozen), so no chapter can be added to it until it's unfrozen (F-BOOK-1).");
+                    ToolErrorCodes.Frozen, $"Book '{target.Key}' is final (frozen), so no chapter can be added to it until it's unfrozen (F-BOOK-1). {Unfreezing(target)}");
             }
 
             if (after is not null)

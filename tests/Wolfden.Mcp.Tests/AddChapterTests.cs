@@ -168,7 +168,7 @@ public sealed class AddChapterTests : IDisposable
         var e = Assert.Throws<DenToolException>(() => tools.AddChapter("ember", "New", universe: "starfall"));
 
         Assert.Equal(ToolErrorCodes.Frozen, e.Code);
-        Assert.StartsWith("Book 'ember' is final (frozen), so no chapter can be added to it until it's unfrozen (F-BOOK-1).", e.Message, StringComparison.Ordinal);
+        Assert.Equal("Book 'ember' is final (frozen), so no chapter can be added to it until it's unfrozen (F-BOOK-1). Ask the writer whether to unfreeze book 'ember'; only they can.", e.Message);
         Assert.Equal(ember, den.Read(Ember));
     }
 
@@ -185,6 +185,50 @@ public sealed class AddChapterTests : IDisposable
         Assert.NotNull(made.IdAdded);
         Assert.Contains($"id: {made.IdAdded}", den.Read(Ash), StringComparison.Ordinal);
         Assert.Contains(made.Effects, e => e.Contains("had no id", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-71")]
+    public void BlankLinesAndGroupingCommentsInTheChaptersStay()
+    {
+        var den = Den(TempDen.Starfall());
+        const string Grouped =
+            "---\nid: 01JAQKFBF5KZNWJ47TAN9ZT24M\nname: Ember\nstatus: draft\nchapters:\n" +
+            "  # Part One\n" +
+            "  - { key: prologue, title: Before the Dark }\n" +
+            "  - { key: \"1\", number: 1, title: Kessan Reach }\n" +
+            "  - { key: \"2\", number: 2 }\n" +
+            "\n" +
+            "  # Part Two\n" +
+            "  - { key: 2b, number: 3, title: The Long Watch }   # added in revision\n" +
+            "\n" +
+            "  - { key: \"3\", number: 4 }\n" +
+            "\n" +
+            "chapter_defaults:\n  tense: past\n---\n";
+        den.Write(Ember, Grouped);
+        var tools = new DenTools(den.Root);
+        var before = Diagnostics(tools);
+
+        tools.AddChapter("ember", "The Quiet Hour", after: "1", universe: "starfall");
+        tools.AddChapter("ember", universe: "starfall");
+
+        Assert.Equal(
+            "---\nid: 01JAQKFBF5KZNWJ47TAN9ZT24M\nname: Ember\nstatus: draft\nchapters:\n" +
+            "  # Part One\n" +
+            "  - { key: prologue, title: Before the Dark }\n" +
+            "  - { key: \"1\", number: 1, title: Kessan Reach }\n" +
+            "  - { key: \"1b\", number: 2, title: The Quiet Hour }\n" +
+            "  - { key: \"2\", number: 3 }\n" +
+            "\n" +
+            "  # Part Two\n" +
+            "  - { key: 2b, number: 4, title: The Long Watch }   # added in revision\n" +
+            "\n" +
+            "  - { key: \"3\", number: 5 }\n" +
+            "  - { key: \"4\", number: 6 }\n" +
+            "\n" +
+            "chapter_defaults:\n  tense: past\n---\n",
+            den.Read(Ember).ReplaceLineEndings("\n"));
+        Assert.Empty(Diagnostics(tools).Except(before));
     }
 
     // ------------------------------------------------------------ helpers

@@ -94,7 +94,7 @@ public static class NewChapter
                 : null;
         }
 
-        if (KeyAfter(chapters[at].Key, taken) is not { } key)
+        if (InsertedKey(chapters, at, taken) is not { } key)
         {
             return null;
         }
@@ -123,6 +123,19 @@ public static class NewChapter
 
         return new ChapterPlan(key, at + 1, number, renumbered);
     }
+
+    /// <summary>
+    /// The key of a chapter inserted after chapter <paramref name="at"/>,
+    /// which isn't the last: the one place the rule for inserted keys is
+    /// chosen. Today it's <see cref="KeyAfter"/> of that chapter's key, so
+    /// inserting after <c>2</c> while <c>2b</c> follows it gives <c>2c</c>,
+    /// placed before <c>2b</c> (the order of such keys is waiting on the
+    /// maintainer, #228); the whole list is passed in so a rule that looks
+    /// at both neighbors can replace this one without touching
+    /// <see cref="Plan"/>.
+    /// </summary>
+    internal static string? InsertedKey(IReadOnlyList<ChapterSlot> chapters, int at, IReadOnlySet<string> taken) =>
+        KeyAfter(chapters[at].Key, taken);
 
     /// <summary>
     /// The key of a chapter inserted after <paramref name="key"/>: the

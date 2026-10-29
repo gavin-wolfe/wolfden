@@ -385,7 +385,7 @@ internal static class NewCommand
         ChapterAddResult result;
         try
         {
-            result = new DenTools(root) { Words = Words }.AddChapter(book, title, line.Value("--after"), universe: universe);
+            result = new DenTools(root) { Words = FreezeCommand.WithDen(Words, line.Value("--den")) }.AddChapter(book, title, line.Value("--after"), universe: universe);
         }
         catch (DenToolException e)
         {

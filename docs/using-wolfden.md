@@ -201,8 +201,9 @@ there that isn't a position at all. The same goes for a
 `from=` or `until=` you type in a section comment with **Edit file**,
 and for an AI assistant's edits. A typo that's already in the note, from
 an edit outside Wolfden, doesn't stop you saving other changes as long
-as it stays where it is (moving it, or renaming the field that holds
-it, counts as typing it anew); `wolfden check` lists it.
+as it stays where it is (moving it out of a section comment, or renaming
+the field that holds it, counts as typing it anew); `wolfden check` lists
+it.
 
 Any value can have its own status, such as `candidate` for an option
 you haven't settled, and can be **Pinned** as hard canon.

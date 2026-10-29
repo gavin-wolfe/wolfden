@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, getRouteApi } from '@tanstack/react-router'
 import { count, hierarchyQuery, type BookNode, type EntityCounts, type SeriesNode, type UniverseNode } from '../api'
 import { typePlural } from '../components/Links'
+import { NewContainerButton } from '../components/NewContainer'
 import { ErrorState, Loading } from '../components/States'
 import { useDocumentTitle, usePosition } from '../hooks'
 
@@ -32,6 +33,10 @@ export function UniversePage() {
         {at === undefined ? ' in all' : ' the reader has met by this point'}, in{' '}
         {u.series.length > 0 && `${count(u.series.length, 'series', 'series')} and `}
         {count(u.books.length + u.series.reduce((n, s) => n + s.books.length, 0), 'book', 'books')}.
+      </p>
+      <p className="editor-actions">
+        <NewContainerButton kind="series" inName={u.name} />
+        <NewContainerButton kind="book" inName={u.name} />
       </p>
       <Counts counts={u.entities} title="Filed in the universe" />
       {u.series.map((s) => (

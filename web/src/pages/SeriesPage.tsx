@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, getRouteApi } from '@tanstack/react-router'
 import { hierarchyQuery } from '../api'
+import { NewContainerButton } from '../components/NewContainer'
 import { ErrorState, Loading } from '../components/States'
 import { useDocumentTitle, usePosition } from '../hooks'
 import { BookList, Counts } from './UniversePage'
@@ -42,6 +43,9 @@ export function SeriesPage() {
       </nav>
       <p className="eyebrow">Series</p>
       <h1>{s.name}</h1>
+      <p className="editor-actions">
+        <NewContainerButton kind="book" series={s.key} inName={s.name} />
+      </p>
       <h2>Books</h2>
       <BookList universe={universe} books={s.books} empty="This series has no books yet." />
       <Counts counts={s.entities} title="Filed in the series" />

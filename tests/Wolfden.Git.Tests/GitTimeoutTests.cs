@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Wolfden.Core.History;
 
 namespace Wolfden.Git.Tests;
@@ -8,11 +7,22 @@ namespace Wolfden.Git.Tests;
 /// stopped, but one that writes the user's index or refs is never stopped
 /// part way, which would leave <c>.git/index.lock</c> behind. Hooks and
 /// filters here wait for a file the test writes, never a fixed time, and
-/// give up on their own after a minute.
+/// give up on their own after <see cref="GiveUpTenths"/>. Where a test shows
+/// Wolfden didn't wait for one, it checks that the script hadn't finished
+/// when Wolfden returned, not how long Wolfden took: a busy Windows CI
+/// machine can take over half a minute for a checkpoint (#219).
 /// </summary>
 public sealed class GitTimeoutTests
 {
     private const string Mara = "universes/vael/entities/characters/mara-voss.md";
+
+    /// <summary>
+    /// How long, in tenths of a second, a waiting script runs if the test
+    /// never releases it: five minutes, far longer than any git call here
+    /// takes, so a script still running when Wolfden returns shows it wasn't
+    /// waited for.
+    /// </summary>
+    private const int GiveUpTenths = 3000;
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
@@ -22,7 +32,7 @@ public sealed class GitTimeoutTests
         #!/bin/sh
         : > .git/wolfden-{name}-started
         i=0
-        while [ ! -f .git/wolfden-{name}-release ] && [ $i -lt 600 ]; do sleep 0.1; i=$((i+1)); done
+        while [ ! -f .git/wolfden-{name}-release ] && [ $i -lt {GiveUpTenths} ]; do sleep 0.1; i=$((i+1)); done
         : > .git/wolfden-{name}-done
         exit {exitCode}
 
@@ -139,15 +149,13 @@ public sealed class GitTimeoutTests
         repo.WriteDen(Mara, "# Mara Voss\n");
         try
         {
-            // The default limits: what's measured is the wait after git exits, not a limit.
-            var clock = Stopwatch.StartNew();
+            // The default limits. A checkpoint that waited for the child's
+            // output to close would return only once the child had ended.
             var entry = repo.History.Checkpoint(new CheckpointRequest("Add Mara"), Token).Value;
-            clock.Stop();
 
             Assert.NotNull(entry);
             Assert.Equal("Add Mara", entry.Message);
-            Assert.True(clock.Elapsed < TimeSpan.FromSeconds(20), $"The checkpoint took {clock.Elapsed}, waiting on the hook's child.");
-            Assert.False(File.Exists(GitFile(repo, "wolfden-child-done")), "The hook's child ended before the checkpoint returned, so this proves nothing.");
+            Assert.False(File.Exists(GitFile(repo, "wolfden-child-done")), "The checkpoint waited on the hook's child.");
         }
         finally
         {
@@ -164,14 +172,12 @@ public sealed class GitTimeoutTests
         {
             // An alias runs in the shell: it prints, then leaves a child
             // holding git's standard output open after git has exited.
-            var clock = Stopwatch.StartNew();
             var run = GitProcess.Run(options, repo.Root, ["-c", $"alias.wolfden-partial=!printf partial; {BackgroundChild}", "wolfden-partial"], cancellationToken: Token);
-            clock.Stop();
 
             Assert.True(run.Succeeded, run.Said);
             Assert.False(run.OutputComplete);
             Assert.Equal("partial", run.Output);
-            Assert.True(clock.Elapsed < TimeSpan.FromSeconds(20), $"Git's output was waited for for {clock.Elapsed}.");
+            Assert.False(File.Exists(GitFile(repo, "wolfden-child-done")), "Git's output was waited for until the child ended.");
             var refused = Assert.Throws<HistoryException>(() => GitHistory.OutputOf(run, "wolfden-partial"));
             Assert.StartsWith("git wolfden-partial finished, but its output was still open when Wolfden stopped waiting", refused.Message, StringComparison.Ordinal);
         }
@@ -181,9 +187,9 @@ public sealed class GitTimeoutTests
         }
     }
 
-    /// <summary>A shell line that starts a child holding the shell's output open until the test releases it, or a minute passes.</summary>
-    private const string BackgroundChild =
-        "(i=0; while [ ! -f .git/wolfden-child-release ] && [ $i -lt 600 ]; do sleep 0.1; i=$((i+1)); done; : > .git/wolfden-child-done) &";
+    /// <summary>A shell line that starts a child holding the shell's output open until the test releases it, or <see cref="GiveUpTenths"/> pass.</summary>
+    private static readonly string BackgroundChild =
+        $"(i=0; while [ ! -f .git/wolfden-child-release ] && [ $i -lt {GiveUpTenths} ]; do sleep 0.1; i=$((i+1)); done; : > .git/wolfden-child-done) &";
 
     /// <summary>
     /// Releases the <see cref="BackgroundChild"/> and waits until it has
@@ -223,22 +229,20 @@ public sealed class GitTimeoutTests
         repo.Git(
             "config",
             "filter.wolfden-slow.clean",
-            ": > .git/wolfden-filter-started; i=0; while [ ! -f .git/wolfden-filter-release ] && [ $i -lt 600 ]; do sleep 0.1; i=$((i+1)); done; cat");
+            $": > .git/wolfden-filter-started; i=0; while [ ! -f .git/wolfden-filter-release ] && [ $i -lt {GiveUpTenths} ]; do sleep 0.1; i=$((i+1)); done; : > .git/wolfden-filter-done; cat");
         repo.WriteRepo(".gitattributes", "*.md filter=wolfden-slow\n");
         repo.WriteDen(Mara, "# Mara Voss\n");
         var history = GitHistory.ForDen(repo.DenRoot, TestRepo.Options with { ReadTimeout = TimeSpan.FromSeconds(10) }, Token);
-        var clock = Stopwatch.StartNew();
         try
         {
             var stopped = Assert.Throws<HistoryException>(() => history.Diff(new HistoryDiffQuery(), Token));
-            clock.Stop();
 
             Assert.Equal("git diff didn't finish within 10 seconds, so Wolfden stopped it, and nothing was changed. " +
                 "Git may be waiting on a credential helper or a filter (such as Git LFS), or the repository may be very large.", stopped.Message);
             Assert.True(File.Exists(GitFile(repo, "wolfden-filter-started")), "The filter never ran.");
 
-            // The filter would have waited a minute; Wolfden didn't wait for it.
-            Assert.True(clock.Elapsed < TimeSpan.FromSeconds(45), $"Wolfden waited {clock.Elapsed} for a stopped git.");
+            // The filter would have waited minutes; Wolfden didn't wait for it.
+            Assert.False(File.Exists(GitFile(repo, "wolfden-filter-done")), "Wolfden waited for a stopped git's filter.");
             Assert.False(File.Exists(GitFile(repo, "index.lock")));
         }
         finally

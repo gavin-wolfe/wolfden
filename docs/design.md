@@ -735,6 +735,7 @@ commands, and `wolfden <command> --help` describes each one:
 | `wolfden index [<den>] [--watch]` | Rebuilds `.wolfden/index.db` from the files and says what it holds. `--watch` then keeps it up to date as files change (#14), printing one line for each batch of changes it applies (with `--json`, one JSON object per line), until Ctrl+C. Only one watcher runs per den; a second exits 2. |
 | `wolfden query [<universe>] [--universe <key>] [--at <position>]` | Canon as of a position (format.md F-VIEW-1), from the index, of one universe (see "Which universe" below; `*` is refused, since a view is of one universe). `--series` or `--book` narrows the view, `--type` (any type an enabled pack defines) and `--entity` (matched as a link is, F-LINK-6, among the entities in the view, so one the reader meets later can't shadow one they've met) pick entities out of it, `--pinned` gives pinned canon (F-VIEW-2), and `--brief` lists one line per entity. |
 | `wolfden new <type> <name> [--in <scope>] [--from <position>] [--slug <slug>] [--allow-relinks]` | Creates a note from its type's template (types.md F-TPL-6), as the MCP tool `create_entity` does (§8, #29): a new id, the name, and a file name made from it (`-2`, `-3` when it's taken; a `--slug` that's taken is refused). `--in` names where it goes, read exactly as `copy --to` is (the same code, with its messages naming `--in`); without it, the den's universe, when it has one, and with several the error says to name one `with --in`. `--from` gives the position where the reader first meets it, which must resolve in the universe; without it, the note has no `from`. A name that would take links from the entity they reach now (§8, "Creating") is refused, listing them, unless `--allow-relinks`, as for `copy`; the output then lists the links that moved. It writes the den's files only, and exits 2 when the create is refused (an unknown type or scope, a final book, a slug that's taken, a `--from` that doesn't resolve, or a name that isn't one line of at most 200 characters). |
+| `wolfden new series <name> [--in <universe>] [--after <key>]`, `wolfden new book <name> [--in <universe or series>] [--after <key>] [--chapters <n>]` | Creates a series, or a book in a series or standalone in the universe, as the web UI's **New series** and **New book** do (§9, #213; `series` and `book` are reserved type keys, types.md F-TYPE-2, so they never name a note's type): the folder, its key made from the name, and its `series.md` or `book.md` with a new id, the name, and with `--chapters` (1 to 1000) chapters `"1"` to `"N"` numbered 1 to N. It goes in story order at the end, or `--after` the work named, in the series' `books` or the universe's `order`. `--in` is read as for a note, except that a universe's key alone always names the universe (a book holds no series or books), and a book or a series named for a series is refused. It reads the file it edits and writes it in one go, so it passes no hash, as `freeze` does. `--from`, `--slug`, and `--allow-relinks` are for notes and are refused here, as `--after` and `--chapters` are for a note. It exits 2 when the create is refused (§9, "New series and books"). |
 | `wolfden copy <entity> <new name> [--to <scope>] [--universe <key>] [--slug <slug>] [--allow-relinks]` | Copies an entity under a new name, with a new id, as the MCP tool `copy_entity` does (§8, #129): beside the original, or `--to` a universe (`<universe>`, or `<universe>/`) or one of its series or books (`<universe>/<key>`, or `<universe>/series:<key>` or `<universe>/book:<key>` when a series and a book share the key). In a den with one universe, a bare series or book key (or `series:<key>`, `book:<key>`) will do (as for `check`, #127), unless it's also the universe's key, which is refused with every spelling suggested. It writes the den's files only. Its messages name its options (`--allow-relinks`, `--slug`) and commands (`wolfden check`), not the tool's parameters: the tools take the words their advice uses as a setting, and names the writer gave come through as written. It exits 2 when the copy is refused. |
 | `wolfden freeze <book> [--universe <key>]` | Freezes a finished book (§5, #31): `status: final` in its `book.md`, then, when the den has git history, a checkpoint of the whole den and a tag on it, `book/<universe>/<book>/final` (or `final-2`, `final-3`, … for a book frozen before). `--universe` names the book's universe, when the den has several (see "Which universe" below). Freezing a book that's already final finishes a freeze whose checkpoint or tag failed, and otherwise does nothing. It prints the result's message, and exits 0 when the book is frozen (with its snapshot, or with no history to take one in), and 2 when it's refused (no such book) or a step in the history failed; then the message, on standard error, says what to do. |
 | `wolfden unfreeze <book> [--universe <key>]` | Unfreezes a book (§5, #31): `status: draft` in its `book.md`, then a checkpoint, with no tag, when the den has history. A book that isn't final is left as it is. It exits 0 when the book is unfrozen (or wasn't frozen), and 2 when it's refused or the checkpoint failed. |
@@ -1984,6 +1985,76 @@ docs/
     usual "not met yet" banner, whose **Show it anyway** reveals it to
     edit. Escape or Cancel closes the form and returns focus to what
     opened it.
+- **New series and books** (#213). Maintainer decisions (on #213,
+  2026-10-29): series and books are created from the web UI and the CLI
+  (`wolfden new series`, `wolfden new book`, §7); a new one goes at the
+  end of its container's story order by default, and the writer can
+  place it after another work instead (**Place after…**, `--after`);
+  a new book can start with N chapters, keys `"1"` to `"N"` and `number`
+  1 to N, or none. Reordering existing works and adding or inserting
+  chapters are separate. The rest is v0 behaviour, not a recorded
+  decision.
+  - **Where it goes and what it's called.** A universe's page makes a
+    series or a standalone book, and a series' page a book of the
+    series. The folder's name, the key, is made from the name as a
+    note's slug is (types.md F-TPL-6), but a key that's taken, by a
+    folder of any case or by a clash F-KEY-5 forbids (a book key
+    anywhere in the universe, or a series key and a standalone book
+    key), is refused (`already_exists`) rather than given `-2`, since
+    positions name a book by its key alone; so is a name that gives no
+    key starting with a letter (F-KEY-2). The message says the name can
+    be changed in the file afterwards, since the key never follows it.
+  - **The files.** The new file holds `id`, `name`, and for a book its
+    `chapters` as `- { key: "1", number: 1 }` items, as format.md §6.4
+    writes them; no `status` (a draft by default) and no body. The
+    container's list (`books` in `series.md`, `order` in `universe.md`)
+    gets the new key through the lossless list edit
+    (`WithNewListItem`), the rest of the file kept. A list that was
+    left out gets one when there's a work already (F-UNI-3, F-SER-3),
+    with that work first, so `check` stays quiet; with none, the file
+    isn't touched. Works a list leaves out, which come after the listed
+    ones by key, are added to it in that order first, so their place in
+    story order doesn't change and the new work goes where it was asked
+    to. A list that already names the key (a work planned ahead) keeps
+    that place, and placing it elsewhere then is refused. A
+    `universe.md` or `series.md` without an id gets one (F-ID-6). Both
+    files are checked as the den reads them before either is written
+    (`DenWriteCheck` takes a new container file), written together, and
+    if the second write fails, the new file and its folder are removed.
+  - **Links and freezing.** Containers aren't link targets (format.md
+    F-LINK-5), so a new one never changes which note a link reaches,
+    and there's no "create anyway" here. A final book's scope is its
+    `book.md`, outline, and notes (F-BOOK-1), so `series.md` and
+    `universe.md` are never in one, even when every book of the series
+    is final: a freeze doesn't stop a new book beside it. A write into
+    a final book's folder is refused (`frozen`) as a backstop that no
+    create reaches.
+  - **The API.** `GET /api/works?universe=<key>&series=<key>` gives the
+    universe's series and standalone books (or the series' books) in
+    story order, by kind, key, and name, with the path and hash of the
+    file that lists them. `POST /api/series/create` takes `{name,
+    universe, after, expectedHash}` and `POST /api/book/create` takes
+    `{name, universe, series, after, chapters, expectedHash}`, as
+    `application/json`, through the editing endpoints' `DenTools`, so
+    one write runs at a time, both files land in the checkpoint ledger,
+    and a pinned server creates only in its universe. `expectedHash` is
+    required, and a file that changed since is 409 `stale_file`. An
+    `after` that isn't one of those works, a series named that isn't
+    there, or `chapters` outside 1 to 1000 is refused. It answers 201
+    with the kind, key, name, series, path, hash, id, chapter count,
+    effects in words, warnings, and every file written.
+  - **The page.** The universe's page has **New series** and **New
+    book** under its title, and a series' page **New book**. The modal
+    form asks for the name, **Place after…** (a list of the works,
+    starting with "At the end"; not shown when there are none yet), and
+    for a book **Number of chapters**, optional, a whole number from 1
+    to 1000, checked before anything is sent. A stale file says the
+    story order changed in another program and asks for the works
+    again, keeping what was typed. After a create every cached answer is
+    asked again and waited for, then the page goes to the new series or
+    book, with a notice naming the file and what the create did, which
+    takes focus and lasts until the writer leaves the page. Escape or
+    Cancel closes the form and returns focus to the button.
 - **Parsing round-trips.** Read-modify-write keeps formatting, ordering, and
   unknown content. This gets heavy test coverage, since it decides whether
   people trust the tool with their notes.

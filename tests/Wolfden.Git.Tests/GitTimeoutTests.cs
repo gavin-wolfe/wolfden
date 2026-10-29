@@ -7,22 +7,35 @@ namespace Wolfden.Git.Tests;
 /// stopped, but one that writes the user's index or refs is never stopped
 /// part way, which would leave <c>.git/index.lock</c> behind. Hooks and
 /// filters here wait for a file the test writes, never a fixed time, and
-/// give up on their own after <see cref="GiveUpTenths"/>. Where a test shows
+/// give up on their own after <see cref="GiveUpSeconds"/>. Where a test shows
 /// Wolfden didn't wait for one, it checks that the script hadn't finished
 /// when Wolfden returned, not how long Wolfden took: a busy Windows CI
-/// machine can take over half a minute for a checkpoint (#219).
+/// machine can take over half a minute for a checkpoint (#219). The call
+/// runs on a thread of its own, and the test stops waiting for it after
+/// <see cref="Bound"/>, well before the script would give up, so a
+/// regression fails here, named, not by timing out the CI job.
 /// </summary>
 public sealed class GitTimeoutTests
 {
     private const string Mara = "universes/vael/entities/characters/mara-voss.md";
 
     /// <summary>
-    /// How long, in tenths of a second, a waiting script runs if the test
-    /// never releases it: five minutes, far longer than any git call here
-    /// takes, so a script still running when Wolfden returns shows it wasn't
-    /// waited for.
+    /// How long, by the clock, a waiting script runs if the test never
+    /// releases it: longer than <see cref="Bound"/>, so a script still
+    /// running when Wolfden returns shows it wasn't waited for.
     /// </summary>
-    private const int GiveUpTenths = 3000;
+    private const int GiveUpSeconds = 180;
+
+    /// <summary>
+    /// How long a test waits for a git call that should return while a
+    /// script it started is still running. Far longer than any such call
+    /// takes on a busy machine, and shorter than <see cref="GiveUpSeconds"/>.
+    /// </summary>
+    private static readonly TimeSpan Bound = TimeSpan.FromMinutes(2);
+
+    /// <summary>A shell loop that waits until <c>.git/wolfden-&lt;name&gt;-release</c> exists, or <see cref="GiveUpSeconds"/> pass.</summary>
+    private static string WaitForRelease(string name) =>
+        $"end=$(($(date +%s)+{GiveUpSeconds})); while [ ! -f .git/wolfden-{name}-release ] && [ $(date +%s) -lt $end ]; do sleep 0.1; done";
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
@@ -31,8 +44,7 @@ public sealed class GitTimeoutTests
         $"""
         #!/bin/sh
         : > .git/wolfden-{name}-started
-        i=0
-        while [ ! -f .git/wolfden-{name}-release ] && [ $i -lt {GiveUpTenths} ]; do sleep 0.1; i=$((i+1)); done
+        {WaitForRelease(name)}
         : > .git/wolfden-{name}-done
         exit {exitCode}
 
@@ -144,14 +156,14 @@ public sealed class GitTimeoutTests
         repo.CommitAll("start");
 
         // Like a post-commit 'git push &': the child keeps git's stderr open
-        // after git has exited, until the test releases it (or a minute).
+        // after git has exited, until the test releases it.
         repo.WriteHook("post-commit", $"#!/bin/sh\n{BackgroundChild}\nexit 0\n");
         repo.WriteDen(Mara, "# Mara Voss\n");
         try
         {
             // The default limits. A checkpoint that waited for the child's
             // output to close would return only once the child had ended.
-            var entry = repo.History.Checkpoint(new CheckpointRequest("Add Mara"), Token).Value;
+            var entry = (await WithinBound(() => repo.History.Checkpoint(new CheckpointRequest("Add Mara"), Token), "The checkpoint waited on the hook's child.")).Value;
 
             Assert.NotNull(entry);
             Assert.Equal("Add Mara", entry.Message);
@@ -172,7 +184,9 @@ public sealed class GitTimeoutTests
         {
             // An alias runs in the shell: it prints, then leaves a child
             // holding git's standard output open after git has exited.
-            var run = GitProcess.Run(options, repo.Root, ["-c", $"alias.wolfden-partial=!printf partial; {BackgroundChild}", "wolfden-partial"], cancellationToken: Token);
+            var run = await WithinBound(
+                () => GitProcess.Run(options, repo.Root, ["-c", $"alias.wolfden-partial=!printf partial; {BackgroundChild}", "wolfden-partial"], cancellationToken: Token),
+                "Git's output was waited for until the child ended.");
 
             Assert.True(run.Succeeded, run.Said);
             Assert.False(run.OutputComplete);
@@ -187,9 +201,9 @@ public sealed class GitTimeoutTests
         }
     }
 
-    /// <summary>A shell line that starts a child holding the shell's output open until the test releases it, or <see cref="GiveUpTenths"/> pass.</summary>
+    /// <summary>A shell line that starts a child holding the shell's output open until the test releases it, or <see cref="GiveUpSeconds"/> pass.</summary>
     private static readonly string BackgroundChild =
-        $"(i=0; while [ ! -f .git/wolfden-child-release ] && [ $i -lt {GiveUpTenths} ]; do sleep 0.1; i=$((i+1)); done; : > .git/wolfden-child-done) &";
+        $"({WaitForRelease("child")}; : > .git/wolfden-child-done) &";
 
     /// <summary>
     /// Releases the <see cref="BackgroundChild"/> and waits until it has
@@ -219,7 +233,7 @@ public sealed class GitTimeoutTests
     }
 
     [Fact]
-    public void AReadThatHangsIsStopped()
+    public async Task AReadThatHangsIsStopped()
     {
         using var repo = TestRepo.Create();
         repo.CommitAll("start");
@@ -229,7 +243,7 @@ public sealed class GitTimeoutTests
         repo.Git(
             "config",
             "filter.wolfden-slow.clean",
-            $": > .git/wolfden-filter-started; i=0; while [ ! -f .git/wolfden-filter-release ] && [ $i -lt {GiveUpTenths} ]; do sleep 0.1; i=$((i+1)); done; : > .git/wolfden-filter-done; cat");
+            $": > .git/wolfden-filter-started; {WaitForRelease("filter")}; : > .git/wolfden-filter-done; cat");
         repo.WriteRepo(".gitattributes", "*.md filter=wolfden-slow\n");
         repo.WriteDen(Mara, "# Mara Voss\n");
         var history = GitHistory.ForDen(repo.DenRoot, TestRepo.Options with { ReadTimeout = TimeSpan.FromSeconds(10) }, Token);
@@ -244,6 +258,14 @@ public sealed class GitTimeoutTests
             // The filter would have waited minutes; Wolfden didn't wait for it.
             Assert.False(File.Exists(GitFile(repo, "wolfden-filter-done")), "Wolfden waited for a stopped git's filter.");
             Assert.False(File.Exists(GitFile(repo, "index.lock")));
+
+            // And git was stopped, filter and all: released now, a filter
+            // still running would finish within a moment. (A slow machine
+            // can only make a filter that's still running look stopped,
+            // never the other way round.)
+            Release(repo, "filter");
+            await Task.Delay(TimeSpan.FromSeconds(3), Token);
+            Assert.False(File.Exists(GitFile(repo, "wolfden-filter-done")), "Git's filter was still running after Wolfden gave up on git: it wasn't stopped.");
         }
         finally
         {
@@ -259,6 +281,25 @@ public sealed class GitTimeoutTests
         Assert.Throws<ArgumentOutOfRangeException>(() => GitOptions.Default with { ReadTimeout = TimeSpan.FromSeconds(seconds) });
         Assert.Throws<ArgumentOutOfRangeException>(() => GitOptions.Default with { WriteTimeout = TimeSpan.FromSeconds(seconds) });
         Assert.Equal(Timeout.InfiniteTimeSpan, (GitOptions.Default with { WriteTimeout = Timeout.InfiniteTimeSpan }).WriteTimeout);
+    }
+
+    /// <summary>
+    /// Runs <paramref name="call"/> on a thread of its own and waits up to
+    /// <see cref="Bound"/> for it, failing with <paramref name="failure"/>
+    /// if it hasn't returned by then.
+    /// </summary>
+    private static async Task<T> WithinBound<T>(Func<T> call, string failure)
+    {
+        var run = Task.Factory.StartNew(call, Token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+        try
+        {
+            return await run.WaitAsync(Bound, Token);
+        }
+        catch (TimeoutException)
+        {
+            Assert.Fail($"{failure} It hadn't returned after {Bound.TotalMinutes} minutes.");
+            throw;
+        }
     }
 
     private static string GitFile(TestRepo repo, string name) => Path.Combine(repo.Root, ".git", name);

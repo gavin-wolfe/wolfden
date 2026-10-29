@@ -191,7 +191,8 @@ public sealed class WolfdenTools
         "{\"op\": \"remove\", \"path\": ...} (a key or list item). A path is dotted: 'status', 'from', 'aliases', 'fields.born', " +
         "'fields.rank.1.from' (item numbers from 0). An entry is {\"value\": x, \"from\": \"book:chapter\", \"until\": ..., \"status\": ..., \"pin\": true}. " +
         "The id never changes. Aliases can be added here; to rename the entity, or change or remove an alias, use rename_entity or " +
-        "change_alias, which rewrite the links that used the old text." + WriteHelp)]
+        "change_alias, which rewrite the links that used the old text. A 'from' or 'until' you set must be a position the universe has " +
+        "(bad_position otherwise); null leaves it out." + WriteHelp)]
     public CallToolResult UpdateFields(
         [Description("The entity: its name, an alias, its file name, its id, its key, or its path.")] string entity,
         [Description(HashHelp)] string expected_hash,
@@ -208,7 +209,7 @@ public sealed class WolfdenTools
         "new 'Appearance' from a later chapter: give it a 'from' where it takes over. A new section can carry 'from', 'until', 'status', " +
         "and 'pin', written as its section comment; a standard section of the type goes in the type's order, any other at the end, " +
         "and with 'under' it's a subsection at the end of that section. To keep reveals in place, put a later fact in a subsection with " +
-        "its own 'from'." + WriteHelp)]
+        "its own 'from', a position the universe has (bad_position otherwise; empty is none)." + WriteHelp)]
     public CallToolResult AppendSection(
         [Description("The entity: its name, an alias, its file name, its id, its key, or its path.")] string entity,
         [Description("The section's name (heading text).")] string section,

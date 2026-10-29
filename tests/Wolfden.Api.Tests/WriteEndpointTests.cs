@@ -270,6 +270,33 @@ public class WriteEndpointTests
 
     [Fact]
     [Trait("Scenario", "SC-WEB-42")]
+    public async Task EditFileRefusesAPositionThatDoesntResolveButKeepsOneAlreadyThere()
+    {
+        using var den = NewDen();
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+        var source = await SourceAsync(server, NotePath);
+
+        // A typo in a section comment would leave the section out of every canon view (F-POS-4, #211).
+        var typo = Note.Replace("<!-- wolfden: pin=true -->", "<!-- wolfden: pin=true from=dracula:999 -->", StringComparison.Ordinal);
+        var (status, json) = await PostAsync(server, "/api/edit/file", new { entity = NotePath, expectedHash = Hash(source), text = typo });
+        Assert.Equal(HttpStatusCode.BadRequest, status);
+        Assert.Equal("bad_position", json.GetProperty("code").GetString());
+        Assert.Contains("'from' of section 'First' dracula:999", json.GetProperty("message").GetString(), StringComparison.Ordinal);
+        Assert.Equal(Note, den.Read(NotePath));
+
+        // One already in the file, written by hand, doesn't stop an edit that leaves it as it is.
+        den.Write(NotePath, typo);
+        source = await SourceAsync(server, NotePath);
+        var edited = typo.Replace("The opening line.", "The opening line, edited.", StringComparison.Ordinal);
+        (status, _) = await PostAsync(server, "/api/edit/file", new { entity = NotePath, expectedHash = Hash(source), text = edited });
+        Assert.Equal(HttpStatusCode.OK, status);
+        var saved = den.Read(NotePath);
+        Assert.Contains("The opening line, edited.", saved, StringComparison.Ordinal);
+        Assert.Contains("<!-- wolfden: pin=true from=dracula:999 -->", saved, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-42")]
     public async Task TextThatWouldAddAHeadingToASectionIsRefused()
     {
         using var den = NewDen();

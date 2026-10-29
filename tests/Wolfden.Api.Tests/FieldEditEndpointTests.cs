@@ -281,6 +281,21 @@ public class FieldEditEndpointTests
 
     [Fact]
     [Trait("Scenario", "SC-WEB-65")]
+    public async Task AFromThatDoesntResolveIsRefusedAsBadPosition()
+    {
+        using var den = NewDen();
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+        var hash = await HashAsync(server);
+
+        // The web field editor shares update_fields' check (#211): a chapter the book doesn't have is refused, and nothing is written.
+        var (status, json) = await EditAsync(server, hash, "keeper", new[] { new { op = "set", path = new object[] { 0, "until" }, value = "dracula:999" } });
+        Assert.Equal(HttpStatusCode.BadRequest, status);
+        Assert.Equal("bad_position", json.GetProperty("code").GetString());
+        Assert.Equal(Box, den.Read(BoxPath));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-65")]
     public async Task AStaleFrozenOrInvalidFieldEditIsRefusedAndNothingIsWritten()
     {
         using var den = NewDen();

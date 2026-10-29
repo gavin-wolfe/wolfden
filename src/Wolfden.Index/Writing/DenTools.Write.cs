@@ -648,8 +648,9 @@ public sealed partial class DenTools
             // refused unless allow_relinks, as for a copy (maintainer decision on #29, 2026-10-28).
             var (_, _, changed) = CheckNewEntityLinks(
                 den, EntityCatalog.Load(structure, den), check, files, allowRelinks, "created", "create it with those links moving to it", "the new entity");
-            Save(files, null, created: made.Path);
             var entity = EntityCatalog.ReadEntityFile(check.Structure, made.Path, bytes).Entity!;
+            CheckWrittenPositions(null, entity);
+            Save(files, null, created: made.Path);
             var effects = new List<string> { $"Created {made.Path} from the '{type.Key}' template, with id {id}." };
             if (!entity.Status.IsInCanon())
             {
@@ -701,12 +702,58 @@ public sealed partial class DenTools
 
         if (universe.Resolve(position).Problem is { } problem)
         {
-            throw new DenToolException(
-                ToolErrorCodes.BadPosition,
-                $"'from' {text} doesn't resolve in universe '{universe.Key}': {problem} An entity whose 'from' doesn't resolve is left out of every canon view, " +
-                "so nothing was created. Leave 'from' out to start where it's filed.");
+            throw Unresolvable("'from'", text, universe, problem, "An entity whose 'from' doesn't resolve is left out of every canon view, so nothing was created. Leave 'from' out to start where it's filed.");
         }
     }
+
+    /// <summary>
+    /// Refuses a write that sets a <c>from</c> or <c>until</c> (of the
+    /// entity, a field entry, or a section comment) that names a book or
+    /// chapter the universe doesn't have (F-POS-4, maintainer decision on
+    /// #211, 2026-10-29), as <see cref="CheckFrom"/> does for a new entity:
+    /// the fact would drop out of every canon view, and a typo would go
+    /// unnoticed until <c>check</c>. Only positions the write adds count:
+    /// one that doesn't resolve and was already in <paramref name="before"/>
+    /// (counted by its text, so the same one written once more is new) is
+    /// left alone. A <c>position</c> field's value isn't a bound: one that
+    /// doesn't resolve is kept, just not placed in story order, so it stays
+    /// a warning.
+    /// </summary>
+    private static void CheckWrittenPositions(CatalogEntity? before, CatalogEntity after)
+    {
+        var had = before is null ? [] : UnresolvedBounds(before).Select(r => r.Text).ToList();
+        foreach (var reference in UnresolvedBounds(after))
+        {
+            if (had.Remove(reference.Text))
+            {
+                continue;
+            }
+
+            var what = reference.Site switch
+            {
+                PositionSite.EntityFrom => "'from'",
+                PositionSite.EntryFrom => $"'from' of a fields.{reference.Field} entry",
+                PositionSite.EntryUntil => $"'until' of a fields.{reference.Field} entry",
+                PositionSite.SectionFrom => $"'from' of section '{reference.Section!.Name}'",
+                _ => $"'until' of section '{reference.Section!.Name}'",
+            };
+            throw Unresolvable(
+                what, reference.Text, after.Universe, after.Universe.Resolve(reference.Position!).Problem!,
+                "A fact whose position doesn't resolve is left out of every canon view, so nothing was written. " +
+                "Take chapter keys from get_chapter, or leave the position out (or empty) for none.");
+        }
+
+        static IEnumerable<PositionReference> UnresolvedBounds(CatalogEntity entity) =>
+            UnresolvedReferences(entity).Where(r => r.Site != PositionSite.FieldValue);
+    }
+
+    /// <summary>The positions written in the entity's file that parse but don't resolve in its universe (F-POS-4), in file order.</summary>
+    private static IEnumerable<PositionReference> UnresolvedReferences(CatalogEntity entity) =>
+        PositionScanner.Scan(entity.File, entity.Definition?.PositionFields).References
+            .Where(r => r.Position is { } p && !entity.Universe.Resolve(p).IsResolved);
+
+    private static DenToolException Unresolvable(string what, string text, Universe universe, string problem, string outcome) =>
+        new(ToolErrorCodes.BadPosition, $"{what} {text} doesn't resolve in universe '{universe.Key}': {problem} {outcome}");
 
     private string NewUnusedId(HashSet<string> used)
     {
@@ -739,6 +786,9 @@ public sealed partial class DenTools
             throw new DenToolException(ToolErrorCodes.BadArgument, "A section name is one line of text.");
         }
 
+        // An empty 'from' or 'until' is none, as on disk (F-SEC-7) and for create_entity's 'from'.
+        from = string.IsNullOrWhiteSpace(from) ? null : from;
+        until = string.IsNullOrWhiteSpace(until) ? null : until;
         var attributes = new List<string>();
         foreach (var (key, value) in new[] { ("status", status), ("from", from), ("until", until), ("pin", pin is null ? null : pin.Value ? "true" : "false") })
         {
@@ -901,8 +951,9 @@ public sealed partial class DenTools
 
             var files = new Dictionary<string, byte[]>(StringComparer.Ordinal) { [path] = bytes };
             var check = Check(den, structure, files);
-            Save(files, new Dictionary<string, byte[]>(StringComparer.Ordinal) { [path] = original }, created: null);
             var after = EntityCatalog.ReadEntityFile(check.Structure, path, bytes).Entity!;
+            CheckWrittenPositions(before, after);
+            Save(files, new Dictionary<string, byte[]>(StringComparer.Ordinal) { [path] = original }, created: null);
             var said = effects(before, after).ToList();
             if (idAdded is not null)
             {

@@ -349,8 +349,7 @@ public sealed partial class DenTools
 
     /// <summary>The distinct positions written in the entity's file that don't resolve in its universe.</summary>
     private static IEnumerable<string> UnresolvedPositions(CatalogEntity entity) =>
-        PositionScanner.Scan(entity.File, entity.Definition?.PositionFields).References
-            .Where(r => r.Position is { } p && !entity.Universe.Resolve(p).IsResolved)
+        UnresolvedReferences(entity)
             .Select(r => r.Text)
             .Distinct(StringComparer.Ordinal);
 

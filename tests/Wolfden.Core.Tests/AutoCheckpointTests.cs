@@ -344,21 +344,30 @@ public sealed class AutoCheckpointTests : IDisposable
             Hold = hold,
         };
 
-        // The checkpoint waits, as on a passphrase prompt.
-        var checkpoint = Task.Run(() => ledger.Checkpoint(history, new CheckpointRequest("Notes pass after drafting ch 12")), TestContext.Current.CancellationToken);
-        Assert.True(history.Committing.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+        // The checkpoint waits, as on a passphrase prompt. It and the save run
+        // on threads of their own, and nothing below waits on a short timer:
+        // on a busy CI machine the thread pool can take longer than that to
+        // start a work item (#219). The minute-long waits only stop a hang.
+        var token = TestContext.Current.CancellationToken;
+        var checkpoint = OwnThread(() => ledger.Checkpoint(history, new CheckpointRequest("Notes pass after drafting ch 12")), token);
+        if (await Task.WhenAny(checkpoint, history.Committing.Task).WaitAsync(TimeSpan.FromMinutes(1), token) == checkpoint)
+        {
+            await checkpoint;
+            Assert.Fail("The checkpoint finished without reaching git.");
+        }
 
-        // A save, and a status, meanwhile: neither waits for git.
-        var save = Task.Run(
+        // A save, and a status, meanwhile: neither waits for git, which is
+        // still held. A save that waited would end only once git let go.
+        var save = OwnThread(
             () =>
             {
                 File.WriteAllText(Path.Combine(_root, "b.md"), "two\n");
                 ledger.Wrote("b.md", Encoding.UTF8.GetBytes("two\n"));
                 return ledger.IsOwn(new HistoryFileChange(HistoryChangeKind.Modified, "b.md"));
             },
-            TestContext.Current.CancellationToken);
-        Assert.True(await save.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken), "A save waited on a running checkpoint.");
-
+            token);
+        Assert.True(await save.WaitAsync(TimeSpan.FromMinutes(1), token));
+        Assert.False(history.Released, "A save waited on a running checkpoint.");
 
         hold.Set();
         var done = await checkpoint;
@@ -369,6 +378,10 @@ public sealed class AutoCheckpointTests : IDisposable
         Assert.False(ledger.IsOwn(new HistoryFileChange(HistoryChangeKind.Modified, "a.md")));
         Assert.True(ledger.IsOwn(new HistoryFileChange(HistoryChangeKind.Modified, "b.md")));
     }
+
+    /// <summary>Runs <paramref name="work"/> on a thread of its own, never waiting for one from the pool.</summary>
+    private static Task<T> OwnThread<T>(Func<T> work, CancellationToken cancellationToken) =>
+        Task.Factory.StartNew(work, cancellationToken, TaskCreationOptions.LongRunning, TaskScheduler.Default);
 
     [Fact]
     [Trait("Scenario", "SC-WEB-53")]
@@ -485,6 +498,8 @@ public sealed class AutoCheckpointTests : IDisposable
     /// <summary>A history that records what it was asked to checkpoint.</summary>
     internal sealed class FakeHistory : IHistoryProvider
     {
+        private bool _released;
+
         public IReadOnlyList<HistoryFileChange> Pending { get; set; } = [];
 
         public bool Writing { get; set; }
@@ -510,7 +525,11 @@ public sealed class AutoCheckpointTests : IDisposable
         /// <summary>When set, a checkpoint waits for it, as git waits on a passphrase prompt.</summary>
         public ManualResetEventSlim? Hold { get; set; }
 
-        public ManualResetEventSlim Committing { get; } = new();
+        /// <summary>Done once a checkpoint has reached the history, before it waits for <see cref="Hold"/>.</summary>
+        public TaskCompletionSource Committing { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        /// <summary>True once a checkpoint has stopped waiting for <see cref="Hold"/>.</summary>
+        public bool Released => Volatile.Read(ref _released);
 
         HistoryResult<IReadOnlyList<HistoryFileChange>> IHistoryProvider.Pending(CancellationToken cancellationToken) =>
             HistoryResult<IReadOnlyList<HistoryFileChange>>.Done(Pending);
@@ -518,8 +537,9 @@ public sealed class AutoCheckpointTests : IDisposable
         public HistoryResult<HistoryEntry?> Checkpoint(CheckpointRequest request, CancellationToken cancellationToken = default)
         {
             Checkpoints++;
-            Committing.Set();
+            Committing.TrySetResult();
             Hold?.Wait(TimeSpan.FromSeconds(30));
+            Volatile.Write(ref _released, true);
             if (Refuse is { } why)
             {
                 throw new HistoryException(why);

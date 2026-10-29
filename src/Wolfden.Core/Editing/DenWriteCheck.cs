@@ -33,14 +33,17 @@ public static class DenWriteCheck
         ArgumentNullException.ThrowIfNull(files);
         var overlay = new OverlayDenSource(den, files);
         var containers = Containers(structure).ToDictionary(c => c.FilePath, StringComparer.Ordinal);
-        var after = files.Keys.Any(containers.ContainsKey) ? DenStructure.Load(overlay) : structure;
+
+        // A new series' or book's file (made from the web UI or the CLI, #213) is a container file too.
+        var made = files.Keys.Where(p => !containers.ContainsKey(p) && IsNewContainerFile(structure, p)).ToHashSet(StringComparer.Ordinal);
+        var after = files.Keys.Any(containers.ContainsKey) || made.Count > 0 ? DenStructure.Load(overlay) : structure;
         var outlines = after.Universes.SelectMany(u => u.Books).ToDictionary(b => $"{b.Path}/outline.md", StringComparer.Ordinal);
         RowIndex? rows = null;
 
         var result = new Dictionary<string, IReadOnlyList<Diagnostic>>(StringComparer.Ordinal);
         foreach (var (path, bytes) in files)
         {
-            if (containers.ContainsKey(path))
+            if (containers.ContainsKey(path) || made.Contains(path))
             {
                 result[path] = after.Diagnostics.Where(d => d.Path == path).Select(d => d.Diagnostic).ToList();
             }
@@ -78,6 +81,29 @@ public static class DenWriteCheck
         }
 
         return new DenWriteCheckResult(after, result);
+    }
+
+    /// <summary>
+    /// True if <paramref name="path"/> is where a new series' or book's file
+    /// goes (format.md §5.1, F-LAY-4): <c>series.md</c> in a folder directly
+    /// in a loaded universe's <c>series/</c>, or <c>book.md</c> in a folder
+    /// directly in a loaded universe's or series' <c>books/</c>.
+    /// </summary>
+    private static bool IsNewContainerFile(DenStructure structure, string path)
+    {
+        var folder = DenPaths.Parent(path);
+        if (folder.Length == 0 || !folder.Contains('/', StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var parent = DenPaths.Parent(folder);
+        return DenPaths.Name(path) switch
+        {
+            "series.md" => structure.Universes.Any(u => parent == $"{u.Path}/series"),
+            "book.md" => structure.Universes.Any(u => parent == $"{u.Path}/books" || u.Series.Any(s => parent == $"{s.Path}/books")),
+            _ => false,
+        };
     }
 
     private static IEnumerable<Container> Containers(DenStructure structure) =>

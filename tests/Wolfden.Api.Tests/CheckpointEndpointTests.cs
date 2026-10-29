@@ -172,6 +172,28 @@ public sealed class CheckpointEndpointTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "SC-WEB-69")]
+    public async Task ABookCreatedThroughThisServerIsMarkedSavedHere()
+    {
+        var den = Repository(TempDen.Dracula());
+        Commit(den, "Start");
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root) { History = () => GitHistory.ForDen(den.Root, Git) });
+        var hash = (await server.GetJsonAsync("/api/works", HttpStatusCode.OK)).GetProperty("hash").GetString();
+
+        using var content = new StringContent(JsonSerializer.Serialize(new { name = "Dracula's Guest", expectedHash = hash }), Encoding.UTF8, "application/json");
+        using var response = await server.Client.PostAsync("/api/book/create", content, Token);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        // Both files the create wrote go through the server's ledger (#213).
+        var status = await server.GetJsonAsync("/api/checkpoint", HttpStatusCode.OK);
+        Assert.Equal(
+            [("universes/dracula/books/dracula-s-guest/book.md", "added", true), ("universes/dracula/universe.md", "modified", true)],
+            status.GetProperty("changes").EnumerateArray()
+                .Select(c => (c.GetProperty("path").GetString(), c.GetProperty("kind").GetString(), c.GetProperty("savedHere").GetBoolean()))
+                .OrderBy(c => c.Item1, StringComparer.Ordinal));
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-WEB-50")]
     public async Task ASaveThroughThisServerIsToldApartFromAChangeMadeElsewhere()
     {

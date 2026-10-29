@@ -391,6 +391,28 @@ public class WriteEndpointTests
     }
 
     [Fact]
+    [Trait("Scenario", "SC-WEB-60")]
+    public void ANameOrAliasEditInTheWritersWordsPointsAtAnAssistant()
+    {
+        // The page's field edits always go under 'fields', but the API's DenTools gives every
+        // refusal in the page's words, so one for the name or an alias names no MCP tool.
+        using var den = NewDen();
+        var tools = new DenTools(den.Root) { Words = WriteEndpoints.Words };
+        var hash = tools.GetSource(SwalesPath).Hash;
+        static JsonElement Changes(string json) => JsonDocument.Parse(json).RootElement;
+
+        var name = Assert.Throws<DenToolException>(() => tools.UpdateFields(SwalesPath, hash, Changes("""[{"op": "set", "path": "name", "value": "Swales"}]""")));
+        Assert.Equal(ToolErrorCodes.UnsupportedEdit, name.Code);
+        Assert.EndsWith(WriteEndpoints.Words.NameLinks, name.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("rename_entity", name.Message, StringComparison.Ordinal);
+
+        var alias = Assert.Throws<DenToolException>(() => tools.UpdateFields(SwalesPath, hash, Changes("""[{"op": "remove", "path": "aliases.0"}]""")));
+        Assert.Equal(ToolErrorCodes.UnsupportedEdit, alias.Code);
+        Assert.EndsWith(WriteEndpoints.Words.AliasLinks, alias.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("change_alias", alias.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-WEB-45")]
     public async Task EditingAndSavingTheSameTextKeepsEveryByte()
     {

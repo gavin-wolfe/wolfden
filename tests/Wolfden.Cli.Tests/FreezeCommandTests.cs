@@ -21,6 +21,20 @@ public sealed class FreezeCommandTests : IDisposable
         Cli.Run([args[0], "--den", _den.Root, .. args[1..]]);
 
     [Fact]
+    [Trait("Scenario", "SC-CLI-15")]
+    public void TheUnfreezeHintNamesTheDenItWasGiven()
+    {
+        // Without --den, the hint is as it is; with one, it names that den, quoted if it has a space or a quote.
+        Assert.Same(NewCommand.Words, FreezeCommand.WithDen(NewCommand.Words, null));
+        Assert.Equal(
+            "Run 'wolfden unfreeze ash --universe starfall --den dens/main' to open the book for editing again.",
+            FreezeCommand.WithDen(NewCommand.Words, "dens/main").Unfreezing("ash", "starfall"));
+        Assert.Equal(
+            "Run 'wolfden unfreeze ash --universe starfall --den \"my {dens}\"' to open the book for editing again.",
+            FreezeCommand.WithDen(NewCommand.Words, "my {dens}").Unfreezing("ash", "starfall"));
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-CLI-14")]
     public void WithoutHistoryFreezeMarksTheBookFinalAndUnfreezeWritesDraft()
     {

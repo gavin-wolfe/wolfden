@@ -502,7 +502,8 @@ public sealed class WriteToolTests : IDisposable
         {
             var refused = Assert.Throws<DenToolException>(() => Tools.UpdateFields("Renfield's Master", hash, Json($"[{change}]")));
             Assert.Equal(ToolErrorCodes.BadPosition, refused.Code);
-            Assert.Contains($"holds {shape}, not a story position. It holds positions, such as 'dracula:1' (book:chapter), so nothing was written.", refused.Message, StringComparison.Ordinal);
+            Assert.Contains($"is {shape} (", refused.Message, StringComparison.Ordinal);
+            Assert.Contains("), not a story position. It holds positions, such as 'dracula:1' (book:chapter), so nothing was written.", refused.Message, StringComparison.Ordinal);
             Assert.DoesNotContain("dracula:5", refused.Message, StringComparison.Ordinal);
             Assert.Equal(before, _den.Read(Thread));
         }
@@ -514,6 +515,13 @@ public sealed class WriteToolTests : IDisposable
         Assert.True(kept.Changed);
         Assert.Equal(ToolErrorCodes.BadPosition, Assert.Throws<DenToolException>(() =>
             Tools.UpdateFields("Renfield's Master", kept.Hash, Json("""[{"op": "set", "path": "fields.planted", "value": {"a": 1}}]"""))).Code);
+
+        // The same place counts its content too, as for a scalar: another mapping in its place is new.
+        var changed = Assert.Throws<DenToolException>(() =>
+            Tools.UpdateFields("Renfield's Master", kept.Hash, Json("""[{"op": "set", "path": "fields.paid_off", "value": {"b": 2}}]""")));
+        Assert.Equal(ToolErrorCodes.BadPosition, changed.Code);
+        Assert.Contains("fields.paid_off is a mapping (", changed.Message, StringComparison.Ordinal);
+        Assert.Contains("2}), not a story position", changed.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -530,6 +538,21 @@ public sealed class WriteToolTests : IDisposable
 
         var own = Assert.Throws<DenToolException>(() => Tools.CreateEntity("character", "Sister Agatha", universe: "dracula", from: "dracula:1:2"));
         Assert.EndsWith("Give one such as 'dracula:1' (book:chapter).", own.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-32")]
+    public void ARefusedPositionsExampleSkipsABookWhoseKeyIsShared()
+    {
+        using var den = TempDen.Starfall();
+        var tools = new DenTools(den.Root);
+        DenToolException Refused() => Assert.Throws<DenToolException>(() => tools.CreateEntity("character", "Iven Sol", universe: "starfall", from: "ember:1:2"));
+        Assert.EndsWith("Give one such as 'ember:prologue' (book:chapter).", Refused().Message, StringComparison.Ordinal);
+
+        // A second 'ember' makes the key ambiguous (F-KEY-5), so neither is the example: positions in it don't resolve.
+        den.Write("universes/starfall/series/drift-war/series.md", "---\nid: 01JA3E28JT97KB6CQ643DZVMXY\nname: The Drift War\nbooks: [ember]\n---\n");
+        den.Write("universes/starfall/series/drift-war/books/ember/book.md", "---\nid: 01JB0000000000000000000A02\nname: Ember of the Drift\nchapters: [1, 2]\n---\n");
+        Assert.EndsWith("Give one such as 'ash:1' (book:chapter).", Refused().Message, StringComparison.Ordinal);
     }
 
     [Fact]

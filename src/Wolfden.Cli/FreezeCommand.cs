@@ -86,6 +86,23 @@ internal static class FreezeCommand
     /// <summary>How the command line unfreezes a book that refused a write (<see cref="ToolWords.Unfreeze"/>), for every command's words.</summary>
     internal const string UnfreezeWords = "Run 'wolfden unfreeze {0} --universe {1}' to open the book for editing again.";
 
+    /// <summary>
+    /// <paramref name="words"/> for a command given <c>--den <paramref name="den"/></c>:
+    /// the unfreeze hint names the same den, so it works from where the
+    /// command was run. Without <c>--den</c>, the words as they are.
+    /// </summary>
+    internal static ToolWords WithDen(ToolWords words, string? den)
+    {
+        if (string.IsNullOrWhiteSpace(den))
+        {
+            return words;
+        }
+
+        var quoted = den.Any(c => char.IsWhiteSpace(c) || c == '\'') ? $"\"{den}\"" : den;
+        var escaped = quoted.Replace("{", "{{", StringComparison.Ordinal).Replace("}", "}}", StringComparison.Ordinal);
+        return words with { Unfreeze = $"Run 'wolfden unfreeze {{0}} --universe {{1}} --den {escaped}' to open the book for editing again." };
+    }
+
     /// <summary>Snapshots that mean a step in the den's history failed, so the command exits 2.</summary>
     private static readonly string[] Failures = [FreezeSnapshot.CheckpointFailed, FreezeSnapshot.TagFailed];
 

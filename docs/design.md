@@ -977,8 +977,9 @@ store, so an edit changes only what it means to (format.md §12):
   caller's words (`ToolWords.Unfreeze`, #209): for MCP, "Ask the writer
   whether to unfreeze book 'dracula'; only they can."; on the web page,
   **Unfreeze…** on the book's page; for the CLI, `wolfden unfreeze
-  <book> --universe <key>`. One that names files in several final books
-  says it for each. The entity page's and the source's `frozen` reason
+  <book> --universe <key>` (with `--den <den>` when the command was
+  given one). One that names files in several final books says it
+  for each. The entity page's and the source's `frozen` reason
   ends the same way. Edits to pinned canon are made, and
   `pinned_canon` in the result lists each pinned fact touched. A
   series' or universe's `chapter_defaults` isn't in a book's scope, but
@@ -1095,12 +1096,14 @@ store, so an edit changes only what it means to (format.md §12):
   position goes (`paid_off: {a: 1}`, #222). On disk each stays the
   F-FT-10 warning, so a file that already holds one loads as before,
   and the same-place rule applies to it (a mapping or a list matches
-  one of the same shape in the same field). The refusal says where to
+  one with the same content in the same field, written out in flow
+  style, so layout and comments don't count). The refusal says where to
   find a chapter key in the caller's words (`get_chapter` for MCP, the
   book's chapters on the page). Its example, as for `create_entity`'s
   `from`, is in the universe's own keys: the first chapter of its
-  first book, in story order, that lists one (`'dracula:1'`), or
-  `'book:chapter'` when none does (#222). `update_chapter_fields`, `update_chapter_defaults`,
+  first book, in story order, that lists one and whose key no other
+  book shares (`'dracula:1'`), or `'book:chapter'` when none does
+  (#222). `update_chapter_fields`, `update_chapter_defaults`,
   `move_entity`, and `copy_entity` take no position: a move writes the
   entry point the entity had, and a copy keeps the original's positions
   and says which don't resolve where the copy is.
@@ -1713,8 +1716,10 @@ docs/
     can rename a note or change an alias and rewrite the links, where the
     MCP tools' words name `rename_entity` and `change_alias`. A `frozen`
     refusal says to use **Unfreeze…** on the book's page, where the MCP
-    tools' words say to ask the writer (#209). The MCP
-    tools' and the command line's words are unchanged.
+    tools' words say to ask the writer (#209). The command line has its
+    own words too: its options, `wolfden query`, and, for `frozen`,
+    `wolfden unfreeze <book> --universe <key>`, with the `--den` the
+    command was given.
   - **Removing a section** takes its subsections, and doesn't rewrite
     links to it by heading: `effects` lists them, and what they reach
     now (a later section of that name, or only the note).

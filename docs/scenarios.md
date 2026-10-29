@@ -1239,7 +1239,8 @@ sequel book.
   name the command's options and commands (`--allow-relinks`,
   `--slug`, `wolfden query`), not the MCP tool's parameters, and a copy
   named "Count allow_relinks" is reported by that name, in text and
-  JSON.
+  JSON. The refusal for a final book says how to unfreeze it, with the
+  `--den` the copy was given (#209), as `wolfden new` does (SC-CLI-15).
 
 Spec: format.md F-ID-3, F-ID-4, design.md §7, §8 (#129). Covered by:
 `CopyCommandTests.ACopyGoesBesideTheOriginalWithANewIdAndSaysWhatItMeans`,
@@ -1302,12 +1303,14 @@ dracula:8`.
   or one over 200 characters, or a `den.yaml` that doesn't load exits 2
   and writes nothing. The refusal for a final book says how to unfreeze
   it: "Run 'wolfden unfreeze aftermath --universe dracula' to open the
-  book for editing again." (#209); `wolfden copy` says the same.
+  book for editing again." (#209). Given `--den`, the hint passes the
+  same `--den` on, quoted if it has a space.
 
 Spec: types.md F-TPL-6, design.md §7 (#29). Covered by:
 `NewCommandTests.ANewNoteComesFromItsTemplateInTheUniverseWithANewId`,
 `NewCommandTests.InNamesWhereItGoesAndFromWhereTheReaderMeetsIt`,
 `NewCommandTests.ARefusedCreateExitsTwoAndWritesNothing`,
+`FreezeCommandTests.TheUnfreezeHintNamesTheDenItWasGiven`,
 `NewCommandTests.ANoteThatWouldTakeLinksNeedsAllowRelinks`,
 `NewCommandTests.ADenWhoseDenYamlDoesntLoadSaysSo`,
 `NewCommandTests.JsonPrintsTheWriteResult`.
@@ -2406,12 +2409,12 @@ comment, and the assistant edits the note again.
   (types.md F-FT-10). So is a value that isn't a position at all
   (`chapter nine`, `dracula:9.2`), or a mapping or a list where a
   position goes (`paid_off: {a: 1}`, #222), though in a file each is
-  only the F-FT-10 warning; one already there, in the same field,
-  doesn't stop an edit.
+  only the F-FT-10 warning; one already there, in the same field and
+  with the same content, doesn't stop an edit.
 - A refusal for a value that isn't a position gives an example in the
   universe's own keys, the first chapter of its first book that lists
-  one ('dracula:1'), or 'book:chapter' in a universe whose books list
-  no chapters yet.
+  one ('dracula:1'), skipping a book whose key another book shares, or
+  'book:chapter' in a universe whose books list no chapters yet.
 - The Arc's `from=dracula:999`, already in the file, doesn't stop an
   edit that leaves it alone: the assistant's field change and its text
   for Voice are saved, and `check` still reports it. Writing
@@ -2439,8 +2442,9 @@ Covered by:
 `WriteToolTests.APositionIsCheckedBeforeTheLinksAnEntityWouldTake`,
 `WriteToolTests.AnUntouchedSectionPositionKeepsUnderARenamedHeading`,
 `WriteToolTests.APositionFieldValueThatIsntAPositionIsRefusedWhenWritten`,
-`WriteToolTests.AMappingOrListInAPositionFieldIsRefusedWhenWritten`,
-`WriteToolTests.ARefusedPositionsExampleUsesTheUniversesOwnKeys`.
+  `WriteToolTests.AMappingOrListInAPositionFieldIsRefusedWhenWritten`,
+`WriteToolTests.ARefusedPositionsExampleUsesTheUniversesOwnKeys`,
+`WriteToolTests.ARefusedPositionsExampleSkipsABookWhoseKeyIsShared`.
 
 ## STORE: Wolfden saves, moves, and deletes notes
 

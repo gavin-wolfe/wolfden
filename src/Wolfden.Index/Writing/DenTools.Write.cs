@@ -779,7 +779,7 @@ public sealed partial class DenTools
             {
                 throw new DenToolException(
                     ToolErrorCodes.BadPosition,
-                    $"{what} holds {reference.Text}, not a story position. It holds positions, such as {PositionExample(after.Universe)}, " +
+                    $"{what} is {(reference.Text.StartsWith('{') ? "a mapping" : "a list")} ({reference.Text}), not a story position. It holds positions, such as {PositionExample(after.Universe)}, " +
                     $"so nothing was written. {ToolWords.Cap(Words.ChapterKeys)}, or leave the position out.");
             }
 
@@ -801,7 +801,7 @@ public sealed partial class DenTools
         }
 
         // Positions that don't resolve, and position field values that aren't positions, or are a list or a
-        // mapping (Shape) where a position goes (a bad 'from' or 'until' is already an error).
+        // mapping (Shape) where a position goes, by content (a bad 'from' or 'until' is already an error).
         static IEnumerable<(PositionReference Reference, bool Shape)> Bad(CatalogEntity entity)
         {
             var scan = PositionScanner.Scan(entity.File, entity.Definition?.PositionFields);
@@ -824,9 +824,10 @@ public sealed partial class DenTools
     /// An example story position for a refusal, quoted, in <paramref name="universe"/>'s
     /// own keys: the first chapter of its first book (in story order) that lists one, such
     /// as <c>'dracula:1' (book:chapter)</c>, or <c>'book:chapter'</c> when no book does (#222).
+    /// A book whose key another book shares is skipped (F-KEY-5): its positions don't resolve.
     /// </summary>
     private static string PositionExample(Universe universe) =>
-        universe.Books.SelectMany(b => b.Chapters).FirstOrDefault() is { } chapter
+        universe.Books.Where(b => universe.FindBook(b.Key) is not null).SelectMany(b => b.Chapters).FirstOrDefault() is { } chapter
             ? $"'{chapter.Book.Key}:{chapter.Key}' (book:chapter)"
             : "'book:chapter'";
 
@@ -1411,7 +1412,12 @@ public sealed partial class DenTools
         return segments is null || segments.Count == 0 || segments.Any(s => s.Length == 0) ? null : segments;
     }
 
-    private static void CheckFrontmatterPath(IReadOnlyList<string> path, string op)
+    /// <summary>
+    /// Refuses a field edit of what only another tool may change. The advice
+    /// is in the caller's words (<see cref="ToolWords.NameLinks"/>, <see cref="ToolWords.AliasLinks"/>),
+    /// since the web UI's field edits reach this too.
+    /// </summary>
+    private void CheckFrontmatterPath(IReadOnlyList<string> path, string op)
     {
         switch (path[0])
         {
@@ -1420,11 +1426,11 @@ public sealed partial class DenTools
             case "name":
                 throw new DenToolException(
                     ToolErrorCodes.UnsupportedEdit,
-                    "Renaming an entity means rewriting the links that match the old name (F-RT-5): use rename_entity, which does that.");
+                    $"Renaming an entity means rewriting the links that match the old name (F-RT-5), so it isn't done here. {Words.NameLinks}");
             case "aliases" when op != "add" || path.Count != 1:
                 throw new DenToolException(
                     ToolErrorCodes.UnsupportedEdit,
-                    "Aliases can be added here, but not changed or removed: links that matched the old alias must follow (F-RT-5). Use change_alias, which rewrites them.");
+                    $"Aliases can be added here, but not changed or removed: links that matched the old alias must follow (F-RT-5). {Words.AliasLinks}");
             case "fields" when path.Count == 1 && op != "set":
                 throw new DenToolException(ToolErrorCodes.BadArgument, "Name a field: 'fields.<name>'.");
             case "fields" when path.Count == 1:

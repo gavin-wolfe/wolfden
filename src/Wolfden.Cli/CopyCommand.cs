@@ -100,7 +100,7 @@ internal static class CopyCommand
         WriteResult result;
         try
         {
-            result = new DenTools(root) { Words = Words }.CopyEntity(
+            result = new DenTools(root) { Words = FreezeCommand.WithDen(Words, line.Value("--den")) }.CopyEntity(
                 line.Arguments[0], line.Arguments[1], line.Value("--universe"), toUniverse, toSeries, toBook, line.Value("--slug"), line.Has("--allow-relinks"));
         }
         catch (DenToolException e)

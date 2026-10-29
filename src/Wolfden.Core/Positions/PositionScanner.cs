@@ -45,8 +45,9 @@ public sealed record PositionReference(string Text, StoryPosition? Position, Pos
 /// The values of <c>position</c> fields that are a list or a mapping, so
 /// hold no position at all (the F-FT-10 warning in <paramref name="Diagnostics"/>),
 /// in the order found. Each has no <see cref="PositionReference.Position"/>,
-/// and its <see cref="PositionReference.Text"/> says which it is:
-/// <c>a list</c> or <c>a mapping</c>.
+/// and its <see cref="PositionReference.Text"/> is the value in flow
+/// style, such as <c>{a: 1}</c> or <c>[x, y]</c>, so a list starts with
+/// <c>[</c> and a mapping with <c>{</c> (see <see cref="PositionScanner.FlowText"/>).
 /// </param>
 public sealed record PositionScan(IReadOnlyList<PositionReference> References, IReadOnlyList<Diagnostic> Diagnostics, IReadOnlyList<PositionReference> NotPositions);
 
@@ -210,6 +211,21 @@ public static class PositionScanner
     }
 
     /// <summary>
+    /// A YAML value in one line of flow style, such as <c>{a: 1, b: [x, "y z"]}</c>,
+    /// for comparing two values by content and naming one in a message: a
+    /// plain scalar as written, any other quoted as a JSON string, a
+    /// mapping's keys in file order. Layout and comments don't count.
+    /// </summary>
+    public static string FlowText(YamlNode node) => node switch
+    {
+        YamlScalar { Style: YamlScalarStyle.Plain } s => s.Text,
+        YamlScalar s => System.Text.Json.JsonSerializer.Serialize(s.Text),
+        YamlSequence l => $"[{string.Join(", ", l.Items.Select(FlowText))}]",
+        YamlMapping m => $"{{{string.Join(", ", m.Entries.Select(e => $"{FlowText(e.Key)}: {FlowText(e.Value)}"))}}}",
+        _ => "",
+    };
+
+    /// <summary>
     /// The value of a <c>position</c> field: a position, or a list of them for
     /// a list field. A bad one is a warning (types.md F-FT-10). A null value
     /// is unset (F-FLD-4).
@@ -236,7 +252,7 @@ public static class PositionScanner
                     var shape = item is YamlSequence ? "list" : "mapping";
                     diagnostics.Add(new Diagnostic("F-FT-10", DiagnosticSeverity.Warning, item.Line,
                         $"{field} holds story positions, such as \"ember:14\", not a {shape}: {StoryPosition.InvalidMessage}."));
-                    notPositions.Add(new PositionReference($"a {shape}", null, PositionSite.FieldValue, item.Line, field));
+                    notPositions.Add(new PositionReference(FlowText(item), null, PositionSite.FieldValue, item.Line, field));
                     break;
             }
         }

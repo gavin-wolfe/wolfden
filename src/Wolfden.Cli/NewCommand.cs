@@ -160,7 +160,7 @@ internal static class NewCommand
         WriteResult result;
         try
         {
-            result = new DenTools(root) { Words = Words }.CreateEntity(
+            result = new DenTools(root) { Words = FreezeCommand.WithDen(Words, line.Value("--den")) }.CreateEntity(
                 line.Arguments[0], name, universe, series, book, line.Value("--slug"), from: line.Value("--from"), allowRelinks: line.Has("--allow-relinks"));
         }
         catch (DenToolException e)
@@ -267,7 +267,7 @@ internal static class NewCommand
         ContainerCreateResult result;
         try
         {
-            var tools = new DenTools(root) { Words = Words };
+            var tools = new DenTools(root) { Words = FreezeCommand.WithDen(Words, line.Value("--den")) };
             result = series
                 ? tools.CreateSeries(name, universe, line.Value("--after"), first: line.Has("--first"))
                 : tools.CreateBook(name, universe, inSeries, line.Value("--after"), chapters, first: line.Has("--first"));

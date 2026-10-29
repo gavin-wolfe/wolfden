@@ -711,26 +711,50 @@ public sealed partial class DenTools
     /// <summary>
     /// Refuses a write that sets a story position that names a book or
     /// chapter the universe doesn't have (F-POS-4, maintainer decisions on
-    /// #211, 2026-10-29): a <c>from</c> or <c>until</c> of the entity, a
-    /// field entry, or a section comment, or a value of a <c>position</c>
-    /// field (types.md F-FT-10), as <see cref="CheckFrom"/> does for a new
-    /// entity's <c>from</c>. The fact would drop out of canon views, or out
-    /// of story order, and a typo would go unnoticed until <c>check</c>.
-    /// Only positions the write adds count: one that doesn't resolve and
-    /// was already in <paramref name="before"/> at the same place (the same
-    /// kind of position, of the same field or section, with the same text)
-    /// is left alone, so moving it somewhere else, or writing it once more,
-    /// is refused. A <c>position</c> field value that isn't a position at
-    /// all is a value that doesn't fit its type, saved with the F-FT-10
-    /// warning, as for any other field type.
+    /// #211 and #217, 2026-10-29): a <c>from</c> or <c>until</c> of the
+    /// entity, a field entry, or a section comment, or a value of a
+    /// <c>position</c> field (types.md F-FT-10), as <see cref="CheckFrom"/>
+    /// does for a new entity's <c>from</c>. The fact would drop out of canon
+    /// views, or out of story order, and a typo would go unnoticed until
+    /// <c>check</c>. A <c>position</c> field value that isn't a position at
+    /// all is refused too, though on disk it's only the F-FT-10 warning, so
+    /// a worse value can't get past where a near miss is refused.
     /// </summary>
+    /// <remarks>
+    /// Only positions the write adds count. One that was already in
+    /// <paramref name="before"/> is left alone if it's at the same place:
+    /// the same kind of position, of the same field or section, with the
+    /// same text. A section's <c>from</c> or <c>until</c> left over is then
+    /// matched by its kind and text alone, so renaming the section's
+    /// heading keeps it; moving it to the entity's <c>from</c> or a field,
+    /// or writing it once more, is refused.
+    /// </remarks>
     private void CheckWrittenPositions(CatalogEntity? before, CatalogEntity after)
     {
-        var had = before is null ? [] : UnresolvedReferences(before).Select(Place).ToList();
-        foreach (var reference in UnresolvedReferences(after))
+        var had = before is null ? [] : Bad(before).ToList();
+        var left = new List<PositionReference>();
+        foreach (var reference in Bad(after))
         {
-            if (had.Remove(Place(reference)))
+            var same = had.FindIndex(h => Place(h) == Place(reference));
+            if (same >= 0)
             {
+                had.RemoveAt(same);
+            }
+            else
+            {
+                left.Add(reference);
+            }
+        }
+
+        foreach (var reference in left)
+        {
+            // A section bound under a renamed heading.
+            var renamed = reference.Site is PositionSite.SectionFrom or PositionSite.SectionUntil
+                ? had.FindIndex(h => h.Site == reference.Site && h.Text == reference.Text)
+                : -1;
+            if (renamed >= 0)
+            {
+                had.RemoveAt(renamed);
                 continue;
             }
 
@@ -743,13 +767,28 @@ public sealed partial class DenTools
                 PositionSite.SectionFrom => $"'from' of section '{reference.Section!.Name}'",
                 _ => $"'until' of section '{reference.Section!.Name}'",
             };
+            if (reference.Position is null)
+            {
+                StoryPosition.TryParse(reference.Text, out _, out var error);
+                throw new DenToolException(
+                    ToolErrorCodes.BadPosition,
+                    $"{what} '{reference.Text}' isn't a story position: {error!.Message} It holds positions, such as 'dracula:5' (book:chapter), " +
+                    $"so nothing was written. {ToolWords.Cap(Words.ChapterKeys)}, or leave the position out.");
+            }
+
             var lost = reference.Site == PositionSite.FieldValue
                 ? "A position that doesn't resolve can't be placed in story order"
                 : "A fact whose position doesn't resolve is left out of every canon view";
             throw Unresolvable(
-                what, reference.Text, after.Universe, after.Universe.Resolve(reference.Position!).Problem!,
+                what, reference.Text, after.Universe, after.Universe.Resolve(reference.Position).Problem!,
                 $"{lost}, so nothing was written. {ToolWords.Cap(Words.ChapterKeys)}, or leave the position out.");
         }
+
+        // Positions that don't resolve, and position field values that aren't positions (a bad 'from' or 'until' is already an error).
+        static IEnumerable<PositionReference> Bad(CatalogEntity entity) =>
+            UnresolvedReferences(entity).Concat(
+                PositionScanner.Scan(entity.File, entity.Definition?.PositionFields).References
+                    .Where(r => r.Position is null && r.Site == PositionSite.FieldValue));
 
         // Where a position is written, as far as it can be told across an edit: lines and item numbers shift.
         static (PositionSite, string?, string?, string) Place(PositionReference r) => (r.Site, r.Field, r.Section?.Name, r.Text);

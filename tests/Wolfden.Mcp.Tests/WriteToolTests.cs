@@ -444,6 +444,48 @@ public sealed class WriteToolTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "SC-MCP-32")]
+    public void AnUntouchedSectionPositionKeepsUnderARenamedHeading()
+    {
+        _den.Write(Swales, _den.Read(Swales).Replace("<!-- wolfden: from=dracula:7 -->", "<!-- wolfden: from=dracula:999 -->", StringComparison.Ordinal));
+        var hash = Tools.GetEntity("Mr. Swales").Entity!.Hash!;
+
+        // Renaming the heading in the whole file keeps the section's position where it was, as rename_section does.
+        var renamed = _den.Read(Swales).Replace("## Arc\n", "## Last days\n", StringComparison.Ordinal);
+        var result = Tools.ReplaceFile("Mr. Swales", renamed, hash);
+
+        Assert.True(result.Changed);
+        Assert.Contains("## Last days\n<!-- wolfden: from=dracula:999 -->", _den.Read(Swales), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-32")]
+    public void APositionFieldValueThatIsntAPositionIsRefusedWhenWritten()
+    {
+        const string Thread = Book + "/entities/threads/renfields-master.md";
+        var before = _den.Read(Thread);
+        var hash = Tools.GetEntity("Renfield's Master").Entity!.Hash!;
+
+        // Only a warning on disk (F-FT-10), but refused when written, as a near miss is.
+        foreach (var change in new[]
+        {
+            """{"op": "set", "path": "fields.paid_off", "value": "chapter nine"}""",
+            """{"op": "add", "path": "fields.planted", "value": "dracula:9.2"}""",
+        })
+        {
+            var refused = Assert.Throws<DenToolException>(() => Tools.UpdateFields("Renfield's Master", hash, Json($"[{change}]")));
+            Assert.Equal(ToolErrorCodes.BadPosition, refused.Code);
+            Assert.Contains("isn't a story position", refused.Message, StringComparison.Ordinal);
+            Assert.Equal(before, _den.Read(Thread));
+        }
+
+        // One already in the file, left where it is, doesn't stop an edit.
+        _den.Write(Thread, before.Replace("paid_off: \"dracula:21\"", "paid_off: \"chapter twenty-one\"", StringComparison.Ordinal));
+        hash = Tools.GetEntity("Renfield's Master").Entity!.Hash!;
+        Assert.True(Tools.UpdateFields("Renfield's Master", hash, Json("""[{"op": "add", "path": "fields.planted", "value": "dracula:9"}]""")).Changed);
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-MCP-17")]
     public void TextGoesIntoASectionOrANewOneInItsPlace()
     {

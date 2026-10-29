@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, getRouteApi } from '@tanstack/react-router'
 import { hierarchyQuery, positionsQuery, type BookNode, type SeriesNode, type UniverseNode } from '../api'
+import { AddChapter } from '../components/AddChapter'
 import { FreezeControl } from '../components/FreezeControl'
 import { ErrorState, Loading } from '../components/States'
 import { useDocumentTitle, usePosition } from '../hooks'
@@ -90,6 +91,7 @@ export function BookPage() {
           })}
         </ol>
       )}
+      <AddChapter key={b.key} universe={universe} book={b.key} bookName={b.name} chapters={b.chapters.length} final={b.status === 'final'} />
       <Counts counts={b.entities} title={at === undefined ? 'Filed in this book' : 'Filed in this book, met by this point'} />
     </div>
   )

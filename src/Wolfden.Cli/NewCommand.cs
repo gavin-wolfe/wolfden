@@ -11,10 +11,11 @@ namespace Wolfden.Cli;
 /// scope the way <c>wolfden copy</c> does: the note goes to the den's files
 /// only, and nothing is committed. <c>wolfden new series &lt;name&gt;</c> and
 /// <c>wolfden new book &lt;name&gt;</c> create a series or book instead (#213),
-/// as the web UI's New series and New book do.
+/// as the web UI's New series and New book do, and <c>wolfden new chapter</c>
+/// adds a chapter to a book (#215), as Add chapter and Insert chapter… do.
 /// </summary>
 /// <remarks>
-/// Exit codes: 0 when the note, series, or book is made, and 2 when the
+/// Exit codes: 0 when the note, series, book, or chapter is made, and 2 when the
 /// command line is wrong, there's no den, or the create is refused (an
 /// unknown type or scope, a final book, a file name or key that's taken, an
 /// <c>--after</c> that isn't there, or a den with several universes and
@@ -28,6 +29,7 @@ internal static class NewCommand
         usage: wolfden new <type> <name> [--in <scope>] [--from <position>] [--slug <slug>] [--allow-relinks] [--den <den>] [--json]
                wolfden new series <name> [--in <universe>] [--after <key> | --first] [--den <den>] [--json]
                wolfden new book <name> [--in <universe or series>] [--after <key> | --first] [--chapters <n>] [--den <den>] [--json]
+               wolfden new chapter [<title>] --in <book> [--after <chapter>] [--den <den>] [--json]
         """,
         """
         Creates a note from its type's template, such as a new character. It
@@ -83,6 +85,22 @@ internal static class NewCommand
                               1 to n; by default, none
 
         Exits 0 when it's made, and 2 if it isn't.
+
+        'wolfden new chapter' adds a chapter to a book's chapters in its
+        book.md, with the title if you give one. At the end, its key is the
+        next whole number; after a chapter, a letter is added to that
+        chapter's key (after 2, 2b, then 2c; after 2b, 2ba). Keys never
+        change, so positions keep naming the same chapters; the display
+        numbers after it move up to make room.
+
+          --in <book>         the book: its key, or '<universe>/<book>' in a den
+                              with several universes that share the key
+          --after <chapter>   the key of the chapter it comes after; by default,
+                              at the end
+
+        Exits 0 when it's added, and 2 if it isn't (no such book or chapter,
+        a final book, or a title that isn't one line of at most 200
+        characters).
         """,
         ["--json", "--allow-relinks", "--first"],
         ["--den", "--in", "--from", "--slug", "--after", "--chapters"],
@@ -106,6 +124,12 @@ internal static class NewCommand
         if (CommandLine.Parse(Spec, args, output, error, out var line) is { } exit)
         {
             return exit;
+        }
+
+        // 'chapter' is a reserved type key too (types.md F-TYPE-2); its title is optional.
+        if (line.Arguments is ["chapter", ..])
+        {
+            return RunChapter(line, output, error);
         }
 
         if (line.Arguments.Count < 2)
@@ -301,6 +325,160 @@ internal static class NewCommand
         }
 
         return CliApp.ExitOk;
+    }
+
+    /// <summary>
+    /// <c>wolfden new chapter [&lt;title&gt;] --in &lt;book&gt; [--after &lt;chapter&gt;]</c>
+    /// (#215): what the web UI's Add chapter and Insert chapter… do
+    /// (<see cref="DenTools.AddChapter"/>). It's a <c>new</c> because it
+    /// makes something, as <c>new series</c> and <c>new book</c> do, and
+    /// <c>chapter</c> is a reserved type key (types.md F-TYPE-2), so it
+    /// never names a note's type. It reads <c>book.md</c> and writes it in
+    /// one go, so it passes no hash.
+    /// </summary>
+    private static int RunChapter(CommandLine line, TextWriter output, TextWriter error)
+    {
+        foreach (var option in new[] { "--from", "--slug", "--chapters" })
+        {
+            if (line.Value(option) is not null)
+            {
+                error.WriteLine($"wolfden new: {option} isn't for a chapter.");
+                return CliApp.ExitUsage;
+            }
+        }
+
+        foreach (var flag in new[] { "--first", "--allow-relinks" })
+        {
+            if (line.Has(flag))
+            {
+                error.WriteLine(flag == "--first"
+                    ? "wolfden new: --first isn't for a chapter: it goes at the end, or --after the chapter you name."
+                    : "wolfden new: --allow-relinks is for a note: a new chapter never changes which note a link reaches.");
+                return CliApp.ExitUsage;
+            }
+        }
+
+        var title = line.Arguments.Count > 1 ? line.Arguments[1] : null;
+        if (!string.IsNullOrWhiteSpace(title) && Wolfden.Core.Editing.NewEntity.NameProblem(title) is { } titleProblem)
+        {
+            error.WriteLine($"wolfden new: give the chapter a title of one line, at most {Wolfden.Core.Editing.NewEntity.MaxNameLength} characters, or none. That one can't be used: {titleProblem}.");
+            return CliApp.ExitUsage;
+        }
+
+        if (line.Value("--in") is not { } place || string.IsNullOrWhiteSpace(place))
+        {
+            error.WriteLine("wolfden new: give the book with --in, such as: wolfden new chapter \"The Quiet Hour\" --in dracula --after 3.");
+            return CliApp.ExitUsage;
+        }
+
+        if (DenLocation.Resolve(Spec.Name, line.Value("--den"), error) is not { } root)
+        {
+            return CliApp.ExitUsage;
+        }
+
+        if (!TryBook(root, place.Trim(), out var universe, out var book, out var problem))
+        {
+            error.WriteLine($"wolfden new: {problem}");
+            return CliApp.ExitUsage;
+        }
+
+        ChapterAddResult result;
+        try
+        {
+            result = new DenTools(root) { Words = FreezeCommand.WithDen(Words, line.Value("--den")) }.AddChapter(book, title, line.Value("--after"), universe: universe);
+        }
+        catch (DenToolException e)
+        {
+            error.WriteLine($"wolfden new: {e.Message}");
+            return CliApp.ExitUsage;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or SqliteException)
+        {
+            error.WriteLine($"wolfden new: couldn't read the den at '{root}' or its index: {e.Message}");
+            return CliApp.ExitUsage;
+        }
+
+        if (line.Has("--json"))
+        {
+            CliJson.Write(output, result);
+            return CliApp.ExitOk;
+        }
+
+        output.WriteLine($"Added chapter {result.Position} to {result.Path}");
+        foreach (var effect in result.Effects)
+        {
+            output.WriteLine($"  {effect}");
+        }
+
+        foreach (var w in result.Warnings)
+        {
+            output.WriteLine($"{w.Path}:{w.Line?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "-"}: {w.Severity} {w.Rule}: {w.Message}");
+        }
+
+        return CliApp.ExitOk;
+    }
+
+    /// <summary>
+    /// Reads <c>--in</c> for a new chapter: a book's key (<c>book:&lt;key&gt;</c>
+    /// will do too), or <c>&lt;universe&gt;/&lt;book&gt;</c>. A bare key
+    /// names a book in whichever universe has one by that key; if several
+    /// do, the universe must be named. A universe's key that's also a book's
+    /// (<c>dracula</c> in the Dracula sample) is the book here, since only a
+    /// book holds chapters.
+    /// </summary>
+    private static bool TryBook(string root, string value, out string? universe, out string book, out string problem)
+    {
+        universe = null;
+        problem = "";
+        var structure = Wolfden.Core.Structure.DenStructure.Load(root);
+        var slash = value.IndexOf('/', StringComparison.Ordinal);
+        var named = slash < 0 ? null : value[..slash];
+        book = slash < 0 ? value : value[(slash + 1)..];
+        if (book.StartsWith("book:", StringComparison.Ordinal))
+        {
+            book = book["book:".Length..];
+        }
+
+        if (!structure.IsLoaded)
+        {
+            // The write tools say why the den doesn't load.
+            universe = named;
+            return true;
+        }
+
+        var key = book;
+        if (named is not null)
+        {
+            if (structure.FindUniverse(named) is not { } u)
+            {
+                problem = $"the den has no universe '{named}'. Its universes: {string.Join(", ", structure.Universes.Select(x => x.Key))}.";
+                return false;
+            }
+
+            if (u.FindBook(key) is null)
+            {
+                problem = $"universe '{u.Key}' has no book '{key}'." + (u.Books.Count == 0 ? " It has no books yet." : $" Its books: {string.Join(", ", u.Books.Select(b => b.Key))}.");
+                return false;
+            }
+
+            universe = u.Key;
+            return true;
+        }
+
+        var holders = structure.Universes.Where(u => u.FindBook(key) is not null).ToList();
+        switch (holders.Count)
+        {
+            case 1:
+                universe = holders[0].Key;
+                return true;
+            case 0:
+                var books = structure.Universes.SelectMany(u => u.Books.Select(b => structure.Universes.Count > 1 ? $"{u.Key}/{b.Key}" : b.Key)).ToList();
+                problem = $"the den has no book '{key}', so --in '{value}' doesn't name one." + (books.Count == 0 ? " It has no books yet." : $" Its books: {string.Join(", ", books)}.");
+                return false;
+            default:
+                problem = $"more than one universe has a book '{key}': give --in {string.Join(" or ", holders.Select(u => $"'{u.Key}/{key}'"))}.";
+                return false;
+        }
     }
 
     /// <summary>

@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Routing;
 namespace Wolfden.Api;
 
 /// <summary>
-/// Creating series and books from the web UI (#213; design.md §9):
+/// Creating series and books (#213) and adding chapters (#215) from the web UI (design.md §9):
 /// <c>GET /api/works</c> lists the works a new one can be placed after, with
 /// the hash of the file that lists them, and <c>POST /api/series/create</c>
 /// and <c>POST /api/book/create</c> make one
@@ -34,14 +34,25 @@ namespace Wolfden.Api;
 /// what was made: its kind and key, which the page navigates to, its file,
 /// and every file written.
 /// </para>
+/// <para>
+/// Adding a chapter (#215): <c>GET /api/book/chapters?book=&lt;key&gt;&amp;universe=&lt;key&gt;</c>
+/// gives a book's chapters (key, number, title) with the hash of its
+/// <c>book.md</c> and whether it's final, as the MCP tool <c>get_chapter</c>
+/// does, and <c>POST /api/chapter/create</c> with
+/// <c>{book, universe, title, after, expectedHash}</c> adds one, at the end
+/// or after the chapter <c>after</c> (<see cref="DenTools.AddChapter"/>),
+/// answering 201 with its key, number, and the numbers it changed. A final
+/// book refuses it (<c>frozen</c>), and a stale <c>book.md</c> too
+/// (<c>stale_file</c>).
+/// </para>
 /// </remarks>
 public static class ContainerEndpoints
 {
     /// <summary>The paths under <c>/api</c> that answer GET.</summary>
-    public static readonly IReadOnlyList<string> GetPaths = ["works"];
+    public static readonly IReadOnlyList<string> GetPaths = ["works", "book/chapters"];
 
     /// <summary>The paths under <c>/api</c> that answer POST.</summary>
-    public static readonly IReadOnlyList<string> PostPaths = ["series/create", "book/create"];
+    public static readonly IReadOnlyList<string> PostPaths = ["series/create", "book/create", "chapter/create"];
 
     /// <summary>Maps the endpoints onto <paramref name="api"/>, writing through <paramref name="tools"/>, the server's one set of write tools.</summary>
     internal static void Map(RouteGroupBuilder api, DenTools tools)
@@ -53,6 +64,17 @@ public static class ContainerEndpoints
             tools.CreateBook(
                 Name(body, "book"), body.OptionalText("universe"), body.OptionalText("series"), body.OptionalText("after"), body.OptionalInt("chapters"), Hash(body),
                 body.OptionalBool("first") ?? false))));
+        api.MapGet("/book/chapters", (HttpContext c) => ReadEndpoints.Answer(
+            c, ["book", "universe"], q => tools.GetChapter(q.Text("book") ?? "", null, q.Text("universe"))));
+        api.MapPost("/chapter/create", (Func<HttpContext, Task<IResult>>)(c => Create(c, ["book", "universe", "title", "after", "expectedHash"], body =>
+            tools.AddChapter(
+                body.OptionalText("book") ?? throw new DenToolException(ToolErrorCodes.BadArgument, "Give the key of the book the chapter goes in, in 'book'."),
+                body.RawText("title"),
+                body.OptionalText("after"),
+                body.OptionalText("expectedHash") ?? throw new DenToolException(
+                    ToolErrorCodes.BadArgument,
+                    "Give 'expectedHash': the hash of the book's book.md, from /api/book/chapters. The add is refused if the file has changed since."),
+                body.OptionalText("universe")))));
     }
 
     private static string Name(WriteEndpoints.Body body, string what) =>
@@ -62,7 +84,7 @@ public static class ContainerEndpoints
         ToolErrorCodes.BadArgument,
         "Give 'expectedHash': the hash of the universe.md or series.md that lists the works, from /api/works. The create is refused if the file has changed since.");
 
-    private static async Task<IResult> Create(HttpContext context, string[] members, Func<WriteEndpoints.Body, ContainerCreateResult> create)
+    private static async Task<IResult> Create<T>(HttpContext context, string[] members, Func<WriteEndpoints.Body, T> create)
     {
         if (!context.Request.HasJsonContentType())
         {

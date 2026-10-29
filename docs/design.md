@@ -1069,14 +1069,20 @@ store, so an edit changes only what it means to (format.md §12):
   to create it anyway and then refused. Only the positions the write
   adds count. A position that doesn't resolve and was already in the
   file at the same place (the same kind of position, of the same field
-  or section by name, with the same text) doesn't stop the write; one
-  moved to another place, or written once more, is refused. An empty
+  or section by name, with the same text) doesn't stop the write. A
+  section's `from` or `until` left over is then matched by its kind and
+  text alone, against one that was a section's before, so renaming the
+  heading in Edit file keeps it, as `rename_section` does. One moved to
+  the entity's `from` or a field, or written once more, is refused, and
+  so is one under a field renamed in Edit file. An empty
   value is none, as on disk: `null` in `update_fields`, and an empty or
   blank `from` or `until` for `append_section`, which then appends to a
   section that's there as if none was given. A `position` field value
-  that isn't a position at all (`chapter seven`) is a value that
-  doesn't fit its type, saved with the F-FT-10 warning, as for any
-  field type. The refusal says where to find a chapter key in the
+  that isn't a position at all (`chapter nine`, `dracula:9.2`) is
+  refused too (`bad_position`), so a worse value can't get past where
+  a near miss is refused; on disk it stays the F-FT-10 warning, so a
+  file that already holds one loads as before, and the same-place rule
+  applies to it. The refusal says where to find a chapter key in the
   caller's words (`get_chapter` for MCP, the book's chapters on the
   page). `update_chapter_fields`, `update_chapter_defaults`,
   `move_entity`, and `copy_entity` take no position: a move writes the

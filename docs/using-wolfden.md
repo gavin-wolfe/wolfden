@@ -196,11 +196,13 @@ it holds until then. A fact that doesn't change can still have a
 A typed From or Until has to be a chapter (or book) your universe has.
 A typo, such as `dracula:999`, is refused rather than saved, since the
 fact would drop out of every story-position view. So is one in a field
-that holds positions, such as a thread's Planted. The same goes for a
+that holds positions, such as a thread's Planted, and so is a value
+there that isn't a position at all. The same goes for a
 `from=` or `until=` you type in a section comment with **Edit file**,
 and for an AI assistant's edits. A typo that's already in the note, from
-an edit outside Wolfden, doesn't stop you saving other changes;
-`wolfden check` lists it.
+an edit outside Wolfden, doesn't stop you saving other changes as long
+as it stays where it is (moving it, or renaming the field that holds
+it, counts as typing it anew); `wolfden check` lists it.
 
 Any value can have its own status, such as `candidate` for an option
 you haven't settled, and can be **Pinned** as hard canon.

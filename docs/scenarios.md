@@ -2358,13 +2358,15 @@ comment, and the assistant edits the note again.
   blank `from` or `until` for `append_section`, is none.
 - A thread's `paid_off` or a new `planted` of `dracula:999` is refused
   the same way, since the thread couldn't be placed in story order
-  (types.md F-FT-10). A value that isn't a position at all is saved with
-  the F-FT-10 warning, as for any field type.
+  (types.md F-FT-10). So is a value that isn't a position at all
+  (`chapter nine`, `dracula:9.2`), though in a file it's only the
+  F-FT-10 warning; one already there doesn't stop an edit.
 - The Arc's `from=dracula:999`, already in the file, doesn't stop an
   edit that leaves it alone: the assistant's field change and its text
   for Voice are saved, and `check` still reports it. Writing
   `dracula:999` again somewhere else, or moving it from the Arc's
-  section comment to the note's `from`, is refused.
+  section comment to the note's `from`, is refused. Renaming the Arc's
+  heading in the whole file keeps it, as `rename_section` does.
 - Appending to Voice with an empty `from` is a plain append: empty is
   none, so it asks for no change to the section's positions.
 - A create whose position doesn't resolve is refused for that before
@@ -2384,7 +2386,8 @@ Covered by:
 `WriteToolTests.APositionThatDoesntResolveMovedToAnotherPlaceIsRefused`,
 `WriteToolTests.AnEmptyPositionIsNoneWhenAppendingToASectionThatsThere`,
 `WriteToolTests.APositionIsCheckedBeforeTheLinksAnEntityWouldTake`,
-`FieldEditEndpointTests.AFromThatDoesntResolveIsRefusedAsBadPosition`.
+`WriteToolTests.AnUntouchedSectionPositionKeepsUnderARenamedHeading`,
+`WriteToolTests.APositionFieldValueThatIsntAPositionIsRefusedWhenWritten`.
 
 ## STORE: Wolfden saves, moves, and deletes notes
 

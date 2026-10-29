@@ -65,7 +65,10 @@ internal static class NewCommand
 
     /// <summary>The command's options and commands, in place of the MCP tool's parameters and tools, in its messages.</summary>
     internal static readonly ToolWords Words = new(
-        "pass --allow-relinks", "as <name>", "--slug", "with --in", "use 'wolfden query --brief'", "run 'wolfden check'", "run 'wolfden check'", "run 'wolfden check'");
+        "pass --allow-relinks", "as <name>", "--slug", "with --in", "use 'wolfden query --brief'", "run 'wolfden check'", "run 'wolfden check'", "run 'wolfden check'")
+    {
+        ChapterKeys = "use a chapter key the book's book.md lists",
+    };
 
     /// <summary><c>--in</c>, where the note goes.</summary>
     private static readonly ScopeOption In = new("--in", "create it in", "created");

@@ -371,6 +371,79 @@ public sealed class WriteToolTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "SC-MCP-32")]
+    public void APositionFieldValueThatDoesntResolveIsRefused()
+    {
+        const string Thread = Book + "/entities/threads/renfields-master.md";
+        var before = _den.Read(Thread);
+        var hash = Tools.GetEntity("Renfield's Master").Entity!.Hash!;
+
+        // A thread's planted and paid_off are positions (types.md F-FT-10): a typo would take it out of story order (#211).
+        foreach (var change in new[]
+        {
+            """{"op": "set", "path": "fields.paid_off", "value": "dracula:999"}""",
+            """{"op": "add", "path": "fields.planted", "value": "dracula:999"}""",
+        })
+        {
+            var refused = Assert.Throws<DenToolException>(() => Tools.UpdateFields("Renfield's Master", hash, Json($"[{change}]")));
+            Assert.Equal(ToolErrorCodes.BadPosition, refused.Code);
+            Assert.Contains("dracula:999 doesn't resolve", refused.Message, StringComparison.Ordinal);
+            Assert.Contains("can't be placed in story order", refused.Message, StringComparison.Ordinal);
+            Assert.Equal(before, _den.Read(Thread));
+        }
+
+        // One that resolves is written; one already there, untouched, doesn't stop an edit.
+        var moved = Tools.UpdateFields("Renfield's Master", hash, Json("""[{"op": "set", "path": "fields.paid_off", "value": "dracula:20"}]"""));
+        _den.Write(Thread, _den.Read(Thread).Replace("paid_off: \"dracula:20\"", "paid_off: \"dracula:998\"", StringComparison.Ordinal));
+        hash = Tools.GetEntity("Renfield's Master").Entity!.Hash!;
+        Assert.True(Tools.UpdateFields("Renfield's Master", hash, Json("""[{"op": "add", "path": "fields.planted", "value": "dracula:9"}]""")).Changed);
+        Assert.True(moved.Changed);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-32")]
+    public void APositionThatDoesntResolveMovedToAnotherPlaceIsRefused()
+    {
+        _den.Write(Swales, _den.Read(Swales).Replace("<!-- wolfden: from=dracula:7 -->", "<!-- wolfden: from=dracula:999 -->", StringComparison.Ordinal));
+        var hash = Tools.GetEntity("Mr. Swales").Entity!.Hash!;
+        var before = _den.Read(Swales);
+
+        // Taken off the Arc's section comment and written as the note's 'from', it's in a new place, so it's checked there.
+        var moved = before
+            .Replace("<!-- wolfden: from=dracula:999 -->\n", "", StringComparison.Ordinal)
+            .Replace("from: \"dracula:6\"", "from: \"dracula:999\"", StringComparison.Ordinal);
+        var refused = Assert.Throws<DenToolException>(() => Tools.ReplaceFile("Mr. Swales", moved, hash));
+        Assert.Equal(ToolErrorCodes.BadPosition, refused.Code);
+        Assert.StartsWith("'from' dracula:999", refused.Message, StringComparison.Ordinal);
+        Assert.Equal(before, _den.Read(Swales));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-32")]
+    public void AnEmptyPositionIsNoneWhenAppendingToASectionThatsThere()
+    {
+        var hash = Tools.GetEntity("Mr. Swales").Entity!.Hash!;
+
+        // Empty is none, so it asks for no change to Voice's positions: the text is added, not refused.
+        var result = Tools.AppendSection("Mr. Swales", "Voice", "He calls the gravestones \"lies\".", hash, from: "", until: " ");
+
+        Assert.True(result.Changed);
+        Assert.Contains("hears it.\n\nHe calls the gravestones \"lies\".\n\n## Arc", _den.Read(Swales), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-32")]
+    public void APositionIsCheckedBeforeTheLinksAnEntityWouldTake()
+    {
+        // A universe-scope Jonathan Harker would take links (refused unless allow_relinks), but the position is the refusal.
+        var refused = Assert.Throws<DenToolException>(() => Tools.CreateEntity(
+            "character", "Jonathan Harker", fields: Json("""{"occupation": {"value": "solicitor", "from": "dracula:999"}}""")));
+
+        Assert.Equal(ToolErrorCodes.BadPosition, refused.Code);
+        Assert.Contains("take chapter keys from get_chapter, or leave the position out", refused.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-MCP-17")]
     public void TextGoesIntoASectionOrANewOneInItsPlace()
     {

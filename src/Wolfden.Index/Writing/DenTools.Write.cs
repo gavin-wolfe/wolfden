@@ -644,12 +644,14 @@ public sealed partial class DenTools
             var files = new Dictionary<string, byte[]>(StringComparer.Ordinal) { [made.Path] = bytes };
             var check = Check(den, structure, files);
 
+            // Before the links, so a writer isn't asked to create it anyway and then refused for a position.
+            var entity = EntityCatalog.ReadEntityFile(check.Structure, made.Path, bytes).Entity!;
+            CheckWrittenPositions(null, entity);
+
             // A new name can take links from the entity they reach now (F-LINK-7: the nearest scope wins):
             // refused unless allow_relinks, as for a copy (maintainer decision on #29, 2026-10-28).
             var (_, _, changed) = CheckNewEntityLinks(
                 den, EntityCatalog.Load(structure, den), check, files, allowRelinks, "created", "create it with those links moving to it", "the new entity");
-            var entity = EntityCatalog.ReadEntityFile(check.Structure, made.Path, bytes).Entity!;
-            CheckWrittenPositions(null, entity);
             Save(files, null, created: made.Path);
             var effects = new List<string> { $"Created {made.Path} from the '{type.Key}' template, with id {id}." };
             if (!entity.Status.IsInCanon())
@@ -707,24 +709,27 @@ public sealed partial class DenTools
     }
 
     /// <summary>
-    /// Refuses a write that sets a <c>from</c> or <c>until</c> (of the
-    /// entity, a field entry, or a section comment) that names a book or
-    /// chapter the universe doesn't have (F-POS-4, maintainer decision on
-    /// #211, 2026-10-29), as <see cref="CheckFrom"/> does for a new entity:
-    /// the fact would drop out of every canon view, and a typo would go
-    /// unnoticed until <c>check</c>. Only positions the write adds count:
-    /// one that doesn't resolve and was already in <paramref name="before"/>
-    /// (counted by its text, so the same one written once more is new) is
-    /// left alone. A <c>position</c> field's value isn't a bound: one that
-    /// doesn't resolve is kept, just not placed in story order, so it stays
-    /// a warning.
+    /// Refuses a write that sets a story position that names a book or
+    /// chapter the universe doesn't have (F-POS-4, maintainer decisions on
+    /// #211, 2026-10-29): a <c>from</c> or <c>until</c> of the entity, a
+    /// field entry, or a section comment, or a value of a <c>position</c>
+    /// field (types.md F-FT-10), as <see cref="CheckFrom"/> does for a new
+    /// entity's <c>from</c>. The fact would drop out of canon views, or out
+    /// of story order, and a typo would go unnoticed until <c>check</c>.
+    /// Only positions the write adds count: one that doesn't resolve and
+    /// was already in <paramref name="before"/> at the same place (the same
+    /// kind of position, of the same field or section, with the same text)
+    /// is left alone, so moving it somewhere else, or writing it once more,
+    /// is refused. A <c>position</c> field value that isn't a position at
+    /// all is a value that doesn't fit its type, saved with the F-FT-10
+    /// warning, as for any other field type.
     /// </summary>
-    private static void CheckWrittenPositions(CatalogEntity? before, CatalogEntity after)
+    private void CheckWrittenPositions(CatalogEntity? before, CatalogEntity after)
     {
-        var had = before is null ? [] : UnresolvedBounds(before).Select(r => r.Text).ToList();
-        foreach (var reference in UnresolvedBounds(after))
+        var had = before is null ? [] : UnresolvedReferences(before).Select(Place).ToList();
+        foreach (var reference in UnresolvedReferences(after))
         {
-            if (had.Remove(reference.Text))
+            if (had.Remove(Place(reference)))
             {
                 continue;
             }
@@ -734,17 +739,20 @@ public sealed partial class DenTools
                 PositionSite.EntityFrom => "'from'",
                 PositionSite.EntryFrom => $"'from' of a fields.{reference.Field} entry",
                 PositionSite.EntryUntil => $"'until' of a fields.{reference.Field} entry",
+                PositionSite.FieldValue => $"fields.{reference.Field}",
                 PositionSite.SectionFrom => $"'from' of section '{reference.Section!.Name}'",
                 _ => $"'until' of section '{reference.Section!.Name}'",
             };
+            var lost = reference.Site == PositionSite.FieldValue
+                ? "A position that doesn't resolve can't be placed in story order"
+                : "A fact whose position doesn't resolve is left out of every canon view";
             throw Unresolvable(
                 what, reference.Text, after.Universe, after.Universe.Resolve(reference.Position!).Problem!,
-                "A fact whose position doesn't resolve is left out of every canon view, so nothing was written. " +
-                "Take chapter keys from get_chapter, or leave the position out (or empty) for none.");
+                $"{lost}, so nothing was written. {ToolWords.Cap(Words.ChapterKeys)}, or leave the position out.");
         }
 
-        static IEnumerable<PositionReference> UnresolvedBounds(CatalogEntity entity) =>
-            UnresolvedReferences(entity).Where(r => r.Site != PositionSite.FieldValue);
+        // Where a position is written, as far as it can be told across an edit: lines and item numbers shift.
+        static (PositionSite, string?, string?, string) Place(PositionReference r) => (r.Site, r.Field, r.Section?.Name, r.Text);
     }
 
     /// <summary>The positions written in the entity's file that parse but don't resolve in its universe (F-POS-4), in file order.</summary>

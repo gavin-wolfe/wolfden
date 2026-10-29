@@ -35,13 +35,18 @@ namespace Wolfden.Index.Reading;
 /// How to ask again for one of an ambiguous name's matches, as a sentence:
 /// <c>Ask again with one's key or path, or name its universe.</c>
 /// </param>
+/// <param name="ChapterKeys">
+/// Where to find a position that resolves, lowercase, for a refused one:
+/// <c>take chapter keys from get_chapter</c>.
+/// </param>
 public sealed record ToolWords(
     string AllowRelinks, string NewName, string Slug, string Universe, string FindEntity, string CheckDen, string CheckTool, string CheckPath,
     string PinnedTo = "This session is pinned to universe '{0}' (wolfden mcp --universe)",
     string AllUniverseReads = "search and list_entities",
     string AskAgain = "Ask again with one's key or path, or name its universe.",
     string NameLinks = "Renaming the note (rename_entity) rewrites them.",
-    string AliasLinks = "Changing an alias with change_alias rewrites them.")
+    string AliasLinks = "Changing an alias with change_alias rewrites them.",
+    string ChapterKeys = "take chapter keys from get_chapter")
 {
     /// <summary>The MCP tools' own words, the default.</summary>
     public static ToolWords Mcp { get; } = new(

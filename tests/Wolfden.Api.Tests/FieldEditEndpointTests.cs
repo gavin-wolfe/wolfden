@@ -292,6 +292,17 @@ public class FieldEditEndpointTests
         Assert.Equal(HttpStatusCode.BadRequest, status);
         Assert.Equal("bad_position", json.GetProperty("code").GetString());
         Assert.Equal(Box, den.Read(BoxPath));
+
+        // The writer reads it on the page, so it says what a writer can do, not which MCP tool to call.
+        var message = json.GetProperty("message").GetString()!;
+        Assert.Contains("Pick a chapter the book lists, or leave the position out.", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("get_chapter", message, StringComparison.Ordinal);
+
+        // A position field's value is checked too.
+        (status, json) = await EditAsync(server, hash, "seen", new[] { new { op = "set", path = new object[] { 1 }, value = "dracula:999" } });
+        Assert.Equal(HttpStatusCode.BadRequest, status);
+        Assert.Equal("bad_position", json.GetProperty("code").GetString());
+        Assert.Equal(Box, den.Read(BoxPath));
     }
 
     [Fact]

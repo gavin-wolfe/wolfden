@@ -191,8 +191,8 @@ public sealed class WolfdenTools
         "{\"op\": \"remove\", \"path\": ...} (a key or list item). A path is dotted: 'status', 'from', 'aliases', 'fields.born', " +
         "'fields.rank.1.from' (item numbers from 0). An entry is {\"value\": x, \"from\": \"book:chapter\", \"until\": ..., \"status\": ..., \"pin\": true}. " +
         "The id never changes. Aliases can be added here; to rename the entity, or change or remove an alias, use rename_entity or " +
-        "change_alias, which rewrite the links that used the old text. A 'from' or 'until' you set must be a position the universe has " +
-        "(bad_position otherwise); null leaves it out." + WriteHelp)]
+        "change_alias, which rewrite the links that used the old text. A 'from', 'until', or position field value you set must be a position the " +
+        "universe has (bad_position otherwise); null leaves it out." + WriteHelp)]
     public CallToolResult UpdateFields(
         [Description("The entity: its name, an alias, its file name, its id, its key, or its path.")] string entity,
         [Description(HashHelp)] string expected_hash,

@@ -20,6 +20,10 @@ public sealed class CopyCommandTests : IDisposable
     private (int ExitCode, string Output, string Error) Copy(params string[] args) =>
         Cli.Run(["copy", "--den", _den.Root, .. args]);
 
+    /// <summary>How a refusal's hint gives back the --den it was run with: quoted, without a trailing backslash, if it has anything a shell might read.</summary>
+    private static string DenArgument(string den) =>
+        den.All(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '.' or '/' or '\\' or ':' or '-') ? den : $"\"{den.TrimEnd('\\')}\"";
+
     [Fact]
     [Trait("Scenario", "SC-CLI-13")]
     public void ACopyGoesBesideTheOriginalWithANewIdAndSaysWhatItMeans()
@@ -106,6 +110,7 @@ public sealed class CopyCommandTests : IDisposable
 
         Assert.Equal(CliApp.ExitUsage, frozen.ExitCode);
         Assert.StartsWith("wolfden copy: Book 'aftermath' is final (frozen)", frozen.Error, StringComparison.Ordinal);
+        Assert.Contains($"To open the book for editing again, run: wolfden unfreeze aftermath --universe dracula --den {DenArgument(_den.Root)}", frozen.Error, StringComparison.Ordinal);
         Assert.Equal(CliApp.ExitUsage, relink.ExitCode);
         Assert.Contains("would change which entity they reach", relink.Error, StringComparison.Ordinal);
         Assert.Contains("or pass --allow-relinks to make the copy anyway", relink.Error, StringComparison.Ordinal);

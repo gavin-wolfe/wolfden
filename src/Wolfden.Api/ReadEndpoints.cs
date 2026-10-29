@@ -41,7 +41,10 @@ public static class ReadEndpoints
     public static readonly ToolWords Words = new(
         "add allowRelinks=true", "in 'newName'", "slug", "in 'universe'", "use /api/search or /api/entities", "run 'wolfden check'",
         "run 'wolfden check'", "run 'wolfden check' and look at '{0}'", "This server is pinned to universe '{0}' (wolfden serve --universe)",
-        "/api/search and /api/entities", "Ask again with one of the candidates' keys.");
+        "/api/search and /api/entities", "Ask again with one of the candidates' keys.")
+    {
+        Unfreeze = "POST /api/book/unfreeze opens book '{0}' for editing again.",
+    };
 
     /// <summary>Maps the read endpoints onto <paramref name="api"/>.</summary>
     public static void Map(RouteGroupBuilder api, WolfdenApiOptions options)

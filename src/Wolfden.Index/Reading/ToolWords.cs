@@ -39,6 +39,12 @@ namespace Wolfden.Index.Reading;
 /// Where to find a position that resolves, lowercase, for a refused one:
 /// <c>take chapter keys from get_chapter</c>.
 /// </param>
+/// <param name="Unfreeze">
+/// What to do about a final (frozen) book that refused a write (F-BOOK-1,
+/// #209), as a sentence, with <c>{0}</c> for the book's key and <c>{1}</c>
+/// for its universe's: <c>Ask the writer whether to unfreeze book '{0}'; only they can.</c>
+/// An AI agent can't unfreeze a book, so it asks; a writer is told how.
+/// </param>
 public sealed record ToolWords(
     string AllowRelinks, string NewName, string Slug, string Universe, string FindEntity, string CheckDen, string CheckTool, string CheckPath,
     string PinnedTo = "This session is pinned to universe '{0}' (wolfden mcp --universe)",
@@ -46,7 +52,8 @@ public sealed record ToolWords(
     string AskAgain = "Ask again with one's key or path, or name its universe.",
     string NameLinks = "Renaming the note (rename_entity) rewrites them.",
     string AliasLinks = "Changing an alias with change_alias rewrites them.",
-    string ChapterKeys = "take chapter keys from get_chapter")
+    string ChapterKeys = "take chapter keys from get_chapter",
+    string Unfreeze = "Ask the writer whether to unfreeze book '{0}'; only they can.")
 {
     /// <summary>The MCP tools' own words, the default.</summary>
     public static ToolWords Mcp { get; } = new(
@@ -58,6 +65,9 @@ public sealed record ToolWords(
 
     /// <summary><see cref="PinnedTo"/> for the universe <paramref name="universe"/>.</summary>
     public string Pinned(string universe) => string.Format(CultureInfo.InvariantCulture, PinnedTo, universe);
+
+    /// <summary><see cref="Unfreeze"/> for book <paramref name="book"/> of universe <paramref name="universe"/>.</summary>
+    public string Unfreezing(string book, string universe) => string.Format(CultureInfo.InvariantCulture, Unfreeze, book, universe);
 
     /// <summary><paramref name="words"/> with its first letter capitalized, to start a sentence.</summary>
     public static string Cap(string words) => words.Length == 0 ? words : char.ToUpperInvariant(words[0]) + words[1..];

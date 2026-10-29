@@ -32,7 +32,12 @@ public enum PositionSite
 /// <param name="Line">The 1-based line in the file.</param>
 /// <param name="Field">For an entry or a position field, the field's name.</param>
 /// <param name="Section">For a section comment, its section.</param>
-public sealed record PositionReference(string Text, StoryPosition? Position, PositionSite Site, int Line, string? Field = null, Section? Section = null);
+/// <param name="Content">
+/// For a value in <see cref="PositionScan.NotPositions"/>, its content, to
+/// compare with another (<see cref="PositionScanner.ContentKey"/>); otherwise null.
+/// </param>
+public sealed record PositionReference(
+    string Text, StoryPosition? Position, PositionSite Site, int Line, string? Field = null, Section? Section = null, string? Content = null);
 
 /// <summary>The positions found in a file, and the problems with them.</summary>
 /// <param name="References">Every position, in the order found: frontmatter first, then sections in file order.</param>
@@ -41,7 +46,16 @@ public sealed record PositionReference(string Text, StoryPosition? Position, Pos
 /// comments are already in the file's own <see cref="DenFile.Diagnostics"/>,
 /// so they aren't repeated here.
 /// </param>
-public sealed record PositionScan(IReadOnlyList<PositionReference> References, IReadOnlyList<Diagnostic> Diagnostics);
+/// <param name="NotPositions">
+/// The values of <c>position</c> fields that are a list or a mapping, so
+/// hold no position at all (the F-FT-10 warning in <paramref name="Diagnostics"/>),
+/// in the order found. Each has no <see cref="PositionReference.Position"/>,
+/// and its <see cref="PositionReference.Text"/> is the value in flow
+/// style, such as <c>{a: 1}</c> or <c>[x, y]</c>, so a list starts with
+/// <c>[</c> and a mapping with <c>{</c> (see <see cref="PositionScanner.FlowText"/>).
+/// Its <see cref="PositionReference.Content"/> is what to compare it by.
+/// </param>
+public sealed record PositionScan(IReadOnlyList<PositionReference> References, IReadOnlyList<Diagnostic> Diagnostics, IReadOnlyList<PositionReference> NotPositions);
 
 /// <summary>
 /// Finds the story positions in an entity file (<see cref="Scan(MarkdownFile, IReadOnlySet{string}?)"/>)
@@ -81,6 +95,7 @@ public static class PositionScanner
         ArgumentNullException.ThrowIfNull(file);
         var references = new List<PositionReference>();
         var diagnostics = new List<Diagnostic>();
+        var notPositions = new List<PositionReference>();
         var frontmatter = isContainer ? null : file.Frontmatter;
         if (frontmatter is not null)
         {
@@ -98,7 +113,7 @@ public static class PositionScanner
                         continue;
                     }
 
-                    ScanField(name, entry.Value, positionFields?.Contains(name) == true, references, diagnostics);
+                    ScanField(name, entry.Value, positionFields?.Contains(name) == true, references, diagnostics, notPositions);
                 }
             }
         }
@@ -128,10 +143,11 @@ public static class PositionScanner
             }
         }
 
-        return new PositionScan(references, diagnostics);
+        return new PositionScan(references, diagnostics, notPositions);
     }
 
-    private static void ScanField(string name, YamlNode value, bool isPositionField, List<PositionReference> references, List<Diagnostic> diagnostics)
+    private static void ScanField(
+        string name, YamlNode value, bool isPositionField, List<PositionReference> references, List<Diagnostic> diagnostics, List<PositionReference> notPositions)
     {
         // F-TMP-1: a single entry, a list of entries, or a plain value.
         var entries = value switch
@@ -145,7 +161,7 @@ public static class PositionScanner
         {
             if (isPositionField)
             {
-                ReadFieldValue(name, value, references, diagnostics);
+                ReadFieldValue(name, value, references, diagnostics, notPositions);
             }
 
             return;
@@ -165,7 +181,7 @@ public static class PositionScanner
 
             if (isPositionField && entry["value"] is { } inner)
             {
-                ReadFieldValue(name, inner, references, diagnostics);
+                ReadFieldValue(name, inner, references, diagnostics, notPositions);
             }
         }
     }
@@ -201,11 +217,39 @@ public static class PositionScanner
     }
 
     /// <summary>
+    /// A YAML value in one line of flow style, such as <c>{a: 1, b: [x, "y z"]}</c>,
+    /// to name it in a message: a plain scalar as written, any other quoted
+    /// as a JSON string, a mapping's keys in file order.
+    /// </summary>
+    public static string FlowText(YamlNode node) => node switch
+    {
+        YamlScalar { Style: YamlScalarStyle.Plain } s => s.Text,
+        YamlScalar s => System.Text.Json.JsonSerializer.Serialize(s.Text),
+        YamlSequence l => $"[{string.Join(", ", l.Items.Select(FlowText))}]",
+        YamlMapping m => $"{{{string.Join(", ", m.Entries.Select(e => $"{FlowText(e.Key)}: {FlowText(e.Value)}"))}}}",
+        _ => "",
+    };
+
+    /// <summary>
+    /// A YAML value's content, to tell whether two are the same: a scalar
+    /// by its text alone, quoted or not (F-YAML-5), a mapping's entries
+    /// sorted by key, a list's items in order. Layout and comments don't count.
+    /// </summary>
+    public static string ContentKey(YamlNode node) => node switch
+    {
+        YamlScalar s => System.Text.Json.JsonSerializer.Serialize(s.Text),
+        YamlSequence l => $"[{string.Join(",", l.Items.Select(ContentKey))}]",
+        YamlMapping m => $"{{{string.Join(",", m.Entries.Select(e => $"{ContentKey(e.Key)}:{ContentKey(e.Value)}").Order(StringComparer.Ordinal))}}}",
+        _ => "",
+    };
+
+    /// <summary>
     /// The value of a <c>position</c> field: a position, or a list of them for
     /// a list field. A bad one is a warning (types.md F-FT-10). A null value
     /// is unset (F-FLD-4).
     /// </summary>
-    private static void ReadFieldValue(string field, YamlNode value, List<PositionReference> references, List<Diagnostic> diagnostics)
+    private static void ReadFieldValue(
+        string field, YamlNode value, List<PositionReference> references, List<Diagnostic> diagnostics, List<PositionReference> notPositions)
     {
         var items = value is YamlSequence list ? list.Items : [value];
         foreach (var item in items)
@@ -223,8 +267,10 @@ public static class PositionScanner
                     references.Add(new PositionReference(scalar.Text, position, PositionSite.FieldValue, scalar.Line, field));
                     break;
                 default:
+                    var shape = item is YamlSequence ? "list" : "mapping";
                     diagnostics.Add(new Diagnostic("F-FT-10", DiagnosticSeverity.Warning, item.Line,
-                        $"{field} holds story positions, such as \"ember:14\", not a {(item is YamlSequence ? "list" : "mapping")}: {StoryPosition.InvalidMessage}."));
+                        $"{field} holds story positions, such as \"ember:14\", not a {shape}: {StoryPosition.InvalidMessage}."));
+                    notPositions.Add(new PositionReference(FlowText(item), null, PositionSite.FieldValue, item.Line, field, Content: ContentKey(item)));
                     break;
             }
         }

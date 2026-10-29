@@ -21,6 +21,23 @@ public sealed class FreezeCommandTests : IDisposable
         Cli.Run([args[0], "--den", _den.Root, .. args[1..]]);
 
     [Fact]
+    [Trait("Scenario", "SC-CLI-15")]
+    public void TheUnfreezeHintNamesTheDenItWasGiven()
+    {
+        // Without --den, the hint is as it is; with one, it names that den, quoted if it has anything a shell might read.
+        const string Hint = "To open the book for editing again, run: wolfden unfreeze ash --universe starfall";
+        Assert.Same(NewCommand.Words, FreezeCommand.WithDen(NewCommand.Words, null));
+        Assert.Equal(Hint, NewCommand.Words.Unfreezing("ash", "starfall"));
+        Assert.Equal($"{Hint} --den dens/main", FreezeCommand.WithDen(NewCommand.Words, "dens/main").Unfreezing("ash", "starfall"));
+        Assert.Equal($@"{Hint} --den C:\dens\", FreezeCommand.WithDen(NewCommand.Words, @"C:\dens\").Unfreezing("ash", "starfall"));
+        Assert.Equal($"{Hint} --den \"my {{dens}}\"", FreezeCommand.WithDen(NewCommand.Words, "my {dens}").Unfreezing("ash", "starfall"));
+        Assert.Equal($"{Hint} --den \"it's\"", FreezeCommand.WithDen(NewCommand.Words, "it's").Unfreezing("ash", "starfall"));
+
+        // Quoted, a trailing backslash is dropped, so it can't escape the closing quote.
+        Assert.Equal($@"{Hint} --den ""D:\My Dens""", FreezeCommand.WithDen(NewCommand.Words, @"D:\My Dens\").Unfreezing("ash", "starfall"));
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-CLI-14")]
     public void WithoutHistoryFreezeMarksTheBookFinalAndUnfreezeWritesDraft()
     {

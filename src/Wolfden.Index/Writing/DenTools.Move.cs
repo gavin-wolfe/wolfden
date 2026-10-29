@@ -79,7 +79,7 @@ public sealed partial class DenTools
             if (scope is Book { Status: BookStatus.Final } frozen)
             {
                 throw new DenToolException(
-                    ToolErrorCodes.Frozen, $"Book '{frozen.Key}' is final (frozen), so nothing can be moved into it until it's unfrozen (F-BOOK-1).");
+                    ToolErrorCodes.Frozen, $"Book '{frozen.Key}' is final (frozen), so nothing can be moved into it until it's unfrozen (F-BOOK-1). {Unfreezing(frozen)}");
             }
 
             var to = EntityMove.Destination(target, scope);
@@ -127,7 +127,7 @@ public sealed partial class DenTools
                 throw new DenToolException(
                     ToolErrorCodes.Frozen,
                     $"Links to '{target.Name}' in files of a final (frozen) book would stop reaching it once it's moved (F-LINK-7), and they can't be rewritten to its id " +
-                    $"until the book is unfrozen (F-BOOK-1): {string.Join(", ", plan.FrozenPaths)}. Nothing was changed.");
+                    $"until the book is unfrozen (F-BOOK-1): {string.Join(", ", plan.FrozenPaths)}. Nothing was changed. {Unfreezing(structure, plan.FrozenPaths)}");
             }
 
             var files = plan.Files.ToDictionary(p => p.Key, p => p.Value, StringComparer.Ordinal);

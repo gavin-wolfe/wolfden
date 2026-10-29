@@ -63,7 +63,10 @@ internal static class CopyCommand
     /// <summary>The command's options and commands, in place of the MCP tool's parameters and tools, in its messages.</summary>
     internal static readonly ToolWords Words = new(
         "pass --allow-relinks", "as <new name>", "--slug", "with --universe", "use 'wolfden query --brief'", "run 'wolfden check'", "run 'wolfden check'",
-        "run 'wolfden check'");
+        "run 'wolfden check'")
+    {
+        Unfreeze = FreezeCommand.UnfreezeWords,
+    };
 
     /// <summary><c>--to</c>, where the copy goes.</summary>
     private static readonly ScopeOption To = new("--to", "copy into", "copied");
@@ -97,7 +100,7 @@ internal static class CopyCommand
         WriteResult result;
         try
         {
-            result = new DenTools(root) { Words = Words }.CopyEntity(
+            result = new DenTools(root) { Words = FreezeCommand.WithDen(Words, line.Value("--den")) }.CopyEntity(
                 line.Arguments[0], line.Arguments[1], line.Value("--universe"), toUniverse, toSeries, toBook, line.Value("--slug"), line.Has("--allow-relinks"));
         }
         catch (DenToolException e)

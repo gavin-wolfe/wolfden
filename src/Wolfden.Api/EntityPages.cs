@@ -181,11 +181,13 @@ internal static class EntityPages
 
     /// <summary>
     /// Why the entity can't be edited: it's filed in a final book (format.md
-    /// F-BOOK-1), as the write tools refuse it (<c>frozen</c>). Null if it can be.
+    /// F-BOOK-1), as the write tools refuse it (<c>frozen</c>), and how to
+    /// unfreeze it, in the page's words (<see cref="WriteEndpoints.Words"/>, #209). Null if it can be.
     /// </summary>
     private static string? Frozen(EntityRecord entity, Dictionary<int, ContainerRecord> containers) =>
         containers[entity.ScopeId] is { Kind: "book", BookStatus: "final" } book
-            ? $"{entity.Path} is in book '{book.Key}', which is final (frozen), so it can't be edited until the book is unfrozen (F-BOOK-1)."
+            ? $"{entity.Path} is in book '{book.Key}', which is final (frozen), so it can't be edited until the book is unfrozen (F-BOOK-1). " +
+                WriteEndpoints.Words.Unfreezing(book.Key, Chain(containers, book.Id)[0].Key)
             : null;
 
     /// <summary>The container chain of a scope: the universe, then any series, then any book.</summary>

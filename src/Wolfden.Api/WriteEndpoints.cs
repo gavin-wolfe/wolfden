@@ -59,6 +59,7 @@ public static partial class WriteEndpoints
         NameLinks = "An AI assistant working through Wolfden can rename the note and rewrite those links.",
         AliasLinks = "An AI assistant working through Wolfden can change an alias and rewrite those links.",
         ChapterKeys = "pick a chapter the book lists",
+        Unfreeze = "Unfreeze… on the page of book '{0}' opens it for editing again.",
     };
 
     /// <summary>Maps the editing endpoints onto <paramref name="api"/>.</summary>

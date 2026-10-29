@@ -486,6 +486,100 @@ public sealed class WriteToolTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "SC-MCP-32")]
+    public void AMappingOrListInAPositionFieldIsRefusedWhenWritten()
+    {
+        const string Thread = Book + "/entities/threads/renfields-master.md";
+        var before = _den.Read(Thread);
+        var hash = Tools.GetEntity("Renfield's Master").Entity!.Hash!;
+
+        // Only the F-FT-10 warning on disk, but refused when written (#222). The example is in the den's own keys.
+        foreach (var (change, shape) in new[]
+        {
+            ("""{"op": "set", "path": "fields.paid_off", "value": {"a": 1}}""", "a mapping"),
+            ("""{"op": "set", "path": "fields.planted", "value": [["dracula:9"]]}""", "a list"),
+        })
+        {
+            var refused = Assert.Throws<DenToolException>(() => Tools.UpdateFields("Renfield's Master", hash, Json($"[{change}]")));
+            Assert.Equal(ToolErrorCodes.BadPosition, refused.Code);
+            Assert.Contains($"is {shape} (", refused.Message, StringComparison.Ordinal);
+            Assert.Contains("), not a story position. It holds positions, such as 'dracula:1' (book:chapter), so nothing was written.", refused.Message, StringComparison.Ordinal);
+            Assert.DoesNotContain("dracula:5", refused.Message, StringComparison.Ordinal);
+            Assert.Equal(before, _den.Read(Thread));
+        }
+
+        // One already in the file, at the same place, doesn't stop an edit; written into another field, it does.
+        _den.Write(Thread, before.Replace("paid_off: \"dracula:21\"", "paid_off: { a: 1 }", StringComparison.Ordinal));
+        hash = Tools.GetEntity("Renfield's Master").Entity!.Hash!;
+        var kept = Tools.UpdateFields("Renfield's Master", hash, Json("""[{"op": "add", "path": "fields.planted", "value": "dracula:9"}]"""));
+        Assert.True(kept.Changed);
+        Assert.Equal(ToolErrorCodes.BadPosition, Assert.Throws<DenToolException>(() =>
+            Tools.UpdateFields("Renfield's Master", kept.Hash, Json("""[{"op": "set", "path": "fields.planted", "value": {"a": 1}}]"""))).Code);
+
+        // The same place counts its content too, as for a scalar: another mapping in its place is new.
+        var changed = Assert.Throws<DenToolException>(() =>
+            Tools.UpdateFields("Renfield's Master", kept.Hash, Json("""[{"op": "set", "path": "fields.paid_off", "value": {"b": 2}}]""")));
+        Assert.Equal(ToolErrorCodes.BadPosition, changed.Code);
+        Assert.Contains("fields.paid_off is a mapping (", changed.Message, StringComparison.Ordinal);
+        Assert.Contains("2}), not a story position", changed.Message, StringComparison.Ordinal);
+
+        // A long value is cut short in the message.
+        var longer = Assert.Throws<DenToolException>(() =>
+            Tools.UpdateFields("Renfield's Master", kept.Hash, Json($$$"""[{"op": "set", "path": "fields.paid_off", "value": {"note": "{{{new string('x', 200)}}}"}}]""")));
+        Assert.Contains("…), not a story position", longer.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(new string('x', 100), longer.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-32")]
+    public void AMappingInAPositionFieldIsTheSameWithItsKeysReorderedOrItsScalarsRequoted()
+    {
+        const string Thread = Book + "/entities/threads/renfields-master.md";
+        _den.Write(Thread, _den.Read(Thread).Replace("paid_off: \"dracula:21\"", "paid_off: { a: 1, b: \"y\" }", StringComparison.Ordinal));
+        var hash = Tools.GetEntity("Renfield's Master").Entity!.Hash!;
+
+        // Scalars are text as written (F-YAML-5), and a mapping's keys have no order, so this is the value the file had.
+        var same = _den.Read(Thread).Replace("paid_off: { a: 1, b: \"y\" }", "paid_off: { b: y, a: \"1\" }", StringComparison.Ordinal);
+        Assert.True(Tools.ReplaceFile("Renfield's Master", same, hash).Changed);
+
+        // A changed value is new, and refused.
+        var now = Tools.GetEntity("Renfield's Master").Entity!.Hash!;
+        var other = _den.Read(Thread).Replace("paid_off: { b: y, a: \"1\" }", "paid_off: { b: y, a: 2 }", StringComparison.Ordinal);
+        Assert.Equal(ToolErrorCodes.BadPosition, Assert.Throws<DenToolException>(() => Tools.ReplaceFile("Renfield's Master", other, now)).Code);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-32")]
+    public void ARefusedPositionsExampleUsesTheUniversesOwnKeys()
+    {
+        // A universe whose only book lists no chapters gets the generic example.
+        _den.Write("universes/carmilla/universe.md", "---\nid: 01M4TF5F0EKGGWD5FNVBAEY8Z6\nname: Carmilla\n---\n");
+        _den.Write("universes/carmilla/books/carmilla/book.md", "---\nid: 01M4TF5F0EKGGWD5FNVBAEY8Z7\nname: Carmilla\nstatus: draft\n---\n");
+
+        var generic = Assert.Throws<DenToolException>(() => Tools.CreateEntity("character", "Laura", universe: "carmilla", from: "carmilla:1:2"));
+        Assert.Equal(ToolErrorCodes.BadPosition, generic.Code);
+        Assert.EndsWith("Give one such as 'book:chapter'.", generic.Message, StringComparison.Ordinal);
+
+        var own = Assert.Throws<DenToolException>(() => Tools.CreateEntity("character", "Sister Agatha", universe: "dracula", from: "dracula:1:2"));
+        Assert.EndsWith("Give one such as 'dracula:1' (book:chapter).", own.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-32")]
+    public void ARefusedPositionsExampleSkipsABookWhoseKeyIsShared()
+    {
+        using var den = TempDen.Starfall();
+        var tools = new DenTools(den.Root);
+        DenToolException Refused() => Assert.Throws<DenToolException>(() => tools.CreateEntity("character", "Iven Sol", universe: "starfall", from: "ember:1:2"));
+        Assert.EndsWith("Give one such as 'ember:prologue' (book:chapter).", Refused().Message, StringComparison.Ordinal);
+
+        // A second 'ember' makes the key ambiguous (F-KEY-5), so neither is the example: positions in it don't resolve.
+        den.Write("universes/starfall/series/drift-war/series.md", "---\nid: 01JA3E28JT97KB6CQ643DZVMXY\nname: The Drift War\nbooks: [ember]\n---\n");
+        den.Write("universes/starfall/series/drift-war/books/ember/book.md", "---\nid: 01JB0000000000000000000A02\nname: Ember of the Drift\nchapters: [1, 2]\n---\n");
+        Assert.EndsWith("Give one such as 'ash:1' (book:chapter).", Refused().Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-MCP-17")]
     public void TextGoesIntoASectionOrANewOneInItsPlace()
     {
@@ -541,6 +635,23 @@ public sealed class WriteToolTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "SC-MCP-18")]
+    public void AnIdeaForAnExistingEntityRefusesTheNewEntitysParameters()
+    {
+        var before = _den.Read(Swales);
+        var hash = Tools.GetEntity("Mr. Swales").Entity!.Hash!;
+
+        var named = Assert.Throws<DenToolException>(() => Tools.AddIdea("Perhaps.", entity: "Mr. Swales", expectedHash: hash, name: "Swales' sight"));
+        Assert.Equal(ToolErrorCodes.BadArgument, named.Code);
+
+        // allow_relinks is for a new idea entity too: a section takes no links from another entity (#204).
+        var relinks = Assert.Throws<DenToolException>(() => Tools.AddIdea("Perhaps.", entity: "Mr. Swales", expectedHash: hash, allowRelinks: true));
+        Assert.Equal(ToolErrorCodes.BadArgument, relinks.Code);
+        Assert.Contains("'allow_relinks' is for a new idea entity", relinks.Message, StringComparison.Ordinal);
+        Assert.Equal(before, _den.Read(Swales));
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-MCP-19")]
     public void RenamingASectionRewritesTheLinksToIt()
     {
@@ -591,6 +702,7 @@ public sealed class WriteToolTests : IDisposable
 
         Assert.Equal(ToolErrorCodes.Frozen, refused.Code);
         Assert.Contains("aftermath/entities/notes/memories.md", refused.Message, StringComparison.Ordinal);
+        Assert.EndsWith("Ask the writer whether to unfreeze book 'aftermath'; only they can.", refused.Message, StringComparison.Ordinal);
         Assert.Equal(before, _den.Read(Swales));
     }
 
@@ -630,11 +742,25 @@ public sealed class WriteToolTests : IDisposable
         var before = _den.Read(Swales);
         var hash = Tools.GetEntity("Mr. Swales").Entity!.Hash!;
 
-        Assert.Equal(ToolErrorCodes.Frozen, Assert.Throws<DenToolException>(() => Tools.AppendSection("Mr. Swales", "Voice", "More.", hash)).Code);
-        Assert.Equal(ToolErrorCodes.Frozen, Assert.Throws<DenToolException>(() => Tools.CreateEntity("character", "Sister Agatha", book: "dracula")).Code);
         var chapter = Tools.GetChapter("dracula", "1");
         Assert.True(chapter.Final);
-        Assert.Equal(ToolErrorCodes.Frozen, Assert.Throws<DenToolException>(() => Tools.UpdateChapterFields("dracula", "1", chapter.Hash, Json("""[{"op": "set", "field": "tense", "value": "present"}]"""))).Code);
+        var chapterDefaults = Tools.GetChapterDefaults(book: "dracula");
+        DenToolException[] refused =
+        [
+            Assert.Throws<DenToolException>(() => Tools.AppendSection("Mr. Swales", "Voice", "More.", hash)),
+            Assert.Throws<DenToolException>(() => Tools.CreateEntity("character", "Sister Agatha", book: "dracula")),
+            Assert.Throws<DenToolException>(() => Tools.UpdateChapterFields("dracula", "1", chapter.Hash, Json("""[{"op": "set", "field": "tense", "value": "present"}]"""))),
+            Assert.Throws<DenToolException>(() => Tools.UpdateChapterDefaults(chapterDefaults.Hash, Json("""[{"op": "set", "field": "tense", "value": "present"}]"""), book: "dracula")),
+            Assert.Throws<DenToolException>(() => Tools.CopyEntity("Bistritz", "Bistritz Again", toBook: "dracula")),
+            Assert.Throws<DenToolException>(() => Tools.MoveEntity("Bistritz", Tools.GetEntity("Bistritz").Entity!.Hash!, toBook: "dracula")),
+        ];
+
+        // Each says what an agent does next: ask the writer, who alone can unfreeze it (design.md §8, #209).
+        Assert.All(refused, e =>
+        {
+            Assert.Equal(ToolErrorCodes.Frozen, e.Code);
+            Assert.EndsWith("Ask the writer whether to unfreeze book 'dracula'; only they can.", e.Message, StringComparison.Ordinal);
+        });
         Assert.Equal(before, _den.Read(Swales));
 
         // The universe isn't frozen.

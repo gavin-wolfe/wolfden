@@ -199,6 +199,7 @@ public sealed class MoveEntityToolTests : IDisposable
 
         Assert.Equal(ToolErrorCodes.Frozen, refused.Code);
         Assert.Contains(EmberOutline, refused.Message, StringComparison.Ordinal);
+        Assert.EndsWith("Nothing was changed. Ask the writer whether to unfreeze book 'ember'; only they can.", refused.Message, StringComparison.Ordinal);
         Assert.Equal(before, _den.Read(Tessaly));
         Assert.False(File.Exists(Path.Combine(_den.Root, Ash + "/entities/ships/tessaly.md")));
 

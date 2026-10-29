@@ -32,7 +32,12 @@ public enum PositionSite
 /// <param name="Line">The 1-based line in the file.</param>
 /// <param name="Field">For an entry or a position field, the field's name.</param>
 /// <param name="Section">For a section comment, its section.</param>
-public sealed record PositionReference(string Text, StoryPosition? Position, PositionSite Site, int Line, string? Field = null, Section? Section = null);
+/// <param name="Content">
+/// For a value in <see cref="PositionScan.NotPositions"/>, its content, to
+/// compare with another (<see cref="PositionScanner.ContentKey"/>); otherwise null.
+/// </param>
+public sealed record PositionReference(
+    string Text, StoryPosition? Position, PositionSite Site, int Line, string? Field = null, Section? Section = null, string? Content = null);
 
 /// <summary>The positions found in a file, and the problems with them.</summary>
 /// <param name="References">Every position, in the order found: frontmatter first, then sections in file order.</param>
@@ -48,6 +53,7 @@ public sealed record PositionReference(string Text, StoryPosition? Position, Pos
 /// and its <see cref="PositionReference.Text"/> is the value in flow
 /// style, such as <c>{a: 1}</c> or <c>[x, y]</c>, so a list starts with
 /// <c>[</c> and a mapping with <c>{</c> (see <see cref="PositionScanner.FlowText"/>).
+/// Its <see cref="PositionReference.Content"/> is what to compare it by.
 /// </param>
 public sealed record PositionScan(IReadOnlyList<PositionReference> References, IReadOnlyList<Diagnostic> Diagnostics, IReadOnlyList<PositionReference> NotPositions);
 
@@ -212,9 +218,8 @@ public static class PositionScanner
 
     /// <summary>
     /// A YAML value in one line of flow style, such as <c>{a: 1, b: [x, "y z"]}</c>,
-    /// for comparing two values by content and naming one in a message: a
-    /// plain scalar as written, any other quoted as a JSON string, a
-    /// mapping's keys in file order. Layout and comments don't count.
+    /// to name it in a message: a plain scalar as written, any other quoted
+    /// as a JSON string, a mapping's keys in file order.
     /// </summary>
     public static string FlowText(YamlNode node) => node switch
     {
@@ -222,6 +227,19 @@ public static class PositionScanner
         YamlScalar s => System.Text.Json.JsonSerializer.Serialize(s.Text),
         YamlSequence l => $"[{string.Join(", ", l.Items.Select(FlowText))}]",
         YamlMapping m => $"{{{string.Join(", ", m.Entries.Select(e => $"{FlowText(e.Key)}: {FlowText(e.Value)}"))}}}",
+        _ => "",
+    };
+
+    /// <summary>
+    /// A YAML value's content, to tell whether two are the same: a scalar
+    /// by its text alone, quoted or not (F-YAML-5), a mapping's entries
+    /// sorted by key, a list's items in order. Layout and comments don't count.
+    /// </summary>
+    public static string ContentKey(YamlNode node) => node switch
+    {
+        YamlScalar s => System.Text.Json.JsonSerializer.Serialize(s.Text),
+        YamlSequence l => $"[{string.Join(",", l.Items.Select(ContentKey))}]",
+        YamlMapping m => $"{{{string.Join(",", m.Entries.Select(e => $"{ContentKey(e.Key)}:{ContentKey(e.Value)}").Order(StringComparer.Ordinal))}}}",
         _ => "",
     };
 
@@ -252,7 +270,7 @@ public static class PositionScanner
                     var shape = item is YamlSequence ? "list" : "mapping";
                     diagnostics.Add(new Diagnostic("F-FT-10", DiagnosticSeverity.Warning, item.Line,
                         $"{field} holds story positions, such as \"ember:14\", not a {shape}: {StoryPosition.InvalidMessage}."));
-                    notPositions.Add(new PositionReference(FlowText(item), null, PositionSite.FieldValue, item.Line, field));
+                    notPositions.Add(new PositionReference(FlowText(item), null, PositionSite.FieldValue, item.Line, field, Content: ContentKey(item)));
                     break;
             }
         }

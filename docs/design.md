@@ -1096,8 +1096,10 @@ store, so an edit changes only what it means to (format.md §12):
   position goes (`paid_off: {a: 1}`, #222). On disk each stays the
   F-FT-10 warning, so a file that already holds one loads as before,
   and the same-place rule applies to it (a mapping or a list matches
-  one with the same content in the same field, written out in flow
-  style, so layout and comments don't count). The refusal says where to
+  one with the same content in the same field: its scalars by their
+  text, quoted or not (F-YAML-5), and a mapping's keys in any order,
+  so layout and comments don't count either). The refusal names the
+  value, cut to 80 characters, and says where to
   find a chapter key in the caller's words (`get_chapter` for MCP, the
   book's chapters on the page). Its example, as for `create_entity`'s
   `from`, is in the universe's own keys: the first chapter of its

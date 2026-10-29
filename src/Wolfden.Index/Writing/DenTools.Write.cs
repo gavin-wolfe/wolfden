@@ -779,7 +779,7 @@ public sealed partial class DenTools
             {
                 throw new DenToolException(
                     ToolErrorCodes.BadPosition,
-                    $"{what} is {(reference.Text.StartsWith('{') ? "a mapping" : "a list")} ({reference.Text}), not a story position. It holds positions, such as {PositionExample(after.Universe)}, " +
+                    $"{what} is {(reference.Text.StartsWith('{') ? "a mapping" : "a list")} ({(reference.Text.Length > 80 ? reference.Text[..80] + "…" : reference.Text)}), not a story position. It holds positions, such as {PositionExample(after.Universe)}, " +
                     $"so nothing was written. {ToolWords.Cap(Words.ChapterKeys)}, or leave the position out.");
             }
 
@@ -812,7 +812,7 @@ public sealed partial class DenTools
 
         // Where a position is written, as far as it can be told across an edit: lines and item numbers shift.
         static (PositionSite, string?, string?, string, bool) Place((PositionReference Reference, bool Shape) bad) =>
-            (bad.Reference.Site, bad.Reference.Field, bad.Reference.Section?.Name, bad.Reference.Text, bad.Shape);
+            (bad.Reference.Site, bad.Reference.Field, bad.Reference.Section?.Name, bad.Reference.Content ?? bad.Reference.Text, bad.Shape);
     }
 
     /// <summary>The positions written in the entity's file that parse but don't resolve in its universe (F-POS-4), in file order.</summary>

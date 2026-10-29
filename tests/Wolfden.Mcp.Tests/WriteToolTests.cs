@@ -522,6 +522,30 @@ public sealed class WriteToolTests : IDisposable
         Assert.Equal(ToolErrorCodes.BadPosition, changed.Code);
         Assert.Contains("fields.paid_off is a mapping (", changed.Message, StringComparison.Ordinal);
         Assert.Contains("2}), not a story position", changed.Message, StringComparison.Ordinal);
+
+        // A long value is cut short in the message.
+        var longer = Assert.Throws<DenToolException>(() =>
+            Tools.UpdateFields("Renfield's Master", kept.Hash, Json($$$"""[{"op": "set", "path": "fields.paid_off", "value": {"note": "{{{new string('x', 200)}}}"}}]""")));
+        Assert.Contains("…), not a story position", longer.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(new string('x', 100), longer.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-32")]
+    public void AMappingInAPositionFieldIsTheSameWithItsKeysReorderedOrItsScalarsRequoted()
+    {
+        const string Thread = Book + "/entities/threads/renfields-master.md";
+        _den.Write(Thread, _den.Read(Thread).Replace("paid_off: \"dracula:21\"", "paid_off: { a: 1, b: \"y\" }", StringComparison.Ordinal));
+        var hash = Tools.GetEntity("Renfield's Master").Entity!.Hash!;
+
+        // Scalars are text as written (F-YAML-5), and a mapping's keys have no order, so this is the value the file had.
+        var same = _den.Read(Thread).Replace("paid_off: { a: 1, b: \"y\" }", "paid_off: { b: y, a: \"1\" }", StringComparison.Ordinal);
+        Assert.True(Tools.ReplaceFile("Renfield's Master", same, hash).Changed);
+
+        // A changed value is new, and refused.
+        var now = Tools.GetEntity("Renfield's Master").Entity!.Hash!;
+        var other = _den.Read(Thread).Replace("paid_off: { b: y, a: \"1\" }", "paid_off: { b: y, a: 2 }", StringComparison.Ordinal);
+        Assert.Equal(ToolErrorCodes.BadPosition, Assert.Throws<DenToolException>(() => Tools.ReplaceFile("Renfield's Master", other, now)).Code);
     }
 
     [Fact]

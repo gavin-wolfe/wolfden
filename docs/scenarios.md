@@ -1302,9 +1302,10 @@ dracula:8`.
   blank name, one with a line break in it (U+2028 and U+2029 included),
   or one over 200 characters, or a `den.yaml` that doesn't load exits 2
   and writes nothing. The refusal for a final book says how to unfreeze
-  it: "Run 'wolfden unfreeze aftermath --universe dracula' to open the
-  book for editing again." (#209). Given `--den`, the hint passes the
-  same `--den` on, quoted if it has a space.
+  it: "To open the book for editing again, run: wolfden unfreeze
+  aftermath --universe dracula" (#209). Given `--den`, the hint passes
+  the same `--den` on, in double quotes (without a trailing backslash)
+  if it has anything but letters, digits, and `_ . / \ : -`.
 
 Spec: types.md F-TPL-6, design.md §7 (#29). Covered by:
 `NewCommandTests.ANewNoteComesFromItsTemplateInTheUniverseWithANewId`,
@@ -2442,7 +2443,8 @@ Covered by:
 `WriteToolTests.APositionIsCheckedBeforeTheLinksAnEntityWouldTake`,
 `WriteToolTests.AnUntouchedSectionPositionKeepsUnderARenamedHeading`,
 `WriteToolTests.APositionFieldValueThatIsntAPositionIsRefusedWhenWritten`,
-  `WriteToolTests.AMappingOrListInAPositionFieldIsRefusedWhenWritten`,
+`WriteToolTests.AMappingOrListInAPositionFieldIsRefusedWhenWritten`,
+`WriteToolTests.AMappingInAPositionFieldIsTheSameWithItsKeysReorderedOrItsScalarsRequoted`,
 `WriteToolTests.ARefusedPositionsExampleUsesTheUniversesOwnKeys`,
 `WriteToolTests.ARefusedPositionsExampleSkipsABookWhoseKeyIsShared`.
 

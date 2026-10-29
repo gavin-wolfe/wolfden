@@ -2341,6 +2341,54 @@ Spec: design.md §6, §8 (maintainer decision of 2026-10-27, #30).
 Covered by: `HistoryToolTests.AfterANotesPassTheAssistantMakesOneCheckpointNamedForIt`,
 `HistoryToolTests.ACheckpointSaysWhichFilesTheSessionWroteAndWhichChangedOutsideIt`.
 
+### SC-MCP-32. My assistant edits a note with a chapter that isn't there
+
+The assistant moves when Mr. Swales's death is learned to `dracula:999`,
+a chapter Dracula doesn't have, and adds a section from it; later the
+writer, editing by hand, makes the same slip in his Arc's section
+comment, and the assistant edits the note again.
+
+- `update_fields` refuses a `from` or `until` that doesn't resolve
+  (`bad_position`): the note's `from`, an entry's `from` or `until`,
+  and a new entry's, naming the position and where it was going. So
+  does `append_section` for a new section's `from` or `until`, and
+  `create_entity` for a field entry's. Nothing is written: the fact
+  would have dropped out of every canon view (F-POS-4). A position
+  that resolves is written; `null` in `update_fields`, or an empty or
+  blank `from` or `until` for `append_section`, is none.
+- A thread's `paid_off` or a new `planted` of `dracula:999` is refused
+  the same way, since the thread couldn't be placed in story order
+  (types.md F-FT-10). So is a value that isn't a position at all
+  (`chapter nine`, `dracula:9.2`), though in a file it's only the
+  F-FT-10 warning; one already there doesn't stop an edit.
+- The Arc's `from=dracula:999`, already in the file, doesn't stop an
+  edit that leaves it alone: the assistant's field change and its text
+  for Voice are saved, and `check` still reports it. Writing
+  `dracula:999` again somewhere else, or moving it from the Arc's
+  section comment to the note's `from`, is refused. Renaming the Arc's
+  heading in the whole file keeps it, as `rename_section` does.
+- Appending to Voice with an empty `from` is a plain append: empty is
+  none, so it asks for no change to the section's positions.
+- A create whose position doesn't resolve is refused for that before
+  the links it would take, so the writer isn't asked to create it
+  anyway first. The message says to take chapter keys from
+  `get_chapter`; on the web page it says to pick a chapter the book
+  lists.
+
+Spec: format.md F-POS-4, types.md F-FT-10 (maintainer decisions on
+#211 and #217, 2026-10-29).
+Covered by:
+`WriteToolTests.AFieldEditThatSetsAPositionThatDoesntResolveIsRefused`,
+`WriteToolTests.ANewSectionWhosePositionDoesntResolveIsRefused`,
+`WriteToolTests.APositionThatDoesntResolveAndIsntTouchedDoesntStopAnEdit`,
+`WriteToolTests.ANewEntitysFieldEntryMustResolveToo`,
+`WriteToolTests.APositionFieldValueThatDoesntResolveIsRefused`,
+`WriteToolTests.APositionThatDoesntResolveMovedToAnotherPlaceIsRefused`,
+`WriteToolTests.AnEmptyPositionIsNoneWhenAppendingToASectionThatsThere`,
+`WriteToolTests.APositionIsCheckedBeforeTheLinksAnEntityWouldTake`,
+`WriteToolTests.AnUntouchedSectionPositionKeepsUnderARenamedHeading`,
+`WriteToolTests.APositionFieldValueThatIsntAPositionIsRefusedWhenWritten`.
+
 ## STORE: Wolfden saves, moves, and deletes notes
 
 Background: the den store (design.md §6, #121) is how Wolfden writes a
@@ -3600,9 +3648,14 @@ Spec: design.md §9 (#28). Covered by:
   Wolfden can rename the note and rewrite them.
 - Text that would leave an error, such as frontmatter that doesn't parse,
   is refused with the errors, and nothing is written.
+- A `from=` or `until=` typed in a section comment that names a chapter
+  the universe doesn't have (`dracula:999`) is refused (`bad_position`),
+  as the assistant's edits are (SC-MCP-32). One already in the file,
+  left as it is, doesn't stop the save.
 
 Spec: design.md §9 (#28). Covered by:
 `WriteEndpointTests.EditFileReplacesTheWholeFileButNeverItsId`,
+`WriteEndpointTests.EditFileRefusesAPositionThatDoesntResolveButKeepsOneAlreadyThere`,
 `WriteEndpointTests.EditFileRefusesAnIdAnotherFileHasOrOneThatIsntAnId`,
 `WriteEndpointTests.EditFileSaysInTheWritersWordsThatLinksToTheOldNameWerentRewritten`,
 `WriteEndpointTests.AnEditThatWouldLeaveAnErrorIsRefusedWithTheErrors`,
@@ -3999,7 +4052,8 @@ Spec: format.md §12, F-RT-1, F-RT-3. Covered by:
   side: Keep mine saves (or clears) on the new hash, Take theirs drops
   mine.
 - A From that isn't a position is refused with the errors
-  (`invalid_edit`), and the form stays open. A note in a final book is
+  (`invalid_edit`), and one that names a chapter the universe doesn't
+  have is `bad_position` (SC-MCP-32); either way the form stays open. A note in a final book is
   `frozen`.
 - An edit names one field, and its paths stay under it: a field name
   that isn't one (F-FLD-1), a path with a dot, an unknown op or member,
@@ -4008,6 +4062,7 @@ Spec: format.md §12, F-RT-1, F-RT-3. Covered by:
 
 Spec: design.md §8 "Stale files", §9. Covered by:
 `FieldEditEndpointTests.AStaleFrozenOrInvalidFieldEditIsRefusedAndNothingIsWritten`,
+`FieldEditEndpointTests.AFromThatDoesntResolveIsRefusedAsBadPosition`,
 `FieldEditing.test.tsx` (web).
 
 ### SC-WEB-66. I freeze and unfreeze a book on its page

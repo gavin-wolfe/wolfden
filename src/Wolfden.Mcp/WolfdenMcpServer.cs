@@ -27,9 +27,9 @@ public static class WolfdenMcpServer
 
         A story position is 'book:chapter' using the den's keys (such as 'dracula:5'), or a bare book key for the start of that
         book. Facts can carry the position where the reader learns them (from) and where they stop holding (until), so canon
-        changes as the story goes on. Chapter keys come from get_chapter. A read at a position the universe doesn't have, or
-        create_entity with one as from, is refused (bad_position). update_fields and append_section write it anyway, and the fact
-        is then left out of canon views, so take keys from get_chapter.
+        changes as the story goes on. Chapter keys come from get_chapter. A read at a position the universe doesn't have, or a
+        write (create_entity, update_fields, append_section) that sets one as a from or until, or as a position field's value
+        (such as a thread's planted), is refused (bad_position), and nothing is written.
 
         Every tool except check reads one universe. A den with one universe uses it. In a den with several, pass 'universe'
         (its key), or a position whose book only one universe has, which settles it. Only search and list_entities take

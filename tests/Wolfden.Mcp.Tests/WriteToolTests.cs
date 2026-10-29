@@ -279,6 +279,213 @@ public sealed class WriteToolTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "SC-MCP-32")]
+    public void AFieldEditThatSetsAPositionThatDoesntResolveIsRefused()
+    {
+        var before = _den.Read(Swales);
+        var hash = Tools.GetEntity("Mr. Swales").Entity!.Hash!;
+
+        // F-POS-4: the entity's 'from', an entry's 'from' or 'until', and a new entry's, each refused as create_entity does (#211).
+        foreach (var change in new[]
+        {
+            """{"op": "set", "path": "from", "value": "dracula:999"}""",
+            """{"op": "set", "path": "fields.died.from", "value": "dracula:999"}""",
+            """{"op": "set", "path": "fields.died.until", "value": "dracul:8"}""",
+            """{"op": "set", "path": "fields.occupation", "value": {"value": "sailor", "from": "dracula:999"}}""",
+        })
+        {
+            var refused = Assert.Throws<DenToolException>(() => Tools.UpdateFields("Mr. Swales", hash, Json($"[{change}]")));
+            Assert.Equal(ToolErrorCodes.BadPosition, refused.Code);
+            Assert.Contains("doesn't resolve in universe 'dracula'", refused.Message, StringComparison.Ordinal);
+            Assert.Contains("nothing was written", refused.Message, StringComparison.Ordinal);
+            Assert.Equal(before, _den.Read(Swales));
+        }
+
+        Assert.Contains(
+            "'until' of a fields.died entry dracul:8",
+            Assert.Throws<DenToolException>(() => Tools.UpdateFields("Mr. Swales", hash, Json("""[{"op": "set", "path": "fields.died.until", "value": "dracul:8"}]"""))).Message,
+            StringComparison.Ordinal);
+
+        // A position that resolves is written, and an empty one (null) is none.
+        var moved = Tools.UpdateFields("Mr. Swales", hash, Json("""[{"op": "set", "path": "fields.died.from", "value": "dracula:8"}]"""));
+        Assert.Contains("    from: \"dracula:8\"\n", _den.Read(Swales), StringComparison.Ordinal);
+        var cleared = Tools.UpdateFields("Mr. Swales", moved.Hash, Json("""[{"op": "set", "path": "from", "value": null}]"""));
+        Assert.True(cleared.Changed);
+        Assert.Null(cleared.Entity!.From);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-32")]
+    public void ANewSectionWhosePositionDoesntResolveIsRefused()
+    {
+        var before = _den.Read(Swales);
+        var hash = Tools.GetEntity("Mr. Swales").Entity!.Hash!;
+
+        var from = Assert.Throws<DenToolException>(() => Tools.AppendSection("Mr. Swales", "Later", "x", hash, from: "dracula:999", newSection: true));
+        Assert.Equal(ToolErrorCodes.BadPosition, from.Code);
+        Assert.Contains("'from' of section 'Later' dracula:999 doesn't resolve", from.Message, StringComparison.Ordinal);
+        var until = Assert.Throws<DenToolException>(() => Tools.AppendSection("Mr. Swales", "Earlier", "x", hash, under: "Arc", until: "dracula:999"));
+        Assert.Equal(ToolErrorCodes.BadPosition, until.Code);
+        Assert.Equal(before, _den.Read(Swales));
+
+        // An empty or blank 'from' or 'until' is none, as on disk (F-SEC-7): the section is added with no section comment.
+        var blank = Tools.AppendSection("Mr. Swales", "Later", "He is buried at Whitby.", hash, from: "", until: "   ", newSection: true);
+        Assert.True(blank.Changed);
+        Assert.EndsWith("\n## Later\nHe is buried at Whitby.\n", _den.Read(Swales), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-32")]
+    public void APositionThatDoesntResolveAndIsntTouchedDoesntStopAnEdit()
+    {
+        // Written by hand, so only check reports it (F-POS-4).
+        _den.Write(Swales, _den.Read(Swales).Replace("<!-- wolfden: from=dracula:7 -->", "<!-- wolfden: from=dracula:999 -->", StringComparison.Ordinal));
+        var hash = Tools.GetEntity("Mr. Swales").Entity!.Hash!;
+
+        var fields = Tools.UpdateFields("Mr. Swales", hash, Json("""[{"op": "set", "path": "fields.occupation", "value": ["sailor"]}]"""));
+        Assert.True(fields.Changed);
+        var text = Tools.AppendSection("Mr. Swales", "Voice", "He calls the gravestones \"lies\".", fields.Hash);
+        Assert.True(text.Changed);
+        Assert.Contains("from=dracula:999", _den.Read(Swales), StringComparison.Ordinal);
+
+        // The same position written again is a new one, so it's refused.
+        Assert.Equal(
+            ToolErrorCodes.BadPosition,
+            Assert.Throws<DenToolException>(() => Tools.UpdateFields("Mr. Swales", text.Hash, Json("""[{"op": "set", "path": "fields.died.from", "value": "dracula:999"}]"""))).Code);
+        Assert.Equal(
+            ToolErrorCodes.BadPosition,
+            Assert.Throws<DenToolException>(() => Tools.AppendSection("Mr. Swales", "Later", "x", text.Hash, from: "dracula:999", newSection: true)).Code);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-32")]
+    public void ANewEntitysFieldEntryMustResolveToo()
+    {
+        var count = Directory.GetFiles(_den.Root, "*.md", SearchOption.AllDirectories).Length;
+
+        var refused = Assert.Throws<DenToolException>(() => Tools.CreateEntity(
+            "character", "Sister Agatha", book: "dracula", fields: Json("""{"occupation": {"value": "nun", "from": "dracula:999"}}""")));
+
+        Assert.Equal(ToolErrorCodes.BadPosition, refused.Code);
+        Assert.Equal(count, Directory.GetFiles(_den.Root, "*.md", SearchOption.AllDirectories).Length);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-32")]
+    public void APositionFieldValueThatDoesntResolveIsRefused()
+    {
+        const string Thread = Book + "/entities/threads/renfields-master.md";
+        var before = _den.Read(Thread);
+        var hash = Tools.GetEntity("Renfield's Master").Entity!.Hash!;
+
+        // A thread's planted and paid_off are positions (types.md F-FT-10): a typo would take it out of story order (#211).
+        foreach (var change in new[]
+        {
+            """{"op": "set", "path": "fields.paid_off", "value": "dracula:999"}""",
+            """{"op": "add", "path": "fields.planted", "value": "dracula:999"}""",
+        })
+        {
+            var refused = Assert.Throws<DenToolException>(() => Tools.UpdateFields("Renfield's Master", hash, Json($"[{change}]")));
+            Assert.Equal(ToolErrorCodes.BadPosition, refused.Code);
+            Assert.Contains("dracula:999 doesn't resolve", refused.Message, StringComparison.Ordinal);
+            Assert.Contains("can't be placed in story order", refused.Message, StringComparison.Ordinal);
+            Assert.Equal(before, _den.Read(Thread));
+        }
+
+        // One that resolves is written; one already there, untouched, doesn't stop an edit.
+        var moved = Tools.UpdateFields("Renfield's Master", hash, Json("""[{"op": "set", "path": "fields.paid_off", "value": "dracula:20"}]"""));
+        _den.Write(Thread, _den.Read(Thread).Replace("paid_off: \"dracula:20\"", "paid_off: \"dracula:998\"", StringComparison.Ordinal));
+        hash = Tools.GetEntity("Renfield's Master").Entity!.Hash!;
+        Assert.True(Tools.UpdateFields("Renfield's Master", hash, Json("""[{"op": "add", "path": "fields.planted", "value": "dracula:9"}]""")).Changed);
+        Assert.True(moved.Changed);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-32")]
+    public void APositionThatDoesntResolveMovedToAnotherPlaceIsRefused()
+    {
+        _den.Write(Swales, _den.Read(Swales).Replace("<!-- wolfden: from=dracula:7 -->", "<!-- wolfden: from=dracula:999 -->", StringComparison.Ordinal));
+        var hash = Tools.GetEntity("Mr. Swales").Entity!.Hash!;
+        var before = _den.Read(Swales);
+
+        // Taken off the Arc's section comment and written as the note's 'from', it's in a new place, so it's checked there.
+        var moved = before
+            .Replace("<!-- wolfden: from=dracula:999 -->\n", "", StringComparison.Ordinal)
+            .Replace("from: \"dracula:6\"", "from: \"dracula:999\"", StringComparison.Ordinal);
+        var refused = Assert.Throws<DenToolException>(() => Tools.ReplaceFile("Mr. Swales", moved, hash));
+        Assert.Equal(ToolErrorCodes.BadPosition, refused.Code);
+        Assert.StartsWith("'from' dracula:999", refused.Message, StringComparison.Ordinal);
+        Assert.Equal(before, _den.Read(Swales));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-32")]
+    public void AnEmptyPositionIsNoneWhenAppendingToASectionThatsThere()
+    {
+        var hash = Tools.GetEntity("Mr. Swales").Entity!.Hash!;
+
+        // Empty is none, so it asks for no change to Voice's positions: the text is added, not refused.
+        var result = Tools.AppendSection("Mr. Swales", "Voice", "He calls the gravestones \"lies\".", hash, from: "", until: " ");
+
+        Assert.True(result.Changed);
+        Assert.Contains("hears it.\n\nHe calls the gravestones \"lies\".\n\n## Arc", _den.Read(Swales), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-32")]
+    public void APositionIsCheckedBeforeTheLinksAnEntityWouldTake()
+    {
+        // A universe-scope Jonathan Harker would take links (refused unless allow_relinks), but the position is the refusal.
+        var refused = Assert.Throws<DenToolException>(() => Tools.CreateEntity(
+            "character", "Jonathan Harker", fields: Json("""{"occupation": {"value": "solicitor", "from": "dracula:999"}}""")));
+
+        Assert.Equal(ToolErrorCodes.BadPosition, refused.Code);
+        Assert.Contains("take chapter keys from get_chapter, or leave the position out", refused.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-32")]
+    public void AnUntouchedSectionPositionKeepsUnderARenamedHeading()
+    {
+        _den.Write(Swales, _den.Read(Swales).Replace("<!-- wolfden: from=dracula:7 -->", "<!-- wolfden: from=dracula:999 -->", StringComparison.Ordinal));
+        var hash = Tools.GetEntity("Mr. Swales").Entity!.Hash!;
+
+        // Renaming the heading in the whole file keeps the section's position where it was, as rename_section does.
+        var renamed = _den.Read(Swales).Replace("## Arc\n", "## Last days\n", StringComparison.Ordinal);
+        var result = Tools.ReplaceFile("Mr. Swales", renamed, hash);
+
+        Assert.True(result.Changed);
+        Assert.Contains("## Last days\n<!-- wolfden: from=dracula:999 -->", _den.Read(Swales), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-32")]
+    public void APositionFieldValueThatIsntAPositionIsRefusedWhenWritten()
+    {
+        const string Thread = Book + "/entities/threads/renfields-master.md";
+        var before = _den.Read(Thread);
+        var hash = Tools.GetEntity("Renfield's Master").Entity!.Hash!;
+
+        // Only a warning on disk (F-FT-10), but refused when written, as a near miss is.
+        foreach (var change in new[]
+        {
+            """{"op": "set", "path": "fields.paid_off", "value": "chapter nine"}""",
+            """{"op": "add", "path": "fields.planted", "value": "dracula:9.2"}""",
+        })
+        {
+            var refused = Assert.Throws<DenToolException>(() => Tools.UpdateFields("Renfield's Master", hash, Json($"[{change}]")));
+            Assert.Equal(ToolErrorCodes.BadPosition, refused.Code);
+            Assert.Contains("isn't a story position", refused.Message, StringComparison.Ordinal);
+            Assert.Equal(before, _den.Read(Thread));
+        }
+
+        // One already in the file, left where it is, doesn't stop an edit.
+        _den.Write(Thread, before.Replace("paid_off: \"dracula:21\"", "paid_off: \"chapter twenty-one\"", StringComparison.Ordinal));
+        hash = Tools.GetEntity("Renfield's Master").Entity!.Hash!;
+        Assert.True(Tools.UpdateFields("Renfield's Master", hash, Json("""[{"op": "add", "path": "fields.planted", "value": "dracula:9"}]""")).Changed);
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-MCP-17")]
     public void TextGoesIntoASectionOrANewOneInItsPlace()
     {

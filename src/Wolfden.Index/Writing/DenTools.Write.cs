@@ -644,12 +644,15 @@ public sealed partial class DenTools
             var files = new Dictionary<string, byte[]>(StringComparer.Ordinal) { [made.Path] = bytes };
             var check = Check(den, structure, files);
 
+            // Before the links, so a writer isn't asked to create it anyway and then refused for a position.
+            var entity = EntityCatalog.ReadEntityFile(check.Structure, made.Path, bytes).Entity!;
+            CheckWrittenPositions(null, entity);
+
             // A new name can take links from the entity they reach now (F-LINK-7: the nearest scope wins):
             // refused unless allow_relinks, as for a copy (maintainer decision on #29, 2026-10-28).
             var (_, _, changed) = CheckNewEntityLinks(
                 den, EntityCatalog.Load(structure, den), check, files, allowRelinks, "created", "create it with those links moving to it", "the new entity");
             Save(files, null, created: made.Path);
-            var entity = EntityCatalog.ReadEntityFile(check.Structure, made.Path, bytes).Entity!;
             var effects = new List<string> { $"Created {made.Path} from the '{type.Key}' template, with id {id}." };
             if (!entity.Status.IsInCanon())
             {
@@ -701,12 +704,103 @@ public sealed partial class DenTools
 
         if (universe.Resolve(position).Problem is { } problem)
         {
-            throw new DenToolException(
-                ToolErrorCodes.BadPosition,
-                $"'from' {text} doesn't resolve in universe '{universe.Key}': {problem} An entity whose 'from' doesn't resolve is left out of every canon view, " +
-                "so nothing was created. Leave 'from' out to start where it's filed.");
+            throw Unresolvable("'from'", text, universe, problem, "An entity whose 'from' doesn't resolve is left out of every canon view, so nothing was created. Leave 'from' out to start where it's filed.");
         }
     }
+
+    /// <summary>
+    /// Refuses a write that sets a story position that names a book or
+    /// chapter the universe doesn't have (F-POS-4, maintainer decisions on
+    /// #211 and #217, 2026-10-29): a <c>from</c> or <c>until</c> of the
+    /// entity, a field entry, or a section comment, or a value of a
+    /// <c>position</c> field (types.md F-FT-10), as <see cref="CheckFrom"/>
+    /// does for a new entity's <c>from</c>. The fact would drop out of canon
+    /// views, or out of story order, and a typo would go unnoticed until
+    /// <c>check</c>. A <c>position</c> field value that isn't a position at
+    /// all is refused too, though on disk it's only the F-FT-10 warning, so
+    /// a worse value can't get past where a near miss is refused.
+    /// </summary>
+    /// <remarks>
+    /// Only positions the write adds count. One that was already in
+    /// <paramref name="before"/> is left alone if it's at the same place:
+    /// the same kind of position, of the same field or section, with the
+    /// same text. A section's <c>from</c> or <c>until</c> left over is then
+    /// matched by its kind and text alone, so renaming the section's
+    /// heading keeps it; moving it to the entity's <c>from</c> or a field,
+    /// or writing it once more, is refused.
+    /// </remarks>
+    private void CheckWrittenPositions(CatalogEntity? before, CatalogEntity after)
+    {
+        var had = before is null ? [] : Bad(before).ToList();
+        var left = new List<PositionReference>();
+        foreach (var reference in Bad(after))
+        {
+            var same = had.FindIndex(h => Place(h) == Place(reference));
+            if (same >= 0)
+            {
+                had.RemoveAt(same);
+            }
+            else
+            {
+                left.Add(reference);
+            }
+        }
+
+        foreach (var reference in left)
+        {
+            // A section bound under a renamed heading.
+            var renamed = reference.Site is PositionSite.SectionFrom or PositionSite.SectionUntil
+                ? had.FindIndex(h => h.Site == reference.Site && h.Text == reference.Text)
+                : -1;
+            if (renamed >= 0)
+            {
+                had.RemoveAt(renamed);
+                continue;
+            }
+
+            var what = reference.Site switch
+            {
+                PositionSite.EntityFrom => "'from'",
+                PositionSite.EntryFrom => $"'from' of a fields.{reference.Field} entry",
+                PositionSite.EntryUntil => $"'until' of a fields.{reference.Field} entry",
+                PositionSite.FieldValue => $"fields.{reference.Field}",
+                PositionSite.SectionFrom => $"'from' of section '{reference.Section!.Name}'",
+                _ => $"'until' of section '{reference.Section!.Name}'",
+            };
+            if (reference.Position is null)
+            {
+                StoryPosition.TryParse(reference.Text, out _, out var error);
+                throw new DenToolException(
+                    ToolErrorCodes.BadPosition,
+                    $"{what} '{reference.Text}' isn't a story position: {error!.Message} It holds positions, such as 'dracula:5' (book:chapter), " +
+                    $"so nothing was written. {ToolWords.Cap(Words.ChapterKeys)}, or leave the position out.");
+            }
+
+            var lost = reference.Site == PositionSite.FieldValue
+                ? "A position that doesn't resolve can't be placed in story order"
+                : "A fact whose position doesn't resolve is left out of every canon view";
+            throw Unresolvable(
+                what, reference.Text, after.Universe, after.Universe.Resolve(reference.Position).Problem!,
+                $"{lost}, so nothing was written. {ToolWords.Cap(Words.ChapterKeys)}, or leave the position out.");
+        }
+
+        // Positions that don't resolve, and position field values that aren't positions (a bad 'from' or 'until' is already an error).
+        static IEnumerable<PositionReference> Bad(CatalogEntity entity) =>
+            UnresolvedReferences(entity).Concat(
+                PositionScanner.Scan(entity.File, entity.Definition?.PositionFields).References
+                    .Where(r => r.Position is null && r.Site == PositionSite.FieldValue));
+
+        // Where a position is written, as far as it can be told across an edit: lines and item numbers shift.
+        static (PositionSite, string?, string?, string) Place(PositionReference r) => (r.Site, r.Field, r.Section?.Name, r.Text);
+    }
+
+    /// <summary>The positions written in the entity's file that parse but don't resolve in its universe (F-POS-4), in file order.</summary>
+    private static IEnumerable<PositionReference> UnresolvedReferences(CatalogEntity entity) =>
+        PositionScanner.Scan(entity.File, entity.Definition?.PositionFields).References
+            .Where(r => r.Position is { } p && !entity.Universe.Resolve(p).IsResolved);
+
+    private static DenToolException Unresolvable(string what, string text, Universe universe, string problem, string outcome) =>
+        new(ToolErrorCodes.BadPosition, $"{what} {text} doesn't resolve in universe '{universe.Key}': {problem} {outcome}");
 
     private string NewUnusedId(HashSet<string> used)
     {
@@ -739,6 +833,9 @@ public sealed partial class DenTools
             throw new DenToolException(ToolErrorCodes.BadArgument, "A section name is one line of text.");
         }
 
+        // An empty 'from' or 'until' is none, as on disk (F-SEC-7) and for create_entity's 'from'.
+        from = string.IsNullOrWhiteSpace(from) ? null : from;
+        until = string.IsNullOrWhiteSpace(until) ? null : until;
         var attributes = new List<string>();
         foreach (var (key, value) in new[] { ("status", status), ("from", from), ("until", until), ("pin", pin is null ? null : pin.Value ? "true" : "false") })
         {
@@ -901,8 +998,9 @@ public sealed partial class DenTools
 
             var files = new Dictionary<string, byte[]>(StringComparer.Ordinal) { [path] = bytes };
             var check = Check(den, structure, files);
-            Save(files, new Dictionary<string, byte[]>(StringComparer.Ordinal) { [path] = original }, created: null);
             var after = EntityCatalog.ReadEntityFile(check.Structure, path, bytes).Entity!;
+            CheckWrittenPositions(before, after);
+            Save(files, new Dictionary<string, byte[]>(StringComparer.Ordinal) { [path] = original }, created: null);
             var said = effects(before, after).ToList();
             if (idAdded is not null)
             {

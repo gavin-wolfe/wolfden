@@ -58,6 +58,7 @@ public static partial class WriteEndpoints
         CheckPath = "open '{0}' in your editor, or run 'wolfden check' in the den's folder,",
         NameLinks = "An AI assistant working through Wolfden can rename the note and rewrite those links.",
         AliasLinks = "An AI assistant working through Wolfden can change an alias and rewrite those links.",
+        ChapterKeys = "pick a chapter the book lists",
     };
 
     /// <summary>Maps the editing endpoints onto <paramref name="api"/>.</summary>

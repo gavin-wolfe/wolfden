@@ -1056,6 +1056,38 @@ store, so an edit changes only what it means to (format.md §12):
   `update_fields` puts a new top-level key in template order too
   (F-TPL-7); `append_section` puts a new standard section in the
   type's section order and a custom one at the end (F-TPL-8).
+- **Positions a write sets must resolve** (maintainer decisions on
+  #211 and #217, 2026-10-29). Every entity write refuses a position it
+  adds that names a book or chapter the universe doesn't have, with
+  `bad_position`, as `create_entity` does for its `from`: the entity's
+  `from`, a field entry's `from` and `until`, a section comment's
+  `from` and `until`, and a value of a `position` field (types.md
+  F-FT-10, such as a thread's `planted`). That covers `update_fields`,
+  `append_section`, `create_entity`'s fields, and the web UI's edits,
+  which share the edit loop (Edit file included). A create checks its
+  positions before the links it would take, so the writer isn't asked
+  to create it anyway and then refused. Only the positions the write
+  adds count. A position that doesn't resolve and was already in the
+  file at the same place (the same kind of position, of the same field
+  or section by name, with the same text) doesn't stop the write. A
+  section's `from` or `until` left over is then matched by its kind and
+  text alone, against one that was a section's before, so renaming the
+  heading in Edit file keeps it, as `rename_section` does. One moved to
+  the entity's `from` or a field, or written once more, is refused, and
+  so is one under a field renamed in Edit file. An empty
+  value is none, as on disk: `null` in `update_fields`, and an empty or
+  blank `from` or `until` for `append_section`, which then appends to a
+  section that's there as if none was given. A `position` field value
+  that isn't a position at all (`chapter nine`, `dracula:9.2`) is
+  refused too (`bad_position`), so a worse value can't get past where
+  a near miss is refused; on disk it stays the F-FT-10 warning, so a
+  file that already holds one loads as before, and the same-place rule
+  applies to it. The refusal says where to find a chapter key in the
+  caller's words (`get_chapter` for MCP, the book's chapters on the
+  page). `update_chapter_fields`, `update_chapter_defaults`,
+  `move_entity`, and `copy_entity` take no position: a move writes the
+  entry point the entity had, and a copy keeps the original's positions
+  and says which don't resolve where the copy is.
 - **Renames** (maintainer decision, 2026-10-23). `rename_section`
   rewrites every link that reaches the section by heading, in any file
   (F-RT-5), as one change: if any of those files is in a final book,

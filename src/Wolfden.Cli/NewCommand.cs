@@ -9,19 +9,26 @@ namespace Wolfden.Cli;
 /// does what the MCP tool <c>create_entity</c> does
 /// (<see cref="DenTools.CreateEntity"/>), and takes its den, universe, and
 /// scope the way <c>wolfden copy</c> does: the note goes to the den's files
-/// only, and nothing is committed.
+/// only, and nothing is committed. <c>wolfden new series &lt;name&gt;</c> and
+/// <c>wolfden new book &lt;name&gt;</c> create a series or book instead (#213),
+/// as the web UI's New series and New book do.
 /// </summary>
 /// <remarks>
-/// Exit codes: 0 when the note is made, and 2 when the command line is
-/// wrong, there's no den, or the create is refused (an unknown type or
-/// scope, a final book, a file name that's taken, or a den with several
-/// universes and none named).
+/// Exit codes: 0 when the note, series, or book is made, and 2 when the
+/// command line is wrong, there's no den, or the create is refused (an
+/// unknown type or scope, a final book, a file name or key that's taken, an
+/// <c>--after</c> that isn't there, or a den with several universes and
+/// none named).
 /// </remarks>
 internal static class NewCommand
 {
     internal static readonly CommandSpec Spec = new(
         "new",
-        "usage: wolfden new <type> <name> [--in <scope>] [--from <position>] [--slug <slug>] [--allow-relinks] [--den <den>] [--json]",
+        """
+        usage: wolfden new <type> <name> [--in <scope>] [--from <position>] [--slug <slug>] [--allow-relinks] [--den <den>] [--json]
+               wolfden new series <name> [--in <universe>] [--after <key>] [--den <den>] [--json]
+               wolfden new book <name> [--in <universe or series>] [--after <key>] [--chapters <n>] [--den <den>] [--json]
+        """,
         """
         Creates a note from its type's template, such as a new character. It
         gets a new id that no file in the den uses, the name, and a file name
@@ -56,9 +63,27 @@ internal static class NewCommand
         nearer them wins), nothing is made unless --allow-relinks. It prints
         the new file, where the note enters canon, and the links that reach it
         now. Exits 0 when the note is made, and 2 if it isn't.
+
+        'wolfden new series' and 'wolfden new book' create a series, or a book
+        in a series or standalone in the universe: its folder, named from the
+        name (a name that gives a key that's taken is refused), and its
+        series.md or book.md with a new id and the name. It's added to the
+        story order: the series' books list, or the universe's order.
+
+          --in <place>        for a series, its universe; for a book, its
+                              universe (a standalone book), or a series:
+                              '<universe>/<series>', or in a den with one
+                              universe, the series' key. By default, the
+                              den's universe, when it has one.
+          --after <key>       the series or book it comes after in story
+                              order; by default, at the end
+          --chapters <n>      a book's chapters to start with, 1 to 1000, keyed
+                              1 to n; by default, none
+
+        Exits 0 when it's made, and 2 if it isn't.
         """,
         ["--json", "--allow-relinks"],
-        ["--den", "--in", "--from", "--slug"],
+        ["--den", "--in", "--from", "--slug", "--after", "--chapters"],
         [],
         2,
         "give the type and the name, and nothing else (quote a name with spaces).");
@@ -79,9 +104,26 @@ internal static class NewCommand
 
         if (line.Arguments.Count < 2)
         {
-            error.WriteLine("wolfden new: give the note's type and its name, such as: wolfden new character \"Mina Harker\".");
+            error.WriteLine(line.Arguments is ["series" or "book"]
+                ? $"wolfden new: give the {line.Arguments[0]}'s name, such as: wolfden new {line.Arguments[0]} \"{(line.Arguments[0] == "series" ? "The Harker Papers" : "Dracula's Guest")}\"."
+                : "wolfden new: give the note's type and its name, such as: wolfden new character \"Mina Harker\".");
             error.WriteLine(Spec.Usage);
             return CliApp.ExitUsage;
+        }
+
+        // 'series' and 'book' are reserved type keys (types.md F-TYPE-2), so they never name a note's type.
+        if (line.Arguments[0] is "series" or "book")
+        {
+            return RunContainer(line, line.Arguments[0] == "series", output, error);
+        }
+
+        foreach (var option in new[] { "--after", "--chapters" })
+        {
+            if (line.Value(option) is not null)
+            {
+                error.WriteLine($"wolfden new: {option} is for a new series or book ('wolfden new series' or 'wolfden new book'), not a note.");
+                return CliApp.ExitUsage;
+            }
         }
 
         var name = line.Arguments[1];
@@ -138,5 +180,152 @@ internal static class NewCommand
         }
 
         return CliApp.ExitOk;
+    }
+
+    /// <summary>
+    /// <c>wolfden new series &lt;name&gt;</c> and <c>wolfden new book &lt;name&gt;</c>
+    /// (#213): what the web UI's New series and New book do
+    /// (<see cref="DenTools.CreateSeries"/>, <see cref="DenTools.CreateBook"/>).
+    /// It reads the universe's or series' file and writes it in one go, so it
+    /// passes no hash, as <c>wolfden freeze</c> does.
+    /// </summary>
+    private static int RunContainer(CommandLine line, bool series, TextWriter output, TextWriter error)
+    {
+        var what = series ? "series" : "book";
+        foreach (var option in new[] { "--from", "--slug" })
+        {
+            if (line.Value(option) is not null)
+            {
+                error.WriteLine($"wolfden new: {option} is for a note, not a {what}.");
+                return CliApp.ExitUsage;
+            }
+        }
+
+        if (line.Has("--allow-relinks"))
+        {
+            // Containers aren't link targets (format.md F-LINK-5), so a new one never moves a link.
+            error.WriteLine($"wolfden new: --allow-relinks is for a note: a new {what} never changes which note a link reaches.");
+            return CliApp.ExitUsage;
+        }
+
+        int? chapters = null;
+        if (line.Value("--chapters") is { } count)
+        {
+            if (series)
+            {
+                error.WriteLine("wolfden new: --chapters is for a new book, not a series.");
+                return CliApp.ExitUsage;
+            }
+
+            if (!int.TryParse(count, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var n)
+                || n is < 1 or > DenTools.MaxNewChapters)
+            {
+                error.WriteLine($"wolfden new: --chapters takes a whole number from 1 to {DenTools.MaxNewChapters}, not '{count}'. Leave it out for a book with no chapters yet.");
+                return CliApp.ExitUsage;
+            }
+
+            chapters = n;
+        }
+
+        var name = line.Arguments[1];
+        if (Wolfden.Core.Editing.NewEntity.NameProblem(name) is { } nameProblem)
+        {
+            error.WriteLine($"wolfden new: give the {what} a name of one line, at most {Wolfden.Core.Editing.NewEntity.MaxNameLength} characters. That one can't be used: {nameProblem}.");
+            return CliApp.ExitUsage;
+        }
+
+        if (DenLocation.Resolve(Spec.Name, line.Value("--den"), error) is not { } root)
+        {
+            return CliApp.ExitUsage;
+        }
+
+        string? universe = null, inSeries = null;
+        if (line.Value("--in") is { } place && !TryPlace(root, place.Trim(), series, out universe, out inSeries, out var problem))
+        {
+            error.WriteLine($"wolfden new: {problem}");
+            return CliApp.ExitUsage;
+        }
+
+        ContainerCreateResult result;
+        try
+        {
+            var tools = new DenTools(root) { Words = Words };
+            result = series
+                ? tools.CreateSeries(name, universe, line.Value("--after"))
+                : tools.CreateBook(name, universe, inSeries, line.Value("--after"), chapters);
+        }
+        catch (DenToolException e)
+        {
+            error.WriteLine($"wolfden new: {e.Message}");
+            return CliApp.ExitUsage;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or SqliteException)
+        {
+            error.WriteLine($"wolfden new: couldn't read the den at '{root}' or its index: {e.Message}");
+            return CliApp.ExitUsage;
+        }
+
+        if (line.Has("--json"))
+        {
+            CliJson.Write(output, result);
+            return CliApp.ExitOk;
+        }
+
+        output.WriteLine($"Created {result.Path}");
+        foreach (var effect in result.Effects)
+        {
+            output.WriteLine($"  {effect}");
+        }
+
+        foreach (var w in result.Warnings)
+        {
+            output.WriteLine($"{w.Path}:{w.Line?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "-"}: {w.Severity} {w.Rule}: {w.Message}");
+        }
+
+        return CliApp.ExitOk;
+    }
+
+    /// <summary>
+    /// Reads <c>--in</c> for a new series (a universe) or book (a universe, or
+    /// one of its series). A universe's key alone always names the universe
+    /// here, since a book holds no series or books: <c>--in dracula</c> in
+    /// the Dracula sample is the universe, though it has a book 'dracula' too.
+    /// Otherwise it's read as for a note (<see cref="ScopeOption"/>), and a
+    /// book is refused.
+    /// </summary>
+    private static bool TryPlace(string root, string value, bool series, out string? universe, out string? inSeries, out string problem)
+    {
+        universe = inSeries = null;
+        problem = "";
+        var structure = Wolfden.Core.Structure.DenStructure.Load(root);
+        if (structure.IsLoaded && !value.Contains('/', StringComparison.Ordinal) && structure.FindUniverse(value) is { } named)
+        {
+            universe = named.Key;
+            return true;
+        }
+
+        if (!In.TryParse(root, value, out universe, out inSeries, out var book, out problem))
+        {
+            return false;
+        }
+
+        if (series && (inSeries is not null || book is not null))
+        {
+            problem = $"a series goes in a universe, so give --in '<universe>', not '{value}'.";
+            return false;
+        }
+
+        if (book is not null)
+        {
+            var u = structure.FindUniverse(universe!);
+            problem = u?.FindBook(book) is not null
+                ? $"'{book}' is a book, and a book goes in a universe or a series: give --in '{universe}' for a standalone book, or '{universe}/<series>'."
+                : $"universe '{universe}' has no series '{book}'." +
+                  (u is null || !u.Series.Any() ? "" : $" Its series: {string.Join(", ", u.Series.Select(s => s.Key))}.") +
+                  $" Give --in '{universe}' for a standalone book, or '{universe}/<series>'.";
+            return false;
+        }
+
+        return true;
     }
 }

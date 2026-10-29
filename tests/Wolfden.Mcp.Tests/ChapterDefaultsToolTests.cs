@@ -185,6 +185,7 @@ public sealed class ChapterDefaultsToolTests : IDisposable
         var refused = Assert.Throws<DenToolException>(() => Tools.UpdateChapterDefaults(series.Hash, change, "starfall", series: "long-dark"));
         Assert.Equal(ToolErrorCodes.Frozen, refused.Code);
         Assert.Contains("book 'ash', pov of chapters 1–epilogue", refused.Message, StringComparison.Ordinal);
+        Assert.EndsWith("of each draft book instead. Ask the writer whether to unfreeze book 'ash'; only they can.", refused.Message, StringComparison.Ordinal);
 
         // Unfrozen, the effect lines say the chapters changed, though the text is the same.
         _den.Write(Ash, "---\nid: 01JAQKFBF5KZNWJ47TAN9ZT24N\nname: Ash\nchapters: [1, 2, 3, 4, epilogue]\n---\n");

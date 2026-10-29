@@ -1,6 +1,7 @@
 using Wolfden.Core.Checks;
 using Wolfden.Core.Documents;
 using Wolfden.Core.History;
+using Wolfden.Core.Structure;
 using Wolfden.Index.Reading;
 
 namespace Wolfden.Index.Writing;
@@ -181,6 +182,22 @@ public sealed partial class DenTools
     /// <summary>True if <paramref name="path"/> is <paramref name="prefix"/> or inside it, on a path-segment boundary: <c>books/a</c> isn't under <c>books/ab</c>.</summary>
     internal static bool IsAtOrUnder(string path, string prefix) =>
         path == prefix || path.StartsWith(prefix + "/", StringComparison.Ordinal);
+
+    /// <summary>
+    /// What to do about the final books that refused a write, in the
+    /// caller's words (<see cref="ToolWords.Unfreeze"/>, #209): one sentence
+    /// for each, in the order given.
+    /// </summary>
+    private string Unfreezing(params IEnumerable<Book> books) =>
+        string.Join(" ", books.DistinctBy(b => (b.Universe.Key, b.Key)).Select(b => Words.Unfreezing(b.Key, b.Universe.Key)));
+
+    /// <summary><see cref="Unfreezing(IEnumerable{Book})"/> for the final books that hold any of <paramref name="paths"/>.</summary>
+    private string Unfreezing(DenStructure structure, IEnumerable<string> paths)
+    {
+        var list = paths.ToList();
+        return Unfreezing(structure.Universes.SelectMany(u => u.Books)
+            .Where(b => b.Status == BookStatus.Final && list.Any(p => IsAtOrUnder(p, b.Path))));
+    }
 
     // The shared read helpers the write tools use too (DenReader).
 

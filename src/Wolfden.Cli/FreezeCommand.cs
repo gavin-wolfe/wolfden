@@ -78,7 +78,35 @@ internal static class FreezeCommand
 
     /// <summary>The command's options and commands, in place of the MCP tools' parameters and tools, in its messages.</summary>
     internal static readonly ToolWords Words = new(
-        "", "", "", "with --universe", "use 'wolfden query --brief'", "run 'wolfden check'", "run 'wolfden check'", "run 'wolfden check'");
+        "", "", "", "with --universe", "use 'wolfden query --brief'", "run 'wolfden check'", "run 'wolfden check'", "run 'wolfden check'")
+    {
+        Unfreeze = UnfreezeWords,
+    };
+
+    /// <summary>How the command line unfreezes a book that refused a write (<see cref="ToolWords.Unfreeze"/>), for every command's words.</summary>
+    /// <remarks>The command comes last, unquoted, so a quoted <c>--den</c> in it never nests quotes.</remarks>
+    internal const string UnfreezeWords = "To open the book for editing again, run: wolfden unfreeze {0} --universe {1}";
+
+    /// <summary>
+    /// <paramref name="words"/> for a command given <c>--den <paramref name="den"/></c>:
+    /// the unfreeze hint names the same den, so it works from where the
+    /// command was run. Without <c>--den</c>, the words as they are. A path
+    /// with anything but letters, digits, and <c>_ . / \ : -</c> is put in
+    /// double quotes, without a trailing backslash, which a shell would read
+    /// as escaping the closing quote.
+    /// </summary>
+    internal static ToolWords WithDen(ToolWords words, string? den)
+    {
+        if (string.IsNullOrWhiteSpace(den))
+        {
+            return words;
+        }
+
+        var plain = den.All(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '.' or '/' or '\\' or ':' or '-');
+        var argument = plain ? den : $"\"{den.TrimEnd('\\').Replace("\"", "\\\"", StringComparison.Ordinal)}\"";
+        var escaped = argument.Replace("{", "{{", StringComparison.Ordinal).Replace("}", "}}", StringComparison.Ordinal);
+        return words with { Unfreeze = $"{UnfreezeWords} --den {escaped}" };
+    }
 
     /// <summary>Snapshots that mean a step in the den's history failed, so the command exits 2.</summary>
     private static readonly string[] Failures = [FreezeSnapshot.CheckpointFailed, FreezeSnapshot.TagFailed];

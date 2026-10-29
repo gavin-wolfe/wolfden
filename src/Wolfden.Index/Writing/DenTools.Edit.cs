@@ -49,7 +49,7 @@ public sealed partial class DenTools
     }
 
     /// <summary>The source of <paramref name="entity"/>, whose file holds <paramref name="bytes"/>.</summary>
-    private static EntitySourceResult SourceOf(CatalogEntity entity, byte[] bytes)
+    private EntitySourceResult SourceOf(CatalogEntity entity, byte[] bytes)
     {
         var file = entity.File;
         var facts = EntityFacts.For(entity, new Bookkeeping(entity.Universe.Den.BookkeepingSections));

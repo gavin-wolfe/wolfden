@@ -115,6 +115,7 @@ public sealed class CreateEndpointTests : IDisposable
         Assert.Equal(HttpStatusCode.Conflict, frozen);
         Assert.Equal("frozen", frozenJson.GetProperty("code").GetString());
         Assert.Contains("final (frozen)", frozenJson.GetProperty("message").GetString(), StringComparison.Ordinal);
+        Assert.EndsWith("Unfreeze… on the page of book 'dracula' opens it for editing again.", frozenJson.GetProperty("message").GetString(), StringComparison.Ordinal);
 
         var (unknown, unknownJson) = await PostAsync(server, "/api/entity/create", new { type = "spaceship", name = "Someone" });
         Assert.Equal(HttpStatusCode.BadRequest, unknown);

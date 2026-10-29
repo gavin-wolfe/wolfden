@@ -97,7 +97,7 @@ public sealed partial class DenTools
                 Kept: keep ? oldName : null,
                 NewAlias: null,
                 SameForLinks: sameForLinks,
-                KeepHint: Hint,
+                KeepHint: $"To make the change, {Hint}.",
                 LostHint: "choose another name, or " + Hint,
                 DroppedAlias: dropped,
                 Notes: notes);
@@ -173,8 +173,8 @@ public sealed partial class DenTools
                 NewAlias: newAlias,
                 SameForLinks: sameForLinks,
                 KeepHint: newAlias is null
-                    ? "keep the alias, or ask the writer to unfreeze the book"
-                    : "pass keep_old_alias: true to add the new alias beside the old one instead, which leaves those links as they are",
+                    ? "Leave the alias as it is."
+                    : "To make the change, pass keep_old_alias: true to add the new alias beside the old one instead, which leaves those links as they are.",
                 LostHint: newAlias is null
                     ? "keep the alias, or change those links to the entity's id or file name first"
                     : "choose another alias, or pass keep_old_alias: true to add the new alias beside the old one instead, which leaves those links as they are",
@@ -193,7 +193,7 @@ public sealed partial class DenTools
     /// <param name="Kept">The old text, when it stays (as an alias).</param>
     /// <param name="NewAlias">For an alias: the new alias, or null if it's removed.</param>
     /// <param name="SameForLinks">True if the new text matches the old for links (F-LINK-4), so links needn't change.</param>
-    /// <param name="KeepHint">What to do instead when a link to rewrite is in a final book.</param>
+    /// <param name="KeepHint">What to do instead when a link to rewrite is in a final book, as a sentence.</param>
     /// <param name="LostHint">What to do instead when a rewritten link wouldn't reach the entity.</param>
     /// <param name="DroppedAlias">For a rename to one of the entity's own aliases: that alias, taken out of <c>aliases</c>.</param>
     /// <param name="Notes">Effects the edit of the entity's own file adds as it's made, such as comment lines that went with an emptied list.</param>
@@ -242,7 +242,7 @@ public sealed partial class DenTools
                 throw new DenToolException(
                     ToolErrorCodes.Frozen,
                     $"Links that use the {what} '{c.OldText}' are in files of a final (frozen) book, which can't be edited until it's unfrozen (F-BOOK-1): " +
-                    $"{string.Join(", ", plan.FrozenPaths)}. Rewriting them is the only way they'd follow, so nothing was changed. To make the change, {c.KeepHint}.");
+                    $"{string.Join(", ", plan.FrozenPaths)}. Rewriting them is the only way they'd follow, so nothing was changed. {c.KeepHint} {Unfreezing(structure, plan.FrozenPaths)}");
             }
 
             var files = plan.Files.ToDictionary(p => p.Key, p => p.Value, StringComparer.Ordinal);

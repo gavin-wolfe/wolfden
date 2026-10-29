@@ -87,10 +87,10 @@ public sealed partial class DenTools
             var path = target.FilePath;
             var original = target.File.ToBytes();
             CheckHash(path, original, hash);
-            if (target is Book { Status: BookStatus.Final })
+            if (target is Book { Status: BookStatus.Final } final)
             {
                 throw new DenToolException(
-                    ToolErrorCodes.Frozen, $"Book '{target.Key}' is final (frozen), so its book.md can't be edited until it's unfrozen (F-BOOK-1).");
+                    ToolErrorCodes.Frozen, $"Book '{target.Key}' is final (frozen), so its book.md can't be edited until it's unfrozen (F-BOOK-1). {Unfreezing(final)}");
             }
 
             var file = target.File;
@@ -254,13 +254,15 @@ public sealed partial class DenTools
     /// what a chapter of a final book has (F-BOOK-1), failing closed: see the
     /// remarks on this class.
     /// </summary>
-    private static void CheckFinalBooksBelow(DefaultsEdit edit, IReadOnlyList<string> fields)
+    private void CheckFinalBooksBelow(DefaultsEdit edit, IReadOnlyList<string> fields)
     {
         var problems = new List<string>();
+        var finals = new List<Book>();
         var afterPaths = BooksBelow(edit.After).Select(b => b.FilePath).ToHashSet(StringComparer.Ordinal);
         foreach (var gone in BooksBelow(edit.Before).Where(b => b.Status == BookStatus.Final && !afterPaths.Contains(b.FilePath)))
         {
             problems.Add($"{BookName(gone)} would no longer load");
+            finals.Add(gone);
         }
 
         foreach (var book in BooksBelow(edit.After).Where(b => b.Status == BookStatus.Final))
@@ -269,6 +271,7 @@ public sealed partial class DenTools
             if (was is null || was.Chapters.Count != book.Chapters.Count || book.Chapters.Any(c => ChapterBefore(was, c) is null))
             {
                 problems.Add($"{BookName(book)}, whose chapters couldn't be compared before and after the edit");
+                finals.Add(book);
                 continue;
             }
 
@@ -278,6 +281,7 @@ public sealed partial class DenTools
                 if (changed.Count > 0)
                 {
                     problems.Add($"{BookName(book)}, {field} of {Chapters(book, changed)}");
+                    finals.Add(book);
                 }
             }
         }
@@ -288,7 +292,7 @@ public sealed partial class DenTools
                 ToolErrorCodes.Frozen,
                 $"The edit would change what chapters of a final (frozen) book have, which can't change until the book is unfrozen (F-BOOK-1): " +
                 $"{string.Join("; ", problems)}. Nothing was changed. To leave the final book as it is, set the value in the chapter_defaults " +
-                "of each draft book instead, or ask the writer whether to unfreeze it.");
+                $"of each draft book instead. {Unfreezing(finals)}");
         }
     }
 
@@ -298,7 +302,7 @@ public sealed partial class DenTools
     /// its frontmatter can't be read, so it may be: its chapters would inherit
     /// the edit once it's fixed. Returns the draft ones, which don't stop it.
     /// </summary>
-    private static List<string> CheckUnloadedBooksBelow(IDenSource den, DenStructure structure, Container container)
+    private List<string> CheckUnloadedBooksBelow(IDenSource den, DenStructure structure, Container container)
     {
         var loaded = structure.Universes.SelectMany(u => u.Books).Select(b => b.FilePath).ToHashSet(StringComparer.Ordinal);
         var suspect = new List<string>();
@@ -315,7 +319,7 @@ public sealed partial class DenTools
             throw new DenToolException(
                 ToolErrorCodes.Frozen,
                 $"These books have errors, so the den leaves them out, but they're marked final (or their status can't be read), and their chapters " +
-                $"would inherit this edit once they're fixed: {string.Join(", ", suspect)}. Nothing was changed. Call check to see the errors, " +
+                $"would inherit this edit once they're fixed: {string.Join(", ", suspect)}. Nothing was changed. {ToolWords.Cap(Words.CheckDen)} to see the errors, " +
                 "and fix them first (F-BOOK-1).");
         }
 

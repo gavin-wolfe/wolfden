@@ -1239,7 +1239,8 @@ sequel book.
   name the command's options and commands (`--allow-relinks`,
   `--slug`, `wolfden query`), not the MCP tool's parameters, and a copy
   named "Count allow_relinks" is reported by that name, in text and
-  JSON.
+  JSON. The refusal for a final book says how to unfreeze it, with the
+  `--den` the copy was given (#209), as `wolfden new` does (SC-CLI-15).
 
 Spec: format.md F-ID-3, F-ID-4, design.md §7, §8 (#129). Covered by:
 `CopyCommandTests.ACopyGoesBesideTheOriginalWithANewIdAndSaysWhatItMeans`,
@@ -1300,12 +1301,17 @@ dracula:8`.
   would leave the note out of every canon view, F-POS-4), a missing or
   blank name, one with a line break in it (U+2028 and U+2029 included),
   or one over 200 characters, or a `den.yaml` that doesn't load exits 2
-  and writes nothing.
+  and writes nothing. The refusal for a final book says how to unfreeze
+  it: "To open the book for editing again, run: wolfden unfreeze
+  aftermath --universe dracula" (#209). Given `--den`, the hint passes
+  the same `--den` on, in double quotes (without a trailing backslash)
+  if it has anything but letters, digits, and `_ . / \ : -`.
 
 Spec: types.md F-TPL-6, design.md §7 (#29). Covered by:
 `NewCommandTests.ANewNoteComesFromItsTemplateInTheUniverseWithANewId`,
 `NewCommandTests.InNamesWhereItGoesAndFromWhereTheReaderMeetsIt`,
 `NewCommandTests.ARefusedCreateExitsTwoAndWritesNothing`,
+`FreezeCommandTests.TheUnfreezeHintNamesTheDenItWasGiven`,
 `NewCommandTests.ANoteThatWouldTakeLinksNeedsAllowRelinks`,
 `NewCommandTests.ADenWhoseDenYamlDoesntLoadSaysSo`,
 `NewCommandTests.JsonPrintsTheWriteResult`.
@@ -1902,9 +1908,13 @@ have seen the dog leap ashore.
   idea`, `about` linking the Count, and the text in its lead. With an
   entity named, it adds a section marked `status=idea` to Swales
   instead. Canon views leave both out.
+- With an entity named, the new entity's parameters (`name`, `type`,
+  `series`, `book`, `fields`, and `allow_relinks`) are refused
+  (`bad_argument`), since nothing is created (#204).
 
 Spec: format.md §9.3, types.md §9.1. Covered by:
 `WriteToolTests.AnIdeaIsRecordedOutOfCanon`,
+`WriteToolTests.AnIdeaForAnExistingEntityRefusesTheNewEntitysParameters`,
 `WriteEditTests.TextGoesAtTheEndOfTheLead`.
 
 ### SC-MCP-19. My assistant renames a section
@@ -1961,9 +1971,15 @@ Spec: format.md F-RT-6, types.md F-CHAP-5 (maintainer decisions,
 
 The writer has frozen the book (`status: final`).
 
-- Adding to Swales, creating a character in the book, and changing a
-  chapter's fields are each refused as `frozen`, and nothing changes.
-  The universe isn't frozen, so a new location there is made.
+- Adding to Swales, creating a character in the book, changing a
+  chapter's fields or the book's `chapter_defaults`, and copying or
+  moving a place into the book are each refused as `frozen`, and
+  nothing changes. The universe isn't frozen, so a new location there
+  is made.
+- Each refusal ends by telling the assistant to ask the writer whether
+  to unfreeze book 'dracula', since only the writer can (#209). The
+  same refusals in the web UI and the CLI say how to unfreeze it
+  instead (SC-WEB-44, SC-CLI-15).
 
 Spec: format.md F-BOOK-1 (maintainer decision, 2026-10-22). Covered by:
 `WriteToolTests.NothingInAFinalBookIsWritten`.
@@ -2418,8 +2434,14 @@ comment, and the assistant edits the note again.
 - A thread's `paid_off` or a new `planted` of `dracula:999` is refused
   the same way, since the thread couldn't be placed in story order
   (types.md F-FT-10). So is a value that isn't a position at all
-  (`chapter nine`, `dracula:9.2`), though in a file it's only the
-  F-FT-10 warning; one already there doesn't stop an edit.
+  (`chapter nine`, `dracula:9.2`), or a mapping or a list where a
+  position goes (`paid_off: {a: 1}`, #222), though in a file each is
+  only the F-FT-10 warning; one already there, in the same field and
+  with the same content, doesn't stop an edit.
+- A refusal for a value that isn't a position gives an example in the
+  universe's own keys, the first chapter of its first book that lists
+  one ('dracula:1'), skipping a book whose key another book shares, or
+  'book:chapter' in a universe whose books list no chapters yet.
 - The Arc's `from=dracula:999`, already in the file, doesn't stop an
   edit that leaves it alone: the assistant's field change and its text
   for Voice are saved, and `check` still reports it. Writing
@@ -2446,7 +2468,11 @@ Covered by:
 `WriteToolTests.AnEmptyPositionIsNoneWhenAppendingToASectionThatsThere`,
 `WriteToolTests.APositionIsCheckedBeforeTheLinksAnEntityWouldTake`,
 `WriteToolTests.AnUntouchedSectionPositionKeepsUnderARenamedHeading`,
-`WriteToolTests.APositionFieldValueThatIsntAPositionIsRefusedWhenWritten`.
+`WriteToolTests.APositionFieldValueThatIsntAPositionIsRefusedWhenWritten`,
+`WriteToolTests.AMappingOrListInAPositionFieldIsRefusedWhenWritten`,
+`WriteToolTests.AMappingInAPositionFieldIsTheSameWithItsKeysReorderedOrItsScalarsRequoted`,
+`WriteToolTests.ARefusedPositionsExampleUsesTheUniversesOwnKeys`,
+`WriteToolTests.ARefusedPositionsExampleSkipsABookWhoseKeyIsShared`.
 
 ## STORE: Wolfden saves, moves, and deletes notes
 
@@ -3750,8 +3776,10 @@ Spec: design.md §8 "Stale files", §9 (#28). Covered by:
   makes the browser ask. Leaving closes the editor; a new position shows
   the note as of there.
 - On a note in a final book, every Edit control is off, and the page says
-  why ("... is in book 'dracula', which is final (frozen) ..."). The API
-  refuses such an edit anyway (`frozen`).
+  why ("... is in book 'dracula', which is final (frozen) ...") and how
+  to change that ("Unfreeze… on the page of book 'dracula' opens it
+  for editing again.", #209). The API refuses such an edit anyway
+  (`frozen`), in the same words.
 - One piece is edited at a time: the other Edit controls are off until
   the open one is saved or cancelled.
 

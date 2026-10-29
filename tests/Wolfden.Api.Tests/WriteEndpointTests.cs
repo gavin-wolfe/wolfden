@@ -367,10 +367,14 @@ public class WriteEndpointTests
         await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
         var before = den.Read(SwalesPath);
 
+        // Each says how the writer unfreezes the book, in the page's words, not an MCP agent's (#209).
+        const string Unfreeze = "Unfreeze… on the page of book 'dracula' opens it for editing again.";
         var source = await SourceAsync(server, SwalesPath);
         Assert.Contains("final (frozen)", source.GetProperty("frozen").GetString(), StringComparison.Ordinal);
+        Assert.EndsWith(Unfreeze, source.GetProperty("frozen").GetString(), StringComparison.Ordinal);
         var page = await server.GetJsonAsync($"/api/entity?entity={Uri.EscapeDataString(SwalesPath)}", HttpStatusCode.OK);
         Assert.Contains("final (frozen)", page.GetProperty("entity").GetProperty("frozen").GetString(), StringComparison.Ordinal);
+        Assert.EndsWith(Unfreeze, page.GetProperty("entity").GetProperty("frozen").GetString(), StringComparison.Ordinal);
 
         var (status, json) = await PostAsync(server, "/api/edit/section", new
         {
@@ -379,9 +383,33 @@ public class WriteEndpointTests
 
         Assert.Equal(HttpStatusCode.Conflict, status);
         Assert.Equal("frozen", json.GetProperty("code").GetString());
+        Assert.EndsWith(Unfreeze, json.GetProperty("message").GetString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("ask the writer", json.GetProperty("message").GetString(), StringComparison.OrdinalIgnoreCase);
         Assert.Equal(before, den.Read(SwalesPath));
         var draft = await server.GetJsonAsync($"/api/entity?entity={Uri.EscapeDataString(NotePath)}", HttpStatusCode.OK);
         Assert.Equal(JsonValueKind.Null, draft.GetProperty("entity").GetProperty("frozen").ValueKind);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-60")]
+    public void ANameOrAliasEditInTheWritersWordsPointsAtAnAssistant()
+    {
+        // The page's field edits always go under 'fields', but the API's DenTools gives every
+        // refusal in the page's words, so one for the name or an alias names no MCP tool.
+        using var den = NewDen();
+        var tools = new DenTools(den.Root) { Words = WriteEndpoints.Words };
+        var hash = tools.GetSource(SwalesPath).Hash;
+        static JsonElement Changes(string json) => JsonDocument.Parse(json).RootElement;
+
+        var name = Assert.Throws<DenToolException>(() => tools.UpdateFields(SwalesPath, hash, Changes("""[{"op": "set", "path": "name", "value": "Swales"}]""")));
+        Assert.Equal(ToolErrorCodes.UnsupportedEdit, name.Code);
+        Assert.EndsWith(WriteEndpoints.Words.NameLinks, name.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("rename_entity", name.Message, StringComparison.Ordinal);
+
+        var alias = Assert.Throws<DenToolException>(() => tools.UpdateFields(SwalesPath, hash, Changes("""[{"op": "remove", "path": "aliases.0"}]""")));
+        Assert.Equal(ToolErrorCodes.UnsupportedEdit, alias.Code);
+        Assert.EndsWith(WriteEndpoints.Words.AliasLinks, alias.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("change_alias", alias.Message, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -295,7 +295,8 @@ A typed From or Until has to be a chapter (or book) your universe has.
 A typo, such as `dracula:999`, is refused rather than saved, since the
 fact would drop out of every story-position view. So is one in a field
 that holds positions, such as a thread's Planted, and so is a value
-there that isn't a position at all. The same goes for a
+there that isn't a position at all, including a list or a mapping typed
+in with **Edit file** (`paid_off: {a: 1}`). The same goes for a
 `from=` or `until=` you type in a section comment with **Edit file**,
 and for an AI assistant's edits. A typo that's already in the note, from
 an edit outside Wolfden, doesn't stop you saving other changes as long
@@ -581,7 +582,10 @@ missing. The same goes for a book you marked `status: final` by hand:
 freezing it takes a snapshot of the book as it is now.
 
 AI assistants can't freeze or unfreeze a book. If one tries to edit a
-frozen book, it's told the book is frozen, and should ask you.
+frozen book, it's told the book is frozen and to ask you whether to
+unfreeze it. When Wolfden refuses your own edit for the same reason, on
+the page or with `wolfden new` or `wolfden copy`, it says how to
+unfreeze the book: **Unfreeze…** on its page, or `wolfden unfreeze`.
 
 ## Gotchas
 
@@ -721,7 +725,8 @@ in it, which Wolfden calls a checkpoint.
   editor can, and Wolfden can't stop it. With history, the book's page
   then offers **Finish freezing…**, which takes a new snapshot that
   includes the change. If the change was a mistake, undo it first (the
-  note's History tab shows what it was)
+  History tab of the note you changed, or `git diff`, shows what it
+  was)
   ([Freezing a finished book](#freezing-a-finished-book)).
 - **Freeze tags never move.** Each freeze keeps its own snapshot, so
   freezing a book again adds `final-2`, then `final-3`, and the earlier

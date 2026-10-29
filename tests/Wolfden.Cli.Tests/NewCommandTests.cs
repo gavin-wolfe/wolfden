@@ -21,6 +21,10 @@ public sealed class NewCommandTests : IDisposable
     private (int ExitCode, string Output, string Error) New(params string[] args) =>
         Cli.Run(["new", "--den", _den.Root, .. args]);
 
+    /// <summary>How a refusal's hint gives back the --den it was run with: quoted, without a trailing backslash, if it has anything a shell might read.</summary>
+    private static string DenArgument(string den) =>
+        den.All(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '.' or '/' or '\\' or ':' or '-') ? den : $"\"{den.TrimEnd('\\')}\"";
+
     [Fact]
     [Trait("Scenario", "SC-CLI-15")]
     public void ANewNoteComesFromItsTemplateInTheUniverseWithANewId()
@@ -88,6 +92,10 @@ public sealed class NewCommandTests : IDisposable
         var frozen = New("character", "Young Swales", "--in", "aftermath");
         Assert.Equal(CliApp.ExitUsage, frozen.ExitCode);
         Assert.StartsWith("wolfden new: Book 'aftermath' is final (frozen)", frozen.Error, StringComparison.Ordinal);
+
+        // It says how to unfreeze the book from the command line, not to ask the writer (#209).
+        Assert.Contains($"To open the book for editing again, run: wolfden unfreeze aftermath --universe dracula --den {DenArgument(_den.Root)}", frozen.Error, StringComparison.Ordinal);
+        Assert.DoesNotContain("ask the writer", frozen.Error, StringComparison.OrdinalIgnoreCase);
 
         var unknown = New("starship", "Demeter");
         Assert.Equal(CliApp.ExitUsage, unknown.ExitCode);

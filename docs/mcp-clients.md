@@ -213,7 +213,7 @@ prompts. This list is for knowing what the assistant can do.
 | `create_entity` | A new entity from its type's template. If its name would take links from another entity, it's refused unless `allow_relinks`. |
 | `update_fields` | Set, add to, or remove anything in an entity's frontmatter (its fields, `status`, `from`), and add aliases. |
 | `append_section` | Add text to a section, or add a new section. |
-| `add_idea` | Record undecided material with `status: idea`, as its own entity or as a section of one. A new idea entity whose name would take links from another entity is refused unless `allow_relinks`. |
+| `add_idea` | Record undecided material with `status: idea`, as its own entity or as a section of one. A new idea entity whose name would take links from another entity is refused unless `allow_relinks`. An idea added to an existing `entity` creates nothing, so it refuses `allow_relinks`, as it does the new entity's `name`, `type`, `series`, `book`, and `fields`. |
 | `rename_section` | Rename a section and rewrite the links to it, den-wide. |
 | `rename_entity` | Rename an entity and rewrite the links that used the old name, or keep the old name as an alias. |
 | `change_alias` | Change or remove an alias, rewriting its links the same way. |
@@ -301,7 +301,8 @@ docs. The writer's own list is in
   it, and an assistant mustn't work around the refusal, by editing the
   file directly or by copying a note out of the book to change it there.
   Ask the writer, who can unfreeze it in the web UI or with `wolfden
-  unfreeze`.
+  unfreeze`. The error names the book and ends by saying so: "Ask the
+  writer whether to unfreeze book 'dracula'; only they can."
 - **`stale_file` means read again, then retry.** The file changed after
   the assistant read it, often because the writer is editing it. Read it
   again (`get_entity`, `get_chapter`, or `get_chapter_defaults`), and

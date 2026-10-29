@@ -105,7 +105,11 @@ recorded decisions (including typo and accuracy fixes to the README), CI
 that doesn't touch secrets, and permissively licensed dependencies (the
 Reviewer checks the license). Small design choices made while implementing
 are fine. Record them in the PR description so the maintainer can revisit
-them.
+them. That includes small behaviour rules, such as whether an edge case is
+refused or only warned about, or what a blank value means. Pick the rule
+that catches mistakes without nagging, and list it in the PR under "Rules
+chosen; revisit while dogfooding". Rules get refined once the maintainer
+uses Wolfden for real. When unsure whether a choice is small, ask.
 
 **To escalate,** leave the PR open, say in a PR comment what needs deciding
 (with a recommendation), and move the card to In Review. Batch decisions

@@ -95,6 +95,7 @@ internal static class NewCommand
         "pass --allow-relinks", "as <name>", "--slug", "with --in", "use 'wolfden query --brief'", "run 'wolfden check'", "run 'wolfden check'", "run 'wolfden check'")
     {
         ChapterKeys = "use a chapter key the book's book.md lists",
+        Unfreeze = FreezeCommand.UnfreezeWords,
     };
 
     /// <summary><c>--in</c>, where the note goes.</summary>

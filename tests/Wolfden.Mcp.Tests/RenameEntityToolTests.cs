@@ -219,6 +219,7 @@ public sealed class RenameEntityToolTests : IDisposable
         var refused = Assert.Throws<DenToolException>(() => Tools.ChangeAlias("Count Dracula", "Count de Ville", hash));
 
         Assert.Equal(ToolErrorCodes.Frozen, refused.Code);
+        Assert.EndsWith("To make the change, keep the alias. Ask the writer whether to unfreeze book 'aftermath'; only they can.", refused.Message, StringComparison.Ordinal);
         Assert.Equal(before, _den.Read(Count));
         Assert.Contains("keep_old_alias", Assert.Throws<DenToolException>(() => Tools.ChangeAlias("Count Dracula", "Count de Ville", hash, newAlias: "de Ville")).Message, StringComparison.Ordinal);
     }

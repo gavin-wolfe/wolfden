@@ -63,7 +63,10 @@ internal static class CopyCommand
     /// <summary>The command's options and commands, in place of the MCP tool's parameters and tools, in its messages.</summary>
     internal static readonly ToolWords Words = new(
         "pass --allow-relinks", "as <new name>", "--slug", "with --universe", "use 'wolfden query --brief'", "run 'wolfden check'", "run 'wolfden check'",
-        "run 'wolfden check'");
+        "run 'wolfden check'")
+    {
+        Unfreeze = FreezeCommand.UnfreezeWords,
+    };
 
     /// <summary><c>--to</c>, where the copy goes.</summary>
     private static readonly ScopeOption To = new("--to", "copy into", "copied");

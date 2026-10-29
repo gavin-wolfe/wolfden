@@ -194,7 +194,7 @@ public sealed partial class DenTools
             if (structure.Universes.SelectMany(x => x.Books).FirstOrDefault(b => b.Status == BookStatus.Final && files.Keys.Any(p => IsAtOrUnder(p, b.Path))) is { } frozen)
             {
                 throw new DenToolException(
-                    ToolErrorCodes.Frozen, $"Book '{frozen.Key}' is final (frozen), so nothing can be added to it until it's unfrozen (F-BOOK-1).");
+                    ToolErrorCodes.Frozen, $"Book '{frozen.Key}' is final (frozen), so nothing can be added to it until it's unfrozen (F-BOOK-1). {Unfreezing(frozen)}");
             }
 
             var check = Check(den, structure, files);

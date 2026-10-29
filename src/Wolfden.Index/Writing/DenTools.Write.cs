@@ -132,6 +132,13 @@ public sealed partial class DenTools
                     "With 'entity', the idea is a section of that entity: 'name', 'type', 'series', 'book', and 'fields' are for a new idea entity. Leave them out, or leave out 'entity'.");
             }
 
+            // A new section takes no link from another entity, so there's nothing to allow (#204).
+            if (allowRelinks)
+            {
+                throw new DenToolException(
+                    ToolErrorCodes.BadArgument, "'allow_relinks' is for a new idea entity: with 'entity', nothing is created to take links. Leave it out.");
+            }
+
             return AddSection(entity, section ?? "Idea", text, RequireHash(expectedHash), universe, null, null, newSection: true, null, null, "idea", null);
         }
 
@@ -346,7 +353,7 @@ public sealed partial class DenTools
                 throw new DenToolException(
                     ToolErrorCodes.Frozen,
                     $"Links to '{found.Name}' are in files of a final (frozen) book, which can't be edited until it's unfrozen (F-BOOK-1): " +
-                    $"{string.Join(", ", plan.FrozenPaths)}. Renaming the section would break them, so nothing was changed.");
+                    $"{string.Join(", ", plan.FrozenPaths)}. Renaming the section would break them, so nothing was changed. {Unfreezing(structure, plan.FrozenPaths)}");
             }
 
             var files = plan.Files.ToDictionary(p => p.Key, p => p.Value, StringComparer.Ordinal);
@@ -441,7 +448,7 @@ public sealed partial class DenTools
             if (target.Status == BookStatus.Final)
             {
                 throw new DenToolException(
-                    ToolErrorCodes.Frozen, $"Book '{target.Key}' is final (frozen), so its book.md can't be edited until it's unfrozen (F-BOOK-1).");
+                    ToolErrorCodes.Frozen, $"Book '{target.Key}' is final (frozen), so its book.md can't be edited until it's unfrozen (F-BOOK-1). {Unfreezing(target)}");
             }
 
             var file = target.File;
@@ -604,7 +611,7 @@ public sealed partial class DenTools
             if (scope is Book { Status: BookStatus.Final } frozen)
             {
                 throw new DenToolException(
-                    ToolErrorCodes.Frozen, $"Book '{frozen.Key}' is final (frozen), so nothing can be added to it until it's unfrozen (F-BOOK-1).");
+                    ToolErrorCodes.Frozen, $"Book '{frozen.Key}' is final (frozen), so nothing can be added to it until it's unfrozen (F-BOOK-1). {Unfreezing(frozen)}");
             }
 
             CheckFrom(u, from);
@@ -699,7 +706,7 @@ public sealed partial class DenTools
         var text = from.Trim();
         if (!StoryPosition.TryParse(text, out var position, out var error))
         {
-            throw new DenToolException(ToolErrorCodes.BadPosition, $"'from' isn't a story position: {error.Message} Give one such as 'dracula:5' (book:chapter).");
+            throw new DenToolException(ToolErrorCodes.BadPosition, $"'from' isn't a story position: {error.Message} Give one such as {PositionExample(universe)}.");
         }
 
         if (universe.Resolve(position).Problem is { } problem)
@@ -717,8 +724,9 @@ public sealed partial class DenTools
     /// does for a new entity's <c>from</c>. The fact would drop out of canon
     /// views, or out of story order, and a typo would go unnoticed until
     /// <c>check</c>. A <c>position</c> field value that isn't a position at
-    /// all is refused too, though on disk it's only the F-FT-10 warning, so
-    /// a worse value can't get past where a near miss is refused.
+    /// all, or is a mapping or a list where a position goes (#222), is
+    /// refused too, though on disk it's only the F-FT-10 warning, so a worse
+    /// value can't get past where a near miss is refused.
     /// </summary>
     /// <remarks>
     /// Only positions the write adds count. One that was already in
@@ -732,25 +740,25 @@ public sealed partial class DenTools
     private void CheckWrittenPositions(CatalogEntity? before, CatalogEntity after)
     {
         var had = before is null ? [] : Bad(before).ToList();
-        var left = new List<PositionReference>();
-        foreach (var reference in Bad(after))
+        var left = new List<(PositionReference Reference, bool Shape)>();
+        foreach (var bad in Bad(after))
         {
-            var same = had.FindIndex(h => Place(h) == Place(reference));
+            var same = had.FindIndex(h => Place(h) == Place(bad));
             if (same >= 0)
             {
                 had.RemoveAt(same);
             }
             else
             {
-                left.Add(reference);
+                left.Add(bad);
             }
         }
 
-        foreach (var reference in left)
+        foreach (var (reference, shape) in left)
         {
             // A section bound under a renamed heading.
             var renamed = reference.Site is PositionSite.SectionFrom or PositionSite.SectionUntil
-                ? had.FindIndex(h => h.Site == reference.Site && h.Text == reference.Text)
+                ? had.FindIndex(h => h.Reference.Site == reference.Site && h.Reference.Text == reference.Text)
                 : -1;
             if (renamed >= 0)
             {
@@ -767,12 +775,20 @@ public sealed partial class DenTools
                 PositionSite.SectionFrom => $"'from' of section '{reference.Section!.Name}'",
                 _ => $"'until' of section '{reference.Section!.Name}'",
             };
+            if (shape)
+            {
+                throw new DenToolException(
+                    ToolErrorCodes.BadPosition,
+                    $"{what} holds {reference.Text}, not a story position. It holds positions, such as {PositionExample(after.Universe)}, " +
+                    $"so nothing was written. {ToolWords.Cap(Words.ChapterKeys)}, or leave the position out.");
+            }
+
             if (reference.Position is null)
             {
                 StoryPosition.TryParse(reference.Text, out _, out var error);
                 throw new DenToolException(
                     ToolErrorCodes.BadPosition,
-                    $"{what} '{reference.Text}' isn't a story position: {error!.Message} It holds positions, such as 'dracula:5' (book:chapter), " +
+                    $"{what} '{reference.Text}' isn't a story position: {error!.Message} It holds positions, such as {PositionExample(after.Universe)}, " +
                     $"so nothing was written. {ToolWords.Cap(Words.ChapterKeys)}, or leave the position out.");
             }
 
@@ -784,20 +800,35 @@ public sealed partial class DenTools
                 $"{lost}, so nothing was written. {ToolWords.Cap(Words.ChapterKeys)}, or leave the position out.");
         }
 
-        // Positions that don't resolve, and position field values that aren't positions (a bad 'from' or 'until' is already an error).
-        static IEnumerable<PositionReference> Bad(CatalogEntity entity) =>
-            UnresolvedReferences(entity).Concat(
-                PositionScanner.Scan(entity.File, entity.Definition?.PositionFields).References
-                    .Where(r => r.Position is null && r.Site == PositionSite.FieldValue));
+        // Positions that don't resolve, and position field values that aren't positions, or are a list or a
+        // mapping (Shape) where a position goes (a bad 'from' or 'until' is already an error).
+        static IEnumerable<(PositionReference Reference, bool Shape)> Bad(CatalogEntity entity)
+        {
+            var scan = PositionScanner.Scan(entity.File, entity.Definition?.PositionFields);
+            return UnresolvedReferences(entity).Concat(scan.References.Where(r => r.Position is null && r.Site == PositionSite.FieldValue))
+                .Select(r => (r, false))
+                .Concat(scan.NotPositions.Select(r => (r, true)));
+        }
 
         // Where a position is written, as far as it can be told across an edit: lines and item numbers shift.
-        static (PositionSite, string?, string?, string) Place(PositionReference r) => (r.Site, r.Field, r.Section?.Name, r.Text);
+        static (PositionSite, string?, string?, string, bool) Place((PositionReference Reference, bool Shape) bad) =>
+            (bad.Reference.Site, bad.Reference.Field, bad.Reference.Section?.Name, bad.Reference.Text, bad.Shape);
     }
 
     /// <summary>The positions written in the entity's file that parse but don't resolve in its universe (F-POS-4), in file order.</summary>
     private static IEnumerable<PositionReference> UnresolvedReferences(CatalogEntity entity) =>
         PositionScanner.Scan(entity.File, entity.Definition?.PositionFields).References
             .Where(r => r.Position is { } p && !entity.Universe.Resolve(p).IsResolved);
+
+    /// <summary>
+    /// An example story position for a refusal, quoted, in <paramref name="universe"/>'s
+    /// own keys: the first chapter of its first book (in story order) that lists one, such
+    /// as <c>'dracula:1' (book:chapter)</c>, or <c>'book:chapter'</c> when no book does (#222).
+    /// </summary>
+    private static string PositionExample(Universe universe) =>
+        universe.Books.SelectMany(b => b.Chapters).FirstOrDefault() is { } chapter
+            ? $"'{chapter.Book.Key}:{chapter.Key}' (book:chapter)"
+            : "'book:chapter'";
 
     private static DenToolException Unresolvable(string what, string text, Universe universe, string problem, string outcome) =>
         new(ToolErrorCodes.BadPosition, $"{what} {text} doesn't resolve in universe '{universe.Key}': {problem} {outcome}");
@@ -847,7 +878,7 @@ public sealed partial class DenTools
             var v = value.Trim();
             if (v.Length == 0 || v.Any(c => char.IsWhiteSpace(c) || c == '"') || v.Contains("-->", StringComparison.Ordinal))
             {
-                throw new DenToolException(ToolErrorCodes.BadArgument, $"'{key}' must be one word, such as a position 'dracula:5' or a status 'idea'.");
+                throw new DenToolException(ToolErrorCodes.BadArgument, $"'{key}' must be one word, such as a position 'book:chapter' or a status 'idea'.");
             }
 
             attributes.Add($"{key}={v}");
@@ -1088,7 +1119,7 @@ public sealed partial class DenTools
         }
     }
 
-    private static void CheckNotFrozen(CatalogEntity entity)
+    private void CheckNotFrozen(CatalogEntity entity)
     {
         if (FrozenReason(entity) is { } reason)
         {
@@ -1096,12 +1127,12 @@ public sealed partial class DenTools
         }
     }
 
-    /// <summary>Why the entity can't be edited because it's frozen, or null if it can be.</summary>
-    private static string? FrozenReason(CatalogEntity entity)
+    /// <summary>Why the entity can't be edited because it's frozen, and what to do about it, or null if it can be.</summary>
+    private string? FrozenReason(CatalogEntity entity)
     {
         if (entity.Scope is Book { Status: BookStatus.Final } book)
         {
-            return $"{entity.Path} is in book '{book.Key}', which is final (frozen), so it can't be edited until the book is unfrozen (F-BOOK-1).";
+            return $"{entity.Path} is in book '{book.Key}', which is final (frozen), so it can't be edited until the book is unfrozen (F-BOOK-1). {Unfreezing(book)}";
         }
 
         // A backstop: `status: final` on an entity is an F-ENT-5 error, so such a

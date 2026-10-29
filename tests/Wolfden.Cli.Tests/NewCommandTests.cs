@@ -89,6 +89,10 @@ public sealed class NewCommandTests : IDisposable
         Assert.Equal(CliApp.ExitUsage, frozen.ExitCode);
         Assert.StartsWith("wolfden new: Book 'aftermath' is final (frozen)", frozen.Error, StringComparison.Ordinal);
 
+        // It says how to unfreeze the book from the command line, not to ask the writer (#209).
+        Assert.Contains("Run 'wolfden unfreeze aftermath --universe dracula' to open the book for editing again.", frozen.Error, StringComparison.Ordinal);
+        Assert.DoesNotContain("ask the writer", frozen.Error, StringComparison.OrdinalIgnoreCase);
+
         var unknown = New("starship", "Demeter");
         Assert.Equal(CliApp.ExitUsage, unknown.ExitCode);
         Assert.Contains("No enabled pack defines the type 'starship'", unknown.Error, StringComparison.Ordinal);

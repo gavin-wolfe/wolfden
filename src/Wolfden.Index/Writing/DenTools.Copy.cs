@@ -91,7 +91,7 @@ public sealed partial class DenTools
             if (scope is Book { Status: BookStatus.Final } frozen)
             {
                 throw new DenToolException(
-                    ToolErrorCodes.Frozen, $"Book '{frozen.Key}' is final (frozen), so nothing can be copied into it until it's unfrozen (F-BOOK-1).");
+                    ToolErrorCodes.Frozen, $"Book '{frozen.Key}' is final (frozen), so nothing can be copied into it until it's unfrozen (F-BOOK-1). {Unfreezing(frozen)}");
             }
 
             var newPath = CopyPath(den, source, scope, newName, slug);

@@ -106,6 +106,7 @@ public sealed class CopyCommandTests : IDisposable
 
         Assert.Equal(CliApp.ExitUsage, frozen.ExitCode);
         Assert.StartsWith("wolfden copy: Book 'aftermath' is final (frozen)", frozen.Error, StringComparison.Ordinal);
+        Assert.Contains("Run 'wolfden unfreeze aftermath --universe dracula' to open the book for editing again.", frozen.Error, StringComparison.Ordinal);
         Assert.Equal(CliApp.ExitUsage, relink.ExitCode);
         Assert.Contains("would change which entity they reach", relink.Error, StringComparison.Ordinal);
         Assert.Contains("or pass --allow-relinks to make the copy anyway", relink.Error, StringComparison.Ordinal);

@@ -41,7 +41,14 @@ public sealed record PositionReference(string Text, StoryPosition? Position, Pos
 /// comments are already in the file's own <see cref="DenFile.Diagnostics"/>,
 /// so they aren't repeated here.
 /// </param>
-public sealed record PositionScan(IReadOnlyList<PositionReference> References, IReadOnlyList<Diagnostic> Diagnostics);
+/// <param name="NotPositions">
+/// The values of <c>position</c> fields that are a list or a mapping, so
+/// hold no position at all (the F-FT-10 warning in <paramref name="Diagnostics"/>),
+/// in the order found. Each has no <see cref="PositionReference.Position"/>,
+/// and its <see cref="PositionReference.Text"/> says which it is:
+/// <c>a list</c> or <c>a mapping</c>.
+/// </param>
+public sealed record PositionScan(IReadOnlyList<PositionReference> References, IReadOnlyList<Diagnostic> Diagnostics, IReadOnlyList<PositionReference> NotPositions);
 
 /// <summary>
 /// Finds the story positions in an entity file (<see cref="Scan(MarkdownFile, IReadOnlySet{string}?)"/>)
@@ -81,6 +88,7 @@ public static class PositionScanner
         ArgumentNullException.ThrowIfNull(file);
         var references = new List<PositionReference>();
         var diagnostics = new List<Diagnostic>();
+        var notPositions = new List<PositionReference>();
         var frontmatter = isContainer ? null : file.Frontmatter;
         if (frontmatter is not null)
         {
@@ -98,7 +106,7 @@ public static class PositionScanner
                         continue;
                     }
 
-                    ScanField(name, entry.Value, positionFields?.Contains(name) == true, references, diagnostics);
+                    ScanField(name, entry.Value, positionFields?.Contains(name) == true, references, diagnostics, notPositions);
                 }
             }
         }
@@ -128,10 +136,11 @@ public static class PositionScanner
             }
         }
 
-        return new PositionScan(references, diagnostics);
+        return new PositionScan(references, diagnostics, notPositions);
     }
 
-    private static void ScanField(string name, YamlNode value, bool isPositionField, List<PositionReference> references, List<Diagnostic> diagnostics)
+    private static void ScanField(
+        string name, YamlNode value, bool isPositionField, List<PositionReference> references, List<Diagnostic> diagnostics, List<PositionReference> notPositions)
     {
         // F-TMP-1: a single entry, a list of entries, or a plain value.
         var entries = value switch
@@ -145,7 +154,7 @@ public static class PositionScanner
         {
             if (isPositionField)
             {
-                ReadFieldValue(name, value, references, diagnostics);
+                ReadFieldValue(name, value, references, diagnostics, notPositions);
             }
 
             return;
@@ -165,7 +174,7 @@ public static class PositionScanner
 
             if (isPositionField && entry["value"] is { } inner)
             {
-                ReadFieldValue(name, inner, references, diagnostics);
+                ReadFieldValue(name, inner, references, diagnostics, notPositions);
             }
         }
     }
@@ -205,7 +214,8 @@ public static class PositionScanner
     /// a list field. A bad one is a warning (types.md F-FT-10). A null value
     /// is unset (F-FLD-4).
     /// </summary>
-    private static void ReadFieldValue(string field, YamlNode value, List<PositionReference> references, List<Diagnostic> diagnostics)
+    private static void ReadFieldValue(
+        string field, YamlNode value, List<PositionReference> references, List<Diagnostic> diagnostics, List<PositionReference> notPositions)
     {
         var items = value is YamlSequence list ? list.Items : [value];
         foreach (var item in items)
@@ -223,8 +233,10 @@ public static class PositionScanner
                     references.Add(new PositionReference(scalar.Text, position, PositionSite.FieldValue, scalar.Line, field));
                     break;
                 default:
+                    var shape = item is YamlSequence ? "list" : "mapping";
                     diagnostics.Add(new Diagnostic("F-FT-10", DiagnosticSeverity.Warning, item.Line,
-                        $"{field} holds story positions, such as \"ember:14\", not a {(item is YamlSequence ? "list" : "mapping")}: {StoryPosition.InvalidMessage}."));
+                        $"{field} holds story positions, such as \"ember:14\", not a {shape}: {StoryPosition.InvalidMessage}."));
+                    notPositions.Add(new PositionReference($"a {shape}", null, PositionSite.FieldValue, item.Line, field));
                     break;
             }
         }

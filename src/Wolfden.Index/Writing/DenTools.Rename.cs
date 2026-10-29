@@ -173,7 +173,7 @@ public sealed partial class DenTools
                 NewAlias: newAlias,
                 SameForLinks: sameForLinks,
                 KeepHint: newAlias is null
-                    ? "keep the alias, or ask the writer to unfreeze the book"
+                    ? "keep the alias"
                     : "pass keep_old_alias: true to add the new alias beside the old one instead, which leaves those links as they are",
                 LostHint: newAlias is null
                     ? "keep the alias, or change those links to the entity's id or file name first"
@@ -242,7 +242,7 @@ public sealed partial class DenTools
                 throw new DenToolException(
                     ToolErrorCodes.Frozen,
                     $"Links that use the {what} '{c.OldText}' are in files of a final (frozen) book, which can't be edited until it's unfrozen (F-BOOK-1): " +
-                    $"{string.Join(", ", plan.FrozenPaths)}. Rewriting them is the only way they'd follow, so nothing was changed. To make the change, {c.KeepHint}.");
+                    $"{string.Join(", ", plan.FrozenPaths)}. Rewriting them is the only way they'd follow, so nothing was changed. To make the change, {c.KeepHint}. {Unfreezing(structure, plan.FrozenPaths)}");
             }
 
             var files = plan.Files.ToDictionary(p => p.Key, p => p.Value, StringComparer.Ordinal);

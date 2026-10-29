@@ -348,8 +348,10 @@ are unique only within a universe (format.md F-KEY-5).
   says so.
 - **For the writer only.** Freezing and unfreezing are in the web UI
   (the book's page) and the CLI (`wolfden freeze`, `wolfden unfreeze`).
-  MCP agents get no tools for them in v0; their `frozen` errors already
-  tell them to ask the writer (§8).
+  MCP agents get no tools for them in v0; their `frozen` errors tell
+  them to ask the writer whether to unfreeze the book (§8). The same
+  errors in the web UI and the CLI say how the writer unfreezes it
+  instead (#209).
 
 v0 behaviour, not recorded decisions (#31): a freeze or unfreeze takes
 the hash of the `book.md` it's based on and is refused with `stale_file`
@@ -971,7 +973,13 @@ store, so an edit changes only what it means to (format.md §12):
   or outline (format.md F-BOOK-1). There are no tools to freeze or
   unfreeze a book (maintainer decision, 2026-10-28, #31): that's the
   writer's, in the web UI or the CLI (§5), and a `frozen` error is the
-  agent's cue to ask them. Edits to pinned canon are made, and
+  agent's cue to ask them. Each one ends with what to do next, in the
+  caller's words (`ToolWords.Unfreeze`, #209): for MCP, "Ask the writer
+  whether to unfreeze book 'dracula'; only they can."; on the web page,
+  **Unfreeze…** on the book's page; for the CLI, `wolfden unfreeze
+  <book> --universe <key>`. One that names files in several final books
+  says it for each. The entity page's and the source's `frozen` reason
+  ends the same way. Edits to pinned canon are made, and
   `pinned_canon` in the result lists each pinned fact touched. A
   series' or universe's `chapter_defaults` isn't in a book's scope, but
   reaches its chapters, so `update_chapter_defaults` refuses an edit
@@ -1051,7 +1059,9 @@ store, so an edit changes only what it means to (format.md §12):
   `allow_relinks`; with it, `effects` list the links that moved, as do
   links that were broken and now reach the new entity. It's the copy's
   check, the same code, and `add_idea`'s new idea entity gets it too,
-  with its own `allow_relinks`. A `from` that's empty or only spaces is
+  with its own `allow_relinks`. With `entity`, `add_idea` only adds a
+  section, so it refuses `allow_relinks` (`bad_argument`), as it does
+  the new entity's `name`, `type`, `series`, `book`, and `fields` (#204). A `from` that's empty or only spaces is
   no `from`, as on disk (F-ENT-6). The web UI's refusal doesn't suggest
   a slug, since its create takes none.
   `update_fields` puts a new top-level key in template order too
@@ -1081,11 +1091,16 @@ store, so an edit changes only what it means to (format.md §12):
   section that's there as if none was given. A `position` field value
   that isn't a position at all (`chapter nine`, `dracula:9.2`) is
   refused too (`bad_position`), so a worse value can't get past where
-  a near miss is refused; on disk it stays the F-FT-10 warning, so a
-  file that already holds one loads as before, and the same-place rule
-  applies to it. The refusal says where to find a chapter key in the
-  caller's words (`get_chapter` for MCP, the book's chapters on the
-  page). `update_chapter_fields`, `update_chapter_defaults`,
+  a near miss is refused, and so is a mapping or a list where a
+  position goes (`paid_off: {a: 1}`, #222). On disk each stays the
+  F-FT-10 warning, so a file that already holds one loads as before,
+  and the same-place rule applies to it (a mapping or a list matches
+  one of the same shape in the same field). The refusal says where to
+  find a chapter key in the caller's words (`get_chapter` for MCP, the
+  book's chapters on the page). Its example, as for `create_entity`'s
+  `from`, is in the universe's own keys: the first chapter of its
+  first book, in story order, that lists one (`'dracula:1'`), or
+  `'book:chapter'` when none does (#222). `update_chapter_fields`, `update_chapter_defaults`,
   `move_entity`, and `copy_entity` take no position: a move writes the
   entry point the entity had, and a copy keeps the original's positions
   and says which don't resolve where the copy is.
@@ -1696,7 +1711,9 @@ docs/
     (`WriteEndpoints.Words`): they name the search box, an editor, and
     `wolfden check`, and say that an AI assistant working through Wolfden
     can rename a note or change an alias and rewrite the links, where the
-    MCP tools' words name `rename_entity` and `change_alias`. The MCP
+    MCP tools' words name `rename_entity` and `change_alias`. A `frozen`
+    refusal says to use **Unfreeze…** on the book's page, where the MCP
+    tools' words say to ask the writer (#209). The MCP
     tools' and the command line's words are unchanged.
   - **Removing a section** takes its subsections, and doesn't rewrite
     links to it by heading: `effects` lists them, and what they reach

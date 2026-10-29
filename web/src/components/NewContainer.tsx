@@ -127,13 +127,16 @@ export function ContainerCreatedNotice() {
   }
 
   const { result } = shown.created
+  // The first effect starts by naming the file, which the line above names already; the rest of it (the key, the chapters) stays.
+  const lead = `Created ${result.path}: `
+  const effects = result.effects.map((e, i) => (i === 0 && e.startsWith(lead) ? e.charAt(lead.length).toUpperCase() + e.slice(lead.length + 1) : e))
   return (
     <div className="save-result created-notice" role="status" tabIndex={-1} ref={ref}>
       <p>
         Created <code>{result.path}</code>.
       </p>
       <ul>
-        {result.effects.slice(1).map((e) => (
+        {effects.map((e) => (
           <li key={e}>{e}</li>
         ))}
       </ul>
@@ -157,6 +160,9 @@ export function ContainerCreatedNotice() {
 
 /** The most chapters a new book can start with, as the server allows. */
 const MAX_CHAPTERS = 1000
+
+/** The Place after… value for "At the start"; a key never holds a colon. */
+const FIRST = ':first'
 
 /** The New series or New book form: the name, where it goes in story order, and a book's chapters. */
 function NewContainerDialog({
@@ -202,7 +208,8 @@ function NewContainerDialog({
         name: name.trim(),
         universe,
         series,
-        after: after || undefined,
+        after: after && after !== FIRST ? after : undefined,
+        first: after === FIRST || undefined,
         chapters: count,
         expectedHash: hash,
       }),
@@ -239,7 +246,7 @@ function NewContainerDialog({
   // A place that's gone since the form opened falls back to the end.
   const list = works.data?.works ?? []
   useEffect(() => {
-    if (after && works.data && !works.data.works.some((w) => w.key === after)) {
+    if (after && after !== FIRST && works.data && !works.data.works.some((w) => w.key === after)) {
       setAfter('')
     }
   }, [after, works.data])
@@ -260,6 +267,13 @@ function NewContainerDialog({
 
     setMissing(false)
     let count: number | undefined
+    if (kind === 'book' && chaptersRef.current?.validity.badInput) {
+      // Text a number field can't read ("e", "--") reads as empty: refused, not taken as no chapters.
+      setBadChapters(true)
+      chaptersRef.current.focus()
+      return
+    }
+
     if (kind === 'book' && chapters.trim() !== '') {
       const n = Number(chapters.trim())
       if (!Number.isInteger(n) || n < 1 || n > MAX_CHAPTERS) {
@@ -361,6 +375,7 @@ function NewContainerDialog({
                   changed()
                 }}
               >
+                <option value={FIRST}>At the start, before {list[0].name}</option>
                 <option value="">At the end, after {list[list.length - 1].name}</option>
                 {list.map((w) => (
                   <option key={`${w.kind}:${w.key}`} value={w.key}>

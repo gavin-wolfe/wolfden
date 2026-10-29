@@ -141,7 +141,7 @@ describe('SC-WEB-69: I add a book or a series from its universe or series', () =
     // Place after: at the end by default, or after any work.
     const after = (await within(form).findByLabelText('Place after…')) as HTMLSelectElement
     expect(after.value).toBe('')
-    expect([...after.options].map((o) => o.text)).toEqual(['At the end, after Dracula', 'Dracula (book)'])
+    expect([...after.options].map((o) => o.text)).toEqual(['At the start, before Dracula', 'At the end, after Dracula', 'Dracula (book)'])
 
     // A name is required, and chapters are a whole number from 1 to 1000: nothing is sent otherwise.
     fireEvent.click(within(form).getByRole('button', { name: 'Create' }))
@@ -154,6 +154,14 @@ describe('SC-WEB-69: I add a book or a series from its universe or series', () =
       expect(within(form).getByRole('alert').textContent).toContain('whole number from 1 to 1000')
       expect(document.activeElement).toBe(chapters)
     }
+
+    // Text the number field can't read ("e", "--") reads as empty there; it's refused, not taken as no chapters.
+    fireEvent.change(chapters, { target: { value: '' } })
+    Object.defineProperty(chapters, 'validity', { configurable: true, value: { badInput: true } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Create' }))
+    expect(within(form).getByRole('alert').textContent).toContain('whole number from 1 to 1000')
+    expect(document.activeElement).toBe(chapters)
+    delete (chapters as unknown as { validity?: unknown }).validity
 
     expect(posted).toEqual([])
 
@@ -172,6 +180,8 @@ describe('SC-WEB-69: I add a book or a series from its universe or series', () =
     expect(notice.getAttribute('role')).toBe('status')
     expect(notice.textContent).toContain(`Created ${GUEST_PATH}.`)
     expect(notice.textContent).toContain('[dracula, dracula-s-guest]')
+    // What the file holds stays in the notice: the key and the chapters.
+    expect(notice.textContent).toContain("Book 'Dracula's Guest', key 'dracula-s-guest', with id B2. It has 3 chapters, dracula-s-guest:1 to dracula-s-guest:3.")
     await waitFor(() => expect(document.activeElement).toBe(notice))
 
     // Leaving the page ends the notice.
@@ -212,6 +222,24 @@ describe('SC-WEB-69: I add a book or a series from its universe or series', () =
       path: '/api/book/create',
       body: { name: "Dracula's Guest", universe: 'dracula', series: 'the-harker-papers', expectedHash: 'h-s' },
     })
+  })
+})
+
+describe('SC-WEB-69: I put a new book first', () => {
+  it('"At the start" places it before every work', async () => {
+    const { posted } = stubCreate()
+    const { history } = renderApp('/u/dracula')
+    await screen.findByRole('heading', { name: 'Dracula', level: 1 })
+
+    fireEvent.click(screen.getByRole('button', { name: 'New book in Dracula' }))
+    const form = screen.getByRole('dialog')
+    fireEvent.change(within(form).getByLabelText('Name'), { target: { value: "Dracula's Guest" } })
+    const after = (await within(form).findByLabelText('Place after…')) as HTMLSelectElement
+    fireEvent.change(after, { target: { value: [...after.options].find((o) => o.text.startsWith('At the start'))!.value } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Create' }))
+
+    await waitFor(() => expect(history.location.pathname).toBe('/u/dracula/b/dracula-s-guest'))
+    expect(posted).toEqual([{ path: '/api/book/create', body: { name: "Dracula's Guest", universe: 'dracula', first: true, expectedHash: 'h-u' } }])
   })
 })
 

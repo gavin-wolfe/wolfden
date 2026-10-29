@@ -254,6 +254,89 @@ public sealed class CreateContainerTests : IDisposable
         Assert.Equal(ToolErrorCodes.UnknownScope, Assert.Throws<DenToolException>(() => tools.GetWorks("starfall", "nope")).Code);
     }
 
+    [Fact]
+    [Trait("Scenario", "SC-WEB-69")]
+    public void AtTheStartPutsTheNewWorkBeforeEveryOther()
+    {
+        var den = Den(TempDen.Starfall());
+        var tools = new DenTools(den.Root);
+        var before = Diagnostics(tools);
+
+        var series = tools.CreateSeries("The First War", "starfall", first: true);
+        Assert.Contains("order: [the-first-war, long-dark, a-quiet-moon, drift-war]\n", den.Read(Universe).ReplaceLineEndings("\n"), StringComparison.Ordinal);
+        Assert.Contains(series.Effects, e => e.Contains($"Added 'the-first-war' to order in {Universe}, at the start.", StringComparison.Ordinal));
+
+        tools.CreateBook("Kindling", "starfall", "long-dark", first: true);
+        Assert.Contains("books: [kindling, ember, ash]\n", den.Read(LongDark).ReplaceLineEndings("\n"), StringComparison.Ordinal);
+        Assert.Equal(["kindling", "ember", "ash"], tools.GetWorks("starfall", "long-dark").Works.Select(w => w.Key));
+        Assert.Empty(Diagnostics(tools).Except(before));
+
+        // A list that wasn't there: the new one first. With no works at all, first is the end too.
+        var dracula = Den(TempDen.Dracula());
+        var draculaTools = new DenTools(dracula.Root);
+        var prequel = draculaTools.CreateBook("Dracula's Guest", "dracula", first: true);
+        Assert.Contains("\norder: [dracula-s-guest, dracula]\n", dracula.Read(DraculaUniverse).ReplaceLineEndings("\n"), StringComparison.Ordinal);
+        Assert.Contains(prequel.Effects, e => e.Contains("with the new one at the start: [dracula-s-guest, dracula]", StringComparison.Ordinal));
+        draculaTools.CreateSeries("The Harker Papers", "dracula");
+        var lone = draculaTools.CreateBook("First Light", "dracula", "the-harker-papers", first: true);
+        Assert.Single(lone.Files);
+
+        var both = Assert.Throws<DenToolException>(() => tools.CreateBook("Cinder", "starfall", "long-dark", after: "ember", first: true));
+        Assert.Equal(ToolErrorCodes.BadArgument, both.Code);
+        Assert.Contains("not both", both.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-70")]
+    public void ANameInAnotherScriptSaysKeysAreLatinForNow()
+    {
+        var den = Den(TempDen.Starfall());
+        var tools = new DenTools(den.Root);
+
+        foreach (var name in new[] { "Дракула", "東京" })
+        {
+            var e = Assert.Throws<DenToolException>(() => tools.CreateBook(name, "starfall"));
+            Assert.Equal(ToolErrorCodes.BadArgument, e.Code);
+            Assert.Contains("keys use only the letters a–z and the digits 0–9 for now", e.Message, StringComparison.Ordinal);
+            Assert.Contains("Give it a name in Latin letters", e.Message, StringComparison.Ordinal);
+            Assert.DoesNotContain("'Book ", e.Message, StringComparison.Ordinal);
+        }
+
+        var none = Assert.Throws<DenToolException>(() => tools.CreateBook("???", "starfall"));
+        Assert.Contains("no letters or digits", none.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("'Book ", none.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-69")]
+    public void APlannedEntryStillGetsTheLeftOutWorksListed()
+    {
+        var den = Den(TempDen.Starfall());
+        // 'cinder' is planned first; ember and ash are left out, so they come after it, by key: ash, ember.
+        den.Write(LongDark, "---\nid: 01JA3E28JT97KB6CQ643DZVMXX\nname: The Long Dark\nbooks: [cinder]\n---\n");
+        var tools = new DenTools(den.Root);
+        var before = tools.GetWorks("starfall", "long-dark").Works.Select(w => w.Key).ToList();
+
+        var made = tools.CreateBook("Cinder", "starfall", "long-dark");
+
+        Assert.Contains("books: [cinder, ash, ember]\n", den.Read(LongDark), StringComparison.Ordinal);
+        Assert.Contains(made.Effects, e => e.Contains("already listed 'cinder'", StringComparison.Ordinal) && e.Contains("It left out ash, ember", StringComparison.Ordinal));
+        Assert.Equal(["cinder", .. before], tools.GetWorks("starfall", "long-dark").Works.Select(w => w.Key));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-70")]
+    public void ARolledBackCreateRemovesTheFolderItMadeAboveToo()
+    {
+        // Dracula has no series/ folder, and a new series edits universe.md, which fails here.
+        var den = Den(TempDen.Dracula());
+        var tools = new DenTools(den.Root) { Store = new WriteToolTests.FailingStore(den.Root, DraculaUniverse) };
+
+        Assert.Throws<DenToolException>(() => tools.CreateSeries("The Harker Papers", "dracula"));
+
+        Assert.False(Directory.Exists(Path.Combine(den.Root, "universes", "dracula", "series")));
+    }
+
     // ------------------------------------------------------------ helpers
 
     private TempDen Den(TempDen den)

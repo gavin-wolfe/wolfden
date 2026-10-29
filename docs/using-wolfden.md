@@ -166,10 +166,13 @@ asks for:
   Long Dark" is `series/long-dark/`. That folder name is its *key*, which
   story positions use (`ember:3`), so it never changes, but you can
   change the name in its `series.md` or `book.md` later.
-- **Place after…** Where it comes in reading order: at the end, or
-  after a book or series you choose. For a book in a series, that's among
-  the series' books; otherwise among the universe's series and standalone
-  books.
+- **Place after…** Where it comes in reading order: at the end, at the
+  start (a prequel), or after a book or series you choose. For a book in a
+  series, that's among the series' books; otherwise among the universe's
+  series and standalone books. A work placed before a final book is
+  allowed (the frozen book's own files don't change), but it changes what
+  the canon views at that book's chapters include, since the reader now
+  meets the new work first.
 - **Number of chapters** (books only, optional). 24 gives chapters 1 to
   24, so positions such as `ember:3` work straight away. Leave it empty
   for a book with no chapters yet. Chapter titles, a prologue, or a
@@ -188,7 +191,11 @@ since a story position names a book by its key alone: two books called
 mean nothing. Choose another name, then change the name in `book.md`
 afterwards if you want it back. A name that starts with a digit
 ("1984") can't make a key, since keys start with a letter: start it with
-a word, and change it afterwards the same way.
+a word, and change it afterwards the same way. Keys use only the letters
+a–z and the digits 0–9 for now, so a name written entirely in another
+script ("Дракула", "東京") makes no key: give it a name in Latin letters,
+such as a transliteration, then change the name in its file back to the
+one you want; the key stays.
 
 From the command line:
 
@@ -200,8 +207,8 @@ wolfden new book "Dracula's Guest" --in dracula
 
 `--in` names the universe, or a series as `<universe>/<series>` (or just
 the series' key, in a den with one universe). `--after` names the work it
-comes after; leave it out for the end. `--chapters` is the number of
-chapters.
+comes after, and `--first` puts it at the start instead; leave both out
+for the end. `--chapters` is the number of chapters.
 
 ## Editing notes
 

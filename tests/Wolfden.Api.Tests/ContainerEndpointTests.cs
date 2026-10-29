@@ -111,6 +111,8 @@ public sealed class ContainerEndpointTests : IDisposable
         await Refused("/api/book/create", new { name = "Cinder", universe = "starfall", chapters = 1001, expectedHash = hash }, HttpStatusCode.BadRequest, "bad_argument", "1 to 1000");
         await Refused("/api/series/create", new { name = "Cinder", universe = "starfall", chapters = 3, expectedHash = hash }, HttpStatusCode.BadRequest, "bad_argument", "doesn't take 'chapters'");
         await Refused("/api/series/create", new { name = "Cinder", universe = "starfall", expectedHash = "0000" }, HttpStatusCode.Conflict, "stale_file", "has changed since it was read");
+        await Refused("/api/book/create", new { name = "Cinder", universe = "starfall", first = true, after = "long-dark", expectedHash = hash }, HttpStatusCode.BadRequest, "bad_argument", "not both");
+        await Refused("/api/series/create", new { name = "Cinder", universe = "starfall", first = "yes", expectedHash = hash }, HttpStatusCode.BadRequest, "bad_argument", "true or false");
 
         // A series' hash isn't the universe's.
         var series = (await server.GetJsonAsync("/api/works?universe=starfall&series=long-dark", HttpStatusCode.OK)).GetProperty("hash").GetString();
@@ -143,9 +145,10 @@ public sealed class ContainerEndpointTests : IDisposable
         Assert.False(Directory.Exists(System.IO.Path.Combine(den.Root, "universes", "drift", "books", "undertow")));
 
         var hash = (await server.GetJsonAsync("/api/works", HttpStatusCode.OK)).GetProperty("hash").GetString();
-        var (code, made) = await PostAsync(server, "/api/book/create", new { name = "Salt and Iron", expectedHash = hash });
+        var (code, made) = await PostAsync(server, "/api/book/create", new { name = "Salt and Iron", first = true, expectedHash = hash });
         Assert.Equal(HttpStatusCode.Created, code);
         Assert.Equal("starfall", made.GetProperty("universe").GetString());
+        Assert.Equal("salt-and-iron", (await server.GetJsonAsync("/api/works", HttpStatusCode.OK)).GetProperty("works")[0].GetProperty("key").GetString());
     }
 
     // ------------------------------------------------------------ helpers

@@ -21,9 +21,11 @@ namespace Wolfden.Api;
 /// </para>
 /// <para>
 /// A create takes a JSON body, sent as <c>application/json</c>, as the
-/// editing endpoints do: <c>{name, universe, after, expectedHash}</c> for a
-/// series, and <c>{name, universe, series, after, chapters, expectedHash}</c>
-/// for a book (a standalone book without <c>series</c>). <c>expectedHash</c>
+/// editing endpoints do: <c>{name, universe, after, first, expectedHash}</c> for a
+/// series, and <c>{name, universe, series, after, first, chapters, expectedHash}</c>
+/// for a book (a standalone book without <c>series</c>). <c>first: true</c>
+/// places it at the start of the story order (not with <c>after</c>), and
+/// neither places it at the end. <c>expectedHash</c>
 /// is the hash <c>/api/works</c> gave: the create edits that file's list, so
 /// it's refused with <c>stale_file</c> if the file has changed since. It
 /// writes through the server's one set of write tools, so it runs one write
@@ -45,11 +47,12 @@ public static class ContainerEndpoints
     internal static void Map(RouteGroupBuilder api, DenTools tools)
     {
         api.MapGet("/works", (HttpContext c) => ReadEndpoints.Answer(c, ["universe", "series"], q => tools.GetWorks(q.Text("universe"), q.Text("series"))));
-        api.MapPost("/series/create", (Func<HttpContext, Task<IResult>>)(c => Create(c, ["name", "universe", "after", "expectedHash"], body =>
-            tools.CreateSeries(Name(body, "series"), body.OptionalText("universe"), body.OptionalText("after"), Hash(body)))));
-        api.MapPost("/book/create", (Func<HttpContext, Task<IResult>>)(c => Create(c, ["name", "universe", "series", "after", "chapters", "expectedHash"], body =>
+        api.MapPost("/series/create", (Func<HttpContext, Task<IResult>>)(c => Create(c, ["name", "universe", "after", "first", "expectedHash"], body =>
+            tools.CreateSeries(Name(body, "series"), body.OptionalText("universe"), body.OptionalText("after"), Hash(body), body.OptionalBool("first") ?? false))));
+        api.MapPost("/book/create", (Func<HttpContext, Task<IResult>>)(c => Create(c, ["name", "universe", "series", "after", "first", "chapters", "expectedHash"], body =>
             tools.CreateBook(
-                Name(body, "book"), body.OptionalText("universe"), body.OptionalText("series"), body.OptionalText("after"), body.OptionalInt("chapters"), Hash(body)))));
+                Name(body, "book"), body.OptionalText("universe"), body.OptionalText("series"), body.OptionalText("after"), body.OptionalInt("chapters"), Hash(body),
+                body.OptionalBool("first") ?? false))));
     }
 
     private static string Name(WriteEndpoints.Body body, string what) =>

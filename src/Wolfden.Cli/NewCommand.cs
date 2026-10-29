@@ -26,8 +26,8 @@ internal static class NewCommand
         "new",
         """
         usage: wolfden new <type> <name> [--in <scope>] [--from <position>] [--slug <slug>] [--allow-relinks] [--den <den>] [--json]
-               wolfden new series <name> [--in <universe>] [--after <key>] [--den <den>] [--json]
-               wolfden new book <name> [--in <universe or series>] [--after <key>] [--chapters <n>] [--den <den>] [--json]
+               wolfden new series <name> [--in <universe>] [--after <key> | --first] [--den <den>] [--json]
+               wolfden new book <name> [--in <universe or series>] [--after <key> | --first] [--chapters <n>] [--den <den>] [--json]
         """,
         """
         Creates a note from its type's template, such as a new character. It
@@ -77,12 +77,14 @@ internal static class NewCommand
                               den's universe, when it has one.
           --after <key>       the series or book it comes after in story
                               order; by default, at the end
+          --first             put it at the start of the story order instead,
+                              before every work (not with --after)
           --chapters <n>      a book's chapters to start with, 1 to 1000, keyed
                               1 to n; by default, none
 
         Exits 0 when it's made, and 2 if it isn't.
         """,
-        ["--json", "--allow-relinks"],
+        ["--json", "--allow-relinks", "--first"],
         ["--den", "--in", "--from", "--slug", "--after", "--chapters"],
         [],
         2,
@@ -124,6 +126,12 @@ internal static class NewCommand
                 error.WriteLine($"wolfden new: {option} is for a new series or book ('wolfden new series' or 'wolfden new book'), not a note.");
                 return CliApp.ExitUsage;
             }
+        }
+
+        if (line.Has("--first"))
+        {
+            error.WriteLine("wolfden new: --first is for a new series or book ('wolfden new series' or 'wolfden new book'), not a note.");
+            return CliApp.ExitUsage;
         }
 
         var name = line.Arguments[1];
@@ -208,6 +216,12 @@ internal static class NewCommand
             return CliApp.ExitUsage;
         }
 
+        if (line.Has("--first") && line.Value("--after") is not null)
+        {
+            error.WriteLine($"wolfden new: give --first or --after, not both: the {what} goes at the start, or after one work.");
+            return CliApp.ExitUsage;
+        }
+
         int? chapters = null;
         if (line.Value("--chapters") is { } count)
         {
@@ -251,8 +265,8 @@ internal static class NewCommand
         {
             var tools = new DenTools(root) { Words = Words };
             result = series
-                ? tools.CreateSeries(name, universe, line.Value("--after"))
-                : tools.CreateBook(name, universe, inSeries, line.Value("--after"), chapters);
+                ? tools.CreateSeries(name, universe, line.Value("--after"), first: line.Has("--first"))
+                : tools.CreateBook(name, universe, inSeries, line.Value("--after"), chapters, first: line.Has("--first"));
         }
         catch (DenToolException e)
         {
@@ -302,6 +316,21 @@ internal static class NewCommand
         {
             universe = named.Key;
             return true;
+        }
+
+        // A bare key that's no universe, in a den with several: say where it could go, naming universes and series only.
+        if (structure.IsLoaded && structure.Universes.Count > 1 && !value.Contains('/', StringComparison.Ordinal) && !value.Contains(':', StringComparison.Ordinal))
+        {
+            var holders = structure.Universes.Where(x => x.Series.Any(s => s.Key == value)).Select(x => $"'{x.Key}/{value}'").ToList();
+            var asBook = structure.Universes.Any(x => x.FindBook(value) is not null);
+            problem = $"the den has no universe '{value}', so --in '{value}' doesn't name one." +
+                (series
+                    ? " A series goes in a universe: give --in '<universe>'."
+                    : (holders.Count > 0
+                        ? $" To put the book in the series '{value}', give --in {string.Join(" or ", holders)}."
+                        : asBook ? $" '{value}' is a book, and a book goes in a universe or a series." : "") +
+                      " Give --in '<universe>' for a standalone book, or '<universe>/<series>'.");
+            return false;
         }
 
         if (!In.TryParse(root, value, out universe, out inSeries, out var book, out problem))

@@ -86,7 +86,38 @@ public sealed class NewContainerCommandTests : IDisposable
         Refused("'dracula' is a book, and a book goes in a universe or a series", "book", "Dracula's Guest", "--in", "dracula/book:dracula");
         Refused("universe 'dracula' has no series 'sequels'", "book", "Dracula's Guest", "--in", "dracula/sequels");
         Refused("a series goes in a universe", "series", "The Harker Papers", "--in", "dracula/book:dracula");
+        Refused("give --first or --after, not both", "book", "Dracula's Guest", "--first", "--after", "dracula");
+        Refused("--first is for a new series or book", "character", "Sister Agatha", "--first");
+        Refused("keys use only the letters a–z", "book", "Дракула");
 
+        Assert.Equal(before, Cli.Snapshot(_den.Root));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-CLI-16")]
+    public void FirstPutsItAtTheStart()
+    {
+        var (exitCode, output, _) = New("book", "Dracula's Guest", "--first");
+
+        Assert.Equal(CliApp.ExitOk, exitCode);
+        Assert.Contains("at the start: [dracula-s-guest, dracula]", output, StringComparison.Ordinal);
+        Assert.Contains("\norder: [dracula-s-guest, dracula]\n", _den.Read(Universe).ReplaceLineEndings("\n"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-CLI-16")]
+    public void ABareBookKeyInADenWithSeveralUniversesSaysUniverseOrSeries()
+    {
+        _den.Write("universes/legend/universe.md", "---\nid: 01M4TF5F0EKGGWD5FNVBAEY9A1\nname: Legend\n---\n");
+        _den.Write("universes/legend/books/ember/book.md", "---\nid: 01M4TF5F0EKGGWD5FNVBAEY9A2\nname: Ember\n---\n");
+        var before = Cli.Snapshot(_den.Root);
+
+        var (exitCode, _, error) = New("book", "Ash", "--in", "ember");
+
+        Assert.Equal(CliApp.ExitUsage, exitCode);
+        Assert.Contains("'ember' is a book, and a book goes in a universe or a series.", error, StringComparison.Ordinal);
+        Assert.Contains("Give --in '<universe>' for a standalone book, or '<universe>/<series>'.", error, StringComparison.Ordinal);
+        Assert.DoesNotContain("series or book", error, StringComparison.Ordinal);
         Assert.Equal(before, Cli.Snapshot(_den.Root));
     }
 

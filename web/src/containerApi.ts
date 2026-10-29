@@ -59,8 +59,10 @@ export interface ContainerRequest {
   universe: string
   /** For a book in a series; left out, a standalone book. */
   series?: string
-  /** The key of the work it comes after; left out, at the end. */
+  /** The key of the work it comes after; left out, at the end (or with first, at the start). */
   after?: string
+  /** True to put it at the start of the story order, before every work; not with after. */
+  first?: boolean
   /** A book's chapters, 1 to N; left out, none. */
   chapters?: number
   expectedHash: string

@@ -1056,21 +1056,29 @@ store, so an edit changes only what it means to (format.md §12):
   `update_fields` puts a new top-level key in template order too
   (F-TPL-7); `append_section` puts a new standard section in the
   type's section order and a custom one at the end (F-TPL-8).
-- **Positions a write sets must resolve** (maintainer decision on #211,
-  2026-10-29). Every entity write refuses a `from` or `until` it adds
-  that names a book or chapter the universe doesn't have, with
+- **Positions a write sets must resolve** (maintainer decisions on
+  #211 and #217, 2026-10-29). Every entity write refuses a position it
+  adds that names a book or chapter the universe doesn't have, with
   `bad_position`, as `create_entity` does for its `from`: the entity's
-  `from`, a field entry's `from` and `until`, and a section comment's
-  `from` and `until`. That covers `update_fields`, `append_section`,
-  `create_entity`'s fields, and the web UI's edits, which share the
-  edit loop (Edit file included). Only the positions the write adds
-  count: one that doesn't resolve and was already in the file, untouched,
-  doesn't stop the write (counted by text, so writing the same one again
-  elsewhere is refused). An empty value is none, as on disk: `null` in
-  `update_fields`, an empty or blank `from` or `until` for
-  `append_section`. A `position` field's value isn't a bound (types.md
-  F-FT-10): one that doesn't resolve is kept, unplaced, with the F-POS-4
-  warning. `update_chapter_fields`, `update_chapter_defaults`,
+  `from`, a field entry's `from` and `until`, a section comment's
+  `from` and `until`, and a value of a `position` field (types.md
+  F-FT-10, such as a thread's `planted`). That covers `update_fields`,
+  `append_section`, `create_entity`'s fields, and the web UI's edits,
+  which share the edit loop (Edit file included). A create checks its
+  positions before the links it would take, so the writer isn't asked
+  to create it anyway and then refused. Only the positions the write
+  adds count. A position that doesn't resolve and was already in the
+  file at the same place (the same kind of position, of the same field
+  or section by name, with the same text) doesn't stop the write; one
+  moved to another place, or written once more, is refused. An empty
+  value is none, as on disk: `null` in `update_fields`, and an empty or
+  blank `from` or `until` for `append_section`, which then appends to a
+  section that's there as if none was given. A `position` field value
+  that isn't a position at all (`chapter seven`) is a value that
+  doesn't fit its type, saved with the F-FT-10 warning, as for any
+  field type. The refusal says where to find a chapter key in the
+  caller's words (`get_chapter` for MCP, the book's chapters on the
+  page). `update_chapter_fields`, `update_chapter_defaults`,
   `move_entity`, and `copy_entity` take no position: a move writes the
   entry point the entity had, and a copy keeps the original's positions
   and says which don't resolve where the copy is.

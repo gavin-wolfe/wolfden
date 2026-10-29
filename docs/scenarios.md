@@ -2356,17 +2356,35 @@ comment, and the assistant edits the note again.
   would have dropped out of every canon view (F-POS-4). A position
   that resolves is written; `null` in `update_fields`, or an empty or
   blank `from` or `until` for `append_section`, is none.
+- A thread's `paid_off` or a new `planted` of `dracula:999` is refused
+  the same way, since the thread couldn't be placed in story order
+  (types.md F-FT-10). A value that isn't a position at all is saved with
+  the F-FT-10 warning, as for any field type.
 - The Arc's `from=dracula:999`, already in the file, doesn't stop an
   edit that leaves it alone: the assistant's field change and its text
   for Voice are saved, and `check` still reports it. Writing
-  `dracula:999` again somewhere else is refused.
+  `dracula:999` again somewhere else, or moving it from the Arc's
+  section comment to the note's `from`, is refused.
+- Appending to Voice with an empty `from` is a plain append: empty is
+  none, so it asks for no change to the section's positions.
+- A create whose position doesn't resolve is refused for that before
+  the links it would take, so the writer isn't asked to create it
+  anyway first. The message says to take chapter keys from
+  `get_chapter`; on the web page it says to pick a chapter the book
+  lists.
 
-Spec: format.md F-POS-4 (maintainer decision on #211, 2026-10-29).
+Spec: format.md F-POS-4, types.md F-FT-10 (maintainer decisions on
+#211 and #217, 2026-10-29).
 Covered by:
 `WriteToolTests.AFieldEditThatSetsAPositionThatDoesntResolveIsRefused`,
 `WriteToolTests.ANewSectionWhosePositionDoesntResolveIsRefused`,
 `WriteToolTests.APositionThatDoesntResolveAndIsntTouchedDoesntStopAnEdit`,
-`WriteToolTests.ANewEntitysFieldEntryMustResolveToo`.
+`WriteToolTests.ANewEntitysFieldEntryMustResolveToo`,
+`WriteToolTests.APositionFieldValueThatDoesntResolveIsRefused`,
+`WriteToolTests.APositionThatDoesntResolveMovedToAnotherPlaceIsRefused`,
+`WriteToolTests.AnEmptyPositionIsNoneWhenAppendingToASectionThatsThere`,
+`WriteToolTests.APositionIsCheckedBeforeTheLinksAnEntityWouldTake`,
+`FieldEditEndpointTests.AFromThatDoesntResolveIsRefusedAsBadPosition`.
 
 ## STORE: Wolfden saves, moves, and deletes notes
 

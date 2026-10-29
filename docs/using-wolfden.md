@@ -176,9 +176,9 @@ asks for:
   meets the new work first.
 - **Number of chapters** (books only, optional). 24 gives chapters 1 to
   24, so positions such as `ember:3` work straight away. Leave it empty
-  for a book with no chapters yet. Chapter titles, a prologue, or a
-  chapter inserted later are added in the book's `book.md` by hand for
-  now.
+  for a book with no chapters yet. You can add more later
+  ([Adding chapters](#adding-chapters)); a prologue, or a chapter's
+  title, goes in the book's `book.md` with **Edit file** for now.
 
 Choose **Create**, and Wolfden makes the folder and its file, adds the
 new work to the reading order (the series' `books`, or the universe's
@@ -210,6 +210,40 @@ wolfden new book "Dracula's Guest" --in dracula
 the series' key, in a den with one universe). `--after` names the work it
 comes after, and `--first` puts it at the start instead; leave both out
 for the end. `--chapters` is the number of chapters.
+
+## Adding chapters
+
+A story position such as `ember:3` only works for a chapter the book
+lists, so add chapters as you draft them. On a book's page, **Add
+chapter** adds one at the end, and **Insert chapter…** adds one after a
+chapter you pick. The form asks for an optional **Title**; leave it empty
+for none. Wolfden writes it into the `chapters` list in the book's
+`book.md`, keeping the rest of the file as it was, and says what it did.
+
+- **At the end**, the new chapter's key is the next whole number: after
+  chapters 1 to 24, it's `25`.
+- **Inserted after a chapter**, it gets that chapter's key with a letter
+  added: after `2` it's `2b`, then `2c` if `2b` is taken. After `2b`,
+  it's `2ba`. After a word key such as `prologue`, it's `prologuea`.
+- **Keys are for keeps; numbers move.** The key is what positions use,
+  so it never changes, even when the chapter is no longer second. What
+  changes is the number shown: inserting `2b` after chapter 2 makes it
+  chapter 3 on the page, and the chapters after it move up one, as far
+  as needed. `ember:3` still names the chapter it named before. A
+  chapter with no number, such as a prologue, keeps none, and in a book
+  whose chapters have no numbers, the new one has none either.
+
+A final book has neither button: unfreeze it first. From the command
+line:
+
+```text
+wolfden new chapter --in ember
+wolfden new chapter "The Long Watch" --in ember --after 2
+```
+
+`--in` is the book's key (`<universe>/<book>` if two universes have a
+book by that key), and `--after` the chapter it comes after; leave it
+out for the end. The title is optional.
 
 ## Editing notes
 
@@ -643,9 +677,12 @@ in it, which Wolfden calls a checkpoint.
   with a warning, but links can't reach it by id. `wolfden check --fix`
   adds the missing ids.
 - **Chapter keys are for keeps.** Positions name a chapter by its key
-  (`dracula:5`), not its number. To insert a chapter, give it a new key,
-  such as `2b`, and renumber with `number:`, so existing positions still
-  point where they did ([format.md §6.4](format.md#64-bookmd)).
+  (`dracula:5`), not its number. **Insert chapter…** (or `wolfden new
+  chapter --after`) gives a new chapter a new key, such as `2b`, and
+  renumbers the chapters after it, so existing positions still point
+  where they did ([Adding chapters](#adding-chapters), [format.md
+  §6.4](format.md#64-bookmd)). If you edit `book.md` by hand, do the
+  same: never change a key to match a new number.
 - **Hidden files and folder links are ignored.** Anything whose name
   starts with a dot (`.obsidian/`, `.trash/`) isn't part of the den, so
   a note moved to `.trash/` is gone from Wolfden. Folder links (symbolic

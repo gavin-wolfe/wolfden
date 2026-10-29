@@ -1343,6 +1343,32 @@ Spec: design.md §7 (#213). Covered by:
 `NewContainerCommandTests.FirstPutsItAtTheStart`,
 `NewContainerCommandTests.ABareBookKeyInADenWithSeveralUniversesSaysUniverseOrSeries`.
 
+### SC-CLI-17. I add a chapter from the command line
+
+In the Dracula sample, the writer runs `wolfden new chapter "Jonathan's
+Letter" --in dracula --after 3`, then `wolfden new chapter --in
+dracula`.
+
+- Each does what the web UI's Insert chapter… and Add chapter do
+  (SC-WEB-71): `3b`, numbered 4, with chapters 4 to 27 moving up one
+  (the output lists the first two, the last, and how many), then `28` at
+  the end, after the unnumbered closing `note`, numbered after the last
+  numbered chapter. The output names the position and `book.md` and
+  what was done; `--json` prints the result. `check` finds nothing
+  wrong.
+- `--in dracula` is the book, though it's the universe's key too, since
+  only a book holds chapters. `book:dracula` and `dracula/dracula` name
+  it too.
+- No `--in`, a book or universe that isn't there, an `--after` the book
+  doesn't list, a title that isn't one line of at most 200 characters,
+  `--first`, `--chapters`, `--slug`, `--from`, `--allow-relinks`, or a
+  final book exits 2 and writes nothing.
+
+Spec: design.md §7 (#215). Covered by:
+`NewChapterCommandTests.ANewChapterGoesAtTheEndOrAfterTheChapterNamed`,
+`NewChapterCommandTests.JsonPrintsWhatWasAdded`,
+`NewChapterCommandTests.ARefusedAddExitsTwoAndWritesNothing`.
+
 ## WATCH: keeping the index up to date while notes change
 
 Background: `wolfden index --watch` (design.md §7, #14) keeps the index up
@@ -4283,3 +4309,75 @@ Spec: format.md F-KEY-2, F-KEY-5, F-BOOK-1, design.md §9 (#213). Covered by:
 `ContainerEndpointTests.AStaleClashingOrMalformedCreateIsRefusedAndWritesNothing`,
 `ContainerEndpointTests.APinnedServerCreatesOnlyInItsUniverse`,
 `NewContainer.test.tsx` (web).
+
+### SC-WEB-71. I add and insert chapters on a book page
+
+On Ember's page (Starfall: chapters `prologue`, `1`, `2`, `2b` numbered
+3, and `3` numbered 4), the writer chooses **Insert chapter…**, picks
+"After 2", titles it "The Quiet Hour", and adds it. Then **Add chapter**
+with no title.
+
+- The form has **Place** ("At the end, after …", then "After …" for each
+  chapter but the last, by number, title, and key) and an optional
+  **Title**. **Add chapter** starts at the end; **Insert chapter…**,
+  shown when the book has two or more chapters, starts after the first.
+- **Add** sends `POST /api/chapter/create` with the hash `GET
+  /api/book/chapters` gave for `book.md`. The inserted chapter gets the
+  first unused letter suffix of the key it follows: `2c`, since `2b` is
+  taken. It's numbered 3, and `2b` and `3` move up to 4 and 5; no key
+  changes, so `ember:3` names the chapter it did. After `2b` it would be
+  `2ba`, and after `prologue`, `prologuea`, numbered 1, with every number
+  after it moving up.
+- At the end, the key is the next whole number, `4`, numbered after the
+  last numbered chapter; no number changes. A book with no chapters gets
+  `"1"`, number 1. In a book whose chapters have no numbers (Ash,
+  `chapters: [1, 2, 3, 4, epilogue]`), the new one has none either and is
+  a bare key, and a title makes it a mapping.
+- A hand-set gap absorbs an insert: after `1` in 1, 2, 3, 10, the new
+  chapter is 2, the next two move up to 3 and 4, and 10 stays.
+- `book.md` keeps everything else: its comments (`# added in revision`),
+  flow or block items, and the quoting of the item before. `check` finds
+  nothing new. A `book.md` without an id gets one.
+- The form closes, the chapter list asks again and shows the new one in
+  its place, and a notice says what was added and renumbered, and takes
+  focus until dismissed.
+
+Spec: format.md §6.4, F-BOOK-3..6, design.md §9 (#215). Covered by:
+`AddChapterTests.AnInsertedChapterGetsALetterKeyAndTheNumbersAfterItMoveUp`,
+`AddChapterTests.AddingAtTheEndGivesTheNextWholeNumberInTheListsOwnStyle`,
+`AddChapterTests.ABookWithNoChaptersGetsChapterOne`,
+`AddChapterTests.ABookMdWithNoIdGetsOne` (MCP project, the write tools),
+`NewChapterTests.AnInsertedChapterGetsTheFirstUnusedLetterSuffix`,
+`NewChapterTests.AtTheEndItsTheNextWholeNumber`,
+`NewChapterTests.AnEmptyBookGetsChapterOneNumberedOne`,
+`NewChapterTests.InsertingRenumbersTheChaptersAfterItAndAddingAtTheEndRenumbersNone`,
+`NewChapterTests.HandSetNumbersAreMovedOnlyAsFarAsNeeded`,
+`NewChapterTests.AnItemIsWrittenAsTheFormatWritesOne` (Core),
+`ChapterEndpointTests.AChapterIsAddedWhereTheWriterSaysAndTheAnswerSaysWhatChanged`,
+`AddChapter.test.tsx` (web).
+
+### SC-WEB-72. Adding a chapter is guarded
+
+- A final book (`status: final`) has neither button, and the API refuses
+  an add to it (`frozen`, 409) as it refuses any edit of its `book.md`
+  (F-BOOK-1).
+- An `after` the book doesn't list (`unknown_chapter`, naming its
+  chapters; for a book with no chapters, saying so), a title of more than
+  one line (U+2028 and U+2029 included) or over 200 characters
+  (`bad_argument`; the form refuses a long one before sending), a missing
+  `book` or `expectedHash`, a member the endpoint doesn't take, and a
+  `book.md` that changed since the form read it (`stale_file`, 409) are
+  refused and write nothing. The form shows why, in its own words for a
+  stale file, and asks for the chapters again; Escape closes it and
+  returns focus to the button.
+- A blank title is no title, and one of exactly 200 characters is taken.
+- The endpoints take JSON only; `/api/book/chapters` answers GET only,
+  and `/api/chapter/create` POST only. A server pinned to one universe
+  adds chapters only in it.
+
+Spec: format.md F-BOOK-1, design.md §9 (#215). Covered by:
+`AddChapterTests.ARefusedAddWritesNothing`,
+`AddChapterTests.AFinalBookIsRefused` (MCP project, the write tools),
+`ChapterEndpointTests.AStaleFrozenOrMalformedAddIsRefusedAndWritesNothing`,
+`ChapterEndpointTests.APinnedServerAddsChaptersOnlyInItsUniverse`,
+`AddChapter.test.tsx` (web).

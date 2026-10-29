@@ -736,6 +736,7 @@ commands, and `wolfden <command> --help` describes each one:
 | `wolfden query [<universe>] [--universe <key>] [--at <position>]` | Canon as of a position (format.md F-VIEW-1), from the index, of one universe (see "Which universe" below; `*` is refused, since a view is of one universe). `--series` or `--book` narrows the view, `--type` (any type an enabled pack defines) and `--entity` (matched as a link is, F-LINK-6, among the entities in the view, so one the reader meets later can't shadow one they've met) pick entities out of it, `--pinned` gives pinned canon (F-VIEW-2), and `--brief` lists one line per entity. |
 | `wolfden new <type> <name> [--in <scope>] [--from <position>] [--slug <slug>] [--allow-relinks]` | Creates a note from its type's template (types.md F-TPL-6), as the MCP tool `create_entity` does (§8, #29): a new id, the name, and a file name made from it (`-2`, `-3` when it's taken; a `--slug` that's taken is refused). `--in` names where it goes, read exactly as `copy --to` is (the same code, with its messages naming `--in`); without it, the den's universe, when it has one, and with several the error says to name one `with --in`. `--from` gives the position where the reader first meets it, which must resolve in the universe; without it, the note has no `from`. A name that would take links from the entity they reach now (§8, "Creating") is refused, listing them, unless `--allow-relinks`, as for `copy`; the output then lists the links that moved. It writes the den's files only, and exits 2 when the create is refused (an unknown type or scope, a final book, a slug that's taken, a `--from` that doesn't resolve, or a name that isn't one line of at most 200 characters). |
 | `wolfden new series <name> [--in <universe>] [--after <key>] [--first]`, `wolfden new book <name> [--in <universe or series>] [--after <key>] [--first] [--chapters <n>]` | Creates a series, or a book in a series or standalone in the universe, as the web UI's **New series** and **New book** do (§9, #213; `series` and `book` are reserved type keys, types.md F-TYPE-2, so they never name a note's type): the folder, its key made from the name, and its `series.md` or `book.md` with a new id, the name, and with `--chapters` (1 to 1000) chapters `"1"` to `"N"` numbered 1 to N. It goes in story order at the end, `--after` the work named, or with `--first` at the start (not with `--after`), in the series' `books` or the universe's `order`. `--in` is read as for a note, except that a universe's key alone always names the universe (a book holds no series or books), and a book or a series named for a series is refused. It reads the file it edits and writes it in one go, so it passes no hash, as `freeze` does. `--from`, `--slug`, and `--allow-relinks` are for notes and are refused here, as `--after`, `--first`, and `--chapters` are for a note. A bare `--in` key that names no universe, in a den with several, is refused with a hint that names universes and series only. It exits 2 when the create is refused (§9, "New series and books"). |
+| `wolfden new chapter [<title>] --in <book> [--after <chapter>]` | Adds a chapter to a book's `chapters` in its `book.md`, as the web UI's **Add chapter** and **Insert chapter…** do (§9, "Adding chapters", #215), with the title if one is given: at the end, the next whole-number key, or `--after` a chapter, that key with a letter added (`2b`), renumbering the `number`s after it; keys never change. It's a `new`, beside `new series` and `new book`, since it makes something (`chapter` is a reserved type key too, types.md F-TYPE-2), rather than a separate `chapter` command for one action. `--in` names the book: its key, `book:<key>`, or `<universe>/<book>`; a bare key is the book in whichever universe has one, so `--in dracula` in the Dracula sample is the book, though it's the universe's key too (only a book holds chapters), and a key two universes' books share is refused with both spellings. It reads `book.md` and writes it in one go, so it passes no hash. `--first`, `--chapters`, `--from`, `--slug`, and `--allow-relinks` are refused. It exits 2 when the add is refused: no `--in`, no such book or chapter, a final book, or a title that isn't one line of at most 200 characters. |
 | `wolfden copy <entity> <new name> [--to <scope>] [--universe <key>] [--slug <slug>] [--allow-relinks]` | Copies an entity under a new name, with a new id, as the MCP tool `copy_entity` does (§8, #129): beside the original, or `--to` a universe (`<universe>`, or `<universe>/`) or one of its series or books (`<universe>/<key>`, or `<universe>/series:<key>` or `<universe>/book:<key>` when a series and a book share the key). In a den with one universe, a bare series or book key (or `series:<key>`, `book:<key>`) will do (as for `check`, #127), unless it's also the universe's key, which is refused with every spelling suggested. It writes the den's files only. Its messages name its options (`--allow-relinks`, `--slug`) and commands (`wolfden check`), not the tool's parameters: the tools take the words their advice uses as a setting, and names the writer gave come through as written. It exits 2 when the copy is refused. |
 | `wolfden freeze <book> [--universe <key>]` | Freezes a finished book (§5, #31): `status: final` in its `book.md`, then, when the den has git history, a checkpoint of the whole den and a tag on it, `book/<universe>/<book>/final` (or `final-2`, `final-3`, … for a book frozen before). `--universe` names the book's universe, when the den has several (see "Which universe" below). Freezing a book that's already final finishes a freeze whose checkpoint or tag failed, and otherwise does nothing. It prints the result's message, and exits 0 when the book is frozen (with its snapshot, or with no history to take one in), and 2 when it's refused (no such book) or a step in the history failed; then the message, on standard error, says what to do. |
 | `wolfden unfreeze <book> [--universe <key>]` | Unfreezes a book (§5, #31): `status: draft` in its `book.md`, then a checkpoint, with no tag, when the den has history. A book that isn't final is left as it is. It exits 0 when the book is unfrozen (or wasn't frozen), and 2 when it's refused or the checkpoint failed. |
@@ -2097,6 +2098,73 @@ docs/
     book, with a notice naming the file and what the create did, which
     takes focus and lasts until the writer leaves the page. Escape or
     Cancel closes the form and returns focus to the button.
+- **Adding chapters** (#215). Maintainer decisions (on #215,
+  2026-10-29): a book's page has **Add chapter** (at the end) and
+  **Insert chapter…** (after a chapter), with an optional **Title**, and
+  the CLI has `wolfden new chapter` (§7). A chapter inserted after key
+  `K` gets the first unused letter suffix, `Kb`, then `Kc`, and so on
+  (after `2b`, `2ba`); one at the end gets the next unused whole-number
+  key. The `number`s after an insert are renumbered, and keys never
+  change (format.md F-BOOK-6). Removing chapters, and editing a
+  chapter's title from the UI, are out of scope. The rest is v0
+  behaviour, not a recorded decision.
+  - **Keys** (`NewChapter` in `Wolfden.Core/Editing`). The rule behind
+    both suffix examples: a key that ends in a digit starts at `b` (as if
+    `2` were `2a`), one that ends in a letter at `a`, so `prologue` gives
+    `prologuea`. When every single letter is taken, two letters follow
+    (`2ba`, `2bb`, …), and a key that would pass 64 characters (F-KEY-1)
+    is refused. The next whole number is one more than the largest key
+    that's all digits (`07` counts as 7), or `"1"`. Inserting after the
+    last chapter is adding at the end, so the end always gets a whole
+    number.
+  - **Numbers.** `number` is display only (F-BOOK-3), and there's no
+    rule for renumbering beyond F-BOOK-5 (numbers should rise) and
+    F-BOOK-6 (keys stay), so this is Wolfden's reading. The new chapter
+    gets the number of the nearest numbered chapter before it plus 1,
+    or, with none before (after an unnumbered prologue), the number of
+    the first numbered chapter after it. The numbered chapters after it
+    are pushed along only as far as needed: each whose number isn't
+    above the one before gets that one plus 1, and the first that
+    already is stops the renumbering, so a hand-set gap (1, 2, 3, 10)
+    absorbs the insert and the numbers after it stay. Chapters with no
+    number, or one F-BOOK-3 ignores, are left alone. A book whose
+    chapters have no numbers at all keeps that style: the new chapter
+    has none either, and is written as a bare key in a list of bare keys
+    (`chapters: [1, 2, 3]`). A book with no chapters gets
+    `chapters:` with `- { key: "1", number: 1 }`, as a new book's are
+    written.
+  - **The file.** The item (`key`, then `number` and `title` when it has
+    them) goes in through the lossless list edit (`WithNewListItem`),
+    in the list's style and copying the quoting of the item before it,
+    and each changed number is a scalar edit in place, so comments and
+    every other key are kept. A `book.md` without an id gets one
+    (F-ID-6). It's checked as the den reads it, and the result must
+    read back as planned (the same keys, the new one in its place, only
+    the planned numbers changed), or nothing is written. A final book
+    is refused (`frozen`), as any edit of its `book.md` is (F-BOOK-1),
+    and so is an `after` the book doesn't list (`unknown_chapter`) and a
+    title that isn't one line of at most 200 characters, the limits for
+    a name (`bad_argument`).
+  - **The API.** `GET /api/book/chapters?book=<key>&universe=<key>`
+    gives the book's chapters with the hash of `book.md` and whether
+    it's final (the MCP tool `get_chapter`'s result). `POST
+    /api/chapter/create` takes `{book, universe, title, after,
+    expectedHash}` as `application/json`; `expectedHash` is required, and
+    a `book.md` that changed since is 409 `stale_file`. It answers 201
+    with the key, position, number, title, index, the chapters
+    renumbered (key, from, to), effects in words, warnings, and the file
+    written.
+  - **The page.** Under the chapter list, **Add chapter**, and with two
+    or more chapters **Insert chapter…**; a final book has neither. The
+    modal form has **Place** ("At the end, after …", the default for
+    Add, then "After …" for every chapter but the last, the first being
+    the default for Insert) and **Title**, which is focused for Add
+    (Place for Insert); a title over 200 characters is refused before
+    anything is sent. A stale file says the chapters changed in another
+    program and asks for them again. After an add every cached answer is
+    asked again, the form closes, and a notice under the list says what
+    it did, including the renumbering, and takes focus until dismissed.
+    Escape or Cancel closes the form and returns focus to the button.
 - **Parsing round-trips.** Read-modify-write keeps formatting, ordering, and
   unknown content. This gets heavy test coverage, since it decides whether
   people trust the tool with their notes.

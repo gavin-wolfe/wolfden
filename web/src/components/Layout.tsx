@@ -4,6 +4,7 @@ import { Link, Outlet, useRouterState } from '@tanstack/react-router'
 import { denQuery } from '../api'
 import { useUniverseKey } from '../hooks'
 import { CheckpointIndicator } from './CheckpointIndicator'
+import { ContainerCreatedNotice, NewContainerProvider } from './NewContainer'
 import { CreatedNotice, NewEntityProvider, NewMenu } from './NewEntity'
 import { PositionBar } from './PositionBar'
 import { SearchBox } from './SearchBox'
@@ -15,7 +16,8 @@ import { Sidebar } from './Sidebar'
  * narrow screen the tree folds away behind a Contents button and opens over
  * the page, below the top bar: focus moves into it, and Escape closes it and
  * returns focus to the button. In a universe, the top bar's New menu makes
- * a note from a type's template (#29).
+ * a note from a type's template (#29), and the universe's and series'
+ * pages make series and books (#213).
  */
 export function Layout() {
   const den = useQuery(denQuery)
@@ -68,36 +70,39 @@ export function Layout() {
 
   return (
     <NewEntityProvider universe={universe}>
-      <div className="app" ref={appRef}>
-        <header className="topbar" ref={headerRef}>
-          <button
-            type="button"
-            ref={toggleRef}
-            className="tree-toggle"
-            aria-expanded={treeOpen}
-            aria-controls="sidebar"
-            onClick={() => setTreeOpen(!treeOpen)}
-          >
-            Contents
-          </button>
-          <Link to="/" className="den-name">
-            {den.data?.name ?? 'Wolfden'}
-          </Link>
-          {universe && <NewMenu universe={universe} />}
-          <SearchBox universe={universe} />
-          <PositionBar universe={universe} />
-          <CheckpointIndicator />
-        </header>
-        <div className="body">
-          <aside id="sidebar" className="sidebar" data-open={treeOpen} ref={sidebarRef} tabIndex={-1}>
-            <Sidebar universe={universe} />
-          </aside>
-          <main className="page">
-            <CreatedNotice />
-            <Outlet />
-          </main>
+      <NewContainerProvider universe={universe}>
+        <div className="app" ref={appRef}>
+          <header className="topbar" ref={headerRef}>
+            <button
+              type="button"
+              ref={toggleRef}
+              className="tree-toggle"
+              aria-expanded={treeOpen}
+              aria-controls="sidebar"
+              onClick={() => setTreeOpen(!treeOpen)}
+            >
+              Contents
+            </button>
+            <Link to="/" className="den-name">
+              {den.data?.name ?? 'Wolfden'}
+            </Link>
+            {universe && <NewMenu universe={universe} />}
+            <SearchBox universe={universe} />
+            <PositionBar universe={universe} />
+            <CheckpointIndicator />
+          </header>
+          <div className="body">
+            <aside id="sidebar" className="sidebar" data-open={treeOpen} ref={sidebarRef} tabIndex={-1}>
+              <Sidebar universe={universe} />
+            </aside>
+            <main className="page">
+              <CreatedNotice />
+              <ContainerCreatedNotice />
+              <Outlet />
+            </main>
+          </div>
         </div>
-      </div>
+      </NewContainerProvider>
     </NewEntityProvider>
   )
 }

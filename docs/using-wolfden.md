@@ -58,15 +58,23 @@ Set things up in this order. Each step builds on the ones before it.
    only. For a den you already have, run `wolfden init --git` in its
    folder instead. Don't put a den with history in Dropbox, OneDrive, or
    iCloud. See [Turning on history](#turning-on-history).
-4. **Add your series and books.** There's no command for this yet, so
-   you make their folders and files by hand: a `series.md` or a
-   `book.md` with a `name`, and the book's `chapters`, laid out as
-   [format.md §5.1](format.md#51-layout) shows (§13 there has a complete
-   small den). With more than one, list them in reading order: `books` in
-   `series.md`, and `order` in `universe.md`. List the chapters now: a
-   story position, such as "this character enters at chapter 3", only
-   works for a chapter the book lists. Then run `wolfden check --fix`,
-   which gives the new files their ids.
+4. **Add your series and books.** In the den's folder, in reading order:
+
+   ```sh
+   wolfden new series "The Long Dark"
+   wolfden new book "Ember" --in long-dark --chapters 24
+   wolfden new book "A Quiet Moon" --chapters 18
+   ```
+
+   Each makes the folder and its `series.md` or `book.md`, with an id and
+   the name, and adds it to the end of the reading order: `books` in the
+   series' `series.md`, or `order` in `universe.md`. The second book
+   above goes in the series; the third, without `--in`, is a standalone
+   book of the universe. Give the number of chapters now: a story
+   position, such as "this character enters at chapter 3", only works for
+   a chapter the book lists. Once `wolfden serve` is running (step 6),
+   **New series** and **New book** on the universe's and series' pages do
+   the same. See [Adding series and books](#adding-series-and-books).
 5. **Run `wolfden check`.** In the den's folder, it checks every note
    and says what's wrong, file by file. It exits 0 when there are no
    errors (warnings alone pass) and 1 when there are. A file with an
@@ -74,7 +82,8 @@ Set things up in this order. Each step builds on the ones before it.
    check.
 6. **Run `wolfden serve`.** It opens the den in your browser, on this
    computer only. From there you can [make notes](#making-a-new-note),
-   [edit them](#editing-notes), make
+   [edit them](#editing-notes), [add series and
+   books](#adding-series-and-books), make
    [checkpoints](#checkpoints), and
    [freeze a finished book](#freezing-a-finished-book). Start with a
    checkpoint of the books you just added. It runs until you press
@@ -146,6 +155,61 @@ the note in the universe, when your den has one. `--from` is optional,
 and has to be a chapter (or book) your universe has: a typo is refused
 rather than making a note no view shows. Edits are checked the same way
 ([Editing fields](#editing-fields)).
+
+## Adding series and books
+
+In `wolfden serve`, a universe's page has **New series** and **New
+book**, and a series' page has **New book**. A book made from the
+universe's page is a standalone book: one that isn't in a series. The form
+asks for:
+
+- **Name.** The series' or book's name. Its folder is named from it: "The
+  Long Dark" is `series/long-dark/`. That folder name is its *key*, which
+  story positions use (`ember:3`), so it never changes, but you can
+  change the name in its `series.md` or `book.md` later.
+- **Place after…** Where it comes in reading order: at the end, at the
+  start (a prequel), or after a book or series you choose. For a book in a
+  series, that's among the series' books; otherwise among the universe's
+  series and standalone books. A work placed before a final book is
+  allowed (the frozen book's own files don't change), but it changes what
+  the canon views at that book's chapters include, since the reader now
+  meets the new work first.
+- **Number of chapters** (books only, optional). 24 gives chapters 1 to
+  24, so positions such as `ember:3` work straight away. Leave it empty
+  for a book with no chapters yet. Chapter titles, a prologue, or a
+  chapter inserted later are added in the book's `book.md` by hand for
+  now.
+
+Choose **Create**, and Wolfden makes the folder and its file, adds the
+new work to the reading order (the series' `books`, or the universe's
+`order`), and opens its page, saying what it did. A list that wasn't
+there before, because there was only one book, is written with that book
+first. The rest of the file is kept as it was.
+
+Wolfden refuses a name whose key another book or series already has,
+since a story position names a book by its key alone: two books called
+"Ember" in one universe, even in different series, would make `ember:3`
+mean nothing. Choose another name, then change the name in `book.md`
+afterwards if you want it back. A name that starts with a digit
+("1984") can't make a key, since keys start with a letter: start it with
+a word, and change it afterwards the same way. Keys use only the letters
+a–z and the digits 0–9 for now, so a name written entirely in another
+script ("Дракула", "東京") makes no key: give it a name in Latin letters,
+such as a transliteration, then change the name in its file back to the
+one you want; the key stays.
+
+From the command line:
+
+```text
+wolfden new series "The Harker Papers" --after dracula
+wolfden new book "Mina's Journal" --in the-harker-papers --chapters 12
+wolfden new book "Dracula's Guest" --in dracula
+```
+
+`--in` names the universe, or a series as `<universe>/<series>` (or just
+the series' key, in a den with one universe). `--after` names the work it
+comes after, and `--first` puts it at the start instead; leave both out
+for the end. `--chapters` is the number of chapters.
 
 ## Editing notes
 
@@ -502,9 +566,9 @@ Each links to the section with the details.
   no accounts, so anyone else signed in to the same computer can open it
   while it runs. Stop it with Ctrl+C when you're done.
 - **A new den has no books.** `wolfden init` makes the den and, with
-  `--universe`, a first universe. Series and books are folders and
-  files you add by hand for now
-  ([Getting started](#getting-started), step 4).
+  `--universe`, a first universe. Add series and books with `wolfden new
+  series` and `wolfden new book`, or **New series** and **New book** in
+  the web UI ([Getting started](#getting-started), step 4).
 
 ### History and git
 

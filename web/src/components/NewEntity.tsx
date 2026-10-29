@@ -381,8 +381,8 @@ function placesIn(u: UniverseNode): Place[] {
   return places
 }
 
-/** Keeps Tab and Shift+Tab inside the dialog, as the checkpoint dialog does. */
-function trapTab(e: ReactKeyboardEvent<HTMLDivElement>, dialog: HTMLDivElement | null) {
+/** Keeps Tab and Shift+Tab inside the dialog, as the checkpoint dialog does (the New series and New book form uses it too). */
+export function trapTab(e: ReactKeyboardEvent<HTMLDivElement>, dialog: HTMLDivElement | null) {
   const focusable = [...(dialog?.querySelectorAll<HTMLElement>('button, input, select, textarea, a[href]') ?? [])].filter((el) => !el.hasAttribute('disabled'))
   if (focusable.length === 0) {
     e.preventDefault()

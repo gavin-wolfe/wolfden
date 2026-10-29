@@ -1310,6 +1310,39 @@ Spec: types.md F-TPL-6, design.md §7 (#29). Covered by:
 `NewCommandTests.ADenWhoseDenYamlDoesntLoadSaysSo`,
 `NewCommandTests.JsonPrintsTheWriteResult`.
 
+### SC-CLI-16. I add my series and books from the command line
+
+In the Dracula sample, the writer runs `wolfden new book "Dracula's
+Guest" --in dracula --chapters 2`, then `wolfden new series "The Harker
+Papers" --after dracula`, then `wolfden new book "Mina's Journal" --in
+the-harker-papers`.
+
+- Each does what the web UI's New book and New series do (SC-WEB-69):
+  the folder and its `book.md` or `series.md`, with a new id and the
+  name, the book's chapters, and the key in the universe's `order` or
+  the series' `books`, at the end, `--after` the work named, or `--first`
+  at the start. The
+  output names the new file and what was done; `--json` prints the
+  result. `check` finds nothing wrong with any of them.
+- `--in dracula` is the universe, though it has a book 'dracula' too,
+  since a book holds no books. A series' bare key will do in a den with
+  one universe, and `<universe>/<series>` in any. With several universes,
+  a bare key that's only a book (`--in ember`) is refused, and the hint
+  names a universe or a series, never a book.
+- A name that's missing, blank, or taken as a key (`Dracula`), an
+  `--after` that isn't there, `--chapters` that isn't 1 to 1000 or is
+  given for a series, `--from`, `--slug`, or `--allow-relinks` (for notes
+  only), `--after`, `--first`, or `--chapters` for a note, `--first` with
+  `--after`, a name in another script, a book named by `--in`, or
+  a series that isn't there exits 2 and writes nothing.
+
+Spec: design.md §7 (#213). Covered by:
+`NewContainerCommandTests.NewSeriesAndBooksGoInStoryOrder`,
+`NewContainerCommandTests.ARefusedCreateExitsTwoAndWritesNothing`,
+`NewContainerCommandTests.JsonPrintsWhatWasMade`,
+`NewContainerCommandTests.FirstPutsItAtTheStart`,
+`NewContainerCommandTests.ABareBookKeyInADenWithSeveralUniversesSaysUniverseOrSeries`.
+
 ## WATCH: keeping the index up to date while notes change
 
 Background: `wolfden index --watch` (design.md §7, #14) keeps the index up
@@ -4164,3 +4197,89 @@ Spec: format.md F-BOOK-1, design.md §9 (#29). Covered by:
 `CreateEndpointTests.APinnedServerCreatesOnlyInItsUniverse`,
 `CreateEndpointTests.ANoteThatWouldTakeLinksIsRefusedUntilTheWriterCreatesItAnyway`,
 `NewEntity.test.tsx` (web).
+
+### SC-WEB-69. I add a book or a series from its universe or series
+
+On Dracula's universe page, the writer chooses **New book**, names it
+"Dracula's Guest", gives it 3 chapters, and creates it. Then **New
+series**, "The Harker Papers", placed after Dracula, and on its page,
+**New book**.
+
+- The form asks for the name, **Place after…** (the works in story order,
+  "At the start", then "At the end", the default; not shown when there
+  are none yet), and for a
+  book an optional **Number of chapters**, a whole number from 1 to 1000.
+  A name is required and a bad number is refused before anything is sent.
+- **Create** sends `POST /api/book/create` (or `/api/series/create`) with
+  the hash `GET /api/works` gave for `universe.md` or `series.md`. It
+  makes `universes/dracula/books/dracula-s-guest/book.md`, with a new id,
+  the name, and chapters `"1"` to `"3"` numbered 1 to 3, and adds the key
+  to the universe's `order`. Dracula's universe had one book and no
+  `order`, so the list is written with that book first,
+  `[dracula, dracula-s-guest]`, and `check` stays quiet. The rest of the
+  file is as it was.
+- "The Harker Papers" goes after Dracula: `order: [dracula,
+  the-harker-papers, dracula-s-guest]`. A book in a series goes in its
+  `books`, at the end or after the book chosen. A list that leaves works
+  out gets them first, in the order they were read, and a list that
+  already names the new key (a book planned ahead) keeps that place, with
+  the works it left out listed after it. **At the start** (`first: true`)
+  puts the new work before every other: a prequel.
+- The page goes to the new book or series, with a notice naming the file
+  and what was done, which takes focus; the tree and the counts ask
+  again, and the checkpoint dialog lists both files as "saved in
+  Wolfden". Leaving the page ends the notice.
+
+Spec: format.md §6, F-UNI-1..3, F-SER-1..3, design.md §9 (#213). Covered by:
+`CreateContainerTests.ANewBookInASeriesGoesAtTheEndOfItsBooksWithItsChapters`,
+`CreateContainerTests.PlaceAfterPutsTheNewWorkInItsPlaceAndKeepsTheRestOfTheFile`,
+`CreateContainerTests.AnOmittedListIsWrittenWithTheWorkAlreadyThereFirst`,
+`CreateContainerTests.WorksAListLeavesOutAreListedFirstAndAPlannedEntryKeepsItsPlace`,
+`CreateContainerTests.TheWorksAreInStoryOrderWithTheHashOfTheFileThatListsThem`,
+`CreateContainerTests.AtTheStartPutsTheNewWorkBeforeEveryOther`,
+`CreateContainerTests.APlannedEntryStillGetsTheLeftOutWorksListed` (MCP project, the write tools),
+`ContainerEndpointTests.ANewBookAndSeriesAreMadeWhereTheWriterSaysAndTheAnswerNamesThem`,
+`CheckpointEndpointTests.ABookCreatedThroughThisServerIsMarkedSavedHere`,
+`NewContainerTests.ABookFileHasItsIdNameAndChaptersAsTheFormatWritesThem`,
+`NewContainerTests.TheWriteCheckReadsANewContainerFileWithTheListThatNamesIt` (Core),
+`NewContainer.test.tsx` (web).
+
+### SC-WEB-70. New series and New book are guarded
+
+- A name that's empty, more than one line (U+2028 and U+2029 included),
+  or over 200 characters is refused (`bad_argument`), and so is one whose
+  key wouldn't start with a letter ("1984", F-KEY-2). A name in another
+  script ("Дракула", "東京") makes no key, since keys are a–z and 0–9 for
+  now (#133): the message asks for a Latin name, which can be changed
+  back in the file afterwards. Text the chapters field can't read ("e")
+  is refused, not taken as no chapters.
+- A key that's taken is refused (`already_exists`, 409), not given `-2`,
+  since positions name a book by its key alone (F-KEY-5): a second
+  "Ember" anywhere in the universe, a series named like a standalone
+  book or the other way round, or a folder of that name in any case.
+- An `after` that isn't one of the container's works (a series' book,
+  when placing a series in the universe), a series that isn't there
+  (`unknown_scope`), `chapters` that aren't a whole number from 1 to
+  1000, and a `universe.md` or `series.md` that changed since the form
+  read it (`stale_file`, 409) are refused. The form shows why, keeps the
+  name, and asks for the works again; Escape closes it and returns focus
+  to the button.
+- A final book doesn't stop a new book beside it: its scope is its own
+  `book.md`, outline, and notes (F-BOOK-1), not `series.md` or
+  `universe.md`.
+- If the second file can't be written, the first is put back and the new
+  folder removed, with a `books/` or `series/` folder above it that the
+  create made, so nothing is left behind.
+- The endpoints take only their own members, as JSON; `/api/works` answers
+  GET only, and the creates POST only. A server pinned to one universe
+  creates only in it.
+
+Spec: format.md F-KEY-2, F-KEY-5, F-BOOK-1, design.md §9 (#213). Covered by:
+`CreateContainerTests.ARefusedCreateWritesNothing`,
+`CreateContainerTests.FinalBooksDontStopANewBookBesideThem`,
+`CreateContainerTests.AListThatCantBeWrittenLeavesNoNewFolderBehind`,
+`CreateContainerTests.ARolledBackCreateRemovesTheFolderItMadeAboveToo`,
+`CreateContainerTests.ANameInAnotherScriptSaysKeysAreLatinForNow` (MCP project, the write tools),
+`ContainerEndpointTests.AStaleClashingOrMalformedCreateIsRefusedAndWritesNothing`,
+`ContainerEndpointTests.APinnedServerCreatesOnlyInItsUniverse`,
+`NewContainer.test.tsx` (web).

@@ -65,6 +65,8 @@ internal static class CliApp
           query [<universe>]       show canon as of a story position (--at book:chapter)
           new <type> <name>        create a note from its type's template
                                    (--in <scope> says where it goes)
+          new series <name>        create a series, or with 'new book', a book
+                                   (--in, --after <key>, --chapters <n>)
           copy <entity> <name>     copy an entity under a new name, with a new id
                                    (--to <scope> puts it elsewhere)
           freeze <book>            mark a finished book final, and tag its snapshot

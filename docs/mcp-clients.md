@@ -315,10 +315,11 @@ docs. The writer's own list is in
   `keep_entry` or `enter_at_new_scope`.
 - **Positions must resolve.** A position is `book:chapter`, by key
   (`dracula:5`), and must be a chapter the book lists; `get_chapter`
-  lists them. A read, or `create_entity`'s `from`, at one that doesn't
-  is `bad_position`. A `from` or `until` written by `update_fields` or
-  `append_section` isn't checked: it's saved, `check` warns (F-POS-4),
-  and that fact is left out of every canon view.
+  lists them. A read at one that doesn't is `bad_position`, and so is a
+  write that sets one as a `from` or `until`: `create_entity`,
+  `update_fields`, and `append_section` save nothing. One already in the
+  file that the write doesn't touch doesn't stop it. To leave a position
+  out, omit it (or, in `update_fields`, set it to `null`).
 - **Read by position to avoid spoilers.** Without a position,
   `get_entity`, `list_entities`, and `search` give the author's full
   view, ideas and later reveals included. To draft or review a chapter,

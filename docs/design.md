@@ -1056,6 +1056,24 @@ store, so an edit changes only what it means to (format.md §12):
   `update_fields` puts a new top-level key in template order too
   (F-TPL-7); `append_section` puts a new standard section in the
   type's section order and a custom one at the end (F-TPL-8).
+- **Positions a write sets must resolve** (maintainer decision on #211,
+  2026-10-29). Every entity write refuses a `from` or `until` it adds
+  that names a book or chapter the universe doesn't have, with
+  `bad_position`, as `create_entity` does for its `from`: the entity's
+  `from`, a field entry's `from` and `until`, and a section comment's
+  `from` and `until`. That covers `update_fields`, `append_section`,
+  `create_entity`'s fields, and the web UI's edits, which share the
+  edit loop (Edit file included). Only the positions the write adds
+  count: one that doesn't resolve and was already in the file, untouched,
+  doesn't stop the write (counted by text, so writing the same one again
+  elsewhere is refused). An empty value is none, as on disk: `null` in
+  `update_fields`, an empty or blank `from` or `until` for
+  `append_section`. A `position` field's value isn't a bound (types.md
+  F-FT-10): one that doesn't resolve is kept, unplaced, with the F-POS-4
+  warning. `update_chapter_fields`, `update_chapter_defaults`,
+  `move_entity`, and `copy_entity` take no position: a move writes the
+  entry point the entity had, and a copy keeps the original's positions
+  and says which don't resolve where the copy is.
 - **Renames** (maintainer decision, 2026-10-23). `rename_section`
   rewrites every link that reaches the section by heading, in any file
   (F-RT-5), as one change: if any of those files is in a final book,

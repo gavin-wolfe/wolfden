@@ -33,9 +33,14 @@ public sealed class GitTimeoutTests
     /// </summary>
     private static readonly TimeSpan Bound = TimeSpan.FromMinutes(2);
 
-    /// <summary>A shell loop that waits until <c>.git/wolfden-&lt;name&gt;-release</c> exists, or <see cref="GiveUpSeconds"/> pass.</summary>
+    /// <summary>
+    /// A shell loop that waits until <c>.git/wolfden-&lt;name&gt;-release</c>
+    /// exists, or <see cref="GiveUpSeconds"/> pass. It leaves only then: a
+    /// <c>date</c> that fails, as when Wolfden is killing the script's process
+    /// tree, doesn't end it early and make a stopped script look finished.
+    /// </summary>
     private static string WaitForRelease(string name) =>
-        $"end=$(($(date +%s)+{GiveUpSeconds})); while [ ! -f .git/wolfden-{name}-release ] && [ $(date +%s) -lt $end ]; do sleep 0.1; done";
+        $"end=$(($(date +%s)+{GiveUpSeconds})); while [ ! -f .git/wolfden-{name}-release ]; do now=$(date +%s); [ -n \"$now\" ] && [ \"$now\" -ge \"$end\" ] && break; sleep 0.1; done";
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 

@@ -494,7 +494,7 @@ function FieldForm({
   const idBase = `c${useId().replace(/[^a-zA-Z0-9]/g, '')}`
   // What the form was opened on, kept while it's open: a refetch (say, on window focus) mustn't move it onto a
   // file the writer never saw, so the changes, the stale check, and the first send all use this.
-  const [opened] = useState(() => ({ hash, set: view.set, own: view.own, text: view.text }))
+  const [opened] = useState(() => ({ hash, set: view.set, own: view.own, text: view.text, default: view.default, defaultFrom: view.defaultFrom }))
   const [draft, setDraft] = useState(() => editable(type, view) as FieldDraft)
   const [initial] = useState(() => JSON.stringify(draft))
   const [problems, setProblems] = useState<Problem[]>([])
@@ -504,14 +504,15 @@ function FieldForm({
   // With the list emptied, go back to inheriting (the field taken out) instead of saving [] (#138).
   const [inherit, setInherit] = useState(false)
   const client = useQueryClient()
-  const dirty = JSON.stringify(draft) !== initial
   const entry = draft.entries[0]
   const before = opened.set ? (opened.own ?? null) : undefined
   const v = entry.value
   const emptyList = v.kind === 'list' && v.items.length === 0
-  // What it would inherit without its own value, if that's something: then an emptied list offers it (#138).
-  const inheritable = view.default !== null && !(Array.isArray(view.default) && view.default.length === 0) ? view.default : null
+  // What it would inherit without its own value, as the form was opened on, if that's something: then an emptied list offers it (#138).
+  const inheritable = opened.default !== null && !(Array.isArray(opened.default) && opened.default.length === 0) ? opened.default : null
   const inheriting = inherit && emptyList && inheritable !== null
+  // Choosing the default is a change too, even where the list was already empty (own []).
+  const dirty = JSON.stringify(draft) !== initial || inheriting
 
   // Focus goes to the first control when the form opens.
   useEffect(() => {
@@ -561,7 +562,8 @@ function FieldForm({
   }
 
   const save = async () => {
-    if (saving) {
+    // Ctrl/⌘+Enter goes by the same rule as the Save button.
+    if (saving || !dirty) {
       return
     }
 
@@ -667,7 +669,7 @@ function FieldForm({
           name={view.name}
           was={before === undefined ? inheritable : before}
           value={valueWords(inheritable)}
-          from={`${view.defaultFrom} default`}
+          from={`${opened.defaultFrom} default`}
           none={target.noneWords}
           noneChoice={target.noneChoice}
           inheriting={inheriting}

@@ -182,18 +182,18 @@ public static partial class ChapterHeadings
 
     /// <summary>
     /// An item as a heading shows it: a scalar's text as written; a date
-    /// mapping's <c>text</c>, or else its <c>sort</c> numbers joined with
-    /// <c>-</c> (types.md F-FT-11). Anything else shows nothing.
+    /// mapping's <c>text</c>, or, when that's missing or blank, its
+    /// <c>sort</c> as a date (<see cref="SortText"/>, types.md F-FT-11).
+    /// Anything else shows nothing.
     /// </summary>
     private static ChapterHeadingItem? ItemOf(YamlNode node)
     {
         var text = node switch
         {
             YamlScalar { IsNull: false } s => s.Text,
-            YamlMapping m when m["text"] is YamlScalar { IsNull: false } t => t.Text,
-            YamlMapping m when m["sort"] is YamlScalar { IsNull: false } n => n.Text,
-            YamlMapping m when m["sort"] is YamlSequence numbers =>
-                string.Join("-", numbers.Items.OfType<YamlScalar>().Select(n => n.Text)),
+            YamlMapping m when m["text"] is YamlScalar { IsNull: false } t && OneLine(t.Text).Length > 0 => t.Text,
+            YamlMapping m when m["sort"] is YamlScalar { IsNull: false } n => SortText([n.Text]),
+            YamlMapping m when m["sort"] is YamlSequence numbers => SortText(numbers.Items.OfType<YamlScalar>().Select(n => n.Text).ToList()),
             _ => null,
         };
         if (text is null || OneLine(text).Length == 0)
@@ -203,6 +203,33 @@ public static partial class ChapterHeadings
 
         var links = LinkSyntax.FindLinks(text).Select(l => new ChapterHeadingLink(l.Text, l.Target, l.Heading, l.Label)).ToList();
         return new ChapterHeadingItem(text, links);
+    }
+
+    /// <summary>
+    /// A date's sort key as text: the first number (the year) as written,
+    /// then the next two (month and day) padded to two digits and joined
+    /// with <c>-</c>, then any more (a time of day) after a space, padded and
+    /// joined with <c>:</c>, so [2350, 4, 12] is "2350-04-12" and
+    /// [2291, 5, 14, 6, 40] "2291-05-14 06:40". A year of 0 followed by more
+    /// numbers is the "no year" convention (the Dracula sample's
+    /// [0, 5, 3]), so it's left out: "05-03".
+    /// </summary>
+    internal static string SortText(IReadOnlyList<string> numbers)
+    {
+        if (numbers.Count == 0)
+        {
+            return "";
+        }
+
+        static string Pad(string n) => n.Length == 1 && char.IsAsciiDigit(n[0]) ? "0" + n : n;
+        var date = numbers.Take(3).Select((n, i) => i == 0 ? n : Pad(n)).ToList();
+        if (date.Count > 1 && date[0].Trim() is "0" or "-0")
+        {
+            date.RemoveAt(0);
+        }
+
+        var time = numbers.Skip(3).Select(Pad).ToList();
+        return string.Join("-", date) + (time.Count == 0 ? "" : " " + string.Join(":", time));
     }
 
     private static string OneLine(string text) => Spaces().Replace(text, " ").Trim();

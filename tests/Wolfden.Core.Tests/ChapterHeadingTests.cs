@@ -43,6 +43,8 @@ public class ChapterHeadingTests
                   - { key: "3", number: 3, fields: { setting: [] } }
                   - { key: "4", number: 4, fields: { when: { text: "late spring", sort: [2350, 5] } } }
                   - { key: "5", number: 5, title: Plain }
+                  - { key: "6", number: 6, fields: { when: { text: "", sort: [0, 5, 3] } } }
+                  - { key: "7", number: 7, fields: { when: { sort: [2350, 4, 12, 6, 5] } } }
                 ---
                 """));
 
@@ -53,6 +55,9 @@ public class ChapterHeadingTests
         Assert.Null(HeadingOf(den, links, "ember", "3"));
         Assert.Equal("Vesta Yards — late spring", HeadingOf(den, links, "ember", "4"));
         Assert.Equal("Plain · Vesta Yards", HeadingOf(den, links, "ember", "5"));
+        // A date with no text (or a blank one) shows its sort key, padded, with a year of 0 ("no year") left out.
+        Assert.Equal("Vesta Yards — 05-03", HeadingOf(den, links, "ember", "6"));
+        Assert.Equal("Vesta Yards — 2350-04-12 06:05", HeadingOf(den, links, "ember", "7"));
     }
 
     [Fact]
@@ -130,11 +135,12 @@ public class ChapterHeadingTests
                 chapters: [1]
                 ---
                 """)
-            .With($"{Ash}/book.md", "---\nname: Ash\nchapter_heading: [[], ~]\nchapters: [1]\n---\n"));
+            .With($"{Ash}/book.md", "---\nname: Ash\nchapter_heading: [[], ~]\nchapters: [1]\n---\n")
+            .With($"{Moon}/book.md", "---\nname: A Quiet Moon\nchapter_heading: { field: pov }\nchapters: [1]\n---\n"));
 
         Assert.Equal(
             [
-                ($"{LongDark}/series.md", (int?)4),
+                ($"{Moon}/book.md", (int?)3),
                 ($"{Ash}/book.md", 3),
                 ($"{Ash}/book.md", 3),
                 ($"{Ember}/book.md", 5),
@@ -148,9 +154,11 @@ public class ChapterHeadingTests
         var universe = den.FindUniverse("starfall")!;
         // The unknown name is kept; the bad entry and the repeat aren't.
         Assert.Equal(["pov", "pvo"], ChapterHeadings.FieldsFor(universe.FindBook("ember")!));
-        // A value that isn't a list, and a list left with no entries, inherit.
-        Assert.Equal(["when"], ChapterHeadings.FieldsFor(universe.FindBook("ash")!));
-        Assert.Null(universe.Series.Single().ChapterHeading);
+        // One name on its own is a one-item list, with no warning.
+        Assert.Equal(["pov"], universe.Series.Single().ChapterHeading);
+        // A list left with no entries inherits; so does a value that's neither a name nor a list.
+        Assert.Equal(["pov"], ChapterHeadings.FieldsFor(universe.FindBook("ash")!));
+        Assert.Equal(["when"], ChapterHeadings.FieldsFor(universe.FindBook("a-quiet-moon")!));
     }
 
     [Theory]
@@ -160,4 +168,15 @@ public class ChapterHeadingTests
     [InlineData("T", new[] { " | ", "B" }, "T · B")]
     public void ComposeJoinsWhatThereIsToShow(string? title, string[] fields, string? expected) =>
         Assert.Equal(expected, ChapterHeadings.Compose(title, fields.Select(f => f.Split('|'))));
+
+    [Theory]
+    [InlineData("2350", "2350")]
+    [InlineData("2350|4", "2350-04")]
+    [InlineData("2350|4|12", "2350-04-12")]
+    [InlineData("0|5|3", "05-03")]
+    [InlineData("0", "0")]
+    [InlineData("-450|10", "-450-10")]
+    [InlineData("2291|5|14|6|40", "2291-05-14 06:40")]
+    public void ASortKeyShowsAsADate(string numbers, string expected) =>
+        Assert.Equal(expected, ChapterHeadings.SortText(numbers.Split('|')));
 }

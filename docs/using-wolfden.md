@@ -385,11 +385,21 @@ Chapter 3 is headed "Ardent — Vesta Yards, 2350-04-12", and chapter 4
   headings from fields off for that book (or series), even if the
   universe sets one.
 - **Reading as of a chapter.** A chapter after the reading position
-  shows only its title, and a link to a note the reader hasn't met yet
-  shows as you wrote it, not the note's name.
-- `wolfden check` warns about a `chapter_heading` that isn't a list, a
-  repeated entry, or a name that isn't a chapter field (a typo such as
-  `pvo`).
+  shows only its title. Wolfden never supplies the name of a note the
+  reader hasn't met yet: a link to one shows as you wrote it, its label
+  if it has one, or else its target.
+- **Tip: label a link to a note the reader meets later.** A POV
+  character who stays a mystery for a while reads better as
+  `[[halden-pike|the stranger]]`, which shows "the stranger" at every
+  position. Without a label, a link by key shows the key
+  (`halden-pike`), and a link by id shows the raw id.
+- **Dates.** A `when` written as a mapping shows its `text`. With no
+  text, it shows its sort key as a date, such as `2350-04-12`, leaving
+  out a year of `0` (`05-03`), the way to sort dates with no year.
+- `chapter_heading: pov`, one name on its own, is the same as
+  `[pov]`. `wolfden check` warns about a `chapter_heading` that is
+  neither, a repeated entry, or a name that isn't a chapter field (a
+  typo such as `pvo`).
 
 For now you write `chapter_heading` in the file itself, in your editor;
 the pages don't have a form for it yet. The rules are in

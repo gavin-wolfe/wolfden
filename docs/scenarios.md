@@ -716,17 +716,19 @@ Covered by: `TypeEffectsTests.ASettingLinksAChapterToItsPlacesAndInherits`,
 The writer adds `chapter_heading` to the series and its books (#227).
 The series writes `chapter_heading: pov`, without the brackets; Ember
 lists `pov` twice, `pvo` by mistake, and `{ field: when }`; Ash writes
-`chapter_heading: [[], ~]`.
+`chapter_heading: [[], ~]`; A Quiet Moon writes `chapter_heading: {
+field: pov }`.
 
-- Each is an F-CTR-6 warning, and `wolfden check` still passes.
-- The series' `pov` isn't a list, so it's ignored and its books inherit
-  the universe's list, if any.
+- The series' `pov` is a one-item list, `[pov]`, with no warning.
+- Each of the others is an F-CTR-6 warning, and `wolfden check` still
+  passes. A Quiet Moon's mapping is ignored, so it inherits the
+  universe's list, if any.
 - In Ember, the repeated `pov` and the mapping are ignored. `pvo` isn't
   a chapter field: the warning says so and lists the chapter fields, and
   the name is kept, so a chapter that writes its own `pvo` shows it.
 - Ash's list has no entries left, so it counts as not set and Ash
-  inherits, unlike `chapter_heading: []`, which turns headings from
-  fields off.
+  inherits the series' `[pov]`, unlike `chapter_heading: []`, which
+  turns headings from fields off.
 
 Spec: format.md F-CTR-6 (#227). Covered by:
 `ChapterHeadingTests.ProblemsWithTheKeyAreWarnings` (Core).
@@ -4638,5 +4640,5 @@ Halden Pike enters at the start of Ash.
 Spec: format.md F-CTR-6, design.md §9 (#227, #26). Covered by:
 `ChapterHeadingTests` (Core),
 `ChapterHeadingIndexTests.AHeadingNamesANoteByItsNameNow` (index),
-`ChapterHeadingEndpointTests` (API),
+`ChapterHeadingEndpointTests`, `SpoilerTests.NothingAsOfAPositionNamesAnEntityTheReaderHasntMet` (API),
 `ChapterHeading.test.tsx` (web).

@@ -74,6 +74,40 @@ describe('SC-WEB-77: chapter headings built from chapter fields', () => {
     await waitFor(() => expect(document.title).toContain(FULL[0]))
   })
 
+  it('while the headings as of a position are on their way, or if they fail, the chapter page shows titles', async () => {
+    let release: () => void = () => {}
+    const pending = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    stubApi({
+      override: async (path, params) => {
+        if (path === '/api/hierarchy') {
+          if (params.get('asOf') === 'dracula:1') {
+            await pending
+            return new Response(JSON.stringify({ code: 'bad_position', message: 'No such position.' }), { status: 400 })
+          }
+
+          return withHeadings(FULL, null)
+        }
+
+        return undefined
+      },
+    })
+    renderApp('/u/dracula/b/dracula/c/1?at=dracula:1')
+
+    const title = "Jonathan Harker's Journal"
+    expect((await screen.findByRole('heading', { level: 1 })).textContent).toBe(title)
+    const nav = screen.getByRole('navigation', { name: 'Chapters' })
+    expect(within(nav).getByRole('link', { name: `2. ${title} ›` })).toBeTruthy()
+    expect(screen.queryByText(FULL[0])).toBeNull()
+
+    release()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(title)
+    expect(within(nav).getByRole('link', { name: `2. ${title} ›` })).toBeTruthy()
+    expect(document.body.textContent).not.toContain('Bistritz')
+  })
+
   it('as of a position, the chapter page names only what the reader has met', async () => {
     stubHeadings()
     renderApp('/u/dracula/b/dracula/c/1?at=dracula:1')

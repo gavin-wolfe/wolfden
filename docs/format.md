@@ -503,8 +503,9 @@ of the books in the container, such as `chapter_heading: [pov, setting,
 when]` (#227). Like `chapter_defaults`, it's inherited down the scope
 chain, but as a whole list: the nearest container in a book's scope chain
 (book, series, universe) that sets it wins, and its list replaces any
-further up. A null `chapter_heading` is the same as leaving it out, and
-an empty list (`[]`) means "no fields here", which stops inheritance.
+further up. One name on its own (`chapter_heading: pov`) is short for a
+one-item list. A null `chapter_heading` is the same as leaving it out,
+and an empty list (`[]`) means "no fields here", which stops inheritance.
 Leaving it out everywhere changes nothing: a chapter shows its title.
 
 A chapter's **heading** is its `title`, if it has one, then the effective
@@ -512,19 +513,26 @@ values (types.md F-CHAP-5) of the listed fields, in list order. A field
 the chapter has no value for, or "none here" (`[]`), is left out. A link
 shows its label, or else the current name of the note it reaches, so a
 rename follows; a link that doesn't resolve shows its target as written.
-A date mapping (types.md F-FT-11) shows its `text`, or else its `sort`
-numbers joined with `-`. The parts are joined as in "The Long Watch ·
+A date mapping (types.md F-FT-11) shows its `text`, or, if that's
+missing or blank, its `sort` as a date: the first number (the year) as
+written, then month and day padded to two digits and joined with `-`,
+then any time of day after a space, joined with `:`, so `[2350, 4, 12]`
+shows as `2350-04-12`. A year of `0` before other numbers, the usual way
+to sort dates of no stated year, is left out: `[0, 5, 3]` shows as
+`05-03`. The parts are joined as in "The Long Watch ·
 Ardent — Vesta Yards, 2350-04-12": ` · ` after the title, ` — ` after
 the first field, `, ` between the others, and ` & ` between the items of
 a list, such as two POV characters. White space, line breaks included,
 becomes one space. Headings are for display only and never affect keys,
-order, or positions. Views as of a story position never name a note the
-reader hasn't met (design.md §9): a link to one shows as written there.
+order, or positions. As of a story position, Wolfden never supplies the
+name of a note the reader hasn't met (design.md §9): a link to one shows
+as written, its label or else its target, so a writer who links such a
+note by its key or id gives it a label.
 
 Every problem with `chapter_heading` is a [warning]:
 
-- A value that isn't a list (`chapter_heading: pov`) is ignored, so the
-  books inherit from further up.
+- A value that is neither a name nor a list (a mapping, say) is ignored,
+  so the books inherit from further up.
 - An entry that isn't a name (a list, a mapping, a null), and an entry
   that repeats an earlier one, are ignored. A list left with no entries
   counts as not set, unlike an explicit `[]`.

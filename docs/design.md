@@ -1755,7 +1755,7 @@ docs/
 - **Editing fields** (#28, part b). The maintainer decisions above
   apply: one field at a time, explicit Save with stale-file conflicts,
   and the full note while editing. The rest is v0 behaviour, not a
-  recorded decision. Chapter fields and inherited values are #138.
+  recorded decision. Chapter fields are below (#225).
   - **The API.** `/api/entity/source` adds `fields` (each field under
     `fields:` in file order: its `name`, the `line` of its key, and its
     `value` as written, as JSON, with a plain `true`/`false` as one, any
@@ -2195,6 +2195,69 @@ docs/
     asked again, the form closes, and a notice under the list says what
     it did, including the renumbering, and takes focus until dismissed.
     Escape or Cancel closes the form and returns focus to the button.
+- **Chapter fields** (#225). The decisions already recorded apply:
+  values and inheritance as types.md §8 says (F-CHAP-5), the editing
+  rules of #28 (one field at a time, explicit Save, stale-file
+  conflicts), and on #132 that removing the last item of a list leaves
+  `[]`, "none here", while going back to inheriting is an explicit
+  clear. The rest is v0 behaviour, not a recorded decision.
+  - **The API.** `GET /api/book/chapter-fields?book=&universe=` gives a
+    book's chapters, each with every chapter field the den's packs
+    define (in pack order, then any other name the chapter writes or
+    inherits): whether the chapter writes it (`set`), its value as
+    written (`own`, in the form of `/api/entity/source`'s values,
+    numbers as `{"$number": "2.50"}`), whether that's `ignored`
+    (F-CHAP-3), the value that holds and where from (`chapter`, or the
+    `book`, `series`, or `universe` and its key), whether it's `none`,
+    what it would inherit without its own (`default`), and the links in
+    the value, resolved from the container that holds it (F-CHAP-4). It
+    has the den's chapter field definitions (`fieldTypes`, as for a
+    note, with `temporal`, `required`, and `default` always off, F-CHAP-1),
+    whether each chapter is a bare key, and the hash of `book.md`. `GET
+    /api/chapter-defaults?universe=&series=&book=` gives a container's
+    `chapter_defaults` the same way, with the books they reach. `POST
+    /api/chapter/edit` (`{book, universe, chapter, field, changes,
+    expectedHash}`) and `POST /api/chapter-defaults/edit` (`{universe,
+    series, book, field, changes, expectedHash}`) change one field: each
+    change is `{op, value, index, item}`, `op` one of `set`, `add`,
+    `remove`, and `clear`, given the `field`, and they're the MCP
+    `update_chapter_fields` and `update_chapter_defaults`, so frozen
+    books (with `ToolWords.Unfreeze`), a series' or universe's default
+    that would change a final book's chapters, hash checks, the write
+    check, effects, and the ledger are theirs. `POST /api/chapter/create`
+    takes `fields`, an object from field name to value (a name F-CHAP-1
+    reserves is refused, and one given null is left out), written last
+    in the new item's `fields`; in a list of bare keys, fields make the
+    new chapter a mapping.
+  - **Only what changed.** The form is a note field's (#196), and its
+    changes are worked out the same way, then given as the chapter
+    tools' ops, which name no path inside a field: an item taken out is
+    `remove` by its number, a new one `add` where it goes, and one
+    changed in place is taken out and added again; any other change (a
+    date's sort key, a plain value) sets the whole value. Untouched
+    items keep their bytes.
+  - **The pages.** A book's chapter list shows each chapter's values
+    under its title, inherited ones greyed and marked ("book default").
+    A chapter's page has **Fields**: each field, what holds, and
+    "inherited from book 'x' defaults" where it's inherited, with
+    **Edit** for each field the packs define, and **Use the default**
+    for one the chapter writes, which first says what the chapter will
+    have then ("Nothing above sets pov, so this chapter will have
+    none"). A field the packs don't define, a value the form can't show,
+    and a bare-key chapter say why, and are changed in the file. The
+    universe's, series', and book's pages have **Chapter defaults**,
+    edited the same way, with **Clear**. A final book has no Edit and
+    says to unfreeze it; a refusal shows the server's words.
+  - **The form.** It starts from the value written here, or, where
+    there's none, from the inherited value, so a change to it becomes
+    the chapter's own and saving it unchanged sends nothing. A list
+    emptied in the form says it will save `[]` and what that replaces.
+    A stale `book.md` (or container file) is sent again on the new hash
+    when this field is as it was; otherwise both values are shown, and
+    Keep mine sets the writer's value as a whole.
+  - **Adding a chapter** shows a form for each chapter field, empty, with
+    what the chapter will inherit if it stays empty. Only fields given a
+    value are sent; an empty list is inherited at create, not `[]`.
 - **Parsing round-trips.** Read-modify-write keeps formatting, ordering, and
   unknown content. This gets heavy test coverage, since it decides whether
   people trust the tool with their notes.

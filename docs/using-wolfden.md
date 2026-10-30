@@ -249,6 +249,54 @@ wolfden new chapter "Signal Fires" --in ember --after 2
 book by that key), and `--after` the chapter it comes after; leave it
 out for the end. The title is optional.
 
+The web form also has the chapter's **Chapter fields**, such as its POV
+and when it takes place (see the next section). They're optional: a
+field you leave empty is inherited from the chapter defaults, and the
+form says what that will be.
+
+## Chapter fields: POV, when, and the rest
+
+Chapters have fields of their own: who tells the chapter (`pov`), the
+narrative person (`narration`), the tense (`tense`), and when it takes
+place in the story's world (`when`). Your den's packs can add more, such
+as a `setting`; the pages show whatever fields your packs define
+([types.md §8](types.md#8-chapter-fields)).
+
+**Set it once, change it where it differs.** A value that holds for
+most chapters goes in the **Chapter defaults** of the book, its series,
+or the universe, each on its own page. A chapter that differs, such as
+a flashback with its own POV and date, sets its own value, which wins.
+The nearest wins: the chapter, then its book, then its series, then the
+universe.
+
+- **On a book's page,** each chapter in the list shows its fields under
+  its title. A value the chapter inherits is greyed and marked where it
+  comes from, such as "book default".
+- **On a chapter's page,** **Fields** lists every chapter field, with
+  what the chapter has and where that comes from. **Edit** opens the
+  same controls as a note's fields: a link picker for `pov`, a dropdown
+  for `narration` and `tense`, a date (with an optional sort key) for
+  `when`. If the chapter inherits the field, the form starts from the
+  inherited value; what you save becomes the chapter's own.
+- **"None here" and "use the default" are different.** Removing the last
+  POV and saving writes `pov: []`: this chapter has no POV character,
+  even though the book has a default one (an omniscient prologue, say,
+  or a found document). To have the chapter inherit the default again,
+  use **Use the default**, which says first what the chapter will have.
+- **Chapter defaults** are edited the same way on the universe's,
+  series', and book's pages. **Clear** takes a default out, so the
+  chapters inherit from further up again.
+
+A final book's chapters and defaults can't be edited until it's
+unfrozen. A series' or universe's default that would change what a
+final book's chapters have is refused too, with the books named; set
+the value in the draft books' own defaults instead. A chapter written
+in `book.md` as a bare key (`chapters: [1, 2, 3]`) has no place for
+fields: write it as `{ key: 1 }` first.
+
+AI assistants working through Wolfden set the same fields with their
+own tools (`update_chapter_fields`, `update_chapter_defaults`).
+
 ## Editing notes
 
 `wolfden serve` lets you edit a note on its page, one piece at a time.

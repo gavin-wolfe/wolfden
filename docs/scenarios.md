@@ -4422,3 +4422,110 @@ Spec: format.md F-BOOK-1, design.md §9 (#215). Covered by:
 `ChapterEndpointTests.AStaleFrozenOrMalformedAddIsRefusedAndWritesNothing`,
 `ChapterEndpointTests.APinnedServerAddsChaptersOnlyInItsUniverse`,
 `AddChapter.test.tsx` (web).
+
+### SC-WEB-73. I see each chapter's fields, and which are inherited
+
+The Long Dark (`series.md`) has `chapter_defaults: { tense: past }`, and
+Ember (`book.md`) has `chapter_defaults: { pov: ["[[mara-voss]]"] }`. Its
+prologue writes `fields: { pov: [], when: "2284" }`, and chapter 3
+`fields: { tense: futur }`. The writer opens Ember's page, then chapter 1's.
+
+- Under each chapter's title, the book's list shows the fields that have
+  a value: the chapter's own as they are, inherited ones greyed and marked
+  where they come from ("book default", "series default"). A `[[link]]`
+  is a link to the note it reaches, resolved from the file that holds it
+  (F-CHAP-4).
+- The chapter's page lists every chapter field the den's packs define,
+  in pack order (`pov`, `narration`, `tense`, `when`, then any a pack
+  adds, such as `setting`), with what holds: chapter 1 has `pov` Mara Voss
+  "inherited from book 'ember' defaults" and `tense` past "inherited from
+  series 'long-dark' defaults"; `narration` is "not set". The prologue's
+  `pov` is "none (none in this chapter, [])".
+- Chapter 3's `futur` isn't a tense, so it's shown as written and
+  ignored, and the chapter has `past` from the series (F-CHAP-3).
+- The API gives the chapters' fields as written, what holds and where
+  from, what each would inherit, and the den's chapter field definitions
+  (`GET /api/book/chapter-fields`).
+
+Spec: types.md §8 (F-CHAP-1..5), design.md §9 (#225). Covered by:
+`ChapterFieldEndpointTests.EachChaptersFieldsSayWhatHoldsAndWhereItComesFrom` (API),
+`ChapterFields.test.tsx` (web).
+
+### SC-WEB-74. I give a flashback its own POV and date, then undo it
+
+On chapter 2's page the writer chooses **Edit** for `pov`, adds Halden
+Pike next to Mara Voss, and saves. Later they remove both, save, then
+choose **Use the default**.
+
+- The form is a note field's (#196): a link picker for `pov`, a dropdown
+  for `narration` and `tense`, a date with an optional sort key for
+  `when`. A field the chapter inherits starts from the inherited value,
+  and says so; what's saved becomes the chapter's own. Saving with
+  nothing changed sends nothing.
+- Save sends only what changed (`POST /api/chapter/edit`, the MCP
+  `update_chapter_fields`): `{ key: "2", number: 2, fields: { pov:
+  ["[[mara-voss]]", "[[halden-pike]]"] } }` in `book.md`, the rest of the
+  file as it was. The notice says what the chapter has now and what it
+  replaced.
+- Removing the last item says first that saving writes `pov: []`, "none
+  in this chapter", in place of the default, and saving leaves `pov: []`
+  (#132, F-RT-6), not the default.
+- **Use the default** is shown only for a field the chapter writes. It
+  says first what the chapter will have ("This chapter will have
+  [[mara-voss]], from book 'ember' defaults", or "Nothing above sets pov, so this chapter
+  will have none"), then takes the field out.
+- A changed date with a sort key is written whole: `when: { text: Year
+  2290, sort: 2290 }`.
+
+Spec: types.md F-CHAP-5, format.md F-RT-6, design.md §9 (#225). Covered by:
+`ChapterFieldEndpointTests.AChaptersFieldIsSetThenEmptiedThenClearedBackToTheDefault` (API),
+`ChapterFields.test.tsx` (web).
+
+### SC-WEB-75. I set chapter defaults, and give a new chapter its fields
+
+The writer opens the Starfall universe's page and sets **Chapter
+defaults** `narration` to third-limited, then adds a chapter to Ember
+with **Add chapter**, giving it a POV and a date.
+
+- The universe's, series', and book's pages each have **Chapter
+  defaults**, with every chapter field, what the container sets, and
+  what it inherits from above, edited as a chapter's fields are
+  (`POST /api/chapter-defaults/edit`, the MCP `update_chapter_defaults`),
+  with **Clear** to inherit from above again. The notice says what each
+  book's chapters have now.
+- **Add chapter** shows each chapter field, empty, with what the chapter
+  will inherit if it stays empty ("Left empty: past, from book 'ember'
+  defaults"). Only fields given a value are sent, in `fields`, and
+  written last in the new item: `{ key: "1b", number: 2, title:
+  Flashback, fields: { pov: ["[[halden-pike]]"], when: "2270" } }`. In a
+  list of bare keys, fields make the new chapter a mapping.
+
+Spec: types.md F-CHAP-5, design.md §9 (#215, #225). Covered by:
+`ChapterFieldEndpointTests.AContainersDefaultsAreReadAndEdited`,
+`ChapterFieldEndpointTests.ANewChapterCanStartWithItsOwnFields` (API),
+`NewChapterTests.AnItemIsWrittenAsTheFormatWritesOne` (Core),
+`ChapterFields.test.tsx` (web).
+
+### SC-WEB-76. Chapter field edits are guarded
+
+- A final book's chapter page and **Chapter defaults** have no Edit and
+  say to unfreeze it; the API refuses an edit (`frozen`, 409), saying how
+  to unfreeze it in the page's words (**Unfreeze…**). A series' or
+  universe's default that would change what a final book's chapters have
+  is refused too, naming them.
+- A stale `book.md` (or container file) is refused (`stale_file`); the
+  page sends the same changes again on the new file if this field didn't
+  change, and otherwise shows both values, with **Keep mine** and **Take
+  theirs**.
+- A reserved name (`key`, `number`, …, F-CHAP-1), a change member the
+  endpoint doesn't take (`field` inside a change), a missing `field`, an
+  unknown chapter, and `fields` that isn't an object are refused and write
+  nothing. A chapter written as a bare key (`chapters: [1, 2]`) has no
+  place for fields: the API refuses (`unsupported_edit`), and the page
+  says to write it as `{ key: 1 }` first.
+- `/api/book/chapter-fields` and `/api/chapter-defaults` answer GET only,
+  and the edits POST only, as JSON.
+
+Spec: format.md F-BOOK-1, types.md F-CHAP-1, design.md §9 (#225). Covered by:
+`ChapterFieldEndpointTests.ChapterFieldEditsAreGuarded` (API),
+`ChapterFields.test.tsx` (web).

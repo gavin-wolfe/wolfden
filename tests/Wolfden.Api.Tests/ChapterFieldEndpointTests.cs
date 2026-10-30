@@ -91,6 +91,10 @@ public sealed class ChapterFieldEndpointTests : IDisposable
         Assert.Equal(("[[mara-voss]]", "resolved", "Mara Voss"), (link.GetProperty("text").GetString(), link.GetProperty("outcome").GetString(), link.GetProperty("name").GetString()));
         Assert.Equal("01JA7Q8M4XK3V9R2D5W8HN6TQB", link.GetProperty("entity").GetString());
         Assert.Equal(("series", "long-dark", "\"past\""), (Field(1, "tense").GetProperty("from").GetString(), Field(1, "tense").GetProperty("fromKey").GetString(), Field(1, "tense").GetProperty("value").GetRawText()));
+        // Each field carries its chapter item's lines as written, for a stale save's check.
+        Assert.Equal("  - { key: \"1\", number: 1, title: Kessan Reach }", inherited.GetProperty("text").GetString());
+        Assert.Equal("  - { key: 2b, number: 3, title: The Long Watch }   # added in revision", Field(3, "pov").GetProperty("text").GetString());
+
         // A field nothing sets is listed, with no value.
         Assert.Equal(JsonValueKind.Null, Field(1, "narration").GetProperty("value").ValueKind);
 
@@ -140,6 +144,34 @@ public sealed class ChapterFieldEndpointTests : IDisposable
         });
         Assert.True(when.GetProperty("changed").GetBoolean());
         Assert.Contains("title: Kessan Reach, fields: { when: { text: Year 2290, sort: 2290 } } }", _den.Read(Ember), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-74")]
+    public async Task AnItemsCommentThatGoesWithItIsReported()
+    {
+        _den.Write(Ember, _den.Read(Ember).Replace(
+            "  - { key: \"2\", number: 2 }\n",
+            "  - key: \"2\"\n    number: 2\n    fields:\n      pov:\n        - \"[[mara-voss]]\"  # her watch\n        - \"[[halden-pike]]\"\n",
+            StringComparison.Ordinal));
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(_den.Root));
+
+        // Moved: taken out and added again after Pike.
+        var moved = await EditAsync(server, new
+        {
+            book = "ember", universe = "starfall", chapter = "2", field = "pov", expectedHash = await HashAsync(server),
+            changes = new object[] { new { op = "remove", item = 0 }, new { op = "add", value = "[[mara-voss]]" } },
+        });
+        Assert.Contains("Moved an item of pov of chapter '2' to item 1, written afresh, so the comment on it was dropped: '# her watch'. Put it back by hand if you want it.", moved.GetProperty("effects").EnumerateArray().Select(e => e.GetString()));
+
+        // Removed: the comment goes with it, and the effects say so.
+        _den.Write(Ember, _den.Read(Ember).Replace("        - \"[[halden-pike]]\"\n", "        - \"[[halden-pike]]\"  # relief pilot\n", StringComparison.Ordinal));
+        var removed = await EditAsync(server, new
+        {
+            book = "ember", universe = "starfall", chapter = "2", field = "pov", expectedHash = await HashAsync(server),
+            changes = new object[] { new { op = "remove", item = 0 } },
+        });
+        Assert.Contains("Removed item 0 of pov of chapter '2' with the comment on it: '# relief pilot'.", removed.GetProperty("effects").EnumerateArray().Select(e => e.GetString()));
     }
 
     [Fact]
@@ -212,6 +244,7 @@ public sealed class ChapterFieldEndpointTests : IDisposable
         Assert.Equal(["ember", "ash"], series.GetProperty("books").EnumerateArray().Select(b => b.GetProperty("key").GetString()));
         var tense = series.GetProperty("fields").EnumerateArray().Single(f => f.GetProperty("name").GetString() == "tense");
         Assert.Equal((true, "\"past\"", "series"), (tense.GetProperty("set").GetBoolean(), tense.GetProperty("own").GetRawText(), tense.GetProperty("from").GetString()));
+        Assert.Equal("chapter_defaults: { tense: past }", tense.GetProperty("text").GetString());
 
         // The universe sets narration; the series and its books inherit it.
         var universe = await server.GetJsonAsync("/api/chapter-defaults?universe=starfall", HttpStatusCode.OK);

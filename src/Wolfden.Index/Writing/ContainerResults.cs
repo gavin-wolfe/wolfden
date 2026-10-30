@@ -93,9 +93,15 @@ public sealed record ChapterAddResult(
 /// <param name="DefaultFrom">Where that comes from: <c>book</c>, <c>series</c>, or <c>universe</c>, or null.</param>
 /// <param name="DefaultFromKey">The key of that container, or null.</param>
 /// <param name="Links">The links in <paramref name="Value"/>, resolved from the container that holds it (F-CHAP-4).</param>
+/// <param name="Text">
+/// The lines of the file where an edit of the field lands, as written, with LF line breaks: a chapter's item in
+/// <c>chapters</c> (its fields are written there), or the field's entry in a container's <c>chapter_defaults</c> (the
+/// whole <c>chapter_defaults</c> when it doesn't set the field, or is written on one line). A page that finds the file
+/// changed sends its changes again only if these are byte for byte as they were.
+/// </param>
 public sealed record ChapterValueView(
     string Name, bool Set, JsonElement? Own, bool Ignored, JsonElement? Value, string? From, string? FromKey, bool None, JsonElement? Default,
-    string? DefaultFrom, string? DefaultFromKey, IReadOnlyList<ChapterLinkView> Links);
+    string? DefaultFrom, string? DefaultFromKey, IReadOnlyList<ChapterLinkView> Links, string Text);
 
 /// <summary>A link in a chapter field's value, resolved (format.md §10.2).</summary>
 /// <param name="Text">The link as written, such as <c>[[mina-harker]]</c>.</param>

@@ -98,11 +98,14 @@ public sealed partial class DenTools
             var file = target.File;
             var touched = new List<string>();
             var notes = new List<string>();
+            var itemComments = new ItemComments();
             foreach (var op in ops)
             {
                 var field = op.Field!;
                 touched.Add(field);
                 string[] fieldPath = ["chapter_defaults", field];
+                var before = file;
+                var notesBefore = notes.Count;
                 file = Apply(op.Op switch
                 {
                     "set" => () => file.WithFrontmatterValue(fieldPath, op.Value!),
@@ -111,7 +114,10 @@ public sealed partial class DenTools
                         notes, file.WithoutChapterDefaultItem(field, ItemToRemove(file, fieldPath, op, "The default"), out var comments), comments, $"chapter_defaults.{field}"),
                     _ => () => ClearDefault(file, target, field, notes),
                 });
+                itemComments.After(op, before, file, fieldPath, $"chapter_defaults.{field}", notesBefore, notes);
             }
+
+            itemComments.Finish(notes);
 
             touched = touched.Distinct().ToList();
             if (file.ToBytes().AsSpan().SequenceEqual(original))

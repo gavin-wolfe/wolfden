@@ -497,11 +497,14 @@ public sealed partial class DenTools
 
             var touched = new List<string>();
             var notes = new List<string>();
+            var itemComments = new ItemComments();
             foreach (var op in ops)
             {
                 var field = op.Field!;
                 touched.Add(field);
                 string[] fieldPath = [.. itemPath, "fields", field];
+                var before = file;
+                var notesBefore = notes.Count;
                 file = Apply(op.Op switch
                 {
                     "set" => () => file.WithFrontmatterValue(fieldPath, op.Value!),
@@ -510,7 +513,10 @@ public sealed partial class DenTools
                         notes, file.WithoutChapterFieldItem(ch.Key, field, ItemToRemove(file, fieldPath, op), out var comments), comments, $"{field} of chapter '{ch.Key}'"),
                     _ => () => Clear(file, fieldPath, ch, field, notes),
                 });
+                itemComments.After(op, before, file, fieldPath, $"{field} of chapter '{ch.Key}'", notesBefore, notes);
             }
+
+            itemComments.Finish(notes);
 
             if (file.ToBytes().AsSpan().SequenceEqual(original))
             {

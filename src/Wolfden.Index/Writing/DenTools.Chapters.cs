@@ -69,7 +69,7 @@ public sealed partial class DenTools
 
         title = title?.Trim();
         var own = NewChapterFields(fields);
-        after =string.IsNullOrWhiteSpace(after) ? null : after.Trim();
+        after = string.IsNullOrWhiteSpace(after) ? null : after.Trim();
         var hash = expectedHash is null ? null : RequireHash(expectedHash);
         var key = book.Trim();
         var (universeKey, _) = LocateBook(key, universe);

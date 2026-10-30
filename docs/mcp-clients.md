@@ -211,7 +211,7 @@ prompts. This list is for knowing what the assistant can do.
 | Tool | What it does |
 |---|---|
 | `create_entity` | A new entity from its type's template. If its name would take links from another entity, it's refused unless `allow_relinks`. |
-| `update_fields` | Set, add to, or remove anything in an entity's frontmatter (its fields, `status`, `from`), and add aliases. |
+| `update_fields` | Set, add to, or remove anything in an entity's frontmatter (its fields, `status`, `from`), add aliases, and move a list item (`move`), keeping its comments. |
 | `append_section` | Add text to a section, or add a new section. |
 | `add_idea` | Record undecided material with `status: idea`, as its own entity or as a section of one. A new idea entity whose name would take links from another entity is refused unless `allow_relinks`. An idea added to an existing `entity` creates nothing, so it refuses `allow_relinks`, as it does the new entity's `name`, `type`, `series`, `book`, and `fields`. |
 | `rename_section` | Rename a section and rewrite the links to it, den-wide. |
@@ -219,8 +219,8 @@ prompts. This list is for knowing what the assistant can do.
 | `change_alias` | Change or remove an alias, rewriting its links the same way. |
 | `copy_entity` | Copy an entity under a new name and id, beside it or into another scope or universe. |
 | `move_entity` | Move an entity's file to another scope of its universe (a series, a book, or the universe itself), keeping canon views as they were. Links to it that would stop reaching it, and its own links that would change target, are rewritten to ids. |
-| `update_chapter_fields` | Change one chapter's own fields. |
-| `update_chapter_defaults` | Change a universe's, series', or book's `chapter_defaults`. |
+| `update_chapter_fields` | Change one chapter's own fields: set, add, remove, or clear, and move or replace one list item in place (`move`, `replace`), keeping its comments. |
+| `update_chapter_defaults` | Change a universe's, series', or book's `chapter_defaults`, with the same changes. |
 | `checkpoint` | Commit the den (or some paths) to git, with the assistant as co-author. |
 
 ## 5. What keeps the writes safe
@@ -243,6 +243,12 @@ prompts. This list is for knowing what the assistant can do.
   with no POV, the links a rename rewrote, and any link that would now
   reach a different entity (a change like that is refused unless the
   assistant is told to allow it).
+- **Your comments stay put.** A YAML comment you wrote on a field or a
+  list item (`- "[[mina-harker]]"  # main`) is kept when the assistant
+  changes something else. Moving or changing one list item in place
+  (`move`, `replace`, or `set` on an item's path) keeps the comments
+  that belong to it. Removing an item, or taking it out and adding it
+  again, drops its comment, and the result quotes what went.
 - **Files only, until a checkpoint.** Writes go to the files, not to git.
   `checkpoint` commits them, and lists which files the session wrote and
   which were changed outside it, so your own edits are never hidden in an

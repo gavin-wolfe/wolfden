@@ -1797,7 +1797,7 @@ docs/
     and `default`, then the universal `placeholder`; `row` is edited in
     the file). `POST /api/edit/field` takes `field` and `changes`, a
     list of `{op, path, value, index}` with `op` one of `set`, `add`,
-    and `remove`, and `path` a list of keys and item numbers under the
+    `remove`, and `move` (#197), and `path` a list of keys and item numbers under the
     field (none for the field itself). It's `update_fields` with every
     path under `fields.<field>`, so an edit can't reach `id`, `name`,
     `status`, or another field, and it has the same hash check, frozen
@@ -1813,13 +1813,15 @@ docs/
   - **Only what changed.** The page works out the changes from the value
     as written and the form, following each list item and dated entry
     from where it came: one taken out is removed, a new one added where
-    it goes, one moved is removed and added again, and one that stayed
-    has only its changed keys set (`[1, "until"]`). Core has no in-place
-    move yet (#197), so a moved item is written afresh: it takes the
-    quoting of the item before it, and a comment on it is dropped, which
-    `effects` says ("Moved an item of fields.tags to item 0, written
-    afresh, so the comment on it was dropped: '# from Varna'"); removing
-    an item with a comment says so too. A value the writer didn't touch,
+    it goes, one in another place is moved there in place (`move`, from
+    the top), and each one kept has only its changed keys set where it
+    ends up (`[1, "until"]`). A move keeps the item's quoting and the
+    comments that belong to it (format.md F-RT-7, #197); so does a
+    changed item, which is set in place. Removing an item with a comment
+    says so in `effects`, and so does a client that takes an item out
+    and adds it again, which writes it afresh ("Moved an item of
+    fields.tags to item 0, written afresh, so the comment on it was
+    dropped: '# from Varna'"). A value the writer didn't touch,
     and a list whose items are all as they were, is sent back as
     written, so `Dried` isn't rewritten `dried` and an entry's
     `value: ~` stays `~`. A plain value that gains a date or a pin, or a field whose
@@ -2305,16 +2307,18 @@ docs/
     The form keeps the hash and value it was opened on, so a refetch
     while it's open (on window focus, say) can't move it onto a file the
     writer never saw. A stale `book.md` (or container file) is sent again
-    on the new hash only as #196 does for a note: every change adds or
-    removes an item, and the lines the field is written in (the
+    on the new hash only as #196 does for a note: every change adds,
+    removes, moves, or replaces an item, and the lines the field is written in (the
     chapter's item, or the default's entry; the API gives them as
     `text`) are byte for byte as they were. Otherwise both values are
     shown, and Keep mine sets the writer's value as a whole. **Use the
     default** and **Clear** on a stale file are never sent again: the
     page shows what the file has now to choose from, or says the field
-    was already cleared. A removed, moved, or rewritten (changed in
-    place) list item's comment goes with it, and the effects say so, as
-    for a note's fields.
+    was already cleared. The page sends a moved item as `move` and a
+    changed one as `replace`, which keep the item's comments (#197). A
+    removed item's comment goes with it, and the effects say so, as for
+    a note's fields; so do they when a client takes an item out and adds
+    it, or a new value, again.
   - **Adding a chapter** shows a form for each chapter field, empty, with
     what the chapter will inherit if it stays empty. Only fields given a
     value are sent; an empty list is inherited at create, not `[]`.

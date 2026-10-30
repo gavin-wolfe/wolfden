@@ -1663,6 +1663,37 @@ history keeps the old text from the last checkpoint (a commit) before
 the edit. A new key or item written under an empty key later goes
 after any comment lines already indented under that key.
 
+**F-RT-7.** A writer that reorders a list moves each item in place,
+with the comments that belong to it, rather than removing it and adding
+it again (#197). In a block list, an item's own lines are:
+
+- its dash line and the rest of its value, with a comment on any of them
+  (`- "[[mina-harker]]"  # main`);
+- comment lines right after it indented deeper than its dash, which are
+  written under it, as a removal takes them; and
+- comment lines right above its dash, with no blank line between, at or
+  right of its dash and not indented under the item before: a heading
+  for it, as a new item goes after the item before and the comments
+  under that one, not between a heading and its item. This includes
+  comment lines above the first item.
+
+Each item's lines are a slot, and the items move between the slots, as
+sections do: blank lines, and comment lines that aren't an item's (left
+of the dash, or above a blank line), stay where they are. So a
+commented-out item after the last one (`# - "[[lucy-westenra]]"` at the
+dash's indent) stays at the end of the list. In a flow list, the item's
+text moves, with a comment on its line if it has a line of its own, and
+the commas stay in their places, so a list whose last item has no comma
+still has none. A comment anywhere else between the brackets, such as a
+line of its own between items, can't be placed for sure, so the move is
+refused (SC-RT-14).
+
+Changing one item in place keeps the comments on and above it too: only
+the value's characters change (F-RT-2), so `- "[[mina-harker]]"  # main`
+becomes `- "[[lucy-westenra]]"  # main`. Removing an item and adding
+another in its place, by contrast, writes the new one afresh without
+the old one's comment; the MCP write tools say when a comment went.
+
 ## 13. Appendix: a minimal den
 
 A complete den with one universe, one series, one book, and two entities.

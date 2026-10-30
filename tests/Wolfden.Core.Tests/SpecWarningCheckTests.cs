@@ -150,6 +150,22 @@ public class SpecWarningCheckTests
     }
 
     [Fact]
+    public void ARefWarningsExampleLinkComesFromTheFieldsOwnUniverse()
+    {
+        // #240: links don't cross universes, so another universe's note,
+        // even one that sorts first, isn't the example.
+        var source = Den("packs: [fleet]\n")
+            .With("packs/fleet/pack.yaml", "name: Fleet\n")
+            .With("packs/fleet/types/ship.yaml", Ship)
+            .Universe("drift");
+        Note(source, "universes/drift", "aaron-ash", Character("Aaron Ash"));
+        Note(source, A1, "orrin-fell", Character("Orrin Fell"));
+        Note(source, A1, "kestrel", "type: ship\nname: Kestrel\nstatus: canon\nfields:\n  captain: Orrin Fell", folder: "ships");
+
+        Assert.Contains("such as \"[[orrin-fell]]\", in quotes", Message(DenCheck.Run(source), "F-FT-9"), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ARefWarningWithNoNoteOfTheFieldsTypeHasAPlaceholderExample()
     {
         var source = Den("packs: [fleet]\n")

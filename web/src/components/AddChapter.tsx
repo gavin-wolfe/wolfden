@@ -12,8 +12,8 @@ import '../newEntity.css'
  * chapter…** after a chapter the writer picks; the form asks for an
  * optional **Title**. Wolfden writes the item into book.md's `chapters`:
  * at the end the next whole number, after a chapter a letter added to its
- * key (`2b`, then `2c`; after `2b`, `2ba`), and the numbers after it move
- * up. Keys never change, so positions keep naming the same chapters. A
+ * key (`2b`; between `2` and `2b`, `2a`, #229; after `2b`, `2ba`), and
+ * the numbers after it move up. Keys never change, so positions keep naming the same chapters. A
  * final book has neither button: its book.md can't change until it's
  * unfrozen.
  */

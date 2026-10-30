@@ -4352,12 +4352,15 @@ with no title.
   **Title**. **Add chapter** starts at the end; **Insert chapter…**,
   shown when the book has two or more chapters, starts after the first.
 - **Add** sends `POST /api/chapter/create` with the hash `GET
-  /api/book/chapters` gave for `book.md`. The inserted chapter gets the
-  first unused letter suffix of the key it follows: `2c`, since `2b` is
-  taken. It's numbered 3, and `2b` and `3` move up to 4 and 5; no key
-  changes, so `ember:3` names the chapter it did. After `2b` it would be
-  `2ba`, and after `prologue`, `prologuea`, numbered 1, with every number
-  after it moving up.
+  /api/book/chapters` gave for `book.md`. The inserted chapter's key is
+  the key it follows with a letter added, one that sorts between it and
+  the next key when the next is the same key with letters added (#229):
+  `2a`, between `2` and `2b`. It's numbered 3, and `2b` and `3` move up
+  to 4 and 5; no key changes, so `ember:3` names the chapter it did.
+  After `2b` it would be `2ba`, and after `prologue`, `prologuea`,
+  numbered 1, with every number after it moving up. Inserting after `2`
+  again, nothing sorts between `2` and `2a`, so it's the first unused
+  letter, `2c`.
 - At the end, the key is the next whole number, `4`, numbered after the
   last numbered chapter; no number changes. A book with no chapters gets
   `"1"`, number 1. In a book whose chapters have no numbers (Ash,
@@ -4374,7 +4377,7 @@ with no title.
   its place, and a notice says what was added and renumbered, and takes
   focus until dismissed.
 
-Spec: format.md §6.4, F-BOOK-3..6, design.md §9 (#215). Covered by:
+Spec: format.md §6.4, F-BOOK-2..6, design.md §9 (#215, #229). Covered by:
 `AddChapterTests.AnInsertedChapterGetsALetterKeyAndTheNumbersAfterItMoveUp`,
 `AddChapterTests.AddingAtTheEndGivesTheNextWholeNumberInTheListsOwnStyle`,
 `AddChapterTests.ABookWithNoChaptersGetsChapterOne`,
@@ -4385,6 +4388,8 @@ Spec: format.md §6.4, F-BOOK-3..6, design.md §9 (#215). Covered by:
 `BlockListBlankLineTests.BlockMappingItemsKeepTheirBlankLinesToo`,
 `BlockListBlankLineTests.AScalarAliasListKeepsItsBlankLines` (Core),
 `NewChapterTests.AnInsertedChapterGetsTheFirstUnusedLetterSuffix`,
+`NewChapterTests.AnInsertedKeySortsBetweenItsNeighboursWhenOneCan`,
+`NewChapterTests.InsertingAgainAndAgainKeepsKeysInOrderWhereItCan`,
 `NewChapterTests.AtTheEndItsTheNextWholeNumber`,
 `NewChapterTests.AnEmptyBookGetsChapterOneNumberedOne`,
 `NewChapterTests.InsertingRenumbersTheChaptersAfterItAndAddingAtTheEndRenumbersNone`,

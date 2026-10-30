@@ -2129,7 +2129,12 @@ docs/
   `K` gets the first unused letter suffix, `Kb`, then `Kc`, and so on
   (after `2b`, `2ba`); one at the end gets the next unused whole-number
   key. The `number`s after an insert are renumbered, and keys never
-  change (format.md F-BOOK-6). Removing chapters, and editing a
+  change (format.md F-BOOK-6). Maintainer decision (on #229,
+  2026-10-30): when the next chapter's key is `K` with letters added,
+  the inserted key takes a suffix that sorts between them as an ASCII
+  string, as F-OUT-4 orders row suffixes (between `2` and `2b`, `2a`),
+  and falls back to the first unused suffix when none does (between `2`
+  and `2a`, `2c`). Existing keys never change. Removing chapters, and editing a
   chapter's title from the UI, are out of scope. The rest is v0
   behaviour, not a recorded decision.
   - **Keys** (`NewChapter` in `Wolfden.Core/Editing`). The rule behind
@@ -2140,7 +2145,14 @@ docs/
     is refused. The next whole number is one more than the largest key
     that's all digits (`07` counts as 7), or `"1"`. Inserting after the
     last chapter is adding at the end, so the end always gets a whole
-    number.
+    number. Chapter order is the `chapters` list (F-BOOK-2), so "sorts
+    between" only matters when the next key is `K` followed by a letter:
+    any other next key sorts after every suffix of `K` already, or
+    before all of them. Between, shorter suffixes come first, and within
+    a length the ones the first-unused rule would try (so between `2`
+    and `2d` it's still `2b`), then, after a digit, those starting with
+    `a` (`2a` between `2` and `2c` when `2b` is taken), before any
+    longer suffix (rules chosen, #229).
   - **Numbers.** `number` is display only (F-BOOK-3), and there's no
     rule for renumbering beyond F-BOOK-5 (numbers should rise) and
     F-BOOK-6 (keys stay), so this is Wolfden's reading. The new chapter

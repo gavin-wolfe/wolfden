@@ -89,9 +89,10 @@ internal static class NewCommand
         'wolfden new chapter' adds a chapter to a book's chapters in its
         book.md, with the title if you give one. At the end, its key is the
         next whole number; after a chapter, a letter is added to that
-        chapter's key (after 2, 2b, then 2c; after 2b, 2ba). Keys never
-        change, so positions keep naming the same chapters; the display
-        numbers after it move up to make room.
+        chapter's key, one that sorts before the next chapter's key where
+        one can (after 2, 2b; between 2 and 2b, 2a; after 2b, 2ba). Keys
+        never change, so positions keep naming the same chapters; the
+        display numbers after it move up to make room.
 
           --in <book>         the book: its key, or '<universe>/<book>' in a den
                               with several universes that share the key

@@ -270,7 +270,7 @@ described in [Pick a den](#2-pick-a-den).
 | "What does the reader know about Renfield as of chapter 8? No spoilers from later chapters." | `get_entity` with `as_of` |
 | "Where do my notes mention the bloofer lady?" | `search` |
 | "Which characters are physicians?" | `search` with `field: occupation` |
-| "Whose point of view is chapter 21, and when is it set?" | `get_chapter` |
+| "Whose point of view is chapter 4, and when and where is it set?" | `get_chapter` |
 | "Run a continuity check on the den and explain anything it finds." | `check` |
 | "Add to Renfield's Want section: he wants to be trusted with something alive and large." | `get_entity`, then `append_section` |
 | "What changed in Renfield's notes since the last checkpoint?" | `get_history` with `diff` |

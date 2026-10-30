@@ -138,6 +138,7 @@ export const chapterFieldTypes: SourceFieldType[] = [
   { name: 'narration', type: 'enum', list: false, temporal: false, required: false, values: ['first', 'second', 'third-limited', 'third-omniscient', 'third-objective'], to: null, description: null, default: null },
   { name: 'tense', type: 'enum', list: false, temporal: false, required: false, values: ['past', 'present', 'future'], to: null, description: 'The narrative tense.', default: null },
   { name: 'when', type: 'date', list: false, temporal: false, required: false, values: [], to: null, description: null, default: null },
+  { name: 'setting', type: 'ref', list: true, temporal: false, required: false, values: [], to: ['location'], description: 'Where the chapter takes place.', default: null },
 ]
 
 /** A chapter field nothing sets, to build on. */
@@ -179,6 +180,7 @@ export function bookChapterFields(extra: Partial<BookChapterFields> = {}): BookC
         fromBook('narration', 'first'),
         fromBook('tense', 'past'),
         p.chapter === '1' ? unsetValue('when', { set: true, own: { text: '3–5 May', sort: [{ $number: '0' }, { $number: '5' }, { $number: '3' }] }, value: { text: '3–5 May', sort: [{ $number: '0' }, { $number: '5' }, { $number: '3' }] }, from: 'chapter' }) : unsetValue('when'),
+        unsetValue('setting'),
       ],
     })),
     ...extra,
@@ -198,7 +200,7 @@ export function chapterDefaults(kind: ChapterDefaultsSource['kind'] = 'book', ex
     hash: book ? 'h-book' : 'h-universe',
     final: false,
     fieldTypes: chapterFieldTypes,
-    fields: [unsetValue('pov'), book ? own('narration', 'first') : unsetValue('narration'), book ? own('tense', 'past') : unsetValue('tense'), unsetValue('when')],
+    fields: [unsetValue('pov'), book ? own('narration', 'first') : unsetValue('narration'), book ? own('tense', 'past') : unsetValue('tense'), unsetValue('when'), unsetValue('setting')],
     books: [{ key: 'dracula', final: false, chapters: positions.length, path: 'universes/dracula/books/dracula/book.md' }],
     ...extra,
   }

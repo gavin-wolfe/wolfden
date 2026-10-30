@@ -97,7 +97,10 @@ public class BuiltInPacksTests
     [Fact]
     public void TheCoreChapterFields()
     {
-        Assert.Equal(["pov", "narration", "tense", "when"], Core.ChapterFields.Select(f => f.Name));
+        Assert.Equal(["pov", "narration", "tense", "when", "setting"], Core.ChapterFields.Select(f => f.Name));
+        var setting = Core.FindChapterField("setting")!;
+        Assert.Equal((FieldKind.Ref, true, false), (setting.Kind, setting.IsList, setting.IsTemporal));
+        Assert.Equal(["location"], setting.To!);
         Assert.Equal(["first", "second", "third-limited", "third-omniscient", "third-objective"], Core.FindChapterField("narration")!.Values);
         Assert.Equal(["past", "present", "future"], Core.FindChapterField("tense")!.Values);
         var pov = Core.FindChapterField("pov")!;

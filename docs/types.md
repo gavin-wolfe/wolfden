@@ -794,19 +794,19 @@ that adds a custom section SHOULD put it at the end of the body.
 ## 8. Chapter fields
 
 Chapters (format.md §6.4) can carry fields of their own, such as a POV,
-the narrative mode, or an in-world date for a flashback. They are defined
-by packs, like entity fields, and written in a `fields` mapping on the
-chapter item. Values that hold for many chapters can be set once, in a
-container's `chapter_defaults`.
+the narrative mode, an in-world date, or where the chapter is set. They
+are defined by packs, like entity fields, and written in a `fields`
+mapping on the chapter item. Values that hold for many chapters can be set
+once, in a container's `chapter_defaults`.
 
 ```yaml
 # series.md
-chapter_defaults: { narration: third-limited, tense: past }
+chapter_defaults: { narration: third-limited, tense: past, when: "2291" }
 ```
 
 ```yaml
 # book.md
-chapter_defaults: { pov: "[[mara-voss]]" }
+chapter_defaults: { pov: "[[mara-voss]]", setting: "[[kessan-reach]]" }
 chapters:
   - { key: prologue, title: Before the Dark, fields: { when: "2284", tense: present } }
   - { key: "1", number: 1, title: Kessan Reach }
@@ -814,8 +814,9 @@ chapters:
 ```
 
 Every chapter of this book is told in the third person, limited, in the
-past tense, from Mara Voss's point of view, except that the prologue is in
-the present tense and chapter 2 has two POV characters.
+past tense, from Mara Voss's point of view, and takes place in 2291 at
+Kessan Reach, except that the prologue is in the present tense and set in
+2284, and chapter 2 has two POV characters.
 
 **F-CHAP-1.** A pack's `chapter.yaml` is a mapping with one key, `fields`,
 a mapping of field definitions as in §5 (F-FT-1, F-FT-2). A chapter field
@@ -911,10 +912,10 @@ they are facts about the chapters, unlike a field definition's `default`
 
 **F-CORE-1.** The core pack is built in and always enabled (F-DEN-4,
 F-PACK-7), unless a den-local pack shadows it (F-PACK-10). It defines the
-eight types below and the chapter fields `pov`, `narration`, `tense`, and
-`when`. Its files, in [`packs/core/`](../packs/core/), are normative:
-where this section and those files differ, the files win, and the
-difference is a bug in this section. The core pack has no required fields
+eight types below and the chapter fields `pov`, `narration`, `tense`,
+`when`, and `setting`. Its files, in [`packs/core/`](../packs/core/),
+are normative: where this section and those files differ, the files
+win, and the difference is a bug in this section. The core pack has no required fields
 and no required sections, so a hand-written note never gets a "missing"
 warning from it. Each type has a template in `packs/core/templates/`.
 
@@ -1097,15 +1098,21 @@ guide is a universe-scope note.
 | `pov` | list of `ref` to `character` | The chapter's point-of-view character or characters. |
 | `narration` | `enum`: `first`, `second`, `third-limited`, `third-omniscient`, `third-objective` | The narrative person and point of view. |
 | `tense` | `enum`: `past`, `present`, `future` | The narrative tense. |
-| `when` | `date` | When the chapter takes place in-world. |
+| `when` | `date` | When the chapter takes place in-world: the story's present, or a flashback out of step with the chapters around it. |
+| `setting` | list of `ref` to `location` | Where the chapter takes place. |
 
 Set them where they matter. A book or series told one way throughout sets
 `narration` and `tense` once, in `chapter_defaults` (F-CHAP-5), and a
 chapter that differs, such as a flashback whose date and POV are out of
-step with the chapters around it, sets its own. A multi-POV book may set
+step with the chapters around it, sets its own. `when` works the same way
+for the story's present: a space opera can set a far-future date once in
+`chapter_defaults` and override it as time moves on, and `setting` can
+link each chapter to the planet or star system where it happens. Made-up
+calendars such as stardates wait for #37. A multi-POV book may set
 `pov` on every chapter. No check ties `pov` to `narration`. These fields
 are independent of an outline's `pov` column (F-OUT-9), which is per row.
-Time and place for each beat are outline matters (#55).
+Time and place for each beat, finer than a chapter's `when` and
+`setting`, are outline matters (#55).
 
 ## 10. Appendix: a den-local pack
 

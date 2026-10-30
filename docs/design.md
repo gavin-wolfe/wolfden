@@ -281,9 +281,10 @@ The normative rules for books, chapters, positions, and outlines are in
 `book.md` frontmatter holds the ordered chapter list. Each chapter has a
 stable key, a number, an optional title, and optional fields from packs:
 core defines POV, narration (first person, third limited, and so on),
-tense, and an in-world date. A universe, series, or book can set
-`chapter_defaults` once (say, third person past tense for a whole series),
-and a chapter's own fields override them. Story positions refer to chapter
+tense, an in-world date, and a setting (the chapter's locations). A
+universe, series, or book can set `chapter_defaults` once (say, third
+person past tense for a whole series), and a chapter's own fields
+override them. Story positions refer to chapter
 keys, so renumbering chapters doesn't break positions. Book and chapter keys
 can't contain `:` or `.`, which the position syntax uses as separators.
 
@@ -2261,6 +2262,9 @@ docs/
     universe's, series', and book's pages have **Chapter defaults**,
     edited the same way, with **Clear**. A final book has no Edit and
     says to unfreeze it; a refusal shows the server's words.
+  - **Fields a pack adds** (such as the core `setting`, #231, or a den
+    pack's own) get their form from their definition, with nothing in the
+    page naming them.
   - **The form.** It starts from the value written here, or, where
     there's none, from the inherited value, so a change to it becomes
     the chapter's own and saving it unchanged sends nothing. A list

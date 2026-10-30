@@ -589,12 +589,13 @@ that isn't a list, such as a single key or a mapping, is an [error].
 
 A `number` that isn't a non-negative integer (`"3"`, `3.5`, `-1`) is a
 [warning], and the chapter is treated as having no number. Chapter-level
-fields such as POV or an in-world date go in an optional `fields` mapping
-on the item, defined by packs ([`types.md`](types.md) §8), and can be set
-for many chapters at once with `chapter_defaults` (F-CTR-5). Other keys
-are kept but not indexed in v0. An item MAY instead be a plain scalar,
-short for `{ key: <scalar> }`, so `chapters: [prologue, 1, 2, 3]` is
-valid. An item of any other shape, or one with no `key`, is an [error].
+fields such as POV, an in-world date, or a setting go in an optional
+`fields` mapping on the item, defined by packs
+([`types.md`](types.md) §8), and can be set for many chapters at once
+with `chapter_defaults` (F-CTR-5). Other keys are kept but not indexed
+in v0. An item MAY instead be a plain scalar, short for
+`{ key: <scalar> }`, so `chapters: [prologue, 1, 2, 3]` is valid. An
+item of any other shape, or one with no `key`, is an [error].
 
 **F-BOOK-4.** A repeated chapter key is an [error].
 

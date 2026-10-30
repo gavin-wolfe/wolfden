@@ -95,22 +95,22 @@ describe('SC-WEB-73: I see each chapter’s fields, and which are inherited', ()
     expect(within(row('pov', defaults)).getByText('not set')).toBeTruthy()
   })
 
-  it('the chapter page shows each field the den defines, where it comes from, and a field a pack adds', async () => {
-    const withSetting = () => {
+  it('the chapter page shows each field the den defines, where it comes from, and a field a den pack adds', async () => {
+    const withWeather = () => {
       const b = bookChapterFields()
-      const setting = { name: 'setting', type: 'string' as const, list: false, temporal: false, required: false, values: [], to: null, description: 'Where it happens.', default: null }
-      return { ...b, fieldTypes: [...b.fieldTypes, setting], chapters: b.chapters.map((c) => ({ ...c, fields: [...c.fields, unsetValue('setting')] })) }
+      const weather = { name: 'weather', type: 'string' as const, list: false, temporal: false, required: false, values: [], to: null, description: 'The weather.', default: null }
+      return { ...b, fieldTypes: [...b.fieldTypes, weather], chapters: b.chapters.map((c) => ({ ...c, fields: [...c.fields, unsetValue('weather')] })) }
     }
-    stubFields({ book: withSetting })
+    stubFields({ book: withWeather })
     renderApp('/u/dracula/b/dracula/c/2')
     await screen.findByRole('heading', { name: "Jonathan Harker's Journal", level: 1 })
 
     const list = await screen.findByRole('group', { name: 'Fields of this chapter' })
-    expect(within(list).getAllByRole('term').map((t) => t.textContent)).toEqual(['pov', 'narration', 'tense', 'when', 'setting'])
+    expect(within(list).getAllByRole('term').map((t) => t.textContent)).toEqual(['pov', 'narration', 'tense', 'when', 'setting', 'weather'])
     expect(row('tense').textContent).toContain("past inherited from book 'dracula' defaults")
     expect(within(row('pov')).getByText('not set')).toBeTruthy()
     // Every field has Edit, but only a value set here can go back to the default.
-    expect(within(row('setting')).getByRole('button', { name: 'Edit setting' })).toBeTruthy()
+    expect(within(row('weather')).getByRole('button', { name: 'Edit weather' })).toBeTruthy()
     expect(within(list).queryByRole('button', { name: /^Use the default/ })).toBeNull()
   })
 })

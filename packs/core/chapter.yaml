@@ -1,7 +1,7 @@
 # Chapter fields (docs/types.md §8). They go in a chapter item's `fields`
 # mapping in book.md, or in a container's `chapter_defaults`:
 #
-#   - { key: prologue, fields: { pov: "[[mara-voss]]", when: "2284" } }
+#   - { key: prologue, fields: { pov: "[[mara-voss]]", when: "2284", setting: "[[kessan-reach]]" } }
 fields:
   pov:
     type: ref
@@ -21,5 +21,10 @@ fields:
   when:
     type: date
     description: >-
-      When the chapter takes place in-world. Set it where it matters, such
-      as a flashback that is out of step with the chapters around it.
+      When the chapter takes place in-world: the story's present, or a
+      flashback out of step with the chapters around it.
+  setting:
+    type: ref
+    to: location
+    list: true
+    description: Where the chapter takes place.

@@ -358,7 +358,7 @@ public sealed class WolfdenTools
     /// <summary>The <c>get_chapter</c> tool.</summary>
     [McpServerTool(Name = "get_chapter", Title = "Read a book's chapters", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
     [Description(
-        "A book's chapters, or one chapter, with each chapter field (such as pov, narration, tense, when): its effective value, " +
+        "A book's chapters, or one chapter, with each chapter field (such as pov, narration, tense, when, setting): its effective value, " +
         "whether that's the chapter's own or inherited from a chapter_defaults (of the book, series, or universe), and what it would " +
         "inherit without its own value. A list field set to [] means 'none here' and stops inheritance. Also gives the hash of the " +
         "book's book.md, for update_chapter_fields.")]
@@ -389,7 +389,7 @@ public sealed class WolfdenTools
     [McpServerTool(Name = "get_chapter_defaults", Title = "Read chapter defaults", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
     [Description(
         "The chapter_defaults of a universe, a series (with 'series'), or a book (with 'book'): the chapter field values (such as pov, " +
-        "narration, tense) its books' chapters inherit, field by field, unless a nearer container or the chapter sets its own. Each " +
+        "narration, tense, when, setting) its books' chapters inherit, field by field, unless a nearer container or the chapter sets its own. Each " +
         "field gives this container's own value and what its books would inherit from above without it. A list field set to [] means " +
         "'none here' and stops inheritance. Also lists the books it reaches (and which are final), and gives the hash of its file " +
         "(universe.md, series.md, or book.md), for update_chapter_defaults.")]

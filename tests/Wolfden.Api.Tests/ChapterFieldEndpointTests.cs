@@ -62,7 +62,7 @@ public sealed class ChapterFieldEndpointTests : IDisposable
         Assert.False(book.GetProperty("final").GetBoolean());
         // The den's chapter fields, from its packs (the core pack here), each with what a form needs.
         var types = book.GetProperty("fieldTypes").EnumerateArray().ToList();
-        Assert.Equal(["pov", "narration", "tense", "when"], types.Select(t => t.GetProperty("name").GetString()));
+        Assert.Equal(["pov", "narration", "tense", "when", "setting"], types.Select(t => t.GetProperty("name").GetString()));
         Assert.Equal(("ref", true, "character"), (types[0].GetProperty("type").GetString(), types[0].GetProperty("list").GetBoolean(), types[0].GetProperty("to")[0].GetString()));
         Assert.Equal(["past", "present", "future"], types[2].GetProperty("values").EnumerateArray().Select(v => v.GetString()));
         Assert.All(types, t => Assert.False(t.GetProperty("temporal").GetBoolean()));
@@ -208,7 +208,7 @@ public sealed class ChapterFieldEndpointTests : IDisposable
         await using var server = await Server.StartAsync(new WolfdenApiOptions(_den.Root));
         var series = await server.GetJsonAsync("/api/chapter-defaults?universe=starfall&series=long-dark", HttpStatusCode.OK);
         Assert.Equal(("series", "long-dark", Series), (series.GetProperty("kind").GetString(), series.GetProperty("key").GetString(), series.GetProperty("path").GetString()));
-        Assert.Equal(["pov", "narration", "tense", "when"], series.GetProperty("fieldTypes").EnumerateArray().Select(t => t.GetProperty("name").GetString()));
+        Assert.Equal(["pov", "narration", "tense", "when", "setting"], series.GetProperty("fieldTypes").EnumerateArray().Select(t => t.GetProperty("name").GetString()));
         Assert.Equal(["ember", "ash"], series.GetProperty("books").EnumerateArray().Select(b => b.GetProperty("key").GetString()));
         var tense = series.GetProperty("fields").EnumerateArray().Single(f => f.GetProperty("name").GetString() == "tense");
         Assert.Equal((true, "\"past\"", "series"), (tense.GetProperty("set").GetBoolean(), tense.GetProperty("own").GetRawText(), tense.GetProperty("from").GetString()));

@@ -4107,8 +4107,9 @@ The note's type is a den-local `specimen` with a field of every type.
   `1893-08-08 06:40` with the time of day, sorts by itself; "early
   August" with sort key `1893, 8` is written
   `{ text: early August, sort: [1893, 8] }`.
-- A `ref` searches as I type a few letters, offers the notes of its
-  types whose name or slug starts so (not notes that only mention it),
+- A `ref` looks notes up as I type a few letters, offers the notes of its
+  types whose name, alias, or slug starts so (not notes that only
+  mention it; SC-WEB-78),
   and the arrow keys and Enter (or a click) write `[[jonathan-harker]]`.
   If another note of the universe has the same file name, the link is
   by id, `[[01J...]]`, so it reaches only the note I picked (file names
@@ -4642,3 +4643,47 @@ Spec: format.md F-CTR-6, design.md §9 (#227, #26). Covered by:
 `ChapterHeadingIndexTests.AHeadingNamesANoteByItsNameNow` (index),
 `ChapterHeadingEndpointTests`, `SpoilerTests.NothingAsOfAPositionNamesAnEntityTheReaderHasntMet` (API),
 `ChapterHeading.test.tsx` (web).
+
+### SC-WEB-78. I link a note by an alias I remember
+
+In the Dracula sample, I edit a field that links a character, or a
+section, and remember Mina only as "Madam Mina" (#198).
+
+- Typing `madam` in the field's link picker offers "Mina Harker, as
+  *Madam Mina*"; picking it writes `[[mina-harker]]`, as any pick does
+  (`[[01J...]]` where the file name could reach another note). `mur wil`
+  finds her by "Wilhelmina Murray": each word typed starts a word, in any
+  order, ignoring case and accents (`zoe ark` would find a Zoë Arkwright).
+- Typing `mina` offers Mina Harker first (an alias, exactly), then
+  "Mina and Jonathan marry" (a name that starts so), then "The Count
+  visits Mina" (a name that holds it). The picker offers only the
+  field's `to` types: for a character field, Mina Harker alone.
+- `lucys` finds "Lucy's three proposals" by its file name, and an id
+  typed or pasted (ten characters or more) finds its note.
+- In a section, `[[madam` offers the same, and picking it writes
+  `[[mina-harker|Madam Mina]]`, so the text still reads "Madam Mina".
+- Reading as of chapter 1, an editor still offers Van Helsing, whom the
+  reader meets at chapter 9: editing shows everything (#28). The
+  lookup's `asOf`, which the editors don't send, offers only the notes
+  the reader has met (`professor` finds nobody as of `dracula:1`), and
+  never names one they haven't.
+
+Spec: design.md §9 "Looking notes up by name and alias" (#198, #28,
+#26). Covered by: `EntityLookupTests` (index),
+`EntityLookupEndpointTests`,
+`SpoilerTests.NothingAsOfAPositionNamesAnEntityTheReaderHasntMet` (API),
+`FieldEditing.test.tsx`, `LinkLookup.test.tsx` (web).
+
+### SC-WEB-79. The lookup is guarded
+
+- `/api/entities/lookup` answers GET only, refuses a cross-site request
+  like every endpoint, and under `serve --universe` looks in the pinned
+  universe and refuses another (or `*`).
+- A query with no letters or digits, a parameter it doesn't take (`q`),
+  a `limit` outside 1 to 100, an unknown `type`, and a blank `asOf` are
+  refused (`bad_argument`, `unknown_type`).
+
+Spec: design.md §9 (#198, #23). Covered by:
+`EntityLookupEndpointTests.ALookupIsGuarded`,
+`EntityLookupEndpointTests.TypesNarrowALookupToAFieldsToTypes`,
+`EntityLookupEndpointTests.AsOfAPositionOnlyNotesTheReaderHasMetAreOffered`.

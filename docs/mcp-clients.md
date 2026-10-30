@@ -201,7 +201,7 @@ prompts. This list is for knowing what the assistant can do.
 | `get_entity` | One entity, by name, alias, file name, id, key, or path; with `as_of`, only what the reader knows at that position. |
 | `list_entities` | Entities by type, status, series, or book. |
 | `canon_as_of` | Canon at a story position (or the end of the story), pinned canon first. |
-| `get_chapter` | A book's chapters and their fields, with each value's source (the chapter, or `chapter_defaults` above it). |
+| `get_chapter` | A book's chapters and their fields, with each value's source (the chapter, or `chapter_defaults` above it), and each chapter's `heading`: its title, then the fields a `chapter_heading` lists, such as `"Ardent — Vesta Yards, 2350-04-12"`. |
 | `get_chapter_defaults` | A universe's, series', or book's `chapter_defaults`, and the books they reach. |
 | `check` | The continuity check, as `wolfden check` runs it. |
 | `get_history` | The checkpoints that changed an entity's file, and optionally a diff. |

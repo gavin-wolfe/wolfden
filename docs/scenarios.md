@@ -711,6 +711,26 @@ Covered by: `TypeEffectsTests.ASettingLinksAChapterToItsPlacesAndInherits`,
 `TypeEffectsTests.ASettingWrittenAsPlainTextBeforeCoreHadOneIsIgnoredWithAWarning`,
 `PackLoadingTests.ADenLocalSettingWinsOverTheCoreOne`.
 
+### SC-CHECK-43. A `chapter_heading` that doesn't read as I meant
+
+The writer adds `chapter_heading` to the series and its books (#227).
+The series writes `chapter_heading: pov`, without the brackets; Ember
+lists `pov` twice, `pvo` by mistake, and `{ field: when }`; Ash writes
+`chapter_heading: [[], ~]`.
+
+- Each is an F-CTR-6 warning, and `wolfden check` still passes.
+- The series' `pov` isn't a list, so it's ignored and its books inherit
+  the universe's list, if any.
+- In Ember, the repeated `pov` and the mapping are ignored. `pvo` isn't
+  a chapter field: the warning says so and lists the chapter fields, and
+  the name is kept, so a chapter that writes its own `pvo` shows it.
+- Ash's list has no entries left, so it counts as not set and Ash
+  inherits, unlike `chapter_heading: []`, which turns headings from
+  fields off.
+
+Spec: format.md F-CTR-6 (#227). Covered by:
+`ChapterHeadingTests.ProblemsWithTheKeyAreWarnings` (Core).
+
 ## RT: saving a note keeps what the writer wrote
 
 Background: the files are the writer's, and Wolfden is only one of the
@@ -2498,6 +2518,23 @@ Covered by:
 `WriteToolTests.AMappingInAPositionFieldIsTheSameWithItsKeysReorderedOrItsScalarsRequoted`,
 `WriteToolTests.ARefusedPositionsExampleUsesTheUniversesOwnKeys`,
 `WriteToolTests.ARefusedPositionsExampleSkipsABookWhoseKeyIsShared`.
+
+### SC-MCP-33. My assistant reads the chapter headings I see
+
+Dracula's `book.md` gets `chapter_heading: [pov, setting, when]`, and
+the writer asks the assistant for the book's chapters, then has it take
+Bistritz out of chapter 1's setting.
+
+- `get_chapter` gives each chapter's `heading`, as the web UI shows it:
+  "Jonathan Harker's Journal · Jonathan Harker — Bistritz & Castle
+  Dracula, 3–5 May". Without `chapter_heading` the heading is the
+  title.
+- `update_chapter_fields`' result gives the chapter's heading as it is
+  now: "Jonathan Harker's Journal · Jonathan Harker — Castle Dracula,
+  3–5 May".
+
+Spec: format.md F-CTR-6 (#227). Covered by:
+`WriteToolTests.EachChapterGivesTheHeadingTheWriterSees` (MCP).
 
 ## STORE: Wolfden saves, moves, and deletes notes
 
@@ -4570,3 +4607,36 @@ Spec: format.md F-BOOK-1, types.md F-CHAP-1, design.md §9 (#225). Covered by:
 `ChapterFieldEndpointTests.ChapterFieldEditsAreGuarded`,
 `ChapterFieldEndpointTests.AnItemsCommentThatGoesWithItIsReported` (API),
 `ChapterFields.test.tsx` (web).
+
+### SC-WEB-77. My chapters are headed by POV, place, and date
+
+The Long Dark (`series.md`) has `chapter_heading: [pov, setting, when]`
+and `chapter_defaults: { setting: "[[kessan-reach]]" }` (#227). In
+Ember, the prologue (titled Before the Dark) has `when: "2284"`, chapter
+1 is Mara Voss's, chapter 2 is Halden Pike's and `[[mara-voss|the
+Commander]]`'s, and chapter 2b, The Long Watch, is Mara Voss's again.
+Halden Pike enters at the start of Ash.
+
+- Ember's page lists the chapters as "Before the Dark · Kessan Reach —
+  2284", "Mara Voss — Kessan Reach", "Halden Pike & the Commander —
+  Kessan Reach", and "The Long Watch · Mara Voss — Kessan Reach". A
+  chapter's page uses its heading as its title, and so do its links to
+  the chapters before and after it.
+- Renaming Mara Voss's note changes every heading that links her, with
+  no change to `book.md`.
+- Reading as of `ember:2`, chapter 2 is "halden-pike & the Commander —
+  Kessan Reach": the reader hasn't met Pike, so his link shows as
+  written. The Long Watch, after the position, shows its title alone,
+  and an untitled chapter after it is "Chapter 3". As of
+  `ember:prologue`, Kessan Reach (met at chapter 1) shows as written.
+- `/api/hierarchy` gives each chapter's `heading`, as of `asOf` when
+  given; `/api/book/chapters` gives the full one.
+- Without `chapter_heading`, or with `chapter_heading: []` nearer the
+  book, chapters show their titles as before. The nearest container's
+  list wins, whole.
+
+Spec: format.md F-CTR-6, design.md §9 (#227, #26). Covered by:
+`ChapterHeadingTests` (Core),
+`ChapterHeadingIndexTests.AHeadingNamesANoteByItsNameNow` (index),
+`ChapterHeadingEndpointTests` (API),
+`ChapterHeading.test.tsx` (web).

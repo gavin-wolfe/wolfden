@@ -908,6 +908,27 @@ its books `narration`. Views and the index use effective values.
 they are facts about the chapters, unlike a field definition's `default`
 (F-FT-15), which chapter fields don't have.
 
+**Headings.** A container's `chapter_heading` (format.md F-CTR-6, #227)
+lists chapter fields to show in each chapter's heading, after its title.
+A multi-POV book can head each chapter with its POV, and a space opera
+with its POV, place, and date:
+
+```yaml
+# series.md
+chapter_heading: [pov, setting, when]
+chapter_defaults: { setting: "[[vesta-yards]]" }
+```
+
+```yaml
+# book.md
+chapters:
+  - { key: "3", number: 3, fields: { pov: ["[[ines-ardent|Ardent]]"], when: "2350-04-12" } }
+```
+
+Chapter 3 is headed "Ardent — Vesta Yards, 2350-04-12", and a rename of
+the Vesta Yards note shows in every heading at once. It is inherited as
+a whole list, nearest container first, and `[]` turns it off below.
+
 ## 9. The core pack
 
 **F-CORE-1.** The core pack is built in and always enabled (F-DEN-4,

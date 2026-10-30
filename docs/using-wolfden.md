@@ -301,8 +301,15 @@ then its book, then its series, then the universe. The rules are in
   POV and saving writes `pov: []` (in the file, `[]` for any list field
   such as `pov` or `setting`): this chapter has none, even though the
   book has a default (an omniscient prologue, say, or a found document).
-  To have the chapter inherit the default again, use **Use the
+  When something above sets the field, the form shows what saving will
+  do before you save, with the other choice beside it:
+  `pov: ~~[[mara-voss]]~~ → none in this chapter · use book default
+  ([[voss]]) instead`. Click it, and saving takes `pov` out of the
+  chapter, so it inherits; click again to go back to none. To have a
+  chapter inherit the default again without editing it, use **Use the
   default**, which says first what the chapter will have.
+- **Inherited values are greyed** on the chapter's page too, and marked
+  where they come from ("inherited from book 'ember' defaults").
 - **Chapter defaults** are edited the same way on the universe's,
   series', and book's pages. **Clear** takes a default out, so the
   chapters inherit from further up again.

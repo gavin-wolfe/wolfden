@@ -2358,7 +2358,12 @@ docs/
   - **The form.** It starts from the value written here, or, where
     there's none, from the inherited value, so a change to it becomes
     the chapter's own and saving it unchanged sends nothing. A list
-    emptied in the form says it will save `[]` and what that replaces.
+    emptied in the form says it will save `[]` and what that replaces;
+    where something above sets a value that isn't `[]`, it shows the
+    outcome inline with the other choice a click away (#138), `pov:
+    ~~Mara~~ → none in this chapter · use book default (Voss) instead`,
+    which saves a `clear` instead (no change, for a field the chapter
+    only inherited). There's no confirmation step.
     The form keeps the hash and value it was opened on, so a refetch
     while it's open (on window focus, say) can't move it onto a file the
     writer never saw. A stale `book.md` (or container file) is sent again

@@ -199,7 +199,7 @@ describe('SC-WEB-74: I edit a chapter’s fields, and go back to the default', (
     fireEvent.click(await screen.findByRole('button', { name: 'Edit pov' }))
     const form = screen.getByRole('form', { name: 'Edit pov' })
     fireEvent.click(within(form).getByRole('button', { name: 'Remove item 1' }))
-    expect(within(form).getByRole('status').textContent).toBe('No items: saving sets pov: [], none in this chapter. To use the default instead, Cancel and choose Use the default.')
+    expect(within(form).getByRole('status').textContent).toBe('No items: saving sets pov: [], none in this chapter.')
     fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
     await screen.findByText('Saved pov.')
     expect(posted[0].body.changes).toEqual([{ op: 'remove', item: 0 }])
@@ -211,6 +211,70 @@ describe('SC-WEB-74: I edit a chapter’s fields, and go back to the default', (
     fireEvent.click(within(prompt).getByRole('button', { name: 'Use the default' }))
     await waitFor(() => expect(posted).toHaveLength(2))
     expect(posted[1].body).toEqual({ universe: 'dracula', book: 'dracula', chapter: '1', field: 'pov', changes: [{ op: 'clear' }], expectedHash: 'h-book' })
+  })
+
+  it('removing the last POV where the book has one shows the outcome inline, with the default one click away (#138)', async () => {
+    const withDefault = () => {
+      const b = bookChapterFields()
+      const chapters = b.chapters.map((c) =>
+        c.key !== '1'
+          ? c
+          : { ...c, fields: c.fields.map((f) => (f.name === 'pov' ? { ...f, default: ['[[mina-murray]]'], defaultFrom: 'book' as const, defaultFromKey: 'dracula' } : f)) },
+      )
+      return { ...b, chapters }
+    }
+    const { posted } = stubFields({ book: withDefault })
+    renderApp('/u/dracula/b/dracula/c/1')
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit pov' }))
+    const form = screen.getByRole('form', { name: 'Edit pov' })
+    fireEvent.click(within(form).getByRole('button', { name: 'Remove item 1' }))
+
+    // The safe choice, [] "none here", applies by default; the effect shows before saving.
+    expect(within(form).getByRole('status').textContent).toBe('pov: [[jonathan-harker]] → none in this chapter. Saving sets pov: [].')
+    expect(within(form).getByRole('status').querySelector('del')!.textContent).toBe('[[jonathan-harker]]')
+    fireEvent.click(within(form).getByRole('button', { name: 'use book default ([[mina-murray]]) instead' }))
+    expect(within(form).getByRole('status').textContent).toBe('pov: [[jonathan-harker]] → [[mina-murray]] (book default). Saving takes pov out, so it inherits.')
+    // And back again.
+    fireEvent.click(within(form).getByRole('button', { name: 'none in this chapter instead' }))
+    expect(within(form).getByRole('status').textContent).toContain('→ none in this chapter')
+    fireEvent.click(within(form).getByRole('button', { name: 'use book default ([[mina-murray]]) instead' }))
+
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
+    await screen.findByText('Saved pov.')
+    expect(posted[0].body.changes).toEqual([{ op: 'clear' }])
+    expect(screen.queryByRole('group', { name: /^Use the default for pov\?/ })).toBeNull()
+  })
+
+  it('a chapter whose own pov is [] can choose the default, and that counts as a change (#138)', async () => {
+    const ownNone = () => {
+      const b = bookChapterFields()
+      const pov = { set: true, own: [], value: [], from: 'chapter' as const, none: true, links: [], default: ['[[mina-murray]]'], defaultFrom: 'book' as const, defaultFromKey: 'dracula' }
+      return { ...b, chapters: b.chapters.map((c) => (c.key !== '1' ? c : { ...c, fields: c.fields.map((f) => (f.name === 'pov' ? { ...f, ...pov } : f)) })) }
+    }
+    const { posted } = stubFields({ book: ownNone })
+    renderApp('/u/dracula/b/dracula/c/1')
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit pov' }))
+    const form = screen.getByRole('form', { name: 'Edit pov' })
+    const save = within(form).getByRole('button', { name: 'Save' }) as HTMLButtonElement
+    expect(within(form).getByRole('status').textContent).toBe('pov: none in this chapter. Saving sets pov: [].')
+    expect(save.disabled).toBe(true)
+    // Ctrl+Enter follows the Save button: nothing to send yet.
+    fireEvent.keyDown(form, { key: 'Enter', ctrlKey: true })
+    expect(posted).toHaveLength(0)
+
+    fireEvent.click(within(form).getByRole('button', { name: 'use book default ([[mina-murray]]) instead' }))
+    expect(save.disabled).toBe(false)
+    fireEvent.keyDown(form, { key: 'Enter', ctrlKey: true })
+    await screen.findByText('Saved pov.')
+    expect(posted[0].body.changes).toEqual([{ op: 'clear' }])
+  })
+
+  it('a field the chapter only inherits is greyed on its page', async () => {
+    stubFields()
+    renderApp('/u/dracula/b/dracula/c/2')
+    await screen.findByRole('group', { name: 'Fields of this chapter' })
+    await waitFor(() => expect(row('tense').querySelector('dd.inherited-value')).not.toBeNull())
+    expect(row('pov').querySelector('dd.inherited-value')).toBeNull()
   })
 
   it('a changed date is set as a whole, as the form writes it', async () => {

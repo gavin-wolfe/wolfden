@@ -490,8 +490,24 @@ button.peek {
 }
 
 .chapter-field-summary .inherited-value dd,
+.chapter-fields dd.inherited-value,
 .chapter-fields .badge.inherited {
   color: var(--text-muted);
+}
+
+/* An emptied list's outcome and the other choice (#138): the choice reads as a link in the sentence. */
+.inherit-choice del {
+  color: var(--text-muted);
+}
+
+.inherit-choice .link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--link, inherit);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
 }
 
 .chapter-number {

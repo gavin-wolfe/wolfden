@@ -142,6 +142,8 @@ interface Target {
   clear: string
   /** What an emptied list means here. */
   noneWords: string
+  /** The same, short, for the choice beside an emptied list: "none in this chapter instead". */
+  noneChoice: string
   save: (field: string, changes: ChapterFieldChange[], hash: string) => Promise<WriteResult>
   /** The file and this panel's values as they are now, after a stale save, or null if the place is gone. */
   reload: () => Promise<{ hash: string; values: ChapterValueView[] } | null>
@@ -307,7 +309,7 @@ function ChapterValues({
                 </dd>
               ) : (
                 <>
-                  <dd>
+                  <dd className={view.value !== null && view.from !== null && view.from !== target.own && view.from !== 'chapter' ? 'inherited-value' : undefined}>
                     <ChapterValueText universe={target.universe} view={view} none={target.noneWords} /> <Origin view={view} own={target.own} />
                     <IgnoredNote view={view} />
                     {!type && <span className="muted"> (not a chapter field the den's packs define: change it in the file)</span>}
@@ -499,10 +501,17 @@ function FieldForm({
   const [error, setError] = useState<Error | null>(null)
   const [saving, setSaving] = useState(false)
   const [conflict, setConflict] = useState<{ hash: string; theirs: ChapterValueView | null } | null>(null)
+  // With the list emptied, go back to inheriting (the field taken out) instead of saving [] (#138).
+  const [inherit, setInherit] = useState(false)
   const client = useQueryClient()
   const dirty = JSON.stringify(draft) !== initial
   const entry = draft.entries[0]
   const before = opened.set ? (opened.own ?? null) : undefined
+  const v = entry.value
+  const emptyList = v.kind === 'list' && v.items.length === 0
+  // What it would inherit without its own value, if that's something: then an emptied list offers it (#138).
+  const inheritable = view.default !== null && !(Array.isArray(view.default) && view.default.length === 0) ? view.default : null
+  const inheriting = inherit && emptyList && inheritable !== null
 
   // Focus goes to the first control when the form opens.
   useEffect(() => {
@@ -563,7 +572,7 @@ function FieldForm({
       return
     }
 
-    const changes = chapterFieldChanges(type, before, draft)
+    const changes = inheriting ? (opened.set ? [{ op: 'clear' as const }] : []) : chapterFieldChanges(type, before, draft)
     if (changes.length === 0) {
       onDone(null)
       return
@@ -573,7 +582,7 @@ function FieldForm({
   }
 
   if (conflict) {
-    const after = jsonOfField(type, draft).value
+    const after = inheriting ? undefined : jsonOfField(type, draft).value
     return (
       <Conflict
         title={`The file changed while you were editing ${view.name}`}
@@ -594,8 +603,6 @@ function FieldForm({
     )
   }
 
-  const v = entry.value
-  const emptyList = v.kind === 'list' && v.items.length === 0
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault()
@@ -650,14 +657,22 @@ function FieldForm({
         universe={target.universe}
         onChange={(value) => setDraft({ ...draft, entries: [{ ...entry, value }] })}
       />
-      {emptyList && (
+      {emptyList && inheritable === null && (
         <p className="muted" role="status">
-          No items: saving sets {view.name}: [], {target.noneWords}
-          {view.default !== null && !(Array.isArray(view.default) && view.default.length === 0)
-            ? `, in place of ${valueWords(view.default)} from ${defaultsWords(view.defaultFrom!, view.defaultFromKey)}`
-            : ''}
-          .{view.set ? ` To use the default instead, Cancel and choose ${target.clear}.` : ''}
+          No items: saving sets {view.name}: [], {target.noneWords}.
         </p>
+      )}
+      {emptyList && inheritable !== null && (
+        <InheritChoice
+          name={view.name}
+          was={before === undefined ? inheritable : before}
+          value={valueWords(inheritable)}
+          from={`${view.defaultFrom} default`}
+          none={target.noneWords}
+          noneChoice={target.noneChoice}
+          inheriting={inheriting}
+          onToggle={() => setInherit(!inheriting)}
+        />
       )}
       {problems.length > 0 && (
         <ul className="problems" role="alert">
@@ -677,6 +692,53 @@ function FieldForm({
         <span className="muted">Ctrl+Enter (⌘+Enter) saves, Escape cancels.</span>
       </p>
     </form>
+  )
+}
+
+/**
+ * An emptied list's outcome, shown before saving, with the other choice a
+ * click away (#138): "pov: ~~Mara~~ → none in this chapter · use book
+ * default (Voss) instead". Saving [] ("none here", #132) is the default;
+ * the other takes the field out, so it inherits.
+ */
+function InheritChoice({
+  name,
+  was,
+  value,
+  from,
+  none,
+  noneChoice,
+  inheriting,
+  onToggle,
+}: {
+  name: string
+  was: Json | null
+  /** The inherited value in words, and where it's from: "book default". */
+  value: string
+  from: string
+  none: string
+  noneChoice: string
+  inheriting: boolean
+  onToggle: () => void
+}) {
+  const wasShown = Array.isArray(was) && was.length === 0 ? null : valueWords(was)
+  return (
+    <p className="inherit-choice">
+      <span role="status">
+        {name}:{' '}
+        {wasShown && (
+          <>
+            <del>{wasShown}</del> →{' '}
+          </>
+        )}
+        <strong>{inheriting ? `${value} (${from})` : none}</strong>
+        <span className="visually-hidden">{inheriting ? `. Saving takes ${name} out, so it inherits.` : `. Saving sets ${name}: [].`}</span>
+      </span>{' '}
+      ·{' '}
+      <button type="button" className="link-button" onClick={onToggle}>
+        {inheriting ? `${noneChoice} instead` : `use ${from} (${value}) instead`}
+      </button>
+    </p>
   )
 }
 
@@ -709,6 +771,7 @@ export function ChapterFieldsSection({ universe, book, chapter, label }: { unive
     where: label,
     clear: 'Use the default',
     noneWords: 'none in this chapter',
+    noneChoice: 'none in this chapter',
     save: (field, changes, expectedHash) => editChapterField({ universe, book, chapter, field, changes, expectedHash }),
     reload: async () => {
       const now = await client.fetchQuery({ ...bookChapterFieldsQuery(universe, book), staleTime: 0 })
@@ -745,6 +808,7 @@ export function ChapterDefaultsSection({ scope, name }: { scope: DefaultsScope; 
     where: 'the chapters below that set none of their own',
     clear: 'Clear',
     noneWords: 'none, for the chapters below that set none of their own',
+    noneChoice: 'none here',
     save: (field, changes, expectedHash) => editChapterDefault({ ...scope, field, changes, expectedHash }),
     reload: async () => {
       const now = await client.fetchQuery({ ...chapterDefaultsQuery(scope), staleTime: 0 })

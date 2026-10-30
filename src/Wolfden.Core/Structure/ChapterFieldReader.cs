@@ -140,7 +140,7 @@ internal sealed class ChapterFieldReader(DenStructure den, Universe universe)
                 return result;
             case var node:
                 Warn(book.FilePath, "F-CHAP-3", node.Line,
-                    $"The fields of chapter {chapter} must be a mapping from chapter field to value, such as '{{ pov: \"[[mara-voss]]\" }}', so they're ignored.");
+                    $"The fields of chapter {chapter} must be a mapping from chapter field to value, such as '{{ pov: \"[[name-of-the-character]]\" }}', so they're ignored.");
                 return result;
         }
     }
@@ -230,8 +230,9 @@ internal sealed class ChapterFieldReader(DenStructure den, Universe universe)
         }
     }
 
-    private static string Reasons(IEnumerable<ValueProblem> problems) =>
-        string.Join(" ", problems.Select(p => p.Message).Distinct(StringComparer.Ordinal));
+    // A reason may be read at a story position (?at=), so its example links
+    // are placeholders, never a note the reader may not have met (#240).
+    private static string Reasons(IEnumerable<ValueProblem> problems) => FieldValues.Summarize(problems);
 
     private void Warn(string path, string rule, int? line, string message) =>
         den.Add(path, new Diagnostic(rule, DiagnosticSeverity.Warning, line, message));

@@ -198,7 +198,7 @@ public sealed partial class DenTools
 
         if (json.ValueKind != JsonValueKind.Object)
         {
-            throw new DenToolException(ToolErrorCodes.BadArgument, "'fields' is an object from chapter field name to value, such as {\"pov\": [\"[[mara-voss]]\"]}.");
+            throw new DenToolException(ToolErrorCodes.BadArgument, "'fields' is an object from chapter field name to value, such as {\"pov\": [\"[[name-of-the-character]]\"]}.");
         }
 
         var result = new YamlMappingValue();

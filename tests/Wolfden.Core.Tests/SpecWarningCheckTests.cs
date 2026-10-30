@@ -135,6 +135,31 @@ public class SpecWarningCheckTests
         Assert.Contains("calendar", Message(check, "F-FT-11"), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void ARefWarningsExampleLinkIsTheFirstNoteByNameOfTheFieldsTypeInTheDen()
+    {
+        // #240: the example is a note of this den, of a type the field takes.
+        var source = Den("packs: [fleet]\n")
+            .With("packs/fleet/pack.yaml", "name: Fleet\n")
+            .With("packs/fleet/types/ship.yaml", Ship);
+        Note(source, A1, "zara-quell", Character("Zara Quell"));
+        Note(source, A1, "orrin-fell", Character("Orrin Fell"));
+        Note(source, A1, "kestrel", "type: ship\nname: Kestrel\nstatus: canon\nfields:\n  captain: Orrin Fell", folder: "ships");
+
+        Assert.Contains("such as \"[[orrin-fell]]\", in quotes", Message(DenCheck.Run(source), "F-FT-9"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ARefWarningWithNoNoteOfTheFieldsTypeHasAPlaceholderExample()
+    {
+        var source = Den("packs: [fleet]\n")
+            .With("packs/fleet/pack.yaml", "name: Fleet\n")
+            .With("packs/fleet/types/ship.yaml", Ship);
+        Note(source, A1, "kestrel", "type: ship\nname: Kestrel\nstatus: canon\nfields:\n  captain: Orrin Fell", folder: "ships");
+
+        Assert.Contains("such as \"[[name-of-the-character]]\", in quotes", Message(DenCheck.Run(source), "F-FT-9"), StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("species: \"[[velari]]\"")]
     [InlineData("species: ~")]

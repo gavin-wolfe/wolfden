@@ -15,7 +15,15 @@ namespace Wolfden.Core.Types;
 /// True for a warning that doesn't make the value a mismatch, such as a
 /// date's <c>calendar</c> key (types.md F-FT-11): the value is still read.
 /// </param>
-public sealed record ValueProblem(string RuleId, int Line, string Message, YamlNode Node, bool IsAdvisory = false);
+public sealed record ValueProblem(string RuleId, int Line, string Message, YamlNode Node, bool IsAdvisory = false)
+{
+    /// <summary>
+    /// For a message of the form "<c>{Stem}, not '{Written}'.{Suffix}</c>",
+    /// its parts, so the problems of several list items can be said in one
+    /// sentence (<see cref="FieldValues.Summarize"/>); null otherwise.
+    /// </summary>
+    internal (string Stem, string Written, string Suffix)? Parts { get; init; }
+}
 
 /// <summary>The result of checking a plain value against a field definition (types.md §5.2, §5.3).</summary>
 public sealed class ValueCheck
@@ -65,7 +73,10 @@ public static partial class FieldValues
     /// <paramref name="field"/>. For an entry or a temporal list, check each
     /// entry's <c>value</c>.
     /// </summary>
-    public static ValueCheck Check(FieldDefinition field, YamlNode value)
+    /// <param name="field">The field's definition.</param>
+    /// <param name="value">The value as written.</param>
+    /// <param name="examples">Where a ref field's message takes its example link from; placeholders if null (#240).</param>
+    public static ValueCheck Check(FieldDefinition field, YamlNode value, ExampleLinks? examples = null)
     {
         ArgumentNullException.ThrowIfNull(field);
         ArgumentNullException.ThrowIfNull(value);
@@ -78,7 +89,7 @@ public static partial class FieldValues
 
         if (!field.IsList)
         {
-            if (CheckItem(field, value, problems))
+            if (CheckItem(field, value, problems, examples ?? ExampleLinks.Placeholders))
             {
                 items.Add(value);
             }
@@ -99,7 +110,7 @@ public static partial class FieldValues
                 problems.Add(new ValueProblem("F-FT-12", item.Line,
                     $"{field.Name} has a list inside its list, and there are no lists of lists.{ItemQuoteHint(field, item)}", item));
             }
-            else if (CheckItem(field, item, problems))
+            else if (CheckItem(field, item, problems, examples ?? ExampleLinks.Placeholders))
             {
                 items.Add(item);
             }
@@ -153,11 +164,45 @@ public static partial class FieldValues
         return links.Count == 1 && links[0].Text.Length == trimmed.Length;
     }
 
-    private static bool CheckItem(FieldDefinition field, YamlNode node, List<ValueProblem> problems)
+    /// <summary>
+    /// The messages of <paramref name="problems"/> as sentences, with
+    /// problems that differ only in what was written said once, naming each
+    /// value, such as "… not 'Plain text' or 'Other'." (#240).
+    /// </summary>
+    public static string Summarize(IEnumerable<ValueProblem> problems)
+    {
+        ArgumentNullException.ThrowIfNull(problems);
+        var sentences = new List<string>();
+        foreach (var group in problems.GroupBy(p => p.Parts is { } parts ? (p.RuleId, parts.Stem, parts.Suffix) : (p.RuleId, p.Message, (string?)null)))
+        {
+            var written = group.Where(p => p.Parts is not null).Select(p => $"'{p.Parts!.Value.Written}'").Distinct(StringComparer.Ordinal).ToList();
+            sentences.Add(written.Count == 0
+                ? group.Key.Item2
+                : $"{group.Key.Item2}, not {Or(written)}.{group.Key.Item3}");
+        }
+
+        return string.Join(" ", sentences.Distinct(StringComparer.Ordinal));
+    }
+
+    private static string Or(List<string> items) => items.Count switch
+    {
+        1 => items[0],
+        2 => $"{items[0]} or {items[1]}",
+        _ => $"{string.Join(", ", items.Take(items.Count - 1))}, or {items[^1]}",
+    };
+
+    private static bool CheckItem(FieldDefinition field, YamlNode node, List<ValueProblem> problems, ExampleLinks examples)
     {
         var before = problems.Count(p => !p.IsAdvisory);
         var name = field.Name;
         void Problem(string rule, string message) => problems.Add(new ValueProblem(rule, node.Line, message, node));
+
+        // A message "{stem}, not '{what was written}'.{suffix}", which Summarize can group.
+        void Mismatch(string rule, string stem, string suffix = "")
+        {
+            var written = Describe(node);
+            problems.Add(new ValueProblem(rule, node.Line, $"{stem}, not '{written}'.{suffix}", node) { Parts = (stem, written, suffix) });
+        }
 
         switch (field.Kind)
         {
@@ -182,14 +227,14 @@ public static partial class FieldValues
             case FieldKind.Number:
                 if (node is not YamlScalar { Style: YamlScalarStyle.Plain } number || !IsNumber(number.Text))
                 {
-                    Problem("F-FT-6", $"{name} is a number, such as 140 or 2.5, not '{Describe(node)}'. Don't quote it.");
+                    Mismatch("F-FT-6", $"{name} is a number, such as 140 or 2.5", " Don't quote it.");
                 }
 
                 break;
             case FieldKind.Bool:
                 if (node is not YamlScalar b || b.AsBoolean() is null)
                 {
-                    Problem("F-FT-7", $"{name} is true or false, not '{Describe(node)}'.");
+                    Mismatch("F-FT-7", $"{name} is true or false");
                 }
 
                 break;
@@ -200,15 +245,14 @@ public static partial class FieldValues
                 if (node is not YamlScalar e || field.MatchEnum(e.Text) is null)
                 {
                     var suggestion = node is YamlScalar written ? Suggest(field, written.Text) : null;
-                    Problem("F-FT-8", $"{name} is one of {string.Join(", ", field.Values)}, not '{Describe(node)}'."
-                        + (suggestion is null ? "" : $" Did you mean '{suggestion}'?"));
+                    Mismatch("F-FT-8", $"{name} is one of {string.Join(", ", field.Values)}", suggestion is null ? "" : $" Did you mean '{suggestion}'?");
                 }
 
                 break;
             case FieldKind.Ref:
                 if (node is not YamlScalar r || !IsSingleLink(r.Text))
                 {
-                    Problem("F-FT-9", $"{name} is a link to one entity, such as \"{ExampleLink(field)}\", in quotes, with nothing else in the string, not '{Describe(node)}'.{QuoteHint(field, node)}");
+                    Mismatch("F-FT-9", $"{name} is a link to one entity, such as \"{examples.For(field)}\", in quotes, with nothing else in the string", QuoteHint(field, node));
                 }
 
                 break;
@@ -396,17 +440,6 @@ public static partial class FieldValues
 
         return previous[b.Length];
     }
-
-    /// <summary>An example link for a ref field's message, to a note of a type the field takes.</summary>
-    private static string ExampleLink(FieldDefinition field) =>
-        field.To is not { Count: > 0 } to || to.Contains("character")
-            ? "[[mara-voss]]"
-            : to[0] switch
-            {
-                "location" => "[[kessan-reach]]",
-                "faction" => "[[the-compact]]",
-                var type => $"[[name-of-the-{type}]]",
-            };
 
     /// <summary>F-FLD-6: an unquoted <c>[[x]]</c> is a list inside a list.</summary>
     private static string QuoteHint(FieldDefinition field, YamlNode node) =>

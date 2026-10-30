@@ -29,11 +29,18 @@ internal static class ContinuityChecks
     {
         var diagnostics = new List<DenDiagnostic>();
         var bookkeeping = new Bookkeeping(catalog.Structure.BookkeepingSections);
+        // A warning's example link is to a note of the same universe (#240).
+        var examples = new Dictionary<Universe, ExampleLinks>();
         foreach (var entity in catalog.Entities)
         {
             var found = new List<Diagnostic>();
             CheckType(entity, source, found);
-            FieldChecks.Run(entity, rows, found);
+            if (!examples.TryGetValue(entity.Universe, out var links))
+            {
+                links = examples[entity.Universe] = new ExampleLinks(catalog.InUniverse(entity.Universe));
+            }
+
+            FieldChecks.Run(entity, rows, found, links);
             CheckPositions(entity.Universe, PositionScanner.Scan(entity.File, entity.Definition?.PositionFields), found);
             CheckFrom(entity, found);
             var facts = EntityFacts.For(entity, bookkeeping);

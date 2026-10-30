@@ -21,7 +21,11 @@ internal static class FieldChecks
 {
     private static readonly HashSet<string> EntryKeys = new(StringComparer.Ordinal) { "value", "from", "until", "status", "pin" };
 
-    public static void Run(CatalogEntity entity, RowIndex rows, List<Diagnostic> found)
+    /// <param name="entity">The entity.</param>
+    /// <param name="rows">The den's row ids.</param>
+    /// <param name="found">Where to add the warnings.</param>
+    /// <param name="examples">Where a ref field's warning takes its example link from: the notes of the entity's universe (#240), or placeholders if null.</param>
+    public static void Run(CatalogEntity entity, RowIndex rows, List<Diagnostic> found, ExampleLinks? examples = null)
     {
         if (entity.File.Frontmatter?["fields"] is not YamlMapping fields)
         {
@@ -79,7 +83,7 @@ internal static class FieldChecks
                     default:
                         if (definition is not null)
                         {
-                            CheckValue(name, definition, value, found);
+                            CheckValue(name, definition, value, found, examples);
                         }
 
                         break;
@@ -155,9 +159,9 @@ internal static class FieldChecks
     }
 
     /// <summary>F-FLD-3 with types.md §5.2: a value that doesn't match its field type.</summary>
-    private static void CheckValue(string name, FieldDefinition definition, YamlNode value, List<Diagnostic> found)
+    private static void CheckValue(string name, FieldDefinition definition, YamlNode value, List<Diagnostic> found, ExampleLinks? examples)
     {
-        foreach (var problem in FieldValues.Check(definition, value).Problems)
+        foreach (var problem in FieldValues.Check(definition, value, examples).Problems)
         {
             var message = problem.Message.StartsWith(name, StringComparison.Ordinal) ? problem.Message : $"{name}: {problem.Message}";
             found.Add(new Diagnostic(problem.RuleId, DiagnosticSeverity.Warning, problem.Line, message));

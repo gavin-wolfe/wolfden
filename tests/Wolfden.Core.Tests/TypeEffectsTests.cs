@@ -301,9 +301,32 @@ public class TypeEffectsTests
 
         var warning = Assert.Single(den.Diagnostics);
         Assert.Equal(("F-CHAP-3", 4), (warning.Diagnostic.RuleId, warning.Diagnostic.Line!.Value));
-        // The example link is to a location, the type setting takes.
-        Assert.Contains("such as \"[[kessan-reach]]\"", warning.Diagnostic.Message, StringComparison.Ordinal);
+        // The example link is a placeholder for a location, the type setting
+        // takes: the reason may be read at a story position, so it names no note (#240).
+        Assert.Contains("such as \"[[name-of-the-location]]\"", warning.Diagnostic.Message, StringComparison.Ordinal);
         Assert.False(den.FindUniverse("starfall")!.FindBook("ember")!.FindChapter("1")!.Fields.ContainsKey("setting"));
+    }
+
+    [Fact]
+    public void AListWhoseItemsAllFailGivesItsReasonOnceNamingEachItem()
+    {
+        // #240: one sentence for the whole list, not the reason once per item.
+        var source = Den()
+            .With($"{Ember}/book.md", """
+                ---
+                name: Ember
+                chapters:
+                  - { key: "1", fields: { setting: [Plain text, Other, Plain text] } }
+                ---
+                """);
+
+        var chapter = DenStructure.Load(source).FindUniverse("starfall")!.FindBook("ember")!.FindChapter("1")!;
+
+        var ignored = Assert.Single(chapter.IgnoredFields);
+        Assert.Null(ignored.Item);
+        Assert.Equal(
+            "setting is a link to one entity, such as \"[[name-of-the-location]]\", in quotes, with nothing else in the string, not 'Plain text' or 'Other'.",
+            ignored.Reason);
     }
 
     [Fact]

@@ -92,11 +92,17 @@ public class EntityLookupEndpointTests
         Assert.Equal("lucys-three-proposals", (await First("lucys")).GetProperty("linkText").GetString());
         Assert.Equal(MinaId, (await First(MinaId)).GetProperty("linkText").GetString());
 
-        // [[Harker]] ties Jonathan with Quincey Harker (F-LINK-7), so it isn't offered as Jonathan's link.
+        // [[Harker]] ties Jonathan with Quincey Harker (F-LINK-7), so Jonathan is linked by his name instead.
         var harker = Matches(await server.GetJsonAsync("/api/entities/lookup?universe=dracula&query=harker&type=character", HttpStatusCode.OK))
             .Single(m => m.GetProperty("entity").GetProperty("name").GetString() == "Jonathan Harker");
         Assert.Equal("Harker", harker.GetProperty("alias").GetString());
-        Assert.Equal(JsonValueKind.Null, harker.GetProperty("linkText").ValueKind);
+        Assert.Equal("Jonathan Harker", harker.GetProperty("linkText").GetString());
+
+        // A name another note has too ties, so neither alias nor name will do: null.
+        den.Write("universes/dracula/entities/locations/harker-house.md", "---\ntype: location\nname: Jonathan Harker\n---\n");
+        var shadowed = Matches(await server.GetJsonAsync("/api/entities/lookup?universe=dracula&query=jonathan%20harker&type=character", HttpStatusCode.OK))[0];
+        Assert.Equal("Jonathan Harker", shadowed.GetProperty("entity").GetProperty("name").GetString());
+        Assert.Equal(JsonValueKind.Null, shadowed.GetProperty("linkText").ValueKind);
     }
 
     [Fact]
@@ -111,7 +117,9 @@ public class EntityLookupEndpointTests
             ["Mina Harker", "Mina and Jonathan marry", "The Count visits Mina"],
             Names(await server.GetJsonAsync("/api/entities/lookup?universe=dracula&query=mina&type=character,%20event", HttpStatusCode.OK)));
 
-        var error = await server.GetJsonAsync("/api/entities/lookup?universe=dracula&query=mina&type=charcter", HttpStatusCode.BadRequest);
+        // A type no enabled pack defines is skipped, as a ref field's to: skips it (F-FT-9); none known is refused.
+        Assert.Equal(["Mina Harker"], Names(await server.GetJsonAsync("/api/entities/lookup?universe=dracula&query=mina&type=character,vampire", HttpStatusCode.OK)));
+        var error = await server.GetJsonAsync("/api/entities/lookup?universe=dracula&query=mina&type=charcter,vampire", HttpStatusCode.BadRequest);
         Assert.Equal("unknown_type", error.GetProperty("code").GetString());
     }
 

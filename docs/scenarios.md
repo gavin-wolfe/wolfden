@@ -4662,9 +4662,12 @@ section, and remember Mina only as "Madam Mina" (#198).
   typed or pasted (ten characters or more) finds its note.
 - In a section, `[[madam` offers the same, and picking it writes
   `[[Madam Mina]]`: prose links by the text matched, a name or an alias.
-  Where that text would reach another note too (Quincey Harker sharing
-  Jonathan's alias "Harker"), it writes `[[jonathan-harker]]`, or the id
-  where the file name isn't sure either.
+  If Quincey Harker also had the alias "Harker", `[[harker` would write
+  `[[Jonathan Harker]]` for Jonathan: an alias that would reach another
+  note too gives way to the name, then to `[[jonathan-harker]]`, then to
+  the id. A note no link is sure to reach (no id, and a file name and
+  name another note could take) is offered with "add an id with Edit
+  file", and picking it writes nothing.
 - Reading as of chapter 1, an editor still offers Van Helsing, whom the
   reader meets at chapter 9: editing shows everything (#28). The
   lookup's `asOf`, which the editors don't send, offers only the notes
@@ -4683,8 +4686,11 @@ Spec: design.md §9 "Looking notes up by name and alias" (#198, #28,
   like every endpoint, and under `serve --universe` looks in the pinned
   universe and refuses another (or `*`).
 - A query with no letters or digits, a parameter it doesn't take (`q`),
-  a `limit` outside 1 to 100, an unknown `type`, and a blank `asOf` are
-  refused (`bad_argument`, `unknown_type`).
+  a `limit` outside 1 to 100, `type` naming no known type, and a blank
+  `asOf` are refused (`bad_argument`, `unknown_type`). A `type` list
+  with one type no pack enables (`character,vampire`, as a field's
+  `to` may have) skips it and looks among the rest. If the lookup
+  fails, the field's picker says so, and the link can still be typed.
 
 Spec: design.md §9 (#198, #23). Covered by:
 `EntityLookupEndpointTests.ALookupIsGuarded`,

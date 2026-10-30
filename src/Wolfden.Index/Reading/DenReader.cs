@@ -567,7 +567,15 @@ public sealed class DenReader
             var u = ChooseUniverse(db, universe, asOf, allowAll: false)!;
             if (types is { Count: > 0 })
             {
-                CheckTypes(db, u.Id, types, listUsed: asOf is null);
+                // As a ref field's to: does (types.md F-FT-9), a type no pack defines and no
+                // note uses is skipped; only when none of them is known is it refused.
+                var known = KnownTypes(db, u.Id, types);
+                if (known.Count == 0)
+                {
+                    CheckTypes(db, u.Id, types, listUsed: asOf is null);
+                }
+
+                types = known;
             }
 
             var met = asOf is null ? null : CanonView(index, u.Key, asOf, null).Entities.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
@@ -585,15 +593,17 @@ public sealed class DenReader
             // (F-LINK-6) across the universe. As of a position, among the notes met by then,
             // as get_entity matches a name there, so the answer says nothing of a later namesake.
             var among = met is null ? all : all.Where(e => met.Contains(e.Path)).ToList();
-            string? LinkTextOf(EntityRecord e, LookupMatch m)
+            // An alias that doesn't reach it alone gives way to its name.
+            string? LinkTextOf(EntityRecord e, LookupMatch m) => m.By switch
             {
-                var text = m.By switch
-                {
-                    "alias" => m.Alias,
-                    "slug" => e.Slug,
-                    "id" => e.Ulid,
-                    _ => e.Name,
-                };
+                "alias" => Reaching(e, m.Alias) ?? Reaching(e, e.Name),
+                "slug" => Reaching(e, e.Slug),
+                "id" => Reaching(e, e.Ulid),
+                _ => Reaching(e, e.Name),
+            };
+
+            string? Reaching(EntityRecord e, string? text)
+            {
                 if (text is null || text.Trim().Length == 0 || text.IndexOfAny(['[', ']', '|', '#', '\r', '\n']) >= 0)
                 {
                     return null;
@@ -831,6 +841,34 @@ public sealed class DenReader
                     (listUsed ? $" Types in use: {string.Join(", ", used.Order(StringComparer.Ordinal))}." : ""));
             }
         }
+    }
+
+    /// <summary>
+    /// The types of <paramref name="types"/> that an enabled pack defines or
+    /// an entity of the universe uses, as <see cref="CheckTypes"/> knows them, in order.
+    /// </summary>
+    public List<string> KnownTypes(IndexDbContext db, int universeId, IEnumerable<string> types)
+    {
+        ArgumentNullException.ThrowIfNull(db);
+        ArgumentNullException.ThrowIfNull(types);
+        var used = db.Entities.Where(e => e.UniverseId == universeId).Select(e => e.Type).Distinct().ToHashSet(StringComparer.Ordinal);
+        HashSet<string>? defined = null;
+        var known = new List<string>();
+        foreach (var type in types)
+        {
+            if (!used.Contains(type))
+            {
+                defined ??= DenStructure.Load(Root).Types.Types.Select(t => t.Key).ToHashSet(StringComparer.Ordinal);
+                if (!defined.Contains(type))
+                {
+                    continue;
+                }
+            }
+
+            known.Add(type);
+        }
+
+        return known;
     }
 
     /// <summary>Refuses a <c>limit</c> outside 1 to <paramref name="max"/>.</summary>

@@ -4,11 +4,11 @@ import { EditorView, keymap, placeholder as placeholderText } from '@codemirror/
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
 import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
-import { autocompletion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete'
+import { autocompletion, type Completion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete'
 import { useQuery } from '@tanstack/react-query'
 import { entitiesQuery } from '../api'
 import { linkFor } from '../fieldModel'
-import { lookupable, lookupEntities, matchLabel, type LookupResult } from '../lookupApi'
+import { lookupable, lookupEntities, matchLabel, noSureLink, type LookupResult } from '../lookupApi'
 
 /**
  * A Markdown source editor (#28): CodeMirror 6, with Markdown highlighting
@@ -117,12 +117,14 @@ export function editorViewIn(element: Element | null): EditorView | null {
  * the lookup (#198), whatever the story position (#28). Prose stays
  * readable: a pick is linked by the text it matched, `[[Mina Harker]]` for a
  * name and `[[Madam Mina]]` for an alias (shown "as Madam Mina"), where the
- * lookup says that reaches only this note (`linkText`). Otherwise it's linked
- * as the field pickers link it (`linkFor`): `[[slug]]`, or `[[id]]`. A note
- * no link is sure to reach is linked by its name, as written, for
- * `wolfden check` to flag.
+ * lookup says that reaches only this note (`linkText`; for an alias that
+ * doesn't, the name if that does). Otherwise it's linked as the field
+ * pickers link it (`linkFor`): `[[slug]]`, or `[[id]]`. A note no link is
+ * sure to reach is offered with the field picker's hint (add an id) and
+ * inserts nothing, since a link by its name could quietly reach another note.
  * `others` gives the universe's notes when they're known, null if not.
  */
+
 export function noteLinks(universe: string, others: () => readonly { path: string; name?: string }[] | null) {
   return async (context: CompletionContext): Promise<CompletionResult | null> => {
     const before = context.matchBefore(/\[\[[^[\]|#\n]*$/)
@@ -148,11 +150,16 @@ export function noteLinks(universe: string, others: () => readonly { path: strin
 
     const closed = context.state.sliceDoc(context.pos, context.pos + 2) === ']]'
     const notes = others()
-    const options = result.matches.map((hit) => {
+    const options = result.matches.map((hit): Completion => {
       const { name, alias } = matchLabel(hit)
-      const link = hit.linkText === null ? linkFor(hit.entity, notes) : null
-      const text = hit.linkText ?? (link === null ? hit.entity.name.trim() : link.slice(2, -2))
-      return { label: name, detail: alias !== null ? `as ${alias} · ${hit.entity.type}` : hit.entity.type, apply: closed ? text : `${text}]]` }
+      const detail = alias !== null ? `as ${alias} · ${hit.entity.type}` : hit.entity.type
+      const text = hit.linkText ?? linkFor(hit.entity, notes)?.slice(2, -2) ?? null
+      if (text === null) {
+        // No link is sure to reach it: never write one that may reach another note. Picking it leaves the text as typed.
+        return { label: name, detail: `${detail} · no sure link`, info: noSureLink(name), apply: () => {} }
+      }
+
+      return { label: name, detail, apply: closed ? text : `${text}]]` }
     })
     return { from: before.from + 2, options, filter: false }
   }

@@ -2,7 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type R
 import { useQuery } from '@tanstack/react-query'
 import { STATUSES, entitiesQuery, type PositionView } from '../api'
 import { EditError, postEdit, sourceQuery, type EntitySource, type SourceFieldType } from '../editApi'
-import { lookupable, lookupEntities, matchLabel } from '../lookupApi'
+import { lookupable, lookupEntities, matchLabel, noSureLink } from '../lookupApi'
 import {
   controlId,
   fieldChanges,
@@ -877,6 +877,8 @@ function RefInput({
     queryFn: () => lookupEntities(universe, words, { types: to }),
     enabled: searchable,
     staleTime: 30_000,
+    // A refusal won't change on asking again; say so at once.
+    retry: false,
   })
   const options = lookup.data?.matches ?? []
   const listId = `${id}-options`
@@ -889,7 +891,7 @@ function RefInput({
     setOpen(false)
     if (link === null) {
       // No link is sure to reach it: never write one that's broken or reaches another note.
-      setRefused(`“${entity.name}” has no id, and no link by its file name or name is sure to reach it. Add an id with Edit file on that note, then pick it again.`)
+      setRefused(noSureLink(entity.name))
       return
     }
 
@@ -942,6 +944,11 @@ function RefInput({
       {refused && (
         <span className="problem" role="alert">
           {refused}
+        </span>
+      )}
+      {searchable && lookup.isError && (
+        <span className="problem" role="status">
+          Couldn’t look notes up: {lookup.error.message} You can still type the link in full.
         </span>
       )}
       {showing && (

@@ -1765,11 +1765,14 @@ docs/
     for the words typed so far. Prose stays readable as plain Markdown,
     so a pick is linked by the text it matched: `[[Mina Harker]]` for a
     name, `[[Madam Mina]]` for an alias (aliases resolve like names,
-    F-LINK-6). Only where that text wouldn't reach the picked note alone
-    (the lookup's `linkText`, resolved as links are) is it linked as a
-    `ref` field's picker links it, `[[slug]]` or `[[id]]`; a note no
-    link is sure to reach is linked by its name, for `wolfden check` to
-    flag. Preview uses the page's own
+    F-LINK-6). An alias that wouldn't reach the picked note alone gives
+    way to its name, if that would (the lookup's `linkText`, resolved as
+    links are); failing both, it's linked as a `ref` field's picker
+    links it, `[[slug]]` or `[[id]]`. A note no link is sure to reach is
+    offered with the picker's hint (add an id with Edit file) and picking
+    it inserts nothing: a link by its name could reach another note
+    cleanly, by a file name, with nothing for `wolfden check` to report.
+    Preview uses the page's own
     renderer, with links shown as written until the note is saved. One
     piece is edited at a time, and an editor opens only on the source
     fetched when it opened, never a cached answer. Leaving through the
@@ -1884,15 +1887,23 @@ docs/
     to the name, then to the file name or id, then to an alias; then a
     name that starts with the words, in order; a name that holds them;
     a file name that holds them; an alias that starts with them; an
-    alias that holds them; the start of the id. Ties go by name, then
+    alias that holds them; the start of the id. The exact tiers compare
+    as links do (F-LINK-4: case folded, accents kept), so `zoe arkwright`
+    isn't an exact match for Zoë Arkwright, and ranks as a name that
+    starts with the words. Ties go by name, then
     path. Each match says what matched (`matchedBy`: name, slug, id, or
     alias) and, for an alias, which one (`alias`), and gives `linkText`:
     that text where `[[text]]` reaches the note and no other, by the
     link resolver's tiers (F-LINK-6; a tie, F-LINK-7, has no file's scope
-    to break it, so it doesn't count), or null. As of a position, it's
+    to break it, so it doesn't count), or for an alias that doesn't, the
+    name where that does; otherwise null. As of a position, it's
     resolved among the notes met by then, as `get_entity` matches a name
     there. `type` is a type key,
-    or several separated by commas (a `ref` field's `to`); `limit` is 1
+    or several separated by commas (a `ref` field's `to`). A type no
+    enabled pack defines and no note uses is skipped, as `to` skips it
+    (types.md F-FT-9, a warning); only when none of them is known is the
+    lookup refused (`unknown_type`), and the picker then says it couldn't
+    look notes up rather than showing an empty list. `limit` is 1
     to 100, 20 by default, and `truncated` says more matched. The
     editors never send `asOf`: an editing surface shows everything
     (#28), so a field or section can link a note the reader meets later.

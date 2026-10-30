@@ -49,3 +49,8 @@ export function lookupEntities(
 export function matchLabel(hit: LookupHit): { name: string; alias: string | null } {
   return { name: hit.entity.name, alias: hit.matchedBy === 'alias' ? hit.alias : null }
 }
+
+/** Why a pick isn't linked: no link is sure to reach the note (`linkFor` gives none). */
+export function noSureLink(name: string): string {
+  return `“${name}” has no id, and no link by its file name or name is sure to reach it. Add an id with Edit file on that note, then pick it again.`
+}

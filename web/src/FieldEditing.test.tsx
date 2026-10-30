@@ -366,6 +366,10 @@ function stubFields(options: { onPost?: (post: Post, n: number) => Response | Wr
       // The server matches and ranks (#198); this stands in for it with each word typed starting a word.
       stub.calls.push(`${url.pathname}${url.search}`)
       const query = url.searchParams.get('query')!
+      if (query === 'boom') {
+        return Response.json({ code: 'unknown_type', message: "There's no type 'vampire'." }, { status: 400 })
+      }
+
       const typed = query.toLowerCase().split(/\s+/).filter((w) => w !== '')
       const has = (text: string) => typed.every((w) => text.toLowerCase().split(/\s+/).some((t) => t.startsWith(w)))
       const notes: [typeof mina, string[]][] = [[jonathan, []], [mina, ['Mina Murray', 'Madam Mina']], [year, []]]
@@ -724,6 +728,13 @@ describe('SC-WEB-65: field edits are guarded', () => {
 
     const lookups = calls.filter((c) => c.startsWith('/api/entities/lookup'))
     expect(lookups).toEqual(['/api/entities/lookup?query=jon&universe=dracula&type=character&limit=8'])
+
+    // A lookup that fails says so, rather than offering nothing (review of #239).
+    fireEvent.change(within(form).getByRole('combobox', { name: 'Value' }), { target: { value: 'boom' } })
+    expect((await within(form).findByRole('status')).textContent).toBe(
+      "Couldn’t look notes up: There's no type 'vampire'. You can still type the link in full.",
+    )
+    expect(within(form).queryByRole('listbox')).toBeNull()
   })
 
   it('refuses a pick no link is sure to reach, and says how to fix it', async () => {

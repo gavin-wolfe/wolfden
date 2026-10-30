@@ -62,6 +62,17 @@ describe('SC-WEB-78: [[ autocomplete looks notes up by name and alias', () => {
     expect((await complete('[[harker', null))?.options.map(apply)).toEqual(['E-JONATHAN]]'])
   })
 
+  it('writes no link for a note no link is sure to reach, and says to add an id', async () => {
+    // No id, and another note has the same file name: [[its name]] could reach that one (review of #239).
+    const twin = { ...jonathan, key: 'x/renfield.md', id: null, name: 'Renfield', path: 'x/renfield.md' }
+    stubLookup([{ entity: twin, matchedBy: 'name', alias: null, linkText: null }])
+
+    const option = (await complete('[[renf', [...entities, { path: 'y/Renfield.md', name: 'R. M. Renfield' }]))!.options[0]
+    expect(option.detail).toBe('character · no sure link')
+    expect(option.info).toContain('Add an id with Edit file')
+    expect(typeof option.apply).toBe('function')
+  })
+
   it('asks nothing until a letter or digit is typed after [[', async () => {
     const { calls } = stubLookup([])
     expect(await complete('[[')).toBeNull()

@@ -414,9 +414,10 @@ the pages don't have a form for it yet. The rules are in
   opening**. Edit opens the text as Markdown, as it's written in the
   file. Type `[[` and a few letters of a note's name or alias to pick a
   note to link to. The link is the text you matched, so it reads well:
-  `[[Mina Harker]]`, or `[[Madam Mina]]` if you typed her alias. Only
-  when that text could mean another note too does it use the file name
-  instead (`[[mina-harker]]`). Use
+  `[[Mina Harker]]`, or `[[Madam Mina]]` if you typed her alias. When
+  that text could mean another note too, it uses her name instead, or
+  failing that her file name (`[[mina-harker]]`). A note that no link
+  is sure to reach says to add an id with **Edit file** first. Use
   **Preview** to see it as the page shows it. **Save** (or Ctrl+Enter,
   ⌘+Enter on a Mac) saves; **Cancel** (or Escape) leaves it as it was.
   **Add section** adds one at the end or before another. Renaming a

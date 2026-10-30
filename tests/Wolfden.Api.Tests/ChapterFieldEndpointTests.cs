@@ -289,6 +289,21 @@ public sealed class ChapterFieldEndpointTests : IDisposable
             HttpStatusCode.BadRequest,
             "bad_argument",
             $"'pov' in chapter ember:prologue (Before the Dark) ({Ember}) has no item '[[nobody]]'. Reload the page to see its items as they are now.");
+
+        // So are a move and a replace of an item (#197), in the page's words.
+        await Refused(
+            "/api/chapter/edit",
+            new { book = "ember", universe = "starfall", chapter = "3", field = "tense", expectedHash = hash, changes = new object[] { new { op = "move", item = 0, index = 1 } } },
+            HttpStatusCode.BadRequest,
+            "bad_argument",
+            $"'tense' in chapter ember:3 ({Ember}) takes one value, not a list, so 'move' has no list item to move. To change it, edit the field and save the new value.");
+        await Refused(
+            "/api/chapter/edit",
+            new { book = "ember", universe = "starfall", chapter = "1", field = "pov", expectedHash = hash, changes = new object[] { new { op = "replace", item = 0, value = "[[halden-pike]]" } } },
+            HttpStatusCode.BadRequest,
+            "bad_argument",
+            $"Chapter ember:1 (Kessan Reach) ({Ember}) doesn't write 'pov', so 'replace' has no list item to change in place. It inherits 'pov' from chapter_defaults: " +
+            "to change it there, edit Chapter defaults on the page of the book, series, or universe that sets it; to give it a value of its own here, edit the field and save the whole value.");
         var seriesText = _den.Read(Series);
         _den.Write(Series, seriesText.Replace("{ tense: past }", "{ tense: past, setting: Kessan Reach }", StringComparison.Ordinal));
         var seriesHash = (await server.GetJsonAsync("/api/chapter-defaults?universe=starfall&series=long-dark", HttpStatusCode.OK)).GetProperty("hash").GetString();

@@ -2050,7 +2050,11 @@ The book's `chapter_defaults` give every chapter Mina's POV, and chapter
   ignoring case and spacing: `[[Mina]]` doesn't match
   `[[mina-harker]]`. A field named like the chapter's own keys (`key`)
   is refused (types.md F-CHAP-1). An item can also move (`move`) or be
-  changed (`replace`) in place, keeping its comments (SC-RT-17).
+  changed (`replace`) in place, keeping its comments (SC-RT-17). Either
+  is refused as `add` and `remove` are (#233) on a field that takes one
+  value, isn't written as a list, or has no such item; on a field the
+  chapter doesn't write, the refusal says it inherits it and where to
+  change it.
 
 Spec: format.md F-RT-6, types.md F-CHAP-5 (maintainer decisions,
 2026-10-23). Covered by:

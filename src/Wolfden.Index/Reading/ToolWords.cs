@@ -64,6 +64,13 @@ namespace Wolfden.Index.Reading;
 /// tool that reads them and <c>{1}</c> for the API path:
 /// <c>{0} lists its items; name one by its number from 0 in 'item'.</c>
 /// </param>
+/// <param name="NotWritten">
+/// What to do about a change of a chapter field's list items where the
+/// chapter (or container) doesn't write the field, so it inherits it (#197),
+/// as a sentence, with <c>{0}</c> for the field and <c>{1}</c> for where it
+/// inherits from (<c>chapter_defaults</c>):
+/// <c>It inherits '{0}' from {1}: to change it there, use update_chapter_defaults; to give it a value of its own here, send a 'set' change with the whole value.</c>
+/// </param>
 public sealed record ToolWords(
     string AllowRelinks, string NewName, string Slug, string Universe, string FindEntity, string CheckDen, string CheckTool, string CheckPath,
     string PinnedTo = "This session is pinned to universe '{0}' (wolfden mcp --universe)",
@@ -75,7 +82,8 @@ public sealed record ToolWords(
     string Unfreeze = "Ask the writer whether to unfreeze book '{0}'; only they can.",
     string ReplaceOrClear = "To replace it, send a 'set' change with the whole value; to {0}, send a 'clear' change.",
     string SetOne = "To change it, send a 'set' change with the new value.",
-    string ItemsListed = "{0} lists its items; name one by its number from 0 in 'item'.")
+    string ItemsListed = "{0} lists its items; name one by its number from 0 in 'item'.",
+    string NotWritten = "It inherits '{0}' from {1}: to change it there, use update_chapter_defaults; to give it a value of its own here, send a 'set' change with the whole value.")
 {
     /// <summary>The MCP tools' own words, the default.</summary>
     public static ToolWords Mcp { get; } = new(
@@ -96,6 +104,9 @@ public sealed record ToolWords(
 
     /// <summary><see cref="ItemsListed"/>, where the MCP tool <paramref name="tool"/> or the API's <paramref name="apiPath"/> reads the items.</summary>
     public string ListingItems(string tool, string apiPath) => string.Format(CultureInfo.InvariantCulture, ItemsListed, tool, apiPath);
+
+    /// <summary><see cref="NotWritten"/> for <paramref name="field"/>, inherited from <paramref name="from"/>.</summary>
+    public string Inheriting(string field, string from) => string.Format(CultureInfo.InvariantCulture, NotWritten, field, from);
 
     /// <summary><paramref name="words"/> with its first letter capitalized, to start a sentence.</summary>
     public static string Cap(string words) => words.Length == 0 ? words : char.ToUpperInvariant(words[0]) + words[1..];

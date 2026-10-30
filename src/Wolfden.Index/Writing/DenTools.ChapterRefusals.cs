@@ -89,13 +89,15 @@ public sealed partial class DenTools
     }
 
     /// <summary>The changes that work on a list field's items, which <see cref="CheckFieldShape"/> checks the list for.</summary>
-    private static readonly HashSet<string> ListItemOps = ["add", "remove"];
+    private static readonly HashSet<string> ListItemOps = ["add", "remove", "move", "replace"];
 
     /// <summary>What a change of a list's items can't do on a value that isn't a list, after "so".</summary>
     private static string NoList(string op) => op switch
     {
         "add" => "'add' has no list to add an item to",
         "remove" => "'remove' has no list item to take out",
+        "move" => "'move' has no list item to move",
+        "replace" => "'replace' has no list item to change in place",
         _ => $"'{op}' has no list item to change",
     };
 
@@ -132,14 +134,18 @@ public sealed partial class DenTools
         switch (file.GetFrontmatterValue(fieldPath))
         {
             case null when op.Op != "add":
-                throw new DenToolException(ToolErrorCodes.BadArgument, $"{ToolWords.Cap(place.Name)} ({place.Path}) doesn't write '{field}', so {NoList(op.Op)}.");
+                // A chapter inherits from chapter_defaults; a container's defaults from the containers above it.
+                var from = place.FieldsPath.Length > 1 ? "chapter_defaults" : "the chapter_defaults above it";
+                throw new DenToolException(
+                    ToolErrorCodes.BadArgument,
+                    $"{ToolWords.Cap(place.Name)} ({place.Path}) doesn't write '{field}', so {NoList(op.Op)}. {Words.Inheriting(field, from)}");
             case YamlScalar { IsNull: true } when op.Op != "add":
                 throw new DenToolException(
                     ToolErrorCodes.BadArgument,
                     $"{at} is written with no value, so {NoList(op.Op)}. {Words.Replacing(place.ClearTo, place.ClearButton)}");
             case null or YamlScalar { IsNull: true }:
                 return;
-            case YamlSequence:
+            case YamlSequence list:
                 if (op.Op == "remove")
                 {
                     try
@@ -150,6 +156,12 @@ public sealed partial class DenTools
                     {
                         throw new DenToolException(e.Code, $"{Reworded(place, field, e.Message)} {Words.ListingItems(place.ReadTool, place.ReadPath)}");
                     }
+                }
+                else if (op.Op is "move" or "replace" && op.Item is { } item && item >= list.Items.Count)
+                {
+                    throw new DenToolException(
+                        ToolErrorCodes.BadArgument,
+                        $"{at} has {list.Items.Count} item(s), so there's no item {item} to {op.Op}. {Words.ListingItems(place.ReadTool, place.ReadPath)}");
                 }
 
                 return;

@@ -45,6 +45,7 @@ public static class ReadEndpoints
     {
         Unfreeze = "POST /api/book/unfreeze opens book '{0}' for editing again.",
         ItemsListed = "GET {1} lists its items; name one by its number from 0 in 'item'.",
+        NotWritten = "It inherits '{0}' from {1}: to change it there, POST /api/chapter-defaults/edit; to give it a value of its own here, send a 'set' change with the whole value.",
     };
 
     /// <summary>Maps the read endpoints onto <paramref name="api"/>.</summary>

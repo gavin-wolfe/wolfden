@@ -359,3 +359,20 @@ public sealed record HistoryDiffView(string From, string? To, IReadOnlyList<Hist
 /// <param name="Change">How it changed.</param>
 /// <param name="Patch">The change as a unified diff.</param>
 public sealed record HistoryFileDiffView(HistoryChangeView Change, string Patch);
+
+/// <summary>A note a lookup found (#198).</summary>
+/// <param name="Entity">The note.</param>
+/// <param name="MatchedBy">What matched what was typed: name, slug, id, or alias.</param>
+/// <param name="Alias">The alias that matched, for an alias match; otherwise null.</param>
+public sealed record LookupHit(EntitySummary Entity, string MatchedBy, string? Alias);
+
+/// <summary>The result of a lookup by name and alias (#198).</summary>
+/// <param name="Version">The shape version.</param>
+/// <param name="Universe">The universe looked in.</param>
+/// <param name="Query">What was typed.</param>
+/// <param name="Position">The position only notes met by were looked at, or null for every note.</param>
+/// <param name="Count">How many matches this result holds.</param>
+/// <param name="Truncated">True if more notes matched than <c>limit</c>.</param>
+/// <param name="Matches">The matches, best first.</param>
+public sealed record LookupResult(
+    int Version, string Universe, string Query, string? Position, int Count, bool Truncated, IReadOnlyList<LookupHit> Matches);

@@ -539,6 +539,60 @@ public sealed class DenReader
     }
 
     /// <summary>
+    /// The notes of one universe whose name, alias, slug, or id matches what
+    /// was typed (#198), for a link picker: each word typed starts a word of
+    /// it, ignoring case and accents, ranked as <see cref="EntityLookup.Match"/>
+    /// ranks them, then by name and path. <paramref name="types"/> narrows
+    /// them to those types (a ref field's <c>to</c>).
+    /// </summary>
+    /// <remarks>
+    /// The editors don't give <paramref name="asOf"/>: an editing surface
+    /// shows everything (#28). With it, only the notes the reader has met by
+    /// then are looked at (#26). Aliases aren't positional (format.md §9.5),
+    /// so a met note matches by any of them.
+    /// </remarks>
+    public LookupResult LookupEntities(
+        string query, string? universe = null, IReadOnlyList<string>? types = null, string? asOf = null, int limit = 20)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        if (SearchWords.Tokens(query).Count == 0)
+        {
+            throw new DenToolException(ToolErrorCodes.BadArgument, "Give a few letters of a note's name, alias, or file name in 'query'.");
+        }
+
+        CheckLimit(limit, 100);
+        return WithIndex(index =>
+        {
+            var db = index.Context;
+            var u = ChooseUniverse(db, universe, asOf, allowAll: false)!;
+            if (types is { Count: > 0 })
+            {
+                CheckTypes(db, u.Id, types, listUsed: asOf is null);
+            }
+
+            var met = asOf is null ? null : CanonView(index, u.Key, asOf, null).Entities.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
+            var entities = db.Entities.Where(e => e.UniverseId == u.Id).ToList()
+                .Where(e => types is not { Count: > 0 } || types.Contains(e.Type))
+                .Where(e => met is null || met.Contains(e.Path))
+                .ToList();
+            var ids = entities.Select(e => e.Id).ToList();
+            var aliases = db.Aliases.Where(a => ids.Contains(a.EntityId)).ToList()
+                .OrderBy(a => a.Order).ToLookup(a => a.EntityId, a => a.Alias);
+            var matches = entities
+                .Select(e => (Entity: e, Match: EntityLookup.Match(query, e.Name, e.Slug, e.Ulid, aliases[e.Id].ToList())))
+                .Where(x => x.Match is not null)
+                .OrderBy(x => x.Match!.Rank)
+                .ThenBy(x => x.Entity.NameNormalized, StringComparer.Ordinal)
+                .ThenBy(x => x.Entity.Path, StringComparer.Ordinal)
+                .ToList();
+            var universes = new Dictionary<int, string> { [u.Id] = u.Key };
+            var scopes = Scopes(db);
+            var shown = matches.Take(limit).Select(x => new LookupHit(Summary(x.Entity, universes, scopes), x.Match!.By, x.Match.Alias)).ToList();
+            return new LookupResult(ResultVersion, u.Key, query, asOf, shown.Count, matches.Count > limit, shown);
+        });
+    }
+
+    /// <summary>
     /// The canon-as-of view of a universe at <paramref name="position"/>, or
     /// at the end of the story (all canon so far): pinned canon first
     /// (F-VIEW-2), then every entity the reader has met by then with the

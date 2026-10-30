@@ -245,6 +245,66 @@ public class TypeEffectsTests
     }
 
     [Fact]
+    [Trait("Scenario", "SC-CHECK-42")]
+    public void ASettingLinksAChapterToItsPlacesAndInherits()
+    {
+        // types.md §9.2: setting is a list of refs to location, set once in
+        // chapter_defaults or per chapter like any chapter field.
+        var source = Den()
+            .Entity(Starfall, "kessan-reach", "type: location\nname: Kessan Reach\nstatus: canon", folder: "locations")
+            .Entity(Starfall, "the-drift", "type: location\nname: The Drift\nstatus: canon", folder: "locations")
+            .Entity(Starfall, "voss", Character("Voss"))
+            .With($"{LongDark}/series.md", "---\nname: The Long Dark\nbooks: [ember, ash]\nchapter_defaults: { setting: \"[[kessan-reach]]\", when: \"2291\" }\n---\n")
+            .With($"{Ember}/book.md", """
+                ---
+                name: Ember
+                chapters:
+                  - { key: prologue, fields: { when: "2284", setting: ["[[the-drift]]", "[[kessan-reach]]"] } }
+                  - { key: "1" }
+                  - { key: "2", fields: { setting: [] } }
+                  - { key: "3", fields: { setting: ["[[voss]]"] } }
+                ---
+                """);
+
+        var index = LinkIndex.Load(source);
+        var ember = index.Catalog.Structure.FindUniverse("starfall")!.FindBook("ember")!;
+        string? Text(string chapter, string field) => ember.FindChapter(chapter)!.Fields.TryGetValue(field, out var v) ? v.IsNone ? "none" : string.Join(",", v.Items) : null;
+
+        Assert.Empty(index.Catalog.Structure.Diagnostics);
+        Assert.Equal(("[[the-drift]],[[kessan-reach]]", "2284"), (Text("prologue", "setting"), Text("prologue", "when")));
+        Assert.Equal(("[[kessan-reach]]", "2291"), (Text("1", "setting"), Text("1", "when")));
+        Assert.Equal(ember.Series, ember.FindChapter("1")!.Fields["setting"].DefaultFrom);
+        Assert.Equal("none", Text("2", "setting"));
+        // A setting that links to a character, not a place, is a type warning.
+        var warning = Assert.Single(index.Diagnostics);
+        Assert.Equal(("F-LINK-11", 7), (warning.Diagnostic.RuleId, warning.Diagnostic.Line!.Value));
+        Assert.Contains("setting is a ref to location", warning.Diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-CHECK-42")]
+    public void ASettingWrittenAsPlainTextBeforeCoreHadOneIsIgnoredWithAWarning()
+    {
+        // A den that wrote setting as prose before core defined it: the value
+        // is now checked as a link to a location (F-CHAP-3), so it's a
+        // warning and the chapter inherits, as for any value that doesn't match.
+        var source = Den()
+            .With($"{Ember}/book.md", """
+                ---
+                name: Ember
+                chapters:
+                  - { key: "1", fields: { setting: Kessan Reach } }
+                ---
+                """);
+
+        var den = DenStructure.Load(source);
+
+        var warning = Assert.Single(den.Diagnostics);
+        Assert.Equal(("F-CHAP-3", 4), (warning.Diagnostic.RuleId, warning.Diagnostic.Line!.Value));
+        Assert.False(den.FindUniverse("starfall")!.FindBook("ember")!.FindChapter("1")!.Fields.ContainsKey("setting"));
+    }
+
+    [Fact]
     public void ToNamingATypeThatIsntEnabledSkipsIt()
     {
         var source = Den(denYaml: "packs: [starfall]\n")

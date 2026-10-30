@@ -1026,7 +1026,7 @@ public sealed class WriteToolTests : IDisposable
         _den.Write(BookFile, _den.Read(BookFile)
             .Replace("chapter_defaults:\n  narration: first\n  tense: past\n", "chapter_defaults:\n  # always first person\n  narration: first\n  pov:\n    # the usual\n    - \"[[mina-harker]]\"\n", StringComparison.Ordinal)
             .Replace(
-                "    fields:\n      pov: [\"[[jonathan-harker]]\"]\n      when: { text: \"3–5 May\", sort: [0, 5, 3] }\n",
+                "    fields:\n      pov: [\"[[jonathan-harker]]\"]\n      when: { text: \"3–5 May\", sort: [0, 5, 3] }\n      setting: [\"[[bistritz]]\", \"[[castle-dracula]]\"]\n",
                 "    fields:\n      # from his journal\n      pov:\n        # Jonathan writes it all\n        - \"[[jonathan-harker]]\"\n",
                 StringComparison.Ordinal));
         var removed = Tools.UpdateChapterFields("dracula", "1", Tools.GetChapter("dracula", "1").Hash, Json("""[{"op": "remove", "field": "pov", "item": 0}]"""));

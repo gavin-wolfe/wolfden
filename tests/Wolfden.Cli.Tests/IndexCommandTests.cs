@@ -17,7 +17,7 @@ public class IndexCommandTests
 
         Assert.Equal(CliApp.ExitOk, exitCode);
         Assert.Empty(error);
-        Assert.Equal("Rebuilt .wolfden/index.db: 1 universe, 50 entities, and 372 links from 54 files.\n", output);
+        Assert.Equal("Rebuilt .wolfden/index.db: 1 universe, 50 entities, and 378 links from 54 files.\n", output);
         Assert.True(den.Exists(".wolfden/index.db"));
         Assert.Equal(IndexStatus.Current, IndexBuilder.CheckFiles(den.Root));
         // The den's own files are untouched (F-ID-6).

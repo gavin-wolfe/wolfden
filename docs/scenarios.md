@@ -688,6 +688,29 @@ Spec: F-YAML-1. Covered by:
 `QuotingCorpusTests.ColonsThatEveryReaderAgreesOnAreFine`,
 `ContinuityCheckTests.AnEmptyFlowValueWithNoSpaceIsOneErrorAndTheNoteIsLeftOut`.
 
+### SC-CHECK-42. Where a chapter takes place
+
+The writer sets `setting: "[[kessan-reach]]"` in the series'
+`chapter_defaults` and gives the prologue its own two places. One
+chapter lists a character there by mistake. In an older den, a chapter
+says `setting: Kessan Reach` as plain text, written before the core
+pack had a `setting` field; in another, the den's own pack defined a
+`setting` chapter field of its own before core did.
+
+- Chapters without their own `setting` inherit the series' place, and
+  the prologue lists its two. `setting: []` means no place.
+- The character link gets the F-LINK-11 warning: `setting` is a ref to
+  location.
+- The plain-text value is an F-CHAP-3 warning and is ignored, so the
+  chapter inherits.
+- With the den's own definition, it's used and its values stay valid.
+  The clash is one F-CHAP-2 warning, on the den's `chapter.yaml`.
+
+Spec: types.md F-CHAP-2, F-CHAP-3, F-CHAP-5, F-PACK-11, §9.2 (#226).
+Covered by: `TypeEffectsTests.ASettingLinksAChapterToItsPlacesAndInherits`,
+`TypeEffectsTests.ASettingWrittenAsPlainTextBeforeCoreHadOneIsIgnoredWithAWarning`,
+`PackLoadingTests.ADenLocalSettingWinsOverTheCoreOne`.
+
 ## RT: saving a note keeps what the writer wrote
 
 Background: the files are the writer's, and Wolfden is only one of the

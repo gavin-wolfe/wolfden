@@ -1,0 +1,306 @@
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
+import type { BookChapterFields, ChapterDefaultsSource } from './chapterFieldsApi'
+import type { WriteResult } from './editApi'
+import { chapterFieldChanges, fieldDraftOf, type FieldDraft } from './fieldModel'
+import { bookChapterFields, chapterDefaults, chapterFieldTypes, renderApp, stubApi, unsetValue } from './test/harness'
+
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+})
+
+const BOOK = 'universes/dracula/books/dracula/book.md'
+
+function result(extra: Partial<WriteResult> = {}): WriteResult {
+  return {
+    version: 1,
+    changed: true,
+    path: BOOK,
+    hash: 'h-after',
+    entity: null,
+    effects: ['Chapter dracula:2 (Jonathan Harker’s Journal)’s tense is now present, its own value, in place of past from book ’dracula’ chapter_defaults.'],
+    pinnedCanon: [],
+    warnings: [],
+    files: null,
+    idAdded: null,
+    ...extra,
+  }
+}
+
+/** Answers the chapter field endpoints, recording each edit's path and body. */
+function stubFields(options: {
+  post?: (path: string, body: Record<string, unknown>) => Response | WriteResult
+  book?: () => BookChapterFields
+  defaults?: (kind: ChapterDefaultsSource['kind']) => ChapterDefaultsSource
+} = {}) {
+  const posted: { path: string; body: Record<string, unknown> }[] = []
+  const api = stubApi({
+    override: (path, params, init) => {
+      if (path === '/api/chapter/edit' || path === '/api/chapter-defaults/edit' || path === '/api/chapter/create') {
+        expect(init?.method).toBe('POST')
+        expect(new Headers(init?.headers).get('Content-Type')).toBe('application/json')
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>
+        posted.push({ path, body })
+        return options.post?.(path, body) ?? result()
+      }
+
+      if (path === '/api/book/chapter-fields' && options.book) {
+        return options.book()
+      }
+
+      if (path === '/api/chapter-defaults' && options.defaults) {
+        return options.defaults(params.get('book') ? 'book' : params.get('series') ? 'series' : 'universe')
+      }
+
+      if (path === '/api/book/chapters') {
+        const fields = bookChapterFields()
+        return { version: 1, universe: 'dracula', book: 'dracula', path: BOOK, hash: 'h-book', final: false, chapters: fields.chapters.map((c) => ({ key: c.key, number: c.number, title: c.title })) }
+      }
+
+      return undefined
+    },
+  })
+  return { ...api, posted }
+}
+
+/** The field's row on the page: its name, then what holds and its tools. */
+function row(name: string, list?: HTMLElement): HTMLElement {
+  const where = list ?? screen.getByRole('group', { name: /^Fields of / })
+  const dt = within(where)
+    .getAllByRole('term')
+    .find((t) => t.textContent === name)!
+  return dt.parentElement!
+}
+
+describe('SC-WEB-73: I see each chapter’s fields, and which are inherited', () => {
+  it('the book page lists each chapter’s fields under its title, inherited ones marked', async () => {
+    stubFields()
+    renderApp('/u/dracula/b/dracula')
+    await screen.findByRole('heading', { name: 'Dracula', level: 1 })
+
+    await waitFor(() => expect(document.querySelector('ol.chapters li .chapter-field-summary')).not.toBeNull())
+    const first = document.querySelector<HTMLElement>('ol.chapters li')!
+    const summary = first.querySelector<HTMLElement>('.chapter-field-summary')!
+    // pov and when are the chapter's own; narration and tense come from the book's defaults.
+    expect(within(summary).getByRole('link', { name: 'Jonathan Harker' }).getAttribute('href')).toBe('/u/dracula/e/E-JONATHAN')
+    expect(summary.textContent).toContain('when3–5 May')
+    expect(summary.textContent).toContain('narrationfirst book default')
+    expect(summary.querySelectorAll('.inherited-value')).toHaveLength(2)
+
+    // The book's own chapter defaults have their own section.
+    const defaults = screen.getByRole('group', { name: "Chapter defaults of book 'dracula'" })
+    expect(row('tense', defaults).textContent).toContain('past')
+    expect(within(row('pov', defaults)).getByText('not set')).toBeTruthy()
+  })
+
+  it('the chapter page shows each field the den defines, where it comes from, and a field a pack adds', async () => {
+    const withSetting = () => {
+      const b = bookChapterFields()
+      const setting = { name: 'setting', type: 'string' as const, list: false, temporal: false, required: false, values: [], to: null, description: 'Where it happens.', default: null }
+      return { ...b, fieldTypes: [...b.fieldTypes, setting], chapters: b.chapters.map((c) => ({ ...c, fields: [...c.fields, unsetValue('setting')] })) }
+    }
+    stubFields({ book: withSetting })
+    renderApp('/u/dracula/b/dracula/c/2')
+    await screen.findByRole('heading', { name: "Jonathan Harker's Journal", level: 1 })
+
+    const list = await screen.findByRole('group', { name: 'Fields of this chapter' })
+    expect(within(list).getAllByRole('term').map((t) => t.textContent)).toEqual(['pov', 'narration', 'tense', 'when', 'setting'])
+    expect(row('tense').textContent).toContain("past inherited from book 'dracula' defaults")
+    expect(within(row('pov')).getByText('not set')).toBeTruthy()
+    // Every field has Edit, but only a value set here can go back to the default.
+    expect(within(row('setting')).getByRole('button', { name: 'Edit setting' })).toBeTruthy()
+    expect(within(list).queryByRole('button', { name: /^Use the default/ })).toBeNull()
+  })
+})
+
+describe('SC-WEB-74: I edit a chapter’s fields, and go back to the default', () => {
+  it('Edit starts from the inherited value, and Save sets the chapter’s own', async () => {
+    const { posted } = stubFields()
+    renderApp('/u/dracula/b/dracula/c/2')
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit tense' }))
+
+    const form = screen.getByRole('form', { name: 'Edit tense' })
+    const value = within(form).getByLabelText('Value') as HTMLSelectElement
+    await waitFor(() => expect(document.activeElement).toBe(value))
+    expect(value.value).toBe('past')
+    expect(form.textContent).toContain("This starts from the value inherited now, from book 'dracula' defaults.")
+    // Nothing changed yet, so nothing to save.
+    expect((within(form).getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true)
+
+    fireEvent.change(value, { target: { value: 'present' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
+
+    const notice = await screen.findByText('Saved tense.')
+    await waitFor(() => expect(document.activeElement).toBe(notice.closest('[role="status"]')))
+    expect(notice.closest('[role="status"]')!.textContent).toContain('its own value')
+    expect(posted).toEqual([
+      { path: '/api/chapter/edit', body: { universe: 'dracula', book: 'dracula', chapter: '2', field: 'tense', changes: [{ op: 'set', value: 'present' }], expectedHash: 'h-book' } },
+    ])
+  })
+
+  it('removing the last POV saves [], "none in this chapter", and Use the default is its own action', async () => {
+    const { posted } = stubFields()
+    renderApp('/u/dracula/b/dracula/c/1')
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit pov' }))
+    const form = screen.getByRole('form', { name: 'Edit pov' })
+    fireEvent.click(within(form).getByRole('button', { name: 'Remove item 1' }))
+    expect(within(form).getByRole('status').textContent).toBe('No items: saving sets pov: [], none in this chapter. To use the default instead, Cancel and choose Use the default.')
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
+    await screen.findByText('Saved pov.')
+    expect(posted[0].body.changes).toEqual([{ op: 'remove', item: 0 }])
+
+    // Use the default says first what the chapter will have, then clears the field.
+    fireEvent.click(screen.getByRole('button', { name: 'Use the default: pov' }))
+    const prompt = screen.getByRole('group', { name: /^Use the default for pov\?/ })
+    expect(prompt.textContent).toContain('Nothing above sets pov, so this chapter will have none.')
+    fireEvent.click(within(prompt).getByRole('button', { name: 'Use the default' }))
+    await waitFor(() => expect(posted).toHaveLength(2))
+    expect(posted[1].body).toEqual({ universe: 'dracula', book: 'dracula', chapter: '1', field: 'pov', changes: [{ op: 'clear' }], expectedHash: 'h-book' })
+  })
+
+  it('a changed date is set as a whole, as the form writes it', async () => {
+    const { posted } = stubFields()
+    renderApp('/u/dracula/b/dracula/c/1')
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit when' }))
+    const form = screen.getByRole('form', { name: 'Edit when' })
+    fireEvent.change(within(form).getByLabelText('Date'), { target: { value: '3–6 May' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
+    await screen.findByText('Saved when.')
+    expect(posted[0].body.changes).toEqual([{ op: 'set', value: { text: '3–6 May', sort: [{ $number: '0' }, { $number: '5' }, { $number: '3' }] } }])
+  })
+})
+
+describe('SC-WEB-75: I edit chapter defaults, and give a new chapter its fields', () => {
+  it('the universe page edits its chapter defaults', async () => {
+    const { posted } = stubFields()
+    renderApp('/u/dracula')
+    const list = await screen.findByRole('group', { name: "Chapter defaults of universe 'dracula'" })
+    fireEvent.click(within(list).getByRole('button', { name: 'Edit narration' }))
+    const form = screen.getByRole('form', { name: 'Edit narration' })
+    fireEvent.change(within(form).getByLabelText('Value'), { target: { value: 'third-limited' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
+    await screen.findByText('Saved narration.')
+    expect(posted).toEqual([
+      {
+        path: '/api/chapter-defaults/edit',
+        body: { universe: 'dracula', field: 'narration', changes: [{ op: 'set', value: 'third-limited' }], expectedHash: 'h-universe' },
+      },
+    ])
+  })
+
+  it('Add chapter sends the fields filled in, and leaves the empty ones to be inherited', async () => {
+    const { posted } = stubFields({
+      post: () => ({ ...result(), key: '6', position: 'dracula:6', number: 6, title: null, index: 6, renumbered: [], effects: ['Added chapter 6.'] }) as unknown as WriteResult,
+    })
+    renderApp('/u/dracula/b/dracula')
+    fireEvent.click(await screen.findByRole('button', { name: 'Add chapter to Dracula' }))
+    const dialog = screen.getByRole('dialog')
+    const tense = await within(dialog).findByRole('group', { name: 'tense' })
+    expect(tense.textContent).toContain("Left empty: past, from book 'dracula' defaults.")
+    expect(within(dialog).getByRole('group', { name: 'pov' }).textContent).toContain('Left empty: none.')
+    fireEvent.change(within(tense).getByLabelText('Value'), { target: { value: 'present' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }))
+
+    await screen.findByText(/^Added chapter /, { selector: 'p' })
+    expect(posted).toEqual([{ path: '/api/chapter/create', body: { universe: 'dracula', book: 'dracula', fields: { tense: 'present' }, expectedHash: 'h-book' } }])
+  })
+})
+
+describe('SC-WEB-76: chapter field edits are guarded', () => {
+  it('a final book has no Edit, and says how to unfreeze it', async () => {
+    stubFields({ book: () => bookChapterFields({ final: true }), defaults: (kind) => chapterDefaults(kind, { final: kind === 'book' }) })
+    renderApp('/u/dracula/b/dracula/c/1')
+    const list = await screen.findByRole('group', { name: 'Fields of this chapter' })
+    expect(within(list).queryByRole('button')).toBeNull()
+    expect(screen.getByText(/^The book is final \(frozen\)/).textContent).toContain('Unfreeze…')
+  })
+
+  it('a refusal shows the server’s words, which say how to unfreeze', async () => {
+    const frozen =
+      "The edit would change what chapters of a final (frozen) book have (F-BOOK-1): book 'dracula', narration of chapters 1–note. Unfreeze… on the page of book 'dracula' opens it for editing again."
+    stubFields({ post: () => new Response(JSON.stringify({ code: 'frozen', message: frozen }), { status: 409 }) })
+    renderApp('/u/dracula')
+    const list = await screen.findByRole('group', { name: "Chapter defaults of universe 'dracula'" })
+    fireEvent.click(within(list).getByRole('button', { name: 'Edit narration' }))
+    const form = screen.getByRole('form', { name: 'Edit narration' })
+    fireEvent.change(within(form).getByLabelText('Value'), { target: { value: 'first' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
+    expect((await within(form).findByRole('alert')).textContent).toBe(`It can't be saved: ${frozen}`)
+  })
+
+  it('a stale book.md is sent again when the field didn’t change, and shows both versions when it did', async () => {
+    let fresh = bookChapterFields({ hash: 'h-book-2' })
+    let answers: (Response | WriteResult)[] = [new Response(JSON.stringify({ code: 'stale_file', message: 'book.md has changed since it was read' }), { status: 409 }), result()]
+    let reads = 0
+    const { posted } = stubFields({
+      post: () => answers.shift()!,
+      book: () => (reads++ === 0 ? bookChapterFields() : fresh),
+    })
+    renderApp('/u/dracula/b/dracula/c/2')
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit tense' }))
+    let form = screen.getByRole('form', { name: 'Edit tense' })
+    fireEvent.change(within(form).getByLabelText('Value'), { target: { value: 'present' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
+    await screen.findByText('Saved tense.')
+    expect(posted.map((p) => p.body.expectedHash)).toEqual(['h-book', 'h-book-2'])
+
+    // This time another program set chapter 2's tense meanwhile: both versions, and Keep mine sets mine on the new file.
+    posted.length = 0
+    fresh = bookChapterFields({ hash: 'h-book-3' })
+    fresh.chapters[1].fields[2] = unsetValue('tense', { set: true, own: 'future', value: 'future', from: 'chapter' })
+    answers = [new Response(JSON.stringify({ code: 'stale_file', message: 'book.md has changed since it was read' }), { status: 409 }), result()]
+    fireEvent.click(screen.getByRole('button', { name: 'Edit tense' }))
+    form = screen.getByRole('form', { name: 'Edit tense' })
+    fireEvent.change(within(form).getByLabelText('Value'), { target: { value: 'present' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
+    const conflict = await screen.findByRole('region', { name: 'The file changed while you were editing tense' })
+    expect(conflict.textContent).toContain('"present"')
+    expect(conflict.textContent).toContain('"future"')
+    fireEvent.click(within(conflict).getByRole('button', { name: 'Keep mine' }))
+    await waitFor(() => expect(posted).toHaveLength(2))
+    expect(posted.map((p) => p.body.expectedHash)).toEqual(['h-book-2', 'h-book-3'])
+    expect(posted[1].body).toMatchObject({ changes: [{ op: 'set', value: 'present' }] })
+  })
+
+  it('a chapter written as a bare key says how to give it fields', async () => {
+    stubFields({ book: () => ({ ...bookChapterFields(), chapters: bookChapterFields().chapters.map((c) => ({ ...c, bare: true })) }) })
+    renderApp('/u/dracula/b/dracula/c/2')
+    expect((await screen.findByText(/bare key/)).textContent).toContain('write it as { key: 2 } in book.md first')
+    expect(within(screen.getByRole('group', { name: 'Fields of this chapter' })).queryByRole('button')).toBeNull()
+  })
+})
+
+describe('chapterFieldChanges', () => {
+  const pov = chapterFieldTypes[0]
+  const when = chapterFieldTypes[3]
+  const draft = (raw: Parameters<typeof fieldDraftOf>[1]) => fieldDraftOf(pov, raw) as FieldDraft
+
+  it('removes and adds list items by number, and takes an item changed in place out and back', () => {
+    const d = draft(['[[a]]', '[[b]]', '[[c]]'])
+    const items = d.entries[0].value.kind === 'list' ? d.entries[0].value.items : []
+    const changed: FieldDraft = {
+      ...d,
+      entries: [{ ...d.entries[0], value: { kind: 'list', raw: ['[[a]]', '[[b]]', '[[c]]'], items: [items[0], { ...items[1], draft: { ...items[1].draft, text: '[[x]]' } }] } }],
+    }
+    expect(chapterFieldChanges(pov, ['[[a]]', '[[b]]', '[[c]]'], changed)).toEqual([
+      { op: 'remove', item: 2 },
+      { op: 'remove', item: 1 },
+      { op: 'add', value: '[[x]]' },
+    ])
+  })
+
+  it('an emptied list is its items removed, which leaves [], and nothing set is set whole', () => {
+    const d = draft(['[[a]]'])
+    const empty: FieldDraft = { ...d, entries: [{ ...d.entries[0], value: { kind: 'list', raw: ['[[a]]'], items: [] } }] }
+    expect(chapterFieldChanges(pov, ['[[a]]'], empty)).toEqual([{ op: 'remove', item: 0 }])
+    expect(chapterFieldChanges(pov, undefined, { ...empty, shape: 'none' })).toEqual([{ op: 'set', value: [] }])
+    const date = fieldDraftOf(when, '1893') as FieldDraft
+    const v = date.entries[0].value
+    if (v.kind === 'one') {
+      const next: FieldDraft = { ...date, entries: [{ ...date.entries[0], value: { kind: 'one', draft: { ...v.draft, sort: '1893' } } }] }
+      expect(chapterFieldChanges(when, '1893', next)).toEqual([{ op: 'set', value: { text: '1893', sort: { $number: '1893' } } }])
+    }
+  })
+})

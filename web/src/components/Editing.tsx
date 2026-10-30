@@ -596,6 +596,7 @@ export function SaveError({ error }: { error: Error }) {
  * that differ marked, and the three ways forward.
  */
 export function Conflict({
+  title,
   what,
   mine,
   theirs,
@@ -604,6 +605,8 @@ export function Conflict({
   onTakeTheirs,
   onCopyMine,
 }: {
+  /** The heading; by default, that the note changed. */
+  title?: string
   what: string
   mine: string
   theirs: string | null
@@ -619,7 +622,7 @@ export function Conflict({
   return (
     <div className="editor-panel conflict" role="region" aria-labelledby="conflict-heading">
       <h3 id="conflict-heading" ref={heading} tabIndex={-1}>
-        The note changed while you were editing {what}
+        {title ?? `The note changed while you were editing ${what}`}
       </h3>
       <p>Something else saved the file since you opened the editor, perhaps an AI agent or another editor. Nothing of yours was saved yet. Choose what to keep.</p>
       <div className="conflict-versions">

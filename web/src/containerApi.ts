@@ -1,6 +1,7 @@
 import { queryOptions } from '@tanstack/react-query'
 import { ApiRequestError, apiPath, getJson, type ApiError } from './api'
 import type { DiagnosticView } from './editApi'
+import type { Json } from './fieldModel'
 
 // Creating series and books (#213; src/Wolfden.Api/ContainerEndpoints.cs),
 // in camelCase: the works a new one can be placed after, and the create.
@@ -150,6 +151,8 @@ export interface ChapterRequest {
   title?: string
   /** The key of the chapter it comes after; left out, at the end. */
   after?: string
+  /** Its own chapter fields, by name (#225); a field left out is inherited from chapter_defaults. */
+  fields?: Record<string, Json>
   expectedHash: string
 }
 

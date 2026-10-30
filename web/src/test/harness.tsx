@@ -15,6 +15,8 @@ import type {
   PositionsResult,
 } from '../api'
 import type { TypeListResult, TypeView } from '../createApi'
+import type { BookChapterFields, ChapterDefaultsSource, ChapterValueView } from '../chapterFieldsApi'
+import type { SourceFieldType } from '../editApi'
 
 // A small den for the UI's tests, from Dracula (public domain): one book of
 // five chapters and a closing note, and a few of its notes.
@@ -130,6 +132,78 @@ export function page(summary: EntitySummary, extra: Partial<EntityPage> = {}): E
   }
 }
 
+/** The core pack's chapter fields (types.md §9.2), as the API gives them. */
+export const chapterFieldTypes: SourceFieldType[] = [
+  { name: 'pov', type: 'ref', list: true, temporal: false, required: false, values: [], to: ['character'], description: 'The point-of-view character, or characters, of the chapter.', default: null },
+  { name: 'narration', type: 'enum', list: false, temporal: false, required: false, values: ['first', 'second', 'third-limited', 'third-omniscient', 'third-objective'], to: null, description: null, default: null },
+  { name: 'tense', type: 'enum', list: false, temporal: false, required: false, values: ['past', 'present', 'future'], to: null, description: 'The narrative tense.', default: null },
+  { name: 'when', type: 'date', list: false, temporal: false, required: false, values: [], to: null, description: null, default: null },
+]
+
+/** A chapter field nothing sets, to build on. */
+export function unsetValue(name: string, extra: Partial<ChapterValueView> = {}): ChapterValueView {
+  return { name, set: false, own: null, ignored: false, value: null, from: null, fromKey: null, none: false, default: null, defaultFrom: null, defaultFromKey: null, links: [], ...extra }
+}
+
+/** A value the book's chapter_defaults give, as a chapter inherits it. */
+function fromBook(name: string, value: string): ChapterValueView {
+  return unsetValue(name, { value, from: 'book', fromKey: 'dracula', default: value, defaultFrom: 'book', defaultFromKey: 'dracula' })
+}
+
+const JONATHAN_LINK = { text: '[[jonathan-harker]]', target: 'jonathan-harker', label: null, outcome: 'resolved', entity: 'E-JONATHAN', name: 'Jonathan Harker', type: 'character', problem: null } as const
+
+/**
+ * The book's chapters with their fields, as in the Dracula sample: the book
+ * is told in the first person, in the past tense (its chapter_defaults), and
+ * chapter 1 is Jonathan Harker's, in early May.
+ */
+export function bookChapterFields(extra: Partial<BookChapterFields> = {}): BookChapterFields {
+  return {
+    version: 1,
+    universe: 'dracula',
+    book: 'dracula',
+    path: 'universes/dracula/books/dracula/book.md',
+    hash: 'h-book',
+    final: false,
+    fieldTypes: chapterFieldTypes,
+    chapters: positions.map((p) => ({
+      key: p.chapter!,
+      position: p.position,
+      number: p.number,
+      title: p.title,
+      bare: false,
+      fields: [
+        p.chapter === '1'
+          ? unsetValue('pov', { set: true, own: ['[[jonathan-harker]]'], value: ['[[jonathan-harker]]'], from: 'chapter', links: [JONATHAN_LINK] })
+          : unsetValue('pov'),
+        fromBook('narration', 'first'),
+        fromBook('tense', 'past'),
+        p.chapter === '1' ? unsetValue('when', { set: true, own: { text: '3–5 May', sort: [{ $number: '0' }, { $number: '5' }, { $number: '3' }] }, value: { text: '3–5 May', sort: [{ $number: '0' }, { $number: '5' }, { $number: '3' }] }, from: 'chapter' }) : unsetValue('when'),
+      ],
+    })),
+    ...extra,
+  }
+}
+
+/** The book's chapter_defaults (narration first, tense past), or a universe's or series' (none). */
+export function chapterDefaults(kind: ChapterDefaultsSource['kind'] = 'book', extra: Partial<ChapterDefaultsSource> = {}): ChapterDefaultsSource {
+  const book = kind === 'book'
+  const own = (name: string, value: string) => unsetValue(name, { set: true, own: value, value, from: 'book', fromKey: 'dracula' })
+  return {
+    version: 1,
+    universe: 'dracula',
+    kind,
+    key: 'dracula',
+    path: book ? 'universes/dracula/books/dracula/book.md' : 'universes/dracula/universe.md',
+    hash: book ? 'h-book' : 'h-universe',
+    final: false,
+    fieldTypes: chapterFieldTypes,
+    fields: [unsetValue('pov'), book ? own('narration', 'first') : unsetValue('narration'), book ? own('tense', 'past') : unsetValue('tense'), unsetValue('when')],
+    books: [{ key: 'dracula', final: false, chapters: positions.length, path: 'universes/dracula/books/dracula/book.md' }],
+    ...extra,
+  }
+}
+
 export type Responder = (path: string, params: URLSearchParams, init?: RequestInit) => unknown | Promise<unknown>
 
 /**
@@ -178,6 +252,10 @@ function answer(path: string, params: URLSearchParams, at: string | null, option
         otherUniverses: 0,
         autoCheckpoint: { every: null, problem: null, runs: true },
       }
+    case '/api/book/chapter-fields':
+      return bookChapterFields()
+    case '/api/chapter-defaults':
+      return chapterDefaults(params.get('book') ? 'book' : params.get('series') ? 'series' : 'universe')
     case '/api/book/freeze':
       // The book is a draft, in a den with history.
       return {

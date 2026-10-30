@@ -1,0 +1,702 @@
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { ApiRequestError, positionsQuery, type PositionView } from '../api'
+import {
+  bookChapterFieldsQuery,
+  chapterDefaultsQuery,
+  defaultsWords,
+  editChapterDefault,
+  editChapterField,
+  linkViews,
+  type ChapterFieldsView,
+  type ChapterValueView,
+  type DefaultsScope,
+  type ValueFrom,
+} from '../chapterFieldsApi'
+import type { SourceFieldType, WriteResult } from '../editApi'
+import {
+  chapterFieldChanges,
+  controlId,
+  fieldDraftOf,
+  fieldProblems,
+  isNumberText,
+  jsonOfField,
+  valueLines,
+  type ChapterFieldChange,
+  type FieldDraft,
+  type Json,
+  type Problem,
+} from '../fieldModel'
+import { FieldValue } from '../pages/EntityPageView'
+import { Conflict, useAfterSave } from './Editing'
+import { ValueEditor, typeWords } from './FieldEditing'
+import { ErrorState, Loading } from './States'
+
+// Chapter fields in the web UI (#225; types.md §8): each chapter's fields,
+// and the chapter_defaults of a universe, series, or book, shown with where
+// each value comes from, and edited one field at a time with the same
+// controls as a note's fields (#196). A list emptied in the form is saved as
+// [], "none here" (#132); going back to the default is its own action. The
+// fields come from the den's chapter field definitions, so a field a pack
+// adds gets its form like the core pack's.
+
+/** A value as a note's field shows it: a number as its text. */
+function shown(v: Json | null): unknown {
+  if (isNumberText(v)) {
+    return v.$number
+  }
+
+  if (Array.isArray(v)) {
+    return v.map(shown)
+  }
+
+  if (v !== null && typeof v === 'object') {
+    return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, shown(x)]))
+  }
+
+  return v
+}
+
+/** A value in words for a hint: its items as written, or "none". */
+export function valueWords(v: Json | null): string {
+  if (Array.isArray(v)) {
+    return v.length === 0 ? 'none ([])' : v.map((x) => valueWords(x)).join(', ')
+  }
+
+  if (isNumberText(v)) {
+    return v.$number
+  }
+
+  if (v !== null && typeof v === 'object') {
+    return typeof v.text === 'string' ? v.text : valueLines(v)
+  }
+
+  return v === null ? '' : String(v)
+}
+
+/** The value that holds: with its links, "none" for [], or "not set". */
+export function ChapterValueText({ universe, view, none = 'none here' }: { universe: string; view: ChapterValueView; none?: string }) {
+  if (view.value === null) {
+    return <span className="muted">not set</span>
+  }
+
+  if (view.none) {
+    return (
+      <span>
+        none <span className="muted">({none}, [])</span>
+      </span>
+    )
+  }
+
+  return <FieldValue value={shown(view.value)} links={linkViews(view.links)} universe={universe} />
+}
+
+/** Where an inherited value comes from: "from book 'ember' defaults". Nothing for a value set here. */
+function Origin({ view, own, short = false }: { view: ChapterValueView; own: ValueFrom; short?: boolean }) {
+  if (view.value === null || view.from === null || view.from === own || view.from === 'chapter') {
+    return null
+  }
+
+  const words = defaultsWords(view.from, view.fromKey)
+  return (
+    <span className="badge inherited" title={`Inherited from the chapter_defaults of ${view.from} '${view.fromKey}'`}>
+      {short ? `${view.from} default` : `inherited from ${words}`}
+    </span>
+  )
+}
+
+/** A chapter's fields under its title in the book's chapter list: what holds, inherited values marked. */
+export function ChapterFieldSummary({ universe, chapter }: { universe: string; chapter: ChapterFieldsView }) {
+  const shownFields = chapter.fields.filter((f) => f.value !== null)
+  if (shownFields.length === 0) {
+    return null
+  }
+
+  return (
+    <dl className="chapter-field-summary">
+      {shownFields.map((f) => (
+        <div key={f.name} className={f.from === 'chapter' ? undefined : 'inherited-value'}>
+          <dt>{f.name}</dt>
+          <dd>
+            <ChapterValueText universe={universe} view={f} /> <Origin view={f} own="chapter" short />
+          </dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
+/** How a panel's edits are made: the chapter's fields, or a container's defaults. */
+interface Target {
+  universe: string
+  /** What a value set here is: the chapter's own, or this container's default. */
+  own: ValueFrom
+  /** What the panel calls the place, in the effects' words: "chapter 2", "book 'ember'". */
+  where: string
+  /** The action that goes back to inheriting: "Use the default" for a chapter, "Clear" for a container. */
+  clear: string
+  /** What an emptied list means here. */
+  noneWords: string
+  save: (field: string, changes: ChapterFieldChange[], hash: string) => Promise<WriteResult>
+  /** The file and this panel's values as they are now, after a stale save, or null if the place is gone. */
+  reload: () => Promise<{ hash: string; values: ChapterValueView[] } | null>
+}
+
+/** A field's edit button's id, where focus goes back when its editor closes. */
+function editId(field: string): string {
+  return `edit-chapter-field-${field}`
+}
+
+/**
+ * Each chapter field with what holds and where it comes from, an Edit for
+ * each the den's packs define, and, for one set here, a way back to the
+ * default that says first what that will be.
+ */
+function ChapterValues({
+  target,
+  fieldTypes,
+  values,
+  hash,
+  locked,
+  label,
+}: {
+  target: Target
+  fieldTypes: SourceFieldType[]
+  values: ChapterValueView[]
+  hash: string
+  /** Why nothing here can be edited, or null. */
+  locked: string | null
+  label: string
+}) {
+  const positions = useQuery(positionsQuery(target.universe))
+  const afterSave = useAfterSave()
+  const [editing, setEditing] = useState<string | null>(null)
+  const [clearing, setClearing] = useState<string | null>(null)
+  const [saved, setSaved] = useState<{ field: string; result: WriteResult } | null>(null)
+  const [error, setError] = useState<Error | null>(null)
+  const [busy, setBusy] = useState(false)
+  const notice = useRef<HTMLDivElement>(null)
+  const returnTo = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (saved) {
+      notice.current?.focus()
+    } else if (editing === null && clearing === null && returnTo.current) {
+      document.getElementById(returnTo.current)?.focus()
+      returnTo.current = null
+    }
+  }, [saved, editing, clearing])
+
+  const done = async (field: string, result: WriteResult | null) => {
+    returnTo.current = editId(field)
+    setEditing(null)
+    setClearing(null)
+    if (result) {
+      await afterSave()
+      setSaved({ field, result })
+    }
+  }
+
+  const clear = async (view: ChapterValueView) => {
+    setBusy(true)
+    setError(null)
+    try {
+      let on = hash
+      for (let attempt = 0; ; attempt++) {
+        try {
+          await done(view.name, await target.save(view.name, [{ op: 'clear' }], on))
+          return
+        } catch (e) {
+          // book.md changed meanwhile: clear on it as it is now, if this field is still set there.
+          if (e instanceof ApiRequestError && e.code === 'stale_file' && attempt < 2) {
+            const now = await target.reload()
+            const field = now?.values.find((v) => v.name === view.name)
+            if (now && field?.set) {
+              on = now.hash
+              continue
+            }
+
+            if (now) {
+              await done(view.name, null)
+              await afterSave()
+              return
+            }
+          }
+
+          throw e
+        }
+      }
+    } catch (e) {
+      setError(e as Error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const types = new Map(fieldTypes.map((t) => [t.name, t]))
+  return (
+    <>
+      {saved && (
+        <div className="save-result" role="status" tabIndex={-1} ref={notice}>
+          <p>
+            <strong>{saved.result.changed ? `Saved ${saved.field}.` : `Nothing changed in ${saved.field}: the file already said that.`}</strong> Saving doesn't make a
+            checkpoint.
+          </p>
+          {saved.result.changed && saved.result.effects.length > 0 && (
+            <ul className="effects">
+              {saved.result.effects.map((e) => (
+                <li key={e}>{e}</li>
+              ))}
+            </ul>
+          )}
+          {saved.result.warnings.length > 0 && (
+            <div className="warnings">
+              <p>Warnings in the file:</p>
+              <ul>
+                {saved.result.warnings.map((w) => (
+                  <li key={`${w.line}:${w.rule}:${w.message}`}>
+                    {w.line !== null && `Line ${w.line}: `}
+                    {w.message} <span className="muted">({w.rule})</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <button type="button" onClick={() => setSaved(null)}>
+            Dismiss
+          </button>
+        </div>
+      )}
+      {locked && <p className="muted">{locked}</p>}
+      <div role="group" aria-label={label}>
+      <dl className="fields chapter-fields">
+        {values.map((view) => {
+          const type = types.get(view.name)
+          const form = type ? editable(type, view) : null
+          return (
+            <div key={view.name} className="field">
+              <dt>{view.name}</dt>
+              {editing === view.name && type ? (
+                <dd className="field-editing">
+                  <FieldForm
+                    target={target}
+                    type={type}
+                    view={view}
+                    hash={hash}
+                    positions={positions.data?.positions ?? []}
+                    onDone={(result) => void done(view.name, result)}
+                  />
+                </dd>
+              ) : (
+                <>
+                  <dd>
+                    <ChapterValueText universe={target.universe} view={view} none={target.noneWords} /> <Origin view={view} own={target.own} />
+                    {view.ignored && (
+                      <span className="muted">
+                        {' '}
+                        (written here as {view.own === null ? 'no value' : valueLines(view.own)}, which isn't a value of {view.name}, so it's ignored)
+                      </span>
+                    )}
+                    {!type && <span className="muted"> (not a chapter field the den's packs define: change it in the file)</span>}
+                  </dd>
+                  {!locked && type && (
+                    <dd className="field-tools">
+                      {typeof form === 'string' ? (
+                        <span className="muted">{form} Change it in the file.</span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="edit-button"
+                          id={editId(view.name)}
+                          aria-label={`Edit ${view.name}`}
+                          disabled={editing !== null || busy}
+                          onClick={() => {
+                            setSaved(null)
+                            setError(null)
+                            setClearing(null)
+                            setEditing(view.name)
+                          }}
+                        >
+                          Edit
+                        </button>
+                      )}{' '}
+                      {view.set && clearing !== view.name && (
+                        <button
+                          type="button"
+                          aria-label={`${target.clear}: ${view.name}`}
+                          disabled={editing !== null || busy}
+                          onClick={() => {
+                            setSaved(null)
+                            setError(null)
+                            setClearing(view.name)
+                          }}
+                        >
+                          {target.clear}
+                        </button>
+                      )}
+                      {clearing === view.name && (
+                        <ClearPrompt
+                          target={target}
+                          view={view}
+                          busy={busy}
+                          onClear={() => void clear(view)}
+                          onKeep={() => {
+                            returnTo.current = editId(view.name)
+                            setClearing(null)
+                            setError(null)
+                          }}
+                        />
+                      )}
+                      {clearing === view.name && error && <Refused error={error} />}
+                    </dd>
+                  )}
+                </>
+              )}
+            </div>
+          )
+        })}
+      </dl>
+      </div>
+    </>
+  )
+}
+
+/** The form for a value, or why it can't show it (a dated entry, which a chapter field can't have, or a list where one value goes). */
+function editable(type: SourceFieldType, view: ChapterValueView): FieldDraft | string {
+  const draft = fieldDraftOf(type, view.set ? (view.own ?? null) : (view.default ?? undefined))
+  if (typeof draft === 'string') {
+    return draft
+  }
+
+  return draft.shape === 'entry' || draft.shape === 'entries' ? "It's written as a dated entry, which a chapter field can't have (types.md F-CHAP-3)." : draft
+}
+
+/** Asks before going back to the default, saying what that will be. */
+function ClearPrompt({ target, view, busy, onClear, onKeep }: { target: Target; view: ChapterValueView; busy: boolean; onClear: () => void; onKeep: () => void }) {
+  const id = useId()
+  const outcome =
+    view.default === null
+      ? `Nothing above sets ${view.name}, so ${target.where} will have none.`
+      : `${capitalized(target.where)} will have ${valueWords(view.default)}, from ${defaultsWords(view.defaultFrom!, view.defaultFromKey)}.`
+  return (
+    <div className="confirm" role="group" aria-labelledby={id}>
+      <p id={id}>
+        {target.clear} for {view.name}? It's taken out of the file. {outcome}
+      </p>
+      <p className="editor-actions">
+        <button type="button" className="primary" disabled={busy} onClick={onClear}>
+          {busy ? 'Saving…' : target.clear}
+        </button>
+        <button type="button" autoFocus onClick={onKeep} disabled={busy}>
+          Keep it
+        </button>
+      </p>
+    </div>
+  )
+}
+
+function capitalized(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
+/** Why a save was refused, in the page's words for a stale file; the server's words otherwise, which name Unfreeze… for a final book. */
+function Refused({ error }: { error: Error }) {
+  const code = error instanceof ApiRequestError ? error.code : null
+  return (
+    <div className="error" role="alert">
+      <p>
+        {code === 'frozen' ? "It can't be saved: " : "It wasn't saved: "}
+        {error.message}
+      </p>
+    </div>
+  )
+}
+
+/**
+ * Edits one chapter field, or one default, with the control for its type.
+ * It starts from the value set here, or, where nothing is, from what's
+ * inherited, so a change to it becomes the value set here. Save (or
+ * Ctrl/⌘+Enter) sends only what changed; Cancel (or Escape) leaves it.
+ */
+function FieldForm({
+  target,
+  type,
+  view,
+  hash,
+  positions,
+  onDone,
+}: {
+  target: Target
+  type: SourceFieldType
+  view: ChapterValueView
+  hash: string
+  positions: PositionView[]
+  onDone: (result: WriteResult | null) => void
+}) {
+  const idBase = `c${useId().replace(/[^a-zA-Z0-9]/g, '')}`
+  const [draft, setDraft] = useState(() => editable(type, view) as FieldDraft)
+  const [initial] = useState(() => JSON.stringify(draft))
+  const [problems, setProblems] = useState<Problem[]>([])
+  const [error, setError] = useState<Error | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [conflict, setConflict] = useState<{ hash: string; theirs: ChapterValueView | null } | null>(null)
+  const client = useQueryClient()
+  const dirty = JSON.stringify(draft) !== initial
+  const entry = draft.entries[0]
+  const before = view.set ? (view.own ?? null) : undefined
+
+  // Focus goes to the first control when the form opens.
+  useEffect(() => {
+    const first = draft.entries[0]
+    const v = first.value
+    document.getElementById(controlId(idBase, first, v.kind === 'list' && v.items.length === 0 ? 'add-item' : 'value', v.kind === 'list' ? v.items[0] : undefined))?.focus()
+    // Only when it opens.
+  }, [])
+
+  const send = async (on: string, changes: ChapterFieldChange[]) => {
+    setSaving(true)
+    setError(null)
+    try {
+      for (let attempt = 0; ; attempt++) {
+        try {
+          onDone(await target.save(view.name, changes, on))
+          return
+        } catch (e) {
+          if (!(e instanceof ApiRequestError && e.code === 'stale_file')) {
+            throw e
+          }
+
+          // The file changed meanwhile. If this field didn't, nothing of it can be overwritten: send the same changes again.
+          const now = await target.reload()
+          const theirs = now?.values.find((v) => v.name === view.name) ?? null
+          if (now && theirs && theirs.set === view.set && JSON.stringify(theirs.own) === JSON.stringify(view.own) && attempt < 2) {
+            on = now.hash
+            continue
+          }
+
+          if (!now) {
+            throw e
+          }
+
+          setConflict({ hash: now.hash, theirs })
+          return
+        }
+      }
+    } catch (e) {
+      setError(e as Error)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const save = async () => {
+    if (saving) {
+      return
+    }
+
+    const found = fieldProblems(type, draft, idBase, { clear: target.clear })
+    setProblems(found)
+    if (found.length > 0) {
+      document.getElementById(found[0].at)?.focus()
+      return
+    }
+
+    const changes = chapterFieldChanges(type, before, draft)
+    if (changes.length === 0) {
+      onDone(null)
+      return
+    }
+
+    await send(hash, changes)
+  }
+
+  if (conflict) {
+    const after = jsonOfField(type, draft).value
+    return (
+      <Conflict
+        title={`The file changed while you were editing ${view.name}`}
+        what={view.name}
+        mine={valueLines(after)}
+        theirs={valueLines(conflict.theirs?.set ? (conflict.theirs.own ?? null) : undefined)}
+        saving={saving}
+        onKeepMine={() => {
+          const on = conflict.hash
+          setConflict(null)
+          void send(on, after === undefined ? [{ op: 'clear' }] : [{ op: 'set', value: after }])
+        }}
+        onTakeTheirs={() => {
+          void client.invalidateQueries()
+          onDone(null)
+        }}
+      />
+    )
+  }
+
+  const v = entry.value
+  const emptyList = v.kind === 'list' && v.items.length === 0
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault()
+      void save()
+    } else if (e.key === 'Escape' && !e.defaultPrevented) {
+      e.preventDefault()
+      onDone(null)
+    }
+  }
+
+  let start: ReactNode = null
+  if (!view.set && view.default !== null) {
+    start = (
+      <p className="muted">
+        This starts from the value inherited now, from {defaultsWords(view.defaultFrom!, view.defaultFromKey)}. A change you save is set here, in place of it.
+      </p>
+    )
+  }
+
+  return (
+    <form
+      className="editor-panel inline-form field-editor"
+      aria-label={`Edit ${view.name}`}
+      noValidate
+      onSubmit={(e) => {
+        e.preventDefault()
+        void save()
+      }}
+      onKeyDown={onKeyDown}
+    >
+      <p className="field-about">
+        <strong>{view.name}</strong>: {typeWords(type)}
+        {type.description && <span className="muted"> {type.description}</span>}
+      </p>
+      {start}
+      <ValueEditor
+        idBase={idBase}
+        type={type}
+        entry={entry}
+        positions={positions}
+        problems={problems}
+        universe={target.universe}
+        onChange={(value) => setDraft({ ...draft, entries: [{ ...entry, value }] })}
+      />
+      {emptyList && (
+        <p className="muted" role="status">
+          No items: saving sets {view.name}: [], {target.noneWords}
+          {view.default !== null && !(Array.isArray(view.default) && view.default.length === 0)
+            ? `, in place of ${valueWords(view.default)} from ${defaultsWords(view.defaultFrom!, view.defaultFromKey)}`
+            : ''}
+          .{view.set ? ` To use the default instead, Cancel and choose ${target.clear}.` : ''}
+        </p>
+      )}
+      {problems.length > 0 && (
+        <ul className="problems" role="alert">
+          {problems.map((p) => (
+            <li key={`${p.at}:${p.message}`}>{p.message}</li>
+          ))}
+        </ul>
+      )}
+      {error && <Refused error={error} />}
+      <p className="editor-actions">
+        <button type="submit" className="primary" disabled={saving || !dirty}>
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+        <button type="button" onClick={() => onDone(null)} disabled={saving}>
+          Cancel
+        </button>
+        <span className="muted">Ctrl+Enter (⌘+Enter) saves, Escape cancels.</span>
+      </p>
+    </form>
+  )
+}
+
+/** A chapter's fields on its page, with what each inherits, editable unless the book is final. */
+export function ChapterFieldsSection({ universe, book, chapter, label }: { universe: string; book: string; chapter: string; label: string }) {
+  const fields = useQuery(bookChapterFieldsQuery(universe, book))
+  const client = useQueryClient()
+  if (fields.isPending) {
+    return <Loading what="the chapter's fields" />
+  }
+
+  if (fields.isError) {
+    return <ErrorState error={fields.error} />
+  }
+
+  const data = fields.data
+  const c = data.chapters.find((x) => x.key === chapter)
+  if (!c) {
+    return null
+  }
+
+  const locked = data.final
+    ? "The book is final (frozen), so its chapters' fields can't be edited until it's unfrozen: use Unfreeze… on the book's page."
+    : c.bare
+      ? `book.md writes this chapter as a bare key (${c.key}), which has no place for fields. To give it fields, write it as { key: ${c.key} } in book.md first.`
+      : null
+  const target: Target = {
+    universe,
+    own: 'chapter',
+    where: label,
+    clear: 'Use the default',
+    noneWords: 'none in this chapter',
+    save: (field, changes, expectedHash) => editChapterField({ universe, book, chapter, field, changes, expectedHash }),
+    reload: async () => {
+      const now = await client.fetchQuery({ ...bookChapterFieldsQuery(universe, book), staleTime: 0 })
+      const here = now.chapters.find((x) => x.key === chapter)
+      return here ? { hash: now.hash, values: here.fields } : null
+    },
+  }
+  return <ChapterValues target={target} fieldTypes={data.fieldTypes} values={c.fields} hash={data.hash} locked={locked} label={`Fields of ${label}`} />
+}
+
+/** A universe's, series', or book's chapter_defaults: what the chapters below have unless they set their own. */
+export function ChapterDefaultsSection({ scope, name }: { scope: DefaultsScope; name: string }) {
+  const defaults = useQuery(chapterDefaultsQuery(scope))
+  const client = useQueryClient()
+  const headingId = useId()
+  if (defaults.isPending) {
+    return null
+  }
+
+  if (defaults.isError) {
+    return <p className="muted">Chapter defaults aren't available: {defaults.error.message}</p>
+  }
+
+  const data = defaults.data
+  if (data.fieldTypes.length === 0 && data.fields.length === 0) {
+    // The den's packs define no chapter fields.
+    return null
+  }
+
+  const where = `${data.kind} '${data.key}'`
+  const target: Target = {
+    universe: scope.universe,
+    own: data.kind,
+    where: 'the chapters below that set none of their own',
+    clear: 'Clear',
+    noneWords: 'none, for the chapters below that set none of their own',
+    save: (field, changes, expectedHash) => editChapterDefault({ ...scope, field, changes, expectedHash }),
+    reload: async () => {
+      const now = await client.fetchQuery({ ...chapterDefaultsQuery(scope), staleTime: 0 })
+      return { hash: now.hash, values: now.fields }
+    },
+  }
+  const reach =
+    data.kind === 'book'
+      ? `Each chapter of ${name} has these unless it sets its own.`
+      : `Each chapter of the books ${data.kind === 'series' ? 'in' : 'of'} ${name} has these unless its book, ${data.kind === 'universe' ? 'its series, ' : ''}or the chapter itself, sets its own.`
+  return (
+    <section aria-labelledby={headingId} className="chapter-defaults">
+      <h2 id={headingId}>Chapter defaults</h2>
+      <p className="muted">
+        {reach} They're the <code>chapter_defaults</code> in <code>{data.path}</code>.
+      </p>
+      <ChapterValues
+        target={target}
+        fieldTypes={data.fieldTypes}
+        values={data.fields}
+        hash={data.hash}
+        locked={data.final ? "The book is final (frozen), so its defaults can't be edited until it's unfrozen: use Unfreeze… above." : null}
+        label={`Chapter defaults of ${where}`}
+      />
+    </section>
+  )
+}

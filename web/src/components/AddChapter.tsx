@@ -1,8 +1,13 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ApiRequestError } from '../api'
+import { ApiRequestError, positionsQuery } from '../api'
+import { bookChapterFieldsQuery, chapterDefaultsQuery, defaultsWords } from '../chapterFieldsApi'
 import { addChapter, bookChaptersQuery, type BookChapters, type ChapterAddResult } from '../containerApi'
+import type { SourceFieldType } from '../editApi'
+import { fieldDraftOf, fieldProblems, jsonOfField, type FieldDraft, type Json, type Problem } from '../fieldModel'
+import { valueWords } from './ChapterFields'
 import { useAfterSave } from './Editing'
+import { ValueEditor } from './FieldEditing'
 import { trapTab } from './NewEntity'
 import '../newEntity.css'
 
@@ -13,7 +18,9 @@ import '../newEntity.css'
  * optional **Title**. Wolfden writes the item into book.md's `chapters`:
  * at the end the next whole number, after a chapter a letter added to its
  * key (`2b`, then `2c`; after `2b`, `2ba`), and the numbers after it move
- * up. Keys never change, so positions keep naming the same chapters. A
+ * up. Keys never change, so positions keep naming the same chapters. The
+ * form also takes the chapter's own chapter fields (#225), such as its POV
+ * and when it takes place; one left empty is inherited. A
  * final book has neither button: its book.md can't change until it's
  * unfrozen.
  */
@@ -140,6 +147,21 @@ function AddChapterDialog({
   const current = useQuery(bookChaptersQuery(universe, book))
 
   const [title, setTitle] = useState('')
+  const fieldsInfo = useQuery(bookChapterFieldsQuery(universe, book))
+  const defaults = useQuery(chapterDefaultsQuery({ universe, book }))
+  const positions = useQuery(positionsQuery(universe))
+  const fieldBase = useId().replace(/[^a-zA-Z0-9]/g, '')
+  // Each field's form, made once, so its controls keep their ids (and focus) as the writer types.
+  const [drafts, setDrafts] = useState<Record<string, FieldDraft>>({})
+  const [fieldProblemList, setFieldProblemList] = useState<Problem[]>([])
+  const fieldTypes = fieldsInfo.data?.fieldTypes ?? NO_TYPES
+  useEffect(() => {
+    const missing = fieldTypes.filter((t) => !(t.name in drafts))
+    if (missing.length > 0) {
+      setDrafts((d) => ({ ...d, ...Object.fromEntries(missing.map((t) => [t.name, fieldDraftOf(t, undefined) as FieldDraft])) }))
+    }
+  }, [fieldTypes, drafts])
+
   const [tooLong, setTooLong] = useState(false)
   // '' is the end; otherwise the key of the chapter it goes after. Insert starts at the first chapter.
   const [after, setAfter] = useState<string | null>(insert ? null : '')
@@ -162,8 +184,8 @@ function AddChapterDialog({
   }, [after, current.data, choices])
 
   const add = useMutation({
-    mutationFn: (hash: string) =>
-      addChapter({ universe, book, title: title.trim() === '' ? undefined : title.trim(), after: place === '' ? undefined : place, expectedHash: hash }),
+    mutationFn: ({ hash, fields }: { hash: string; fields: Record<string, Json> | undefined }) =>
+      addChapter({ universe, book, title: title.trim() === '' ? undefined : title.trim(), after: place === '' ? undefined : place, fields, expectedHash: hash }),
     onSuccess: async (result) => {
       // Everything is asked again, as after any save, so the chapter list and the positions have the new one.
       await afterSave()
@@ -204,11 +226,18 @@ function AddChapterDialog({
     }
 
     setTooLong(false)
+    const { fields, problems } = chapterFields(fieldTypes, drafts, fieldBase)
+    setFieldProblemList(problems)
+    if (problems.length > 0) {
+      document.getElementById(problems[0].at)?.focus()
+      return
+    }
+
     if (busy || !current.data) {
       return
     }
 
-    add.mutate(current.data.hash)
+    add.mutate({ hash: current.data.hash, fields })
   }
 
   const dismiss = () => {
@@ -311,6 +340,45 @@ function AddChapterDialog({
           ) : (
             <p id={hintId} className="muted new-entity-hint">Optional; leave it empty for none. You can change it in book.md later.</p>
           )}
+          {fieldTypes.length > 0 && (
+            <fieldset className="new-chapter-fields" disabled={busy}>
+              <legend>Chapter fields</legend>
+              <p className="muted new-entity-hint">Optional. A field left empty is inherited from the chapter defaults, as the book's other chapters inherit it.</p>
+              {fieldTypes.map((t) => {
+                const draft = drafts[t.name]
+                if (!draft) {
+                  return null
+                }
+
+                const inherited = defaults.data?.fields.find((f) => f.name === t.name)
+                return (
+                  <div key={t.name} className="new-chapter-field" role="group" aria-label={t.name}>
+                    <p className="field-about">
+                      <strong>{t.name}</strong>
+                      {t.description && <span className="muted"> {t.description}</span>}
+                    </p>
+                    <ValueEditor
+                      idBase={`${fieldBase}${t.name}`}
+                      type={t}
+                      entry={draft.entries[0]}
+                      positions={positions.data?.positions ?? []}
+                      problems={fieldProblemList}
+                      universe={universe}
+                      onChange={(value) => {
+                        setDrafts((d) => ({ ...d, [t.name]: { ...draft, entries: [{ ...draft.entries[0], value }] } }))
+                        changed()
+                      }}
+                    />
+                    <p className="muted new-entity-hint">
+                      {inherited && inherited.value !== null && inherited.from && inherited.from !== 'chapter'
+                        ? `Left empty: ${valueWords(inherited.value)}, from ${defaultsWords(inherited.from, inherited.fromKey)}.`
+                        : 'Left empty: none.'}
+                    </p>
+                  </div>
+                )
+              })}
+            </fieldset>
+          )}
           {error && (
             <div className="error" role="alert">
               <p>{refusal(error)}</p>
@@ -328,6 +396,30 @@ function AddChapterDialog({
       </div>
     </div>
   )
+}
+
+const NO_TYPES: SourceFieldType[] = []
+
+/**
+ * The chapter fields the writer filled in, as JSON to send, and what to fix
+ * first. A field left empty (no text, or a list with no items) isn't sent,
+ * so the new chapter inherits it.
+ */
+function chapterFields(types: SourceFieldType[], drafts: Record<string, FieldDraft>, base: string): { fields: Record<string, Json> | undefined; problems: Problem[] } {
+  const fields: Record<string, Json> = {}
+  const problems: Problem[] = []
+  for (const t of types) {
+    const draft = drafts[t.name]
+    const value = draft ? jsonOfField(t, draft).value : undefined
+    if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) {
+      continue
+    }
+
+    problems.push(...fieldProblems(t, draft, `${base}${t.name}`, { clear: 'leave it empty' }))
+    fields[t.name] = value
+  }
+
+  return { fields: Object.keys(fields).length > 0 ? fields : undefined, problems }
 }
 
 /** Why the add was refused, in the form's words where the server's are for agents. */

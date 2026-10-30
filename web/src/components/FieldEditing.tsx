@@ -544,13 +544,19 @@ function EntryEditor({
   )
 }
 
-function ValueEditor({
+/**
+ * A field's value: one control for its type, or a list's items with Add
+ * item, Remove, and move up and down. Chapter fields (#225) use it too,
+ * outside a note's editor, so they name the universe for the link picker.
+ */
+export function ValueEditor({
   idBase,
   type,
   entry,
   positions,
   problems,
   onChange,
+  universe,
 }: {
   idBase: string
   type: SourceFieldType
@@ -558,13 +564,24 @@ function ValueEditor({
   positions: PositionView[]
   problems: Problem[]
   onChange: (value: EntryDraft['value']) => void
+  /** The universe, for the link picker; a note's editor has it already. */
+  universe?: string
 }) {
   const v = entry.value
   const problemFor = (at: string) => problems.find((p) => p.at === at)?.message
   if (v.kind === 'one') {
     const at = controlId(idBase, entry, 'value')
     return (
-      <ValueInput id={at} label="Value" type={type} draft={v.draft} positions={positions} problem={problemFor(at)} onChange={(draft) => onChange({ kind: 'one', draft })} />
+      <ValueInput
+        id={at}
+        label="Value"
+        type={type}
+        draft={v.draft}
+        positions={positions}
+        problem={problemFor(at)}
+        universe={universe}
+        onChange={(draft) => onChange({ kind: 'one', draft })}
+      />
     )
   }
 
@@ -592,6 +609,7 @@ function ValueEditor({
                 draft={item.draft}
                 positions={positions}
                 problem={problemFor(at)}
+                universe={universe}
                 onChange={(draft) => setItems(v.items.map((x) => (x.id === item.id ? { ...x, draft } : x)))}
               />
               <span className="item-tools">
@@ -641,6 +659,7 @@ function ValueInput({
   positions,
   problem,
   onChange,
+  universe: given,
 }: {
   id: string
   label: string
@@ -649,8 +668,10 @@ function ValueInput({
   positions: PositionView[]
   problem: string | undefined
   onChange: (draft: Draft) => void
+  universe?: string
 }) {
-  const universe = useEditing()!.universe
+  const editing = useEditing()
+  const universe = given ?? editing!.universe
   const text = (t: string) => onChange({ ...draft, text: t })
   const invalid = problem !== undefined
   const described = invalid ? `${id}-problem` : undefined

@@ -2549,8 +2549,11 @@ to add Whitby to chapter 7's setting.
   written and why: `{"field": "setting", "as_written": "Whitby harbour",
   "reason": "setting is a link to one entity, such as …, not 'Whitby
   harbour'."}`. Its `fields` leave it out, and a chapter with nothing
-  ignored has no `ignored`. `get_chapter_defaults` marks an ignored
-  default the same way: `ignored: true`, `written`, and `reason`.
+  ignored has no `ignored`. A list item that doesn't fit (`setting:
+  ["[[bistritz]]", Borgo Pass]`) is listed with its number, `item: 1`,
+  and the rest of the list holds. A field written with no value
+  (`setting:`) isn't a fault, so it isn't listed. `get_chapter_defaults`
+  marks an ignored default with `ignored: true`, `written`, and `reason`.
 - An `add` to it is refused (`bad_argument`), naming the chapter and its
   file, what's written, and why it's ignored, then what to do: "'setting'
   in chapter dracula:7 (Cutting from "The Dailygraph," 8 August)
@@ -2562,15 +2565,27 @@ to add Whitby to chapter 7's setting.
   nothing is written. A `set` with `["[[whitby]]"]` replaces it.
 - One value that holds, such as `setting: "[[whitby]]"`, isn't a list
   either: an `add` is refused the same way, without calling it ignored.
+- A field that takes one value has no list, whatever is written: an
+  `add` to `tense` is refused ("takes one value, not a list … To change
+  it, send a 'set' change with the new value"), so it never writes
+  `tense: [past]`, which would be ignored.
+- In a universe's `chapter_defaults` there's nothing above to go back
+  to, so the refusal says `clear` takes the value out, so its books have
+  none unless their series or book sets one.
 - No refusal of `update_chapter_fields` or `update_chapter_defaults`
-  names a YAML path such as `chapters.6.fields.setting`. An item that
-  isn't there, a place past the end of a list, a field the chapter
-  doesn't set, and `fields` that aren't a mapping each name the chapter
-  (or "the chapter_defaults of book 'ember'") and the field.
+  names a YAML path such as `chapters.6.fields.setting`, and each names
+  the file. An item that isn't there (by number or by text, which adds
+  that `get_chapter` lists the items), a place past the end of a list, a
+  `remove` from a field the chapter doesn't write or writes with no
+  value, a field the chapter doesn't set, and `fields` that aren't a
+  mapping each name the chapter (or "the chapter_defaults of book
+  'ember'") and the field. A chapter's title is folded onto one line and
+  cut short with "…" past 60 characters.
 
 Spec: types.md F-CHAP-3, F-CHAP-5 (#233). Covered by:
 `WriteToolTests.AnIgnoredChapterValueIsShownAndItsRefusalsSayWhatToDo`,
 `WriteToolTests.ChapterFieldRefusalsNameTheChapterNotAYamlPath`,
+`WriteToolTests.ARefusalNamesAChapterByItsTitleOnOneLine`,
 `ChapterDefaultsToolTests.AnAddToADefaultThatIsntAListNamesTheContainerAndSaysWhatToDo` (MCP).
 
 ## STORE: Wolfden saves, moves, and deletes notes
@@ -4547,7 +4562,10 @@ prologue writes `fields: { pov: [], when: "2284" }`, and chapter 3
   ignored, with why ("written here as "futur", which is ignored: tense
   is one of past, present, future, not 'futur'. Did you mean
   'future'?"), and the chapter has `past` from the series (F-CHAP-3).
-  **Edit** says the same before a save replaces it (#233).
+  **Edit** says the same before a save replaces it, in a note the form
+  is described by (#233). An item of a list that doesn't fit is shown as
+  left out ("item 2, "Borgo Pass", is left out: …"); a field written
+  with no value isn't flagged.
 - Reading as of `ember:1`, chapters after it show no fields in the
   book's list (and no chapter does until the page knows where `ember:1`
   is), and a link in a shown value to a note the reader hasn't
@@ -4640,12 +4658,15 @@ Spec: types.md F-CHAP-5, design.md §9 (#215, #225). Covered by:
   nothing. A chapter written as a bare key (`chapters: [1, 2]`) has no
   place for fields: the API refuses (`unsupported_edit`), and the page
   says to write it as `{ key: 1 }` first.
-- An `add` to a value that isn't a list (chapter 3's `tense: futur`) is
-  refused naming the chapter, its file, what's written and why it's
-  ignored, in the page's words: "To replace it, edit the field and save
-  the whole value; to go back to what the chapter inherits from
-  chapter_defaults, choose Use the default" (**Clear** for chapter
-  defaults). No refusal names a YAML path (#233).
+- An `add` to a field that takes one value (chapter 3's `tense`) is
+  refused naming the chapter and its file, in the page's words: "To
+  change it, edit the field and save the new value." An `add` to a
+  default that isn't a list (`setting: Kessan Reach`) says what's
+  written, why it's ignored, and "To replace it, edit the field and save
+  the whole value; to go back to what its books inherit from above,
+  choose Clear" (**Use the default** for a chapter). A `remove` of an
+  item that isn't there says to reload the page. No refusal names a YAML
+  path (#233).
 - `/api/book/chapter-fields` and `/api/chapter-defaults` answer GET only,
   and the edits POST only, as JSON.
 

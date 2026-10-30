@@ -312,7 +312,10 @@ then its book, then its series, then the universe. The rules are in
   why it's ignored ("written here as "Whitby harbour", which is ignored:
   setting is a link to one entity, …"), and the chapter has the default
   meanwhile. **Edit** says so again before you replace it; **Use the
-  default** (or **Clear**, for chapter defaults) takes it out instead.
+  default** (or **Clear**, for chapter defaults) takes it out instead. An
+  item of a list that doesn't fit, such as `Borgo Pass` in `setting:
+  ["[[castle-dracula]]", Borgo Pass]`, is shown as left out, with why,
+  and the rest of the list holds.
 
 A final book's chapters and defaults can't be edited until it's
 unfrozen. A series' or universe's default that would change what a

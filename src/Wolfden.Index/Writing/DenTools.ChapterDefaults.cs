@@ -96,7 +96,7 @@ public sealed partial class DenTools
             }
 
             var file = target.File;
-            var place = DefaultsPlace(target);
+            var place = DefaultsPlace(target, structure.Types);
             var touched = new List<string>();
             var notes = new List<string>();
             var itemComments = new ItemComments();
@@ -519,7 +519,7 @@ public sealed partial class DenTools
                 above?.DefaultFrom?.Key,
                 ignored ? true : null,
                 ignored ? JsonOf(written![name]) : null,
-                ignored ? container.IgnoredChapterDefaults.GetValueOrDefault(name)?.Reason : null);
+                ignored ? container.IgnoredChapterDefaults.FirstOrDefault(i => i.Name == name && i.Item is null)?.Reason : null);
         }).ToList();
         return new ChapterDefaultsView(container.Kind.ToString().ToLowerInvariant(), container.Key, container.FilePath, fields);
     }

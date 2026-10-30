@@ -92,9 +92,10 @@ public sealed record ChapterFieldView(
 /// title alone where no <c>chapter_heading</c> holds; null if there's neither.
 /// </param>
 /// <param name="Ignored">
-/// The fields the chapter writes with a value that's ignored (types.md
-/// F-CHAP-3), so it inherits them as if they weren't written, in name order,
-/// or null if there are none. Show them to the writer before replacing one.
+/// What the chapter writes that's ignored (types.md F-CHAP-3), in name
+/// order, or null if nothing is: a whole value, which the chapter inherits
+/// in place of, or one item of a list, which is left out of it. Show them to
+/// the writer before replacing one.
 /// </param>
 public sealed record ChapterView(
     string Book, string Key, long? Number, string? Title, int Line, IReadOnlyList<ChapterFieldView> Fields, string? Heading,
@@ -102,9 +103,10 @@ public sealed record ChapterView(
 
 /// <summary>A chapter field written with a value that's ignored (types.md F-CHAP-3, #233).</summary>
 /// <param name="Field">The field name, such as <c>setting</c>.</param>
-/// <param name="AsWritten">The value as written, as JSON (null for a field written with no value).</param>
+/// <param name="Item">For one item of a list that's left out of it, the item's number from 0; null when the whole value is ignored.</param>
+/// <param name="AsWritten">The value (or item) as written, as JSON.</param>
 /// <param name="Reason">Why it's ignored, in words for the writer.</param>
-public sealed record IgnoredFieldView(string Field, JsonElement AsWritten, string Reason);
+public sealed record IgnoredFieldView(string Field, int? Item, JsonElement AsWritten, string Reason);
 
 /// <summary>The result of <c>get_chapter</c>.</summary>
 /// <param name="Version">The shape version.</param>

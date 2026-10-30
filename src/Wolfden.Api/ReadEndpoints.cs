@@ -44,6 +44,7 @@ public static class ReadEndpoints
         "/api/search and /api/entities", "Ask again with one of the candidates' keys.")
     {
         Unfreeze = "POST /api/book/unfreeze opens book '{0}' for editing again.",
+        ItemsListed = "GET {1} lists its items; name one by its number from 0 in 'item'.",
     };
 
     /// <summary>Maps the read endpoints onto <paramref name="api"/>.</summary>

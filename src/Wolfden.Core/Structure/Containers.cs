@@ -87,10 +87,9 @@ public abstract class Container
 
     /// <summary>
     /// The fields this container's <c>chapter_defaults</c> writes with a
-    /// value that's ignored (types.md F-CHAP-3), by field name, with why.
+    /// value, or list items, that are ignored (types.md F-CHAP-3), with why, in file order.
     /// </summary>
-    public IReadOnlyDictionary<string, IgnoredChapterField> IgnoredChapterDefaults { get; internal set; } =
-        new Dictionary<string, IgnoredChapterField>(StringComparer.Ordinal);
+    public IReadOnlyList<IgnoredChapterField> IgnoredChapterDefaults { get; internal set; } = [];
 
     /// <summary>
     /// The chapter fields this container's <c>chapter_heading</c> lists
@@ -372,11 +371,10 @@ public sealed class Chapter
 
     /// <summary>
     /// The fields the chapter item's own <c>fields</c> writes with a value
-    /// that's ignored (types.md F-CHAP-3), by field name, with why: the
-    /// chapter inherits them instead.
+    /// that's ignored (types.md F-CHAP-3), so the chapter inherits them
+    /// instead, and the list items it leaves out, with why, in file order.
     /// </summary>
-    public IReadOnlyDictionary<string, IgnoredChapterField> IgnoredFields { get; internal set; } =
-        new Dictionary<string, IgnoredChapterField>(StringComparer.Ordinal);
+    public IReadOnlyList<IgnoredChapterField> IgnoredFields { get; internal set; } = [];
 
     /// <summary>
     /// The chapter's <b>effective values</b> (types.md F-CHAP-5), by field

@@ -137,7 +137,8 @@ public sealed partial class DenTools
             inherited?.DefaultFrom?.Key,
             LinksOf(effective, effective?.DefaultFrom ?? chapter.Book, links),
             text,
-            set && !chapter.OwnFields.ContainsKey(name) ? chapter.IgnoredFields.GetValueOrDefault(name)?.Reason : null);
+            set && !chapter.OwnFields.ContainsKey(name) ? WholeIgnored(chapter.IgnoredFields, name) : null,
+            IgnoredItems(chapter.IgnoredFields, name));
     }
 
     private static ChapterValueView DefaultValue(string name, Container container, YamlMapping? written, Lazy<LinkResolver> links, string text)
@@ -157,8 +158,17 @@ public sealed partial class DenTools
             above?.DefaultFrom?.Key,
             LinksOf(effective, effective?.DefaultFrom ?? container, links),
             text,
-            set && own is null ? container.IgnoredChapterDefaults.GetValueOrDefault(name)?.Reason : null);
+            set && own is null ? WholeIgnored(container.IgnoredChapterDefaults, name) : null,
+            IgnoredItems(container.IgnoredChapterDefaults, name));
     }
+
+    /// <summary>Why the field's whole value is ignored, or null.</summary>
+    private static string? WholeIgnored(IReadOnlyList<IgnoredChapterField> ignored, string name) =>
+        ignored.FirstOrDefault(i => i.Name == name && i.Item is null)?.Reason;
+
+    /// <summary>The field's list items that are left out, with why.</summary>
+    private static List<IgnoredItemView> IgnoredItems(IReadOnlyList<IgnoredChapterField> ignored, string name) =>
+        ignored.Where(i => i.Name == name && i.Item is not null).Select(i => new IgnoredItemView(i.Item!.Value, AsWritten(i.Value), i.Reason)).ToList();
 
     /// <summary>The links in a value's items, resolved from <paramref name="scope"/>, the container that holds the value (types.md F-CHAP-4).</summary>
     private static List<ChapterLinkView> LinksOf(ChapterFieldValue? value, Container scope, Lazy<LinkResolver> links)

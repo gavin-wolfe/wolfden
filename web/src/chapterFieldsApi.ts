@@ -35,6 +35,8 @@ export interface ChapterValueView {
   ignored: boolean
   /** If ignored, why, in words for the writer, such as "setting is a link to one entity, … not 'Whitby harbour'." (#233). */
   ignoredReason: string | null
+  /** The items of a list it writes that don't fit the field, so they're left out of it, with why (#233). */
+  ignoredItems: { item: number; asWritten: Json; reason: string }[]
   /** The value that holds, or null if nothing sets it. */
   value: Json | null
   from: ValueFrom | null

@@ -335,7 +335,27 @@ public sealed class ChapterDefaultsToolTests : IDisposable
         var item = Assert.Throws<DenToolException>(() => Tools.UpdateChapterDefaults(
             Tools.UpdateChapterDefaults(read.Hash, Json("""[{"op": "set", "field": "setting", "value": ["[[kessan-reach]]"]}]"""), "starfall", book: "ember").Hash,
             Json("""[{"op": "remove", "field": "setting", "item": 3}]"""), "starfall", book: "ember"));
-        Assert.Equal("'setting' in the chapter_defaults of book 'ember' has 1 item(s), so there's no item 3.", item.Message);
+        Assert.Equal(
+            $"'setting' in the chapter_defaults of book 'ember' ({Ember}) has 1 item(s), so there's no item 3. get_chapter_defaults lists its items; name one by its number from 0 in 'item'.",
+            item.Message);
+
+        // A universe's defaults have nothing above them: clearing takes the value out.
+        const string UniverseFile = Universe + "/universe.md";
+        _den.Write(UniverseFile, _den.Read(UniverseFile).Replace("name: Starfall\n", "name: Starfall\nchapter_defaults:\n  setting: Kessan Reach\n", StringComparison.Ordinal));
+        var top = Assert.Throws<DenToolException>(() => Tools.UpdateChapterDefaults(
+            Tools.GetChapterDefaults("starfall").Hash, Json("""[{"op": "add", "field": "setting", "value": "[[kessan-reach]]"}]"""), "starfall"));
+        Assert.EndsWith(
+            "To replace it, send a 'set' change with the whole value; to take it out, so its books have none unless their series or the book sets one, send a 'clear' change.",
+            top.Message,
+            StringComparison.Ordinal);
+
+        // A field that takes one value has no list to add to, even where nothing is written.
+        var tense = Assert.Throws<DenToolException>(() => Tools.UpdateChapterDefaults(
+            Tools.GetChapterDefaults("starfall").Hash, Json("""[{"op": "add", "field": "tense", "value": "past"}]"""), "starfall"));
+        Assert.Equal(
+            $"'tense' in the chapter_defaults of universe 'starfall' ({UniverseFile}) takes one value, not a list, so 'add' has no list to add an item to. " +
+            "To change it, send a 'set' change with the new value.",
+            tense.Message);
     }
 
     private static JsonElement Json(string json) => JsonDocument.Parse(json).RootElement.Clone();

@@ -106,6 +106,7 @@ public sealed class ChapterFieldEndpointTests : IDisposable
         Assert.Equal(("series", "\"past\""), (futur.GetProperty("from").GetString(), futur.GetProperty("value").GetRawText()));
         Assert.Equal("tense is one of past, present, future, not 'futur'. Did you mean 'future'?", futur.GetProperty("ignoredReason").GetString());
         Assert.Equal(JsonValueKind.Null, Field(1, "tense").GetProperty("ignoredReason").ValueKind);
+        Assert.Equal(0, Field(1, "pov").GetProperty("ignoredItems").GetArrayLength());
 
         // The chapters' read lists it too, as written and why (#233).
         var read = await server.GetJsonAsync("/api/book/chapters?universe=starfall&book=ember", HttpStatusCode.OK);
@@ -231,23 +232,34 @@ public sealed class ChapterFieldEndpointTests : IDisposable
         Assert.Equal("unsupported_edit", bareJson.GetProperty("code").GetString());
         Assert.Contains("chapter ash:1 is written as a bare key", bareJson.GetProperty("message").GetString(), StringComparison.Ordinal);
 
-        // An add to a value that isn't a list names the chapter and says what to do on the page, never a YAML path (#233).
+        // Refusals of list changes name the chapter and its file, and say what to do on the page, never a YAML path (#233).
         await Refused(
             "/api/chapter/edit",
             new { book = "ember", universe = "starfall", chapter = "3", field = "tense", expectedHash = hash, changes = new object[] { new { op = "add", value = "past" } } },
             HttpStatusCode.BadRequest,
             "bad_argument",
-            $"'tense' in chapter ember:3 ({Ember}) is written as one value, 'futur', not a list, so 'add' has no list to add an item to. That value is ignored: " +
-            "tense is one of past, present, future, not 'futur'. Did you mean 'future'? To replace it, edit the field and save the whole value; to go back to what the chapter " +
-            "inherits from chapter_defaults, choose Use the default.");
+            $"'tense' in chapter ember:3 ({Ember}) takes one value, not a list, so 'add' has no list to add an item to. To change it, edit the field and save the new value.");
+        await Refused(
+            "/api/chapter/edit",
+            new { book = "ember", universe = "starfall", chapter = "prologue", field = "pov", expectedHash = hash, changes = new object[] { new { op = "remove", value = "[[nobody]]" } } },
+            HttpStatusCode.BadRequest,
+            "bad_argument",
+            $"'pov' in chapter ember:prologue (Before the Dark) ({Ember}) has no item '[[nobody]]'. Reload the page to see its items as they are now.");
+        var seriesText = _den.Read(Series);
+        _den.Write(Series, seriesText.Replace("{ tense: past }", "{ tense: past, setting: Kessan Reach }", StringComparison.Ordinal));
         var seriesHash = (await server.GetJsonAsync("/api/chapter-defaults?universe=starfall&series=long-dark", HttpStatusCode.OK)).GetProperty("hash").GetString();
-        var (notList, notListJson) = await PostAsync(server, "/api/chapter-defaults/edit", new { universe = "starfall", series = "long-dark", field = "tense", expectedHash = seriesHash, changes = new object[] { new { op = "add", value = "past" } } });
+        var (notList, notListJson) = await PostAsync(server, "/api/chapter-defaults/edit", new { universe = "starfall", series = "long-dark", field = "setting", expectedHash = seriesHash, changes = new object[] { new { op = "add", value = "[[kessan-reach]]" } } });
         Assert.Equal(HttpStatusCode.BadRequest, notList);
         Assert.EndsWith(
-            "'tense' in the chapter_defaults of series 'long-dark' (" + Series + ") is written as one value, 'past', not a list, so 'add' has no list to add an item to. " +
             "To replace it, edit the field and save the whole value; to go back to what its books inherit from above, choose Clear.",
             notListJson.GetProperty("message").GetString(),
             StringComparison.Ordinal);
+        Assert.StartsWith(
+            "'setting' in the chapter_defaults of series 'long-dark' (" + Series + ") is written as one value, 'Kessan Reach', not a list, so 'add' has no list to add an item to. " +
+            "That value is ignored: setting is a link to one entity",
+            notListJson.GetProperty("message").GetString(),
+            StringComparison.Ordinal);
+        _den.Write(Series, seriesText);
 
         using var get = await server.Client.GetAsync("/api/chapter/edit", Token);
         Assert.Equal(HttpStatusCode.MethodNotAllowed, get.StatusCode);

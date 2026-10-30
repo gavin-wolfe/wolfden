@@ -362,8 +362,8 @@ public sealed class WolfdenTools
         "whether that's the chapter's own or inherited from a chapter_defaults (of the book, series, or universe), and what it would " +
         "inherit without its own value. A list field set to [] means 'none here' and stops inheritance. Each chapter's heading is the title " +
         "the writer sees: its title, then the fields a chapter_heading lists (such as 'Ardent — Vesta Yards, 2350-04-12'). A field the chapter " +
-        "writes with a value that's ignored (such as plain text where the field takes links) is listed in 'ignored', as written and why: show " +
-        "it to the writer before a 'set' replaces it. Also gives the hash of the book's book.md, for update_chapter_fields.")]
+        "writes with a value that's ignored (such as plain text where the field takes links), or a list item that's left out, is listed in " +
+        "'ignored', as written and why: show it to the writer before a 'set' replaces it. Also gives the hash of the book's book.md, for update_chapter_fields.")]
     public CallToolResult GetChapter(
         [Description("The book's key.")] string book,
         [Description("The chapter's key; leave it out for every chapter.")] string? chapter = null,

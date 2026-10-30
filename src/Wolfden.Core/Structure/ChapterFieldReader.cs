@@ -19,7 +19,7 @@ internal sealed class ChapterFieldReader(DenStructure den, Universe universe)
     {
         foreach (var container in new Container[] { universe }.Concat(universe.Series).Concat(universe.Books))
         {
-            var ignored = new Dictionary<string, IgnoredChapterField>(StringComparer.Ordinal);
+            var ignored = new List<IgnoredChapterField>();
             container.ChapterDefaults = ReadDefaults(container, ignored);
             container.IgnoredChapterDefaults = ignored;
             container.ChapterHeading = ReadHeading(container);
@@ -29,7 +29,7 @@ internal sealed class ChapterFieldReader(DenStructure den, Universe universe)
         {
             foreach (var chapter in book.Chapters)
             {
-                var ignored = new Dictionary<string, IgnoredChapterField>(StringComparer.Ordinal);
+                var ignored = new List<IgnoredChapterField>();
                 chapter.OwnFields = ReadChapter(book, chapter, ignored);
                 chapter.IgnoredFields = ignored;
                 var effective = new Dictionary<string, ChapterFieldValue>(chapter.OwnFields, StringComparer.Ordinal);
@@ -46,7 +46,7 @@ internal sealed class ChapterFieldReader(DenStructure den, Universe universe)
         }
     }
 
-    private Dictionary<string, ChapterFieldValue> ReadDefaults(Container container, Dictionary<string, IgnoredChapterField> ignored)
+    private Dictionary<string, ChapterFieldValue> ReadDefaults(Container container, List<IgnoredChapterField> ignored)
     {
         var result = new Dictionary<string, ChapterFieldValue>(StringComparer.Ordinal);
         switch (container.File.Frontmatter?["chapter_defaults"])
@@ -128,7 +128,7 @@ internal sealed class ChapterFieldReader(DenStructure den, Universe universe)
         return names.Count == 0 ? null : names;
     }
 
-    private Dictionary<string, ChapterFieldValue> ReadChapter(Book book, Chapter chapter, Dictionary<string, IgnoredChapterField> ignored)
+    private Dictionary<string, ChapterFieldValue> ReadChapter(Book book, Chapter chapter, List<IgnoredChapterField> ignored)
     {
         var result = new Dictionary<string, ChapterFieldValue>(StringComparer.Ordinal);
         switch (chapter.FieldsNode)
@@ -146,7 +146,7 @@ internal sealed class ChapterFieldReader(DenStructure den, Universe universe)
     }
 
     private void Read(
-        string path, YamlMapping map, Container? defaultFrom, Dictionary<string, ChapterFieldValue> result, Dictionary<string, IgnoredChapterField> ignored, string where)
+        string path, YamlMapping map, Container? defaultFrom, Dictionary<string, ChapterFieldValue> result, List<IgnoredChapterField> ignored, string where)
     {
         foreach (var entry in map.Entries)
         {
@@ -158,7 +158,7 @@ internal sealed class ChapterFieldReader(DenStructure den, Universe universe)
             var value = entry.Value;
             if (value is YamlScalar { IsNull: true })
             {
-                ignored.TryAdd(name, new IgnoredChapterField(name, value, $"{name} is written with no value (null), which counts as not set."));
+                // A null is "not set" (F-FLD-4), not a fault, so it isn't listed as ignored.
                 continue;
             }
 
@@ -166,7 +166,7 @@ internal sealed class ChapterFieldReader(DenStructure den, Universe universe)
             {
                 Warn(path, "F-CHAP-3", value.Line,
                     $"{name} in {where} is an entry, but a chapter field has no entries: write the plain value. It's ignored, as if it were left out.");
-                ignored.TryAdd(name, new IgnoredChapterField(name, value, $"{name} is written as an entry, but a chapter field has no entries: it takes the plain value."));
+                Ignore(ignored, new IgnoredChapterField(name, null, value, $"{name} is written as an entry, but a chapter field has no entries: it takes the plain value."));
                 continue;
             }
 
@@ -194,15 +194,44 @@ internal sealed class ChapterFieldReader(DenStructure den, Universe universe)
             if (set)
             {
                 result[name] = new ChapterFieldValue(name, definition, value, check.Items, defaultFrom);
-                ignored.Remove(name);
+                ignored.RemoveAll(i => i.Name == name);
+                if (value is YamlSequence items)
+                {
+                    // The list's items that don't fit are left out of it (#233).
+                    var faults = check.Problems.Where(p => !p.IsAdvisory).ToList();
+                    for (var i = 0; i < items.Items.Count; i++)
+                    {
+                        var item = items.Items[i];
+                        if (check.Items.Any(m => ReferenceEquals(m, item)))
+                        {
+                            continue;
+                        }
+
+                        var next = i + 1 < items.Items.Count ? items.Items[i + 1].Line : int.MaxValue;
+                        var own = faults.Where(p => ReferenceEquals(p.Node, item)).ToList();
+                        var why = own.Count > 0 ? own : faults.Where(p => p.Line >= item.Line && p.Line < next).ToList();
+                        ignored.Add(new IgnoredChapterField(name, i, item, Reasons(why)));
+                    }
+                }
             }
             else
             {
-                ignored.TryAdd(name, new IgnoredChapterField(
-                    name, value, string.Join(" ", check.Problems.Where(p => !p.IsAdvisory).Select(p => p.Message).Distinct(StringComparer.Ordinal))));
+                Ignore(ignored, new IgnoredChapterField(name, null, value, Reasons(check.Problems.Where(p => !p.IsAdvisory))));
             }
         }
     }
+
+    /// <summary>Records a whole value as ignored, unless the field already has one (a repeated key: the first counts).</summary>
+    private static void Ignore(List<IgnoredChapterField> ignored, IgnoredChapterField field)
+    {
+        if (!ignored.Any(i => i.Name == field.Name && i.Item is null))
+        {
+            ignored.Add(field);
+        }
+    }
+
+    private static string Reasons(IEnumerable<ValueProblem> problems) =>
+        string.Join(" ", problems.Select(p => p.Message).Distinct(StringComparer.Ordinal));
 
     private void Warn(string path, string rule, int? line, string message) =>
         den.Add(path, new Diagnostic(rule, DiagnosticSeverity.Warning, line, message));

@@ -99,10 +99,18 @@ public sealed record ChapterAddResult(
 /// whole <c>chapter_defaults</c> when it doesn't set the field, or is written on one line). A page that finds the file
 /// changed sends its changes again only if these are byte for byte as they were.
 /// </param>
+/// <param name="IgnoredItems">The items of a list it writes that don't fit the field, so they're left out of it, with why (#233).</param>
 /// <param name="IgnoredReason">If <paramref name="Ignored"/>, why, in words for the writer, such as "setting is a link to one entity, ... not 'Whitby harbour'." (#233); null otherwise.</param>
 public sealed record ChapterValueView(
     string Name, bool Set, JsonElement? Own, bool Ignored, JsonElement? Value, string? From, string? FromKey, bool None, JsonElement? Default,
-    string? DefaultFrom, string? DefaultFromKey, IReadOnlyList<ChapterLinkView> Links, string Text, string? IgnoredReason = null);
+    string? DefaultFrom, string? DefaultFromKey, IReadOnlyList<ChapterLinkView> Links, string Text, string? IgnoredReason = null,
+    IReadOnlyList<IgnoredItemView>? IgnoredItems = null);
+
+/// <summary>An item of a chapter field's list that doesn't fit the field, so it's left out of the list (types.md F-CHAP-3, #233).</summary>
+/// <param name="Item">Its number from 0.</param>
+/// <param name="AsWritten">It as written (<see cref="SourceField.Value"/>).</param>
+/// <param name="Reason">Why it's left out, in words for the writer.</param>
+public sealed record IgnoredItemView(int Item, JsonElement AsWritten, string Reason);
 
 /// <summary>A link in a chapter field's value, resolved (format.md §10.2).</summary>
 /// <param name="Text">The link as written, such as <c>[[mina-harker]]</c>.</param>

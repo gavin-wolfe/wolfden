@@ -149,6 +149,14 @@ public sealed class ChapterRecord
 
     /// <summary>The chapter's ordinal in story order.</summary>
     public long Ordinal { get; set; }
+
+    /// <summary>
+    /// What the chapter's heading is built from (format.md F-CTR-6, #227),
+    /// as JSON (<see cref="ChapterHeadingRows"/>), or null when no
+    /// <c>chapter_heading</c> holds or none of its fields has a value. Links
+    /// are kept as written and named when read, so a rename follows.
+    /// </summary>
+    public string? HeadingJson { get; set; }
 }
 
 /// <summary>An entity (format.md §7) that loaded without errors.</summary>

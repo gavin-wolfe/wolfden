@@ -20,7 +20,7 @@ const guest: BookNode = {
   status: 'draft',
   position: 'dracula-s-guest',
   entities: { total: 0, byType: {} },
-  chapters: [1, 2, 3].map((n) => ({ key: String(n), number: n, title: null, position: `dracula-s-guest:${n}` })),
+  chapters: [1, 2, 3].map((n) => ({ key: String(n), number: n, title: null, position: `dracula-s-guest:${n}`, heading: null })),
 }
 
 const papers: SeriesNode = {

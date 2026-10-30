@@ -28,7 +28,14 @@ public sealed record EntityCounts(int Total, IReadOnlyDictionary<string, int> By
 /// <param name="Number">The display number, or null.</param>
 /// <param name="Title">The title, or null.</param>
 /// <param name="Position">The chapter's story position, <c>book:chapter</c>.</param>
-public sealed record ChapterNode(string Key, long? Number, string? Title, string Position);
+/// <param name="Heading">
+/// The heading to show (format.md F-CTR-6, #227): the title, then the chapter
+/// fields <c>chapter_heading</c> lists, such as "Ardent — Vesta Yards,
+/// 2350-04-12"; the title alone where no <c>chapter_heading</c> holds; null
+/// when there's neither. As of a position, a chapter after it shows its title
+/// alone, and a link to a note the reader hasn't met shows as written.
+/// </param>
+public sealed record ChapterNode(string Key, long? Number, string? Title, string Position, string? Heading);
 
 /// <summary>A book in <see cref="HierarchyResult"/>.</summary>
 /// <param name="Key">Its key.</param>

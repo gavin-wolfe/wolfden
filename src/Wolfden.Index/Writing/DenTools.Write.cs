@@ -437,12 +437,14 @@ public sealed partial class DenTools
         }
 
         var (universeKey, _) = LocateBook(book.Trim(), universe);
-        var structure = DenStructure.Load(Snapshot());
+        var den = Snapshot();
+        var structure = DenStructure.Load(den);
         var found = FindBook(structure, universeKey, book.Trim());
         var chapters = chapter is null ? found.Chapters.ToList() : [FindChapter(found, chapter)];
+        var links = Links(structure, den);
         return new GetChapterResult(
             DenReader.ResultVersion, universeKey, found.Key, found.FilePath, HashOf(found.File.ToBytes()), found.Status == BookStatus.Final,
-            chapters.Count, chapters.Select(ChapterOf).ToList());
+            chapters.Count, chapters.Select(c => ChapterOf(c, links)).ToList());
     }
 
     /// <summary>
@@ -523,7 +525,7 @@ public sealed partial class DenTools
                 // A write that changes nothing never adds an id (F-ID-6).
                 return new WriteResult(
                     DenReader.ResultVersion, false, path, HashOf(original), null, ["Nothing changed: book.md already says that."], [], [],
-                    Chapter: ChapterOf(ch));
+                    Chapter: ChapterOf(ch, Links(structure, den)));
             }
 
             var idAdded = target.Id is null ? AddId(ref file) : null;
@@ -536,7 +538,7 @@ public sealed partial class DenTools
             var afterChapter = afterBook.FindChapter(ch.Key)!;
             return new WriteResult(
                 DenReader.ResultVersion, true, path, HashOf(bytes), null, [.. ChapterEffects(ch, afterChapter, touched.Distinct().ToList()), .. notes], [], Warnings(check),
-                Chapter: ChapterOf(afterChapter), IdAdded: idAdded);
+                Chapter: ChapterOf(afterChapter, Links(check.Structure, den)), IdAdded: idAdded);
         }
     }
 
@@ -1766,7 +1768,20 @@ public sealed partial class DenTools
 
     private static string Where(Container c) => $"{c.Kind.ToString().ToLowerInvariant()} '{c.Key}' chapter_defaults";
 
-    private static ChapterView ChapterOf(Chapter chapter)
+    /// <summary>A link resolver over <paramref name="den"/>'s notes, loaded only if it's used.</summary>
+    private static Lazy<LinkResolver> Links(DenStructure structure, IDenSource den) =>
+        new(() => new LinkResolver(EntityCatalog.Load(structure, den)));
+
+    /// <summary>
+    /// A chapter's heading (format.md F-CTR-6), its links named by the notes
+    /// they reach; the den's notes are read only if the heading has a link.
+    /// </summary>
+    internal static string? HeadingOf(Chapter chapter, Lazy<LinkResolver> links) =>
+        ChapterHeadings.Parts(chapter).Any(p => p.Items.Any(i => i.Links.Count > 0))
+            ? ChapterHeadings.Heading(chapter, links.Value)
+            : ChapterHeadings.Heading(chapter, (_, _) => null);
+
+    private static ChapterView ChapterOf(Chapter chapter, Lazy<LinkResolver> links)
     {
         var names = chapter.Fields.Keys.Concat(chapter.OwnFields.Keys).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal);
         var fields = names.Select(name =>
@@ -1784,7 +1799,7 @@ public sealed partial class DenTools
                 inherited is null ? null : JsonOf(inherited.Value),
                 inherited?.DefaultFrom is { } d ? d.Kind.ToString().ToLowerInvariant() : null);
         }).ToList();
-        return new ChapterView(chapter.Book.Key, chapter.Key, chapter.Number, chapter.Title, chapter.Line, fields);
+        return new ChapterView(chapter.Book.Key, chapter.Key, chapter.Number, chapter.Title, chapter.Line, fields, HeadingOf(chapter, links));
     }
 
     // ------------------------------------------------------------- values

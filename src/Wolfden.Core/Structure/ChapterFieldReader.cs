@@ -20,6 +20,7 @@ internal sealed class ChapterFieldReader(DenStructure den, Universe universe)
         foreach (var container in new Container[] { universe }.Concat(universe.Series).Concat(universe.Books))
         {
             container.ChapterDefaults = ReadDefaults(container);
+            container.ChapterHeading = ReadHeading(container);
         }
 
         foreach (var book in universe.Books)
@@ -56,6 +57,71 @@ internal sealed class ChapterFieldReader(DenStructure den, Universe universe)
                     "chapter_defaults must be a mapping from chapter field to value, such as '{ tense: past }', so it's ignored.");
                 return result;
         }
+    }
+
+    private const string HeadingExample = "such as '[pov, setting, when]'";
+
+    /// <summary>
+    /// A container's <c>chapter_heading</c> (format.md F-CTR-6): a list of
+    /// chapter field names. Every problem is a warning. An entry that isn't a
+    /// name, or repeats one, is ignored; a name that isn't a chapter field is
+    /// kept, as a chapter's own undefined field is (types.md F-CHAP-3). One
+    /// name on its own is a one-item list. Any other value that isn't a list,
+    /// or a list left with no entries, counts as not set, so the books
+    /// inherit; an explicit <c>[]</c> is "no fields here".
+    /// </summary>
+    private List<string>? ReadHeading(Container container)
+    {
+        switch (container.File.Frontmatter?[ChapterHeadings.Key])
+        {
+            case null or YamlScalar { IsNull: true }:
+                return null;
+            case YamlSequence { Items.Count: 0 }:
+                return [];
+            case YamlScalar single when single.Text.Trim().Length > 0:
+                // One name on its own (chapter_heading: pov) is a one-item list.
+                return Names(container, [single]);
+            case YamlSequence list:
+                return Names(container, list.Items);
+            case var node:
+                Warn(container.FilePath, "F-CTR-6", node.Line,
+                    $"chapter_heading must be a chapter field's name or a list of them, {HeadingExample}, so it's ignored and the chapters inherit one from further up, if any.");
+                return null;
+        }
+    }
+
+    /// <summary>The names of a <c>chapter_heading</c>'s entries, or null if none is left.</summary>
+    private List<string>? Names(Container container, IReadOnlyList<YamlNode> items)
+    {
+        var names = new List<string>();
+        foreach (var item in items)
+        {
+            if (item is not YamlScalar { IsNull: false } scalar || scalar.Text.Trim().Length == 0)
+            {
+                Warn(container.FilePath, "F-CTR-6", item.Line,
+                    $"Each entry in chapter_heading must be a chapter field's name, {HeadingExample}. This one is ignored.");
+                continue;
+            }
+
+            var name = scalar.Text.Trim();
+            if (names.Contains(name, StringComparer.Ordinal))
+            {
+                Warn(container.FilePath, "F-CTR-6", item.Line, $"'{name}' is already in chapter_heading, so this entry is ignored.");
+                continue;
+            }
+
+            if (den.Types.FindChapterField(name) is null)
+            {
+                var known = den.Types.ChapterFields.Select(f => f.Name).ToList();
+                Warn(container.FilePath, "F-CTR-6", item.Line,
+                    $"'{name}' in chapter_heading isn't a chapter field, so headings show it only for a chapter whose fields write it." +
+                    (known.Count == 0 ? "" : $" The chapter fields are: {string.Join(", ", known)}."));
+            }
+
+            names.Add(name);
+        }
+
+        return names.Count == 0 ? null : names;
     }
 
     private Dictionary<string, ChapterFieldValue> ReadChapter(Book book, Chapter chapter)

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, getRouteApi } from '@tanstack/react-router'
-import { hierarchyQuery } from '../api'
+import { hierarchyQuery, type ChapterNode } from '../api'
 import { ChapterFieldsSection } from '../components/ChapterFields'
 import { EntityList } from '../components/EntityList'
 import { ErrorState, Loading } from '../components/States'
@@ -11,17 +11,30 @@ import { findBook } from './BookPage'
 const route = getRouteApi('/u/$universe/b/$book/c/$chapter')
 
 /**
- * A chapter: its number and title, its chapter fields (POV, when, …), a
+ * A chapter: its number and heading, its chapter fields (POV, when, …), a
  * way to read the den as of it, and the notes that enter the story there.
  */
 export function ChapterPage() {
   const { universe, book, chapter } = route.useParams()
   const { at, setAt } = usePosition()
   const hierarchy = useQuery(hierarchyQuery(universe, undefined))
+  // Headings as of the position (#227): the page's structure comes from the
+  // full hierarchy, so a change of position doesn't reload it (or close a
+  // field's form), but a heading names only what the reader has met (#26).
+  const asOf = useQuery({ ...hierarchyQuery(universe, at), enabled: at !== undefined })
+  const headingOf = (ch: ChapterNode): string | null => {
+    if (at === undefined) {
+      return ch.heading
+    }
+
+    // Until the answer as of the position is in (or if it fails), the title alone, which is shown whatever the position.
+    const there = asOf.data ? findBook(asOf.data.universe, book)?.book.chapters.find((x) => x.key === ch.key) : undefined
+    return there ? there.heading : ch.title
+  }
   const view = useEntitiesInView(universe)
   const titled = hierarchy.data ? findBook(hierarchy.data.universe, book) : null
   const titledChapter = titled?.book.chapters.find((x) => x.key === chapter)
-  useDocumentTitle(titled && titledChapter ? `${titledChapter.title ?? `Chapter ${titledChapter.key}`} · ${titled.book.name}` : undefined)
+  useDocumentTitle(titled && titledChapter ? `${headingOf(titledChapter) ?? `Chapter ${titledChapter.key}`} · ${titled.book.name}` : undefined)
 
   if (hierarchy.isPending) {
     return <Loading what="the chapter" />
@@ -64,7 +77,7 @@ export function ChapterPage() {
         </Link>
       </nav>
       <p className="eyebrow">Chapter {c.number ?? c.key}</p>
-      <h1>{c.title ?? `Chapter ${c.number ?? c.key}`}</h1>
+      <h1>{headingOf(c) ?? `Chapter ${c.number ?? c.key}`}</h1>
       <p>
         {at === c.position ? (
           <span className="badge">You are reading as of this chapter</span>
@@ -93,14 +106,14 @@ export function ChapterPage() {
       <nav className="prev-next" aria-label="Chapters">
         {prev ? (
           <Link to="/u/$universe/b/$book/c/$chapter" params={{ universe, book: b.key, chapter: prev.key }} rel="prev">
-            ‹ {prev.number ?? prev.key}. {prev.title}
+            ‹ {prev.number ?? prev.key}. {headingOf(prev)}
           </Link>
         ) : (
           <span />
         )}
         {next && (
           <Link to="/u/$universe/b/$book/c/$chapter" params={{ universe, book: b.key, chapter: next.key }} rel="next">
-            {next.number ?? next.key}. {next.title} ›
+            {next.number ?? next.key}. {headingOf(next)} ›
           </Link>
         )}
       </nav>

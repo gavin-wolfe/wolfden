@@ -85,7 +85,13 @@ public sealed record ChapterFieldView(
 /// <param name="Title">The title, or null.</param>
 /// <param name="Line">The chapter's line in <c>book.md</c>.</param>
 /// <param name="Fields">Each chapter field the chapter sets or inherits, in name order.</param>
-public sealed record ChapterView(string Book, string Key, long? Number, string? Title, int Line, IReadOnlyList<ChapterFieldView> Fields);
+/// <param name="Heading">
+/// The heading the chapter shows (format.md F-CTR-6): its title, then the
+/// values of the chapter fields <c>chapter_heading</c> lists, links named by
+/// the notes they reach, such as "Ardent — Vesta Yards, 2350-04-12". The
+/// title alone where no <c>chapter_heading</c> holds; null if there's neither.
+/// </param>
+public sealed record ChapterView(string Book, string Key, long? Number, string? Title, int Line, IReadOnlyList<ChapterFieldView> Fields, string? Heading);
 
 /// <summary>The result of <c>get_chapter</c>.</summary>
 /// <param name="Version">The shape version.</param>

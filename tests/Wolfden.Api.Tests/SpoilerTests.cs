@@ -19,6 +19,9 @@ public class SpoilerTests
     private const string QuinceyFile = "universes/dracula/books/dracula/entities/characters/quincey-harker.md";
     private const string MaraFile = "universes/starfall/series/long-dark/entities/characters/mara-voss.md";
     private const string PikeFile = "universes/starfall/series/long-dark/books/ash/entities/characters/halden-pike.md";
+    private const string DraculaBook = "universes/dracula/books/dracula/book.md";
+    private const string LongDarkSeries = "universes/starfall/series/long-dark/series.md";
+    private const string EmberBook = "universes/starfall/series/long-dark/books/ember/book.md";
 
     /// <summary>Members whose text the writer wrote, or (chapter titles, #26 M2) are listed whatever the position.</summary>
     private static readonly HashSet<string> Authored = ["text", "target", "heading", "label", "body", "lead", "value", "snippet", "query", "title"];
@@ -75,8 +78,23 @@ public class SpoilerTests
     public async Task NothingAsOfAPositionNamesAnEntityTheReaderHasntMet(string universe, string asOf)
     {
         using var den = universe == "dracula" ? DraculaWithASharedAlias() : TempDen.Starfall();
+        // Chapter headings built from fields (#227), so the sweep checks the hierarchy's headings too.
+        if (universe == "dracula")
+        {
+            den.Write(DraculaBook, den.Read(DraculaBook).Replace("chapter_defaults:\n", "chapter_heading: [pov, setting, when]\nchapter_defaults:\n", StringComparison.Ordinal));
+            Assert.Contains("chapter_heading:", den.Read(DraculaBook), StringComparison.Ordinal);
+        }
+
         if (universe == "starfall")
         {
+            den.Write(LongDarkSeries, den.Read(LongDarkSeries).Replace("books: [ember, ash]\n", "books: [ember, ash]\nchapter_heading: [pov, setting, when]\n", StringComparison.Ordinal));
+            // A chapter whose POVs are Mara Voss and, by a labelled id link, Pike, whom an Ember reader hasn't met.
+            den.Write(EmberBook, den.Read(EmberBook).Replace(
+                "  - { key: \"2\", number: 2 }",
+                "  - { key: \"2\", number: 2, fields: { pov: [\"[[mara-voss]]\", \"[[01JA7Q8M4XK3V9R2D5W8HN6TQC|the new hand]]\"], setting: [\"[[kessan-reach]]\"] } }",
+                StringComparison.Ordinal));
+            Assert.Contains("|the new hand]]", den.Read(EmberBook), StringComparison.Ordinal);
+            Assert.Contains("chapter_heading:", den.Read(LongDarkSeries), StringComparison.Ordinal);
             // A link by id to an entity met later (Halden Pike, from ash), with a label that doesn't name him.
             den.Write(MaraFile, den.Read(MaraFile).Replace(
                 "Executive officer of the *Tessaly*.", "Executive officer of the *Tessaly*. Distrusts [[01JA7Q8M4XK3V9R2D5W8HN6TQC|the new hand]].", StringComparison.Ordinal)
@@ -230,8 +248,19 @@ public class SpoilerTests
                 {
                     // A section's heading is the writer's text too.
                     var inSection = at.EndsWith(']') && at.Contains("sections[", StringComparison.Ordinal);
-                    if (Authored.Contains(member.Name) || (inSection && member.Name is "name" or "headingPath"))
+                    // A chapter's heading (#227) is built by Wolfden, so it's checked; a link's #heading isn't.
+                    var chapterHeading = member.Name == "heading" && at.EndsWith(']') && at.Contains("chapters[", StringComparison.Ordinal);
+                    if ((Authored.Contains(member.Name) && !chapterHeading) || (inSection && member.Name is "name" or "headingPath"))
                     {
+                        continue;
+                    }
+
+                    // The heading starts with the chapter's title, which is the writer's and listed whatever the position (#26 M2); the rest is Wolfden's.
+                    if (chapterHeading && member.Value.ValueKind == JsonValueKind.String
+                        && json.TryGetProperty("title", out var title) && title.ValueKind == JsonValueKind.String
+                        && member.Value.GetString()!.StartsWith(title.GetString()!, StringComparison.Ordinal))
+                    {
+                        yield return ($"{at}.heading", member.Value.GetString()![title.GetString()!.Length..]);
                         continue;
                     }
 

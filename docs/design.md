@@ -284,7 +284,8 @@ core defines POV, narration (first person, third limited, and so on),
 tense, an in-world date, and a setting (the chapter's locations). A
 universe, series, or book can set `chapter_defaults` once (say, third
 person past tense for a whole series), and a chapter's own fields
-override them. Story positions refer to chapter
+override them. A `chapter_heading` list can build each chapter's displayed
+heading from those fields (#227). Story positions refer to chapter
 keys, so renumbering chapters doesn't break positions. Book and chapter keys
 can't contain `:` or `.`, which the position syntax uses as separators.
 
@@ -838,7 +839,7 @@ it to Claude Code, Claude Desktop, and other clients is in
 | `canon_as_of` | shipped (#20) | Canon at a position, with an optional series or book filter |
 | `check` | shipped (#20) | Run continuity checks and return findings |
 | `get_history` | shipped (#19) | Commit history and diffs for an entity |
-| `get_chapter` | shipped (#21) | A book's chapters with each chapter field's own, effective, and inherited value, and `book.md`'s hash |
+| `get_chapter` | shipped (#21) | A book's chapters with each chapter field's own, effective, and inherited value, each chapter's heading (#227), and `book.md`'s hash |
 | `create_entity` | shipped (#21) | From a type template |
 | `update_fields` / `append_section` | shipped (#21) | Structured edits that keep everything else intact |
 | `add_idea` | shipped (#21) | Record undecided material with `status: idea` |
@@ -2317,6 +2318,36 @@ docs/
   - **Adding a chapter** shows a form for each chapter field, empty, with
     what the chapter will inherit if it stays empty. Only fields given a
     value are sent; an empty list is inherited at create, not `[]`.
+- **Chapter headings** (#227). **Decided (maintainer, 2026-10-30):** a
+  container key `chapter_heading: [pov, setting, when]`, inherited down
+  like `chapter_defaults` (nearest container wins), builds a chapter's
+  displayed heading from the listed chapter fields, in order, after an
+  explicit `title`; leaving it out changes nothing, and links show the
+  linked note's current name, so renames follow (format.md F-CTR-6). The
+  rest is v0 behaviour, not a recorded decision.
+  - **One builder.** Core's `ChapterHeadings` puts every heading
+    together; surfaces differ only in how a link's note is named. The
+    index keeps each chapter's parts (its fields' items, links as
+    written) on its chapter row and names the links when it's read,
+    from the link rows and entity names, which every update rewrites,
+    so a rename shows without a rebuild of the chapter rows.
+  - **Where it shows.** `/api/hierarchy`'s chapters, `get_chapter` (and
+    `/api/book/chapters`), and `update_chapter_fields`' result have
+    `heading`. `/api/positions` and the position bar keep titles, which
+    are shown whatever the position, as does the sidebar tree, to stay
+    short. The book page lists chapters by heading, and the chapter
+    page uses it for its title, its tab, and its links to the chapters
+    before and after.
+  - **As of a position** (#26), `/api/hierarchy?asOf=` builds headings
+    from what the reader has met: a chapter after the position shows its
+    title alone, and a link to a note the reader hasn't met shows as
+    written (its label, or else its target), as the book page shows such
+    a link among a chapter's fields (#225). The chapter page keeps
+    reading its structure without `asOf`, so a change of position
+    doesn't reload it or close a field's form, and asks for headings as
+    of the position on the side, showing the title until they come.
+  - **Editing.** `chapter_heading` is written in the file for now; the
+    Chapter defaults panels don't edit it.
 - **Parsing round-trips.** Read-modify-write keeps formatting, ordering, and
   unknown content. This gets heavy test coverage, since it decides whether
   people trust the tool with their notes.

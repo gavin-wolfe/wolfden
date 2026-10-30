@@ -33,6 +33,14 @@ export interface ChapterNode {
   number: number | null
   title: string | null
   position: string
+  /**
+   * The heading to show (format.md F-CTR-6, #227): the title, then the chapter
+   * fields `chapter_heading` lists, such as "Ardent — Vesta Yards,
+   * 2350-04-12"; the title alone where no `chapter_heading` holds; null when
+   * there's neither. As of a position (the hierarchy's `asOf`), a chapter
+   * after it has its title alone, and none names a note the reader hasn't met.
+   */
+  heading: string | null
 }
 
 export interface BookNode {

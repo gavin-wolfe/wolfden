@@ -86,6 +86,15 @@ public abstract class Container
         new Dictionary<string, ChapterFieldValue>(StringComparer.Ordinal);
 
     /// <summary>
+    /// The chapter fields this container's <c>chapter_heading</c> lists
+    /// (format.md F-CTR-6), in order, with the entries it ignores left out;
+    /// empty for <c>[]</c>, "no fields here", which stops inheritance; null
+    /// if it doesn't set one (or sets one that's ignored), so its books
+    /// inherit from further up. See <see cref="ChapterHeadings"/>.
+    /// </summary>
+    public IReadOnlyList<string>? ChapterHeading { get; internal set; }
+
+    /// <summary>
     /// The scope chain (format.md §1.4): this container and the ones that
     /// enclose it, nearest first. For a book in a series, that's the book,
     /// the series, and the universe.

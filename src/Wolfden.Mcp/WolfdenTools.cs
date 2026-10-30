@@ -360,7 +360,8 @@ public sealed class WolfdenTools
     [Description(
         "A book's chapters, or one chapter, with each chapter field (such as pov, narration, tense, when, setting): its effective value, " +
         "whether that's the chapter's own or inherited from a chapter_defaults (of the book, series, or universe), and what it would " +
-        "inherit without its own value. A list field set to [] means 'none here' and stops inheritance. Also gives the hash of the " +
+        "inherit without its own value. A list field set to [] means 'none here' and stops inheritance. Each chapter's heading is the title " +
+        "the writer sees: its title, then the fields a chapter_heading lists (such as 'Ardent — Vesta Yards, 2350-04-12'). Also gives the hash of the " +
         "book's book.md, for update_chapter_fields.")]
     public CallToolResult GetChapter(
         [Description("The book's key.")] string book,

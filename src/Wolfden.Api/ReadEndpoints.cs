@@ -167,12 +167,20 @@ public static class ReadEndpoints
         var containers = db.Containers.Where(c => c.UniverseId == u.Id).ToList();
         var chapters = db.Chapters.Where(c => c.UniverseId == u.Id).ToList().ToLookup(c => c.BookId);
         var entities = db.Entities.Where(e => e.UniverseId == u.Id).Select(e => new { e.ScopeId, e.Type, e.Path }).ToList();
+        HashSet<string>? met = null;
+        long? point = null;
         if (asOf is not null)
         {
             // As of a position, only what the reader has met: the canon view's entities.
-            var inView = reader.CanonView(index, u.Key, asOf, null).Entities.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
-            entities = entities.Where(e => inView.Contains(e.Path)).ToList();
+            met = reader.CanonView(index, u.Key, asOf, null).Entities.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
+            entities = entities.Where(e => met.Contains(e.Path)).ToList();
+            point = index.PointOf(u.Key, asOf);
         }
+
+        // Headings (#227): as of a position, a chapter after it shows its title
+        // alone, and no heading names a note the reader hasn't met (#26).
+        var headings = ChapterHeadingRows.Headings(
+            db, u.Id, chapters.SelectMany(g => g).ToList(), point is { } at ? c => c.Ordinal <= at : null, met);
 
         var byScope = entities.ToLookup(e => e.ScopeId);
         EntityCounts Counts(ContainerRecord c) => new(
@@ -180,7 +188,7 @@ public static class ReadEndpoints
             new SortedDictionary<string, int>(byScope[c.Id].GroupBy(e => e.Type).ToDictionary(g => g.Key, g => g.Count()), StringComparer.Ordinal));
         BookNode Book(ContainerRecord b) => new(
             b.Key, b.Name, b.Ulid, b.Path, b.BookStatus ?? "draft", b.Key, Counts(b),
-            chapters[b.Id].OrderBy(c => c.Index).Select(c => new ChapterNode(c.Key, c.Number, c.Title, $"{b.Key}:{c.Key}")).ToList());
+            chapters[b.Id].OrderBy(c => c.Index).Select(c => new ChapterNode(c.Key, c.Number, c.Title, $"{b.Key}:{c.Key}", headings[c.Id])).ToList());
         List<BookNode> BooksIn(ContainerRecord parent) =>
             containers.Where(c => c.Kind == "book" && c.ParentId == parent.Id).OrderBy(c => c.StoryOrder).ThenBy(c => c.Key, StringComparer.Ordinal).Select(Book).ToList();
 

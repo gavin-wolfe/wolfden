@@ -48,3 +48,18 @@ public sealed class ChapterFieldValue
     /// <inheritdoc />
     public override string ToString() => $"{Name} ({Items.Count} item(s){(DefaultFrom is { } c ? $", from {c}" : "")})";
 }
+
+/// <summary>
+/// A value written in a chapter item's <c>fields</c> or a container's
+/// <c>chapter_defaults</c> that's ignored (types.md F-CHAP-3): a whole value
+/// that's an entry or doesn't fit the field, so the chapter (or the
+/// container's books) inherits as if it weren't written; or one item of a
+/// list that doesn't fit, which is left out of the list. The text is still
+/// in the file, so a tool shows it before replacing it. A null isn't a fault
+/// (F-FLD-4), so it's never one of these.
+/// </summary>
+/// <param name="Name">The field name as written.</param>
+/// <param name="Item">For one item of a list, its number from 0; null for the whole value.</param>
+/// <param name="Value">The value, or the item, as written.</param>
+/// <param name="Reason">Why it's ignored, in words for the writer, such as "setting is a link to one entity, ... not 'Whitby harbour'."</param>
+public sealed record IgnoredChapterField(string Name, int? Item, YamlNode Value, string Reason);

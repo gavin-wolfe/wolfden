@@ -91,7 +91,22 @@ public sealed record ChapterFieldView(
 /// the notes they reach, such as "Ardent — Vesta Yards, 2350-04-12". The
 /// title alone where no <c>chapter_heading</c> holds; null if there's neither.
 /// </param>
-public sealed record ChapterView(string Book, string Key, long? Number, string? Title, int Line, IReadOnlyList<ChapterFieldView> Fields, string? Heading);
+/// <param name="Ignored">
+/// What the chapter writes that's ignored (types.md F-CHAP-3), in name
+/// order, or null if nothing is: a whole value, which the chapter inherits
+/// in place of, or one item of a list, which is left out of it. Show them to
+/// the writer before replacing one.
+/// </param>
+public sealed record ChapterView(
+    string Book, string Key, long? Number, string? Title, int Line, IReadOnlyList<ChapterFieldView> Fields, string? Heading,
+    IReadOnlyList<IgnoredFieldView>? Ignored = null);
+
+/// <summary>A chapter field written with a value that's ignored (types.md F-CHAP-3, #233).</summary>
+/// <param name="Field">The field name, such as <c>setting</c>.</param>
+/// <param name="Item">For one item of a list that's left out of it, the item's number from 0; null when the whole value is ignored.</param>
+/// <param name="AsWritten">The value (or item) as written, as JSON.</param>
+/// <param name="Reason">Why it's ignored, in words for the writer.</param>
+public sealed record IgnoredFieldView(string Field, int? Item, JsonElement AsWritten, string Reason);
 
 /// <summary>The result of <c>get_chapter</c>.</summary>
 /// <param name="Version">The shape version.</param>
@@ -113,8 +128,10 @@ public sealed record GetChapterResult(int Version, string Universe, string Book,
 /// <param name="InheritedFromKey">The key of that container, or null.</param>
 /// <param name="Ignored">True if this container writes the field but the value is null or doesn't fit the field, so it's ignored (types.md F-CHAP-3) and its books inherit as if it weren't there; null otherwise.</param>
 /// <param name="Written">For an ignored field, the value as written, as JSON.</param>
+/// <param name="Reason">For an ignored field, why it's ignored, in words for the writer (#233).</param>
 public sealed record ChapterDefaultFieldView(
-    string Name, JsonElement? Own, bool None, JsonElement? Inherited, string? InheritedFrom, string? InheritedFromKey, bool? Ignored = null, JsonElement? Written = null);
+    string Name, JsonElement? Own, bool None, JsonElement? Inherited, string? InheritedFrom, string? InheritedFromKey, bool? Ignored = null, JsonElement? Written = null,
+    string? Reason = null);
 
 /// <summary>A container's <c>chapter_defaults</c>.</summary>
 /// <param name="Kind"><c>universe</c>, <c>series</c>, or <c>book</c>.</param>

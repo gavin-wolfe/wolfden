@@ -361,8 +361,9 @@ public sealed class WolfdenTools
         "A book's chapters, or one chapter, with each chapter field (such as pov, narration, tense, when, setting): its effective value, " +
         "whether that's the chapter's own or inherited from a chapter_defaults (of the book, series, or universe), and what it would " +
         "inherit without its own value. A list field set to [] means 'none here' and stops inheritance. Each chapter's heading is the title " +
-        "the writer sees: its title, then the fields a chapter_heading lists (such as 'Ardent — Vesta Yards, 2350-04-12'). Also gives the hash of the " +
-        "book's book.md, for update_chapter_fields.")]
+        "the writer sees: its title, then the fields a chapter_heading lists (such as 'Ardent — Vesta Yards, 2350-04-12'). A field the chapter " +
+        "writes with a value that's ignored (such as plain text where the field takes links), or a list item that's left out, is listed in " +
+        "'ignored', as written and why: show it to the writer before a 'set' replaces it. Also gives the hash of the book's book.md, for update_chapter_fields.")]
     public CallToolResult GetChapter(
         [Description("The book's key.")] string book,
         [Description("The chapter's key; leave it out for every chapter.")] string? chapter = null,
@@ -392,7 +393,8 @@ public sealed class WolfdenTools
         "The chapter_defaults of a universe, a series (with 'series'), or a book (with 'book'): the chapter field values (such as pov, " +
         "narration, tense, when, setting) its books' chapters inherit, field by field, unless a nearer container or the chapter sets its own. Each " +
         "field gives this container's own value and what its books would inherit from above without it. A list field set to [] means " +
-        "'none here' and stops inheritance. Also lists the books it reaches (and which are final), and gives the hash of its file " +
+        "'none here' and stops inheritance. A field written with a value that's ignored has ignored: true, the value in 'written', and why in " +
+        "'reason': show it to the writer before a 'set' replaces it. Also lists the books it reaches (and which are final), and gives the hash of its file " +
         "(universe.md, series.md, or book.md), for update_chapter_defaults.")]
     public CallToolResult GetChapterDefaults(
         [Description(UniverseHelp)] string? universe = null,

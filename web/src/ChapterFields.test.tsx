@@ -113,6 +113,59 @@ describe('SC-WEB-73: I see each chapter’s fields, and which are inherited', ()
     expect(within(row('weather')).getByRole('button', { name: 'Edit weather' })).toBeTruthy()
     expect(within(list).queryByRole('button', { name: /^Use the default/ })).toBeNull()
   })
+
+  it('a value written but ignored is shown as written, with why, before Edit replaces it (#233)', async () => {
+    const reason = `setting is a link to one entity, such as "[[whitby]]", in quotes, with nothing else in the string, not 'Whitby harbour'.`
+    const withPlainSetting = () => {
+      const b = bookChapterFields()
+      const chapters = b.chapters.map((c) =>
+        c.key !== '2' ? c : { ...c, fields: c.fields.map((f) => (f.name === 'setting' ? unsetValue('setting', { set: true, own: 'Whitby harbour', ignored: true, ignoredReason: reason }) : f)) },
+      )
+      return { ...b, chapters }
+    }
+    const { posted } = stubFields({ book: withPlainSetting })
+    renderApp('/u/dracula/b/dracula/c/2')
+    await screen.findByRole('heading', { name: "Jonathan Harker's Journal", level: 1 })
+
+    await waitFor(() => expect(row('setting').textContent).toContain(`(written here as "Whitby harbour", which is ignored: ${reason})`))
+    fireEvent.click(within(row('setting')).getByRole('button', { name: 'Edit setting' }))
+    const form = screen.getByRole('form', { name: 'Edit setting' })
+    const note = within(form).getByRole('note')
+    expect(note.textContent).toBe(`Written here as "Whitby harbour", which is ignored: ${reason} Saving replaces it.`)
+    expect(form.getAttribute('aria-describedby')).toBe(note.id)
+    expect(posted).toEqual([])
+  })
+
+  it('a list item that doesn’t fit is shown as left out, with why; a value written as null isn’t a fault (#233)', async () => {
+    const reason = `setting is a link to one entity, such as "[[borgo-pass]]", in quotes, with nothing else in the string, not 'Borgo Pass'.`
+    const withItem = () => {
+      const b = bookChapterFields()
+      const chapters = b.chapters.map((c) =>
+        c.key !== '2'
+          ? c
+          : {
+              ...c,
+              fields: c.fields.map((f) =>
+                f.name === 'setting'
+                  ? unsetValue('setting', { set: true, own: ['[[castle-dracula]]', 'Borgo Pass'], value: ['[[castle-dracula]]', 'Borgo Pass'], from: 'chapter', ignoredItems: [{ item: 1, asWritten: 'Borgo Pass', reason }] })
+                  : f.name === 'when'
+                    ? unsetValue('when', { set: true, own: null, ignored: true })
+                    : f,
+              ),
+            },
+      )
+      return { ...b, chapters }
+    }
+    stubFields({ book: withItem })
+    renderApp('/u/dracula/b/dracula/c/2')
+    await screen.findByRole('heading', { name: "Jonathan Harker's Journal", level: 1 })
+
+    await waitFor(() => expect(row('setting').textContent).toContain(`(item 2, "Borgo Pass", is left out: ${reason})`))
+    expect(row('when').textContent).not.toContain('ignored')
+    fireEvent.click(within(row('setting')).getByRole('button', { name: 'Edit setting' }))
+    const form = screen.getByRole('form', { name: 'Edit setting' })
+    expect(within(form).getByRole('note').textContent).toBe(`Item 2, "Borgo Pass", is left out: ${reason} Change or remove it here, or it stays as written.`)
+  })
 })
 
 describe('SC-WEB-74: I edit a chapter’s fields, and go back to the default', () => {

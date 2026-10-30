@@ -309,12 +309,7 @@ function ChapterValues({
                 <>
                   <dd>
                     <ChapterValueText universe={target.universe} view={view} none={target.noneWords} /> <Origin view={view} own={target.own} />
-                    {view.ignored && (
-                      <span className="muted">
-                        {' '}
-                        (written here as {view.own === null ? 'no value' : valueLines(view.own)}, which isn't a value of {view.name}, so it's ignored)
-                      </span>
-                    )}
+                    <IgnoredNote view={view} />
                     {!type && <span className="muted"> (not a chapter field the den's packs define: change it in the file)</span>}
                   </dd>
                   {!locked && type && (
@@ -394,6 +389,32 @@ function ChapterValues({
       </div>
     </>
   )
+}
+
+/**
+ * What a field writes that's ignored, and why (F-CHAP-3, #233): its whole
+ * value, or the items of its list that are left out. Null if nothing is; a
+ * value written as null isn't a fault, so it's never one of these.
+ */
+function ignoredWords(view: ChapterValueView): { whole: string | null; items: string | null } | null {
+  const whole = view.ignored && view.own !== null ? `written here as ${valueLines(view.own)}, which is ignored: ${view.ignoredReason ?? `it isn't a value of ${view.name}.`}` : null
+  const items = view.ignoredItems.length > 0 ? view.ignoredItems.map((i) => `item ${i.item + 1}, ${valueLines(i.asWritten)}, is left out: ${i.reason}`).join(' ') : null
+  return whole || items ? { whole, items } : null
+}
+
+/** What a field writes that's ignored, and why, so the writer sees it before replacing it. */
+function IgnoredNote({ view }: { view: ChapterValueView }) {
+  const words = ignoredWords(view)
+  if (!words) {
+    return null
+  }
+
+  return <span className="muted ignored-value"> ({words.whole ?? words.items})</span>
+}
+
+/** "written here as …" with its first letter capitalized, to start a sentence. */
+function sentence(words: string): string {
+  return words.charAt(0).toUpperCase() + words.slice(1)
 }
 
 /** The form for a value, or why it can't show it (a dated entry, which a chapter field can't have, or a list where one value goes). */
@@ -586,7 +607,16 @@ function FieldForm({
   }
 
   let start: ReactNode = null
-  if (!view.set && view.default !== null) {
+  const ignored = ignoredWords(view)
+  const noteId = `${idBase}-ignored`
+  if (ignored) {
+    // What's written stays in the file until a save replaces it (#233).
+    start = (
+      <p className="muted" role="note" id={noteId}>
+        {ignored.whole ? `${sentence(ignored.whole)} Saving replaces it.` : `${sentence(ignored.items!)} Change or remove it here, or it stays as written.`}
+      </p>
+    )
+  } else if (!view.set && view.default !== null) {
     start = (
       <p className="muted">
         This starts from the value inherited now, from {defaultsWords(view.defaultFrom!, view.defaultFromKey)}. A change you save is set here, in place of it.
@@ -598,6 +628,7 @@ function FieldForm({
     <form
       className="editor-panel inline-form field-editor"
       aria-label={`Edit ${view.name}`}
+      aria-describedby={ignored ? noteId : undefined}
       noValidate
       onSubmit={(e) => {
         e.preventDefault()

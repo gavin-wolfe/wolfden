@@ -96,6 +96,7 @@ public sealed partial class DenTools
             }
 
             var file = target.File;
+            var place = DefaultsPlace(target, structure.Types);
             var touched = new List<string>();
             var notes = new List<string>();
             var itemComments = new ItemComments();
@@ -106,7 +107,7 @@ public sealed partial class DenTools
                 string[] fieldPath = ["chapter_defaults", field];
                 var before = file;
                 var notesBefore = notes.Count;
-                file = Apply(op.Op switch
+                file = ApplyToField(place, op, file, op.Op switch
                 {
                     "set" => () => file.WithFrontmatterValue(fieldPath, op.Value!),
                     "add" => () => file.WithNewListItem(fieldPath, op.Value!, op.Index),
@@ -517,7 +518,8 @@ public sealed partial class DenTools
                 above?.DefaultFrom?.Kind.ToString().ToLowerInvariant(),
                 above?.DefaultFrom?.Key,
                 ignored ? true : null,
-                ignored ? JsonOf(written![name]) : null);
+                ignored ? JsonOf(written![name]) : null,
+                ignored ? container.IgnoredChapterDefaults.FirstOrDefault(i => i.Name == name && i.Item is null)?.Reason : null);
         }).ToList();
         return new ChapterDefaultsView(container.Kind.ToString().ToLowerInvariant(), container.Key, container.FilePath, fields);
     }

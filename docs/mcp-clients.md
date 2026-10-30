@@ -308,6 +308,11 @@ docs. The writer's own list is in
   again (`get_entity`, `get_chapter`, or `get_chapter_defaults`), and
   make the edit on what's there now. Never resend the old text over the
   writer's change.
+- **`den_busy` means wait a moment, then retry.** Another Wolfden
+  (`wolfden serve`, another assistant's session, or a command) was
+  writing to the den for the whole 30 seconds a write waits, so nothing
+  was written. Retry the same call; the hash still holds, since nothing
+  changed. If it keeps happening, ask the writer what's running.
 - **`allow_relinks` only with the writer's say-so.** A create, copy,
   rename, or move that would send existing links to a different note is
   refused, with the links listed. Show them to the writer, and set

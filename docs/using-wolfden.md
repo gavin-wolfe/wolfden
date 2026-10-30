@@ -672,6 +672,14 @@ in it, which Wolfden calls a checkpoint.
   and shows both versions, so nothing is lost. Choose which to keep
   ([Editing notes](#editing-notes)). An assistant's edit is refused the
   same way, and it reads the note again.
+- **Wolfdens take turns writing.** `wolfden serve`, an AI assistant,
+  and a command such as `wolfden new` can all run on one den. Each save
+  waits while another is being made, so none is lost; a command that
+  has to wait says so. If one waits more than 30 seconds, it gives up
+  and saves nothing, so try again. The turns are kept with
+  `.wolfden/write.lock`, which can stay there and is safe to leave;
+  editors such as Obsidian don't take turns, so a save there is caught
+  by the check above instead.
 - **A note with an error disappears.** A file with an error is left out
   of Wolfden until it's fixed: its page, its links, and every view. An
   error in a `book.md` leaves out the whole book. Run `wolfden check` to

@@ -314,6 +314,27 @@ public class WriteEndpointTests
     }
 
     [Fact]
+    public async Task AnEditWhileAnotherWolfdenKeepsWritingIsDenBusyAndWritesNothing()
+    {
+        using var den = NewDen();
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root) { WriteLockWait = TimeSpan.Zero });
+        var source = await SourceAsync(server, LinkerPath);
+
+        // Another Wolfden process holds the den's write lock (#221).
+        using (new FileStream(Path.Combine(den.Root, ".wolfden", "write.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
+        {
+            var (status, json) = await PostAsync(server, "/api/edit/lead", new { entity = LinkerPath, expectedHash = Hash(source), text = "Mine." });
+
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, status);
+            Assert.Equal("den_busy", json.GetProperty("code").GetString());
+            Assert.Equal(Linker, den.Read(LinkerPath));
+        }
+
+        // Once it's let go, the same edit goes ahead.
+        Assert.Equal(HttpStatusCode.OK, (await PostAsync(server, "/api/edit/lead", new { entity = LinkerPath, expectedHash = Hash(source), text = "Mine." })).Status);
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-WEB-43")]
     public async Task AStaleEditIsRefusedWithTheFileAsItIsNow()
     {

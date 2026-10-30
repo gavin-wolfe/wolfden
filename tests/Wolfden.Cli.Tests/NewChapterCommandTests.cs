@@ -88,4 +88,62 @@ public sealed class NewChapterCommandTests : IDisposable
         before = _den.Read(Book);
         Refused("Book 'dracula' is final (frozen), so no chapter can be added to it until it's unfrozen (F-BOOK-1). To open the book for editing again, run: wolfden unfreeze dracula --universe dracula --den ", "chapter", "--in", "dracula");
     }
+
+    [Fact]
+    [Trait("Scenario", "SC-CLI-17")]
+    public async Task ACommandWaitsWhileAnotherWolfdenProcessIsWritingThenWrites()
+    {
+        // This process holds the den's write lock (#221), as 'wolfden serve' does while it saves.
+        var cancel = TestContext.Current.CancellationToken;
+        Directory.CreateDirectory(Path.Combine(_den.Root, ".wolfden"));
+        var held = new FileStream(Path.Combine(_den.Root, ".wolfden", "write.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+        var start = new System.Diagnostics.ProcessStartInfo(Dotnet)
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        foreach (var arg in new[] { Wolfden, "new", "chapter", "--in", "dracula", "--den", _den.Root })
+        {
+            start.ArgumentList.Add(arg);
+        }
+
+        using var process = System.Diagnostics.Process.Start(start)!;
+        var output = process.StandardOutput.ReadToEndAsync(cancel);
+        try
+        {
+            // The command says it's waiting, and hasn't written anything.
+            using (var bound = CancellationTokenSource.CreateLinkedTokenSource(cancel))
+            {
+                bound.CancelAfter(TimeSpan.FromSeconds(120));
+                var line = await process.StandardError.ReadLineAsync(bound.Token);
+                Assert.Equal("wolfden new: another Wolfden is writing to the den; waiting for it to finish...", line);
+            }
+
+            Assert.DoesNotContain("key: \"28\"", _den.Read(Book), StringComparison.Ordinal);
+        }
+        finally
+        {
+            // The other process finishes its write (or ends, however it ends): the OS lets go of the file.
+            held.Dispose();
+        }
+
+        var rest = await process.StandardError.ReadToEndAsync(cancel);
+        using (var exit = CancellationTokenSource.CreateLinkedTokenSource(cancel))
+        {
+            exit.CancelAfter(TimeSpan.FromSeconds(120));
+            await process.WaitForExitAsync(exit.Token);
+        }
+
+        Assert.Equal("", rest);
+        Assert.Equal(CliApp.ExitOk, process.ExitCode);
+        Assert.StartsWith($"Added chapter dracula:28 to {Book}", await output, StringComparison.Ordinal);
+        Assert.Contains("\n  - key: \"28\"\n    number: 28\n---\n", _den.Read(Book).ReplaceLineEndings("\n"), StringComparison.Ordinal);
+    }
+
+    /// <summary>The built <c>wolfden</c>, next to the test binaries.</summary>
+    private static string Wolfden => Path.Combine(AppContext.BaseDirectory, "wolfden.dll");
+
+    /// <summary>The <c>dotnet</c> host running the tests, or the one on the PATH.</summary>
+    private static string Dotnet => Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") is { Length: > 0 } host ? host : "dotnet";
 }

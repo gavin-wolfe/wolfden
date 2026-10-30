@@ -965,10 +965,23 @@ store, so an edit changes only what it means to (format.md §12):
   (`stale_file`) if the file has changed since; the file is compared
   again just before it's written. Each result gives the new hash, so
   edits can follow one another without reading again. Writes are made
-  one at a time within the server. Between processes a small window
-  remains, as with the den store (§6): another program can save the
-  file after that last comparison and before the write replaces it.
-  Closing it would need a lock every editor honours.
+  one at a time, across processes too (#221): each holds the den's
+  write lock, `.wolfden/write.lock`, from reading the files it's based
+  on until the last one is written or put back, so `serve`, an MCP
+  session, and a `wolfden new` take turns, and none saves over another's
+  change. The lock is the file held open with no sharing, which the OS
+  lets go of when the process ends, crash included, so a stale lock
+  can't happen and no process id is guessed at; the file staying behind
+  means nothing. It's one lock for the whole den, so a rename's den-wide
+  link rewrite can't deadlock with another write. A write that finds it
+  held waits, up to 30 seconds, then gives up with `den_busy` and writes
+  nothing; a command says once that it's waiting. `checkpoint` doesn't
+  take it (it writes no den file, and git has its own lock), but freezing
+  and unfreezing do, around the whole change. `check --fix` takes it
+  too. Other programs don't know the lock, so for an editor a small
+  window remains, as with the den store (§6): it can save the file after
+  that last comparison and before the write replaces it. Closing it
+  would need a lock every editor honours.
 - **Frozen and pinned** (maintainer decision, 2026-10-22). Nothing in
   a final book's scope is written (`frozen`): its entities, `book.md`,
   or outline (format.md F-BOOK-1). There are no tools to freeze or
@@ -1645,7 +1658,8 @@ docs/
     (`stale_file`), frozen books (`frozen`), F-ID-6 ids, warnings,
     `effects`, and `pinned_canon`, which the API calls `pinnedCanon`.
     `serve` holds one `DenTools` for the server, so its writes are made
-    one at a time. A lead or section edit replaces the piece's text
+    one at a time, and the den's write lock makes them take turns with
+    other Wolfdens' (#221). A lead or section edit replaces the piece's text
     between the blank lines around it (`MarkdownFile.WithLead`,
     `WithSectionBody`); a section rename is `rename_section`'s den-wide
     link rewrite. Every edit lists the pinned facts it changed, added,
@@ -1670,7 +1684,7 @@ docs/
     write tools' `WriteResult`. Errors add 409 for `stale_file`,
     `frozen`, `ambiguous_section`, and `already_exists`; 422 for
     `invalid_edit` and `unsupported_edit`; 404 for `unknown_section`;
-    and 500 for `write_failed`. A `stale_file` error has `current`, the
+    503 for `den_busy`; and 500 for `write_failed`. A `stale_file` error has `current`, the
     file's source as it is now, so the page can show both versions.
   - **Naming a section.** A section is sent by its `index` (its place
     among the file's sections, subsections included) and its `name`

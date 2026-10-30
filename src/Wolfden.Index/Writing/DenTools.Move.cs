@@ -57,7 +57,7 @@ public sealed partial class DenTools
         }
 
         var (path, ids) = Locate(entity, universe);
-        lock (_writeLock)
+        using (EnterWrite())
         {
             var den = Snapshot();
             var structure = DenStructure.Load(den);

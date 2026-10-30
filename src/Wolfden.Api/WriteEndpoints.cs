@@ -72,6 +72,7 @@ public static partial class WriteEndpoints
         var tools = new DenTools(options.DenRoot)
         {
             WatcherWait = options.WatcherWait,
+            WriteLockWait = options.WriteLockWait,
             PinnedUniverse = options.PinnedUniverse,
             Words = WriteEndpoints.Words,
 

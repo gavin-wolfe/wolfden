@@ -274,6 +274,11 @@ are in [`types.md`](types.md) §8.
 If your den's own pack already defines a chapter field named `setting`,
 yours is used and `wolfden check` warns that it replaces the core one.
 Rename yours, or delete it to use the core field, whichever you prefer.
+If you wrote `setting:` as plain text without defining it (say,
+`setting: Kessan Reach`), `wolfden check` now warns about it and ignores
+the value, since the core field takes links to location notes. Make it a
+link to a location note (`setting: "[[kessan-reach]]"`), or define a
+text `setting` in your den's pack to keep it as it is.
 
 ## Editing notes
 

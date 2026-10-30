@@ -913,9 +913,9 @@ they are facts about the chapters, unlike a field definition's `default`
 **F-CORE-1.** The core pack is built in and always enabled (F-DEN-4,
 F-PACK-7), unless a den-local pack shadows it (F-PACK-10). It defines the
 eight types below and the chapter fields `pov`, `narration`, `tense`,
-`when`, and `setting`. Its files, in [`packs/core/`](../packs/core/), are normative:
-where this section and those files differ, the files win, and the
-difference is a bug in this section. The core pack has no required fields
+`when`, and `setting`. Its files, in [`packs/core/`](../packs/core/),
+are normative: where this section and those files differ, the files
+win, and the difference is a bug in this section. The core pack has no required fields
 and no required sections, so a hand-written note never gets a "missing"
 warning from it. Each type has a template in `packs/core/templates/`.
 
@@ -1111,7 +1111,8 @@ link each chapter to the planet or star system where it happens. Made-up
 calendars such as stardates wait for #37. A multi-POV book may set
 `pov` on every chapter. No check ties `pov` to `narration`. These fields
 are independent of an outline's `pov` column (F-OUT-9), which is per row.
-Time and place for each beat are outline matters (#55).
+Time and place for each beat, finer than a chapter's `when` and
+`setting`, are outline matters (#55).
 
 ## 10. Appendix: a den-local pack
 

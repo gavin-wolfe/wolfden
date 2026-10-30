@@ -301,6 +301,8 @@ public class TypeEffectsTests
 
         var warning = Assert.Single(den.Diagnostics);
         Assert.Equal(("F-CHAP-3", 4), (warning.Diagnostic.RuleId, warning.Diagnostic.Line!.Value));
+        // The example link is to a location, the type setting takes.
+        Assert.Contains("such as \"[[kessan-reach]]\"", warning.Diagnostic.Message, StringComparison.Ordinal);
         Assert.False(den.FindUniverse("starfall")!.FindBook("ember")!.FindChapter("1")!.Fields.ContainsKey("setting"));
     }
 

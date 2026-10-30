@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen, waitFor, within, configure } from '@testing-library/react'
-import type { EntityPageResult, PageField, SearchResult } from './api'
+import type { EntityPageResult, PageField } from './api'
 import type { EntitySource, SourceFieldType, WriteResult } from './editApi'
-import { fieldChanges, fieldDraftOf, fieldProblems, linkFor, nameMatches, newEntry, newItem, type FieldDraft, type Json } from './fieldModel'
+import { fieldChanges, fieldDraftOf, fieldProblems, linkFor, newEntry, newItem, type FieldDraft, type Json } from './fieldModel'
+import type { LookupHit, LookupResult } from './lookupApi'
 import { entities, page, renderApp, stubApi } from './test/harness'
 
 // Editing a note's fields in place (#28, part b): the changes worked out from
@@ -233,18 +234,6 @@ describe('SC-WEB-61: the changes a field edit sends', () => {
     expect(linkFor(year, null)).toBeNull()
   })
 
-  it('offers notes by their name or slug, not ones that only mention the words', () => {
-    const jon = { name: 'Jonathan Harker', path: 'x/jonathan-harker.md' }
-    expect(nameMatches(jon, 'Jon')).toBe(true)
-    expect(nameMatches(jon, 'har')).toBe(true)
-    expect(nameMatches(jon, 'jon har')).toBe(true)
-    expect(nameMatches(jon, 'jonathan-h')).toBe(true)
-    expect(nameMatches(jon, 'mina')).toBe(false)
-    // Typed words split as names do.
-    expect(nameMatches({ name: 'Dr. Van Helsing', path: 'x/abraham-van-helsing.md' }, 'dr. van')).toBe(true)
-    expect(nameMatches({ name: 'Dr. Van Helsing', path: 'x/abraham-van-helsing.md' }, 'van_hel')).toBe(true)
-    expect(nameMatches({ name: 'Castle Dracula', path: 'x/castle-dracula.md' }, 'Jon')).toBe(false)
-  })
 })
 
 describe('B1: an untouched form sends nothing, whatever the value', () => {
@@ -392,11 +381,26 @@ function stubFields(options: { onPost?: (post: Post, n: number) => Response | Wr
       return Response.json(file.source)
     }
 
-    if (url.pathname === '/api/search') {
+    if (url.pathname === '/api/entities/lookup') {
+      // The server matches and ranks (#198); this stands in for it with each word typed starting a word.
       stub.calls.push(`${url.pathname}${url.search}`)
-      const hit = (e: typeof mina) => ({ entity: e, section: null, line: null, snippet: e.name, status: 'canon', inCanon: true, inComment: false })
-      const hits = url.searchParams.get('query')!.startsWith('year') ? [hit(year)] : [hit(jonathan), hit(mina)]
-      return Response.json({ version: 1, query: url.searchParams.get('query')!, count: hits.length, truncated: false, hits } satisfies SearchResult)
+      const query = url.searchParams.get('query')!
+      if (query === 'boom') {
+        return Response.json({ code: 'unknown_type', message: "There's no type 'vampire'." }, { status: 400 })
+      }
+
+      const typed = query.toLowerCase().split(/\s+/).filter((w) => w !== '')
+      const has = (text: string) => typed.every((w) => text.toLowerCase().split(/\s+/).some((t) => t.startsWith(w)))
+      const notes: [typeof mina, string[]][] = [[jonathan, []], [mina, ['Mina Murray', 'Madam Mina']], [year, []]]
+      const matches: LookupHit[] = notes.flatMap(([e, aliases]): LookupHit[] => {
+        if (has(e.name)) {
+          return [{ entity: e, matchedBy: 'name', alias: null, linkText: e.name }]
+        }
+
+        const alias = aliases.find(has)
+        return alias ? [{ entity: e, matchedBy: 'alias', alias, linkText: alias }] : []
+      })
+      return Response.json({ version: 1, universe: 'dracula', query, position: null, count: matches.length, truncated: false, matches } satisfies LookupResult)
     }
 
     if (url.pathname.startsWith('/api/edit/')) {
@@ -528,8 +532,8 @@ describe('SC-WEB-60: editing a field with a control for its type', () => {
     expect(posts[0].body.changes).toEqual([{ op: 'remove', path: [0] }])
   })
 
-  it('offers a link from the search as letters are typed, picked with the arrow keys and Enter', async () => {
-    const { posts, file } = stubFields()
+  it('offers a link from the lookup as letters are typed, picked with the arrow keys and Enter', async () => {
+    const { posts, file, calls } = stubFields()
     file.source = { ...source(), fields: [...source().fields, { name: 'husband', line: 13, value: null }] }
     renderApp('/u/dracula/e/E-MINA')
     fireEvent.click(await screen.findByRole('button', { name: 'Add a field' }))
@@ -550,6 +554,19 @@ describe('SC-WEB-60: editing a field with a control for its type', () => {
     fireEvent.keyDown(input, { key: 'Enter' })
     expect((input as HTMLInputElement).value).toBe('[[jonathan-harker]]')
     expect(within(form).queryByRole('listbox')).toBeNull()
+    // The lookup is of the field's types, with no position: an editor shows everything (#28).
+    const lookups = calls.filter((c) => c.startsWith('/api/entities/lookup'))
+    expect(lookups.length).toBeGreaterThan(0)
+    expect(lookups.every((c) => c.includes('type=character') && !c.includes('asOf'))).toBe(true)
+
+    // A note found by an alias says which (#198), and its link is by its slug all the same.
+    fireEvent.change(input, { target: { value: 'madam' } })
+    const byAlias = await within(form).findByRole('listbox')
+    const option = within(byAlias).getByRole('option')
+    expect(option.textContent).toBe('Mina Harker, as Madam Mina character')
+    expect(option.querySelector('em')?.textContent).toBe('Madam Mina')
+    fireEvent.mouseDown(option)
+    expect((input as HTMLInputElement).value).toBe('[[mina-harker]]')
 
     // Escape closes an open list, not the editor.
     fireEvent.change(input, { target: { value: 'Min' } })
@@ -719,6 +736,28 @@ describe('SC-WEB-65: field edits are guarded', () => {
 
     expect(await screen.findByRole('region', { name: 'The note changed while you were editing the field state' })).toBeTruthy()
     expect(posts).toHaveLength(1)
+  })
+
+  it('offers every note whatever the story position, since editing shows everything', async () => {
+    const { calls } = stubFields()
+    renderApp('/u/dracula/e/E-MINA?at=dracula:1')
+    fireEvent.click(await screen.findByRole('button', { name: 'Add a field' }))
+    const add = await screen.findByRole('form', { name: 'Add a field' })
+    fireEvent.change(within(add).getByRole('combobox', { name: 'Field' }), { target: { value: 'husband' } })
+    fireEvent.click(within(add).getByRole('button', { name: 'Add field' }))
+    const form = await screen.findByRole('form', { name: 'Edit husband' })
+    fireEvent.change(within(form).getByRole('combobox', { name: 'Value' }), { target: { value: 'jon' } })
+    await within(form).findByRole('listbox')
+
+    const lookups = calls.filter((c) => c.startsWith('/api/entities/lookup'))
+    expect(lookups).toEqual(['/api/entities/lookup?query=jon&universe=dracula&type=character&limit=8'])
+
+    // A lookup that fails says so, rather than offering nothing (review of #239).
+    fireEvent.change(within(form).getByRole('combobox', { name: 'Value' }), { target: { value: 'boom' } })
+    expect((await within(form).findByRole('status')).textContent).toBe(
+      "Couldn’t look notes up: There's no type 'vampire'. You can still type the link in full.",
+    )
+    expect(within(form).queryByRole('listbox')).toBeNull()
   })
 
   it('refuses a pick no link is sure to reach, and says how to fix it', async () => {

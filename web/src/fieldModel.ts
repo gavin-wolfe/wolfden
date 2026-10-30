@@ -648,24 +648,6 @@ function fileKey(path: string): string {
   return normalized((path.split('/').pop() ?? '').replace(/\.md$/i, ''))
 }
 
-/** How names, slugs, and what's typed are split into words for the link picker. */
-const WORDS = /[\s\-_.,:;'’"()]+/
-
-/**
- * True if a note's name or slug matches what was typed for a link: each word
- * typed starts a word of the name or slug, ignoring case, so `jon har` finds
- * Jonathan Harker but a note that only mentions him in its text doesn't.
- */
-export function nameMatches(entity: { name: string; path: string }, typed: string): boolean {
-  const words = typed.toLowerCase().split(WORDS).filter((w) => w !== '')
-  if (words.length === 0) {
-    return false
-  }
-
-  const candidates = [entity.name, slugOf(entity) ?? ''].map((t) => t.toLowerCase().split(WORDS).filter((w) => w !== ''))
-  return candidates.some((parts) => words.every((w) => parts.some((p) => p.startsWith(w))))
-}
-
 /** A value as the lines of YAML-like text a writer reads, for the conflict view. */
 export function valueLines(value: Json | undefined): string {
   if (value === undefined) {

@@ -138,6 +138,12 @@ public class SpoilerTests
         foreach (var (entity, unmetNames) in unmet)
         {
             await Ask($"/api/search?universe={universe}&asOf={asOf}&limit=200&query={Uri.EscapeDataString(entity.Name)}");
+            // The lookup by name and alias (#198), by the note's name, each name only it has, and its id.
+            foreach (var name in unmetNames.Append(entity.Name).Concat(entity.Id is { } unmetId ? [unmetId] : []).Distinct())
+            {
+                await Ask($"/api/entities/lookup?universe={universe}&asOf={asOf}&limit=100&query={Uri.EscapeDataString(name)}");
+            }
+
             foreach (var name in universe == "starfall" ? unmetNames : [])
             {
                 // A name only a note the reader hasn't met has finds nothing in the field that links that note.

@@ -35,7 +35,7 @@ public static class ReadEndpoints
     public const int ResultVersion = 1;
 
     /// <summary>The paths under <c>/api</c> this maps, all GET.</summary>
-    public static readonly IReadOnlyList<string> Paths = ["hierarchy", "positions", "entities", "entity", "canon", "search", "fields", "history", "history/diff"];
+    public static readonly IReadOnlyList<string> Paths = ["hierarchy", "positions", "entities", "entities/lookup", "entity", "canon", "search", "fields", "history", "history/diff"];
 
     /// <summary>The words the API's messages use for what to do next (<see cref="ToolWords"/>).</summary>
     public static readonly ToolWords Words = new(
@@ -44,6 +44,7 @@ public static class ReadEndpoints
         "/api/search and /api/entities", "Ask again with one of the candidates' keys.")
     {
         Unfreeze = "POST /api/book/unfreeze opens book '{0}' for editing again.",
+        ItemsListed = "GET {1} lists its items; name one by its number from 0 in 'item'.",
     };
 
     /// <summary>Maps the read endpoints onto <paramref name="api"/>.</summary>
@@ -66,6 +67,10 @@ public static class ReadEndpoints
             ["universe", "type", "status", "series", "book", "asOf", "limit"],
             q => reader.ListEntities(
                 q.Text("universe"), q.Text("type"), q.Text("status"), q.Text("series"), q.Text("book"), q.Int("limit", 200), q.Position("asOf"))));
+        api.MapGet("/entities/lookup", (HttpContext c) => Answer(
+            c,
+            ["query", "universe", "type", "asOf", "limit"],
+            q => reader.LookupEntities(q.Text("query") ?? "", q.Text("universe"), Types(q.Text("type")), q.Position("asOf"), q.Int("limit", 20))));
         api.MapGet("/entity", (HttpContext c) => Answer(
             c, ["entity", "universe", "asOf"], q => EntityPages.Get(reader, q.Text("entity"), q.Text("universe"), q.Position("asOf"))));
         api.MapGet("/canon", (HttpContext c) => Answer(
@@ -85,6 +90,15 @@ public static class ReadEndpoints
             c, ["entity", "universe", "checkpoint", "from", "to"],
             q => HistoryDiff(reader, q.Text("entity"), q.Text("universe"), q.Text("checkpoint"), q.Text("from"), q.Text("to"))));
     }
+
+    /// <summary>
+    /// The types a lookup takes (#198): one type key, or several separated by
+    /// commas, as a ref field's <c>to</c> lists them; null for none.
+    /// </summary>
+    internal static List<string>? Types(string? type) =>
+        type?.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.Ordinal).ToList() is { Count: > 0 } t
+            ? t
+            : null;
 
     /// <summary>
     /// A search's result as the API gives it: the tool's, with each hit's

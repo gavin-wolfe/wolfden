@@ -752,6 +752,123 @@ public sealed class WriteToolTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "SC-MCP-34")]
+    public void AnIgnoredChapterValueIsShownAndItsRefusalsSayWhatToDo()
+    {
+        // Chapter 7's setting written as plain text, as before the core pack made setting a list of links.
+        _den.Write(BookFile, _den.Read(BookFile).Replace("      setting: [\"[[whitby]]\"]\n", "      setting: Whitby harbour\n", StringComparison.Ordinal));
+        var chapter = Tools.GetChapter("dracula", "7");
+
+        // get_chapter lists the ignored value, as written and why; its fields leave it out.
+        var ignored = Assert.Single(chapter.Chapters[0].Ignored!);
+        Assert.Equal("setting", ignored.Field);
+        Assert.Equal("\"Whitby harbour\"", ignored.AsWritten.GetRawText());
+        Assert.StartsWith("setting is a link to one entity", ignored.Reason, StringComparison.Ordinal);
+        Assert.Contains("not 'Whitby harbour'", ignored.Reason, StringComparison.Ordinal);
+        Assert.DoesNotContain(chapter.Chapters[0].Fields, f => f.Name == "setting");
+        Assert.Null(Tools.GetChapter("dracula", "6").Chapters[0].Ignored);
+
+        // Adding to it names the chapter, what's written, why it's ignored, and what to do: never a YAML path.
+        var before = _den.Read(BookFile);
+        var add = Assert.Throws<DenToolException>(() => Tools.UpdateChapterFields("dracula", "7", chapter.Hash, Json("""[{"op": "add", "field": "setting", "value": "[[whitby]]"}]""")));
+        Assert.Equal(ToolErrorCodes.BadArgument, add.Code);
+        Assert.StartsWith(
+            $"'setting' in chapter dracula:7 (Cutting from \"The Dailygraph,\" 8 August) ({BookFile}) is written as one value, 'Whitby harbour', not a list, " +
+            "so 'add' has no list to add an item to. That value is ignored: setting is a link to one entity",
+            add.Message,
+            StringComparison.Ordinal);
+        Assert.EndsWith(
+            "To replace it, send a 'set' change with the whole value; to go back to what the chapter inherits from chapter_defaults, send a 'clear' change.",
+            add.Message,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("chapters.", add.Message, StringComparison.Ordinal);
+        var remove = Assert.Throws<DenToolException>(() => Tools.UpdateChapterFields("dracula", "7", chapter.Hash, Json("""[{"op": "remove", "field": "setting", "item": 0}]""")));
+        Assert.Contains("so 'remove' has no list item to take out. That value is ignored", remove.Message, StringComparison.Ordinal);
+        Assert.Equal(before, _den.Read(BookFile));
+
+        // 'set' replaces it, and then nothing is ignored.
+        var set = Tools.UpdateChapterFields("dracula", "7", chapter.Hash, Json("""[{"op": "set", "field": "setting", "value": ["[[whitby]]"]}]"""));
+        Assert.Null(set.Chapter!.Ignored);
+
+        // One value that holds isn't a list either, so an add says so, without calling it ignored.
+        _den.Write(BookFile, _den.Read(BookFile).Replace("      setting: [\"[[whitby]]\"]\n", "      setting: \"[[whitby]]\"\n", StringComparison.Ordinal));
+        var one = Assert.Throws<DenToolException>(() => Tools.UpdateChapterFields("dracula", "7", Tools.GetChapter("dracula", "7").Hash, Json("""[{"op": "add", "field": "setting", "value": "[[london]]"}]""")));
+        Assert.Contains("is written as one value, '[[whitby]]', not a list, so 'add' has no list to add an item to. To replace it,", one.Message, StringComparison.Ordinal);
+
+        // In a list, an item that doesn't fit is left out, and listed by its number.
+        _den.Write(BookFile, _den.Read(BookFile).Replace("      setting: [\"[[bistritz]]\", \"[[castle-dracula]]\"]\n", "      setting: [\"[[bistritz]]\", Borgo Pass]\n", StringComparison.Ordinal));
+        var partly = Assert.Single(Tools.GetChapter("dracula", "1").Chapters[0].Ignored!);
+        Assert.Equal(("setting", (int?)1, "\"Borgo Pass\""), (partly.Field, partly.Item, partly.AsWritten.GetRawText()));
+        Assert.Contains("not 'Borgo Pass'", partly.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-34")]
+    public void ARefusalNamesAChapterByItsTitleOnOneLine()
+    {
+        // A block-scalar title with a line break, longer than a message's line.
+        _den.Write(BookFile, _den.Read(BookFile).Replace(
+            "    title: Mina Murray's Journal\n    fields:\n      pov: [\"[[mina-harker]]\", \"[[john-seward]]\"]\n",
+            "    title: |-\n      Mina Murray's Journal, continued at Whitby\n      with the storm, the Demeter, and the dog\n    fields:\n      pov: [\"[[mina-harker]]\", \"[[john-seward]]\"]\n",
+            StringComparison.Ordinal));
+        var refused = Assert.Throws<DenToolException>(() => Tools.UpdateChapterFields("dracula", "6", Tools.GetChapter("dracula", "6").Hash, Json("""[{"op": "add", "field": "tense", "value": "past"}]""")));
+        Assert.StartsWith($"'tense' in chapter dracula:6 (Mina Murray's Journal, continued at Whitby with the storm,…) ({BookFile}) takes one value", refused.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-34")]
+    public void ChapterFieldRefusalsNameTheChapterNotAYamlPath()
+    {
+        var hash = Tools.GetChapter("dracula", "6").Hash;
+        const string Six = "chapter dracula:6 (Mina Murray's Journal)";
+
+        DenToolException Refused(string changes, string chapter = "6") =>
+            Assert.Throws<DenToolException>(() => Tools.UpdateChapterFields("dracula", chapter, Tools.GetChapter("dracula", chapter).Hash, Json(changes)));
+
+        // An item that isn't there, by number or by text, says where to find the items.
+        const string Items = " get_chapter lists its items; name one by its number from 0 in 'item'.";
+        Assert.Equal($"'pov' in {Six} ({BookFile}) has 2 item(s), so there's no item 5.{Items}", Refused("""[{"op": "remove", "field": "pov", "item": 5}]""").Message);
+        Assert.Equal($"'pov' in {Six} ({BookFile}) has no item '[[nobody]]'.{Items}", Refused("""[{"op": "remove", "field": "pov", "value": "[[nobody]]"}]""").Message);
+
+        // A place past the end of the list.
+        var index = Refused("""[{"op": "add", "field": "pov", "value": "[[lucy-westenra]]", "index": 9}]""");
+        Assert.Equal($"'pov' in {Six} ({BookFile}): The list has 2 items, so a new one goes at 0 to 2.", index.Message);
+
+        // Clearing what the chapter doesn't set.
+        var clear = Refused("""[{"op": "clear", "field": "tense"}]""");
+        Assert.Equal($"Chapter dracula:6 (Mina Murray's Journal) ({BookFile}) doesn't set 'tense' itself, so there's nothing to clear: it already inherits.", clear.Message);
+
+        // A field that takes one value has no list, whatever is written: an add would write [past], which is ignored.
+        var one = Refused("""[{"op": "add", "field": "tense", "value": "past"}]""");
+        Assert.Equal(
+            $"'tense' in {Six} ({BookFile}) takes one value, not a list, so 'add' has no list to add an item to. To change it, send a 'set' change with the new value.",
+            one.Message);
+
+        // Removing from a field the chapter doesn't write, or writes with no value.
+        Assert.Equal($"Chapter dracula:6 (Mina Murray's Journal) ({BookFile}) doesn't write 'setting', so 'remove' has no list item to take out.", Refused("""[{"op": "remove", "field": "setting", "item": 0}]""").Message);
+        _den.Write(BookFile, _den.Read(BookFile).Replace("      when: { text: \"5 June – 6 August\", sort: [0, 6, 5] }\n", "      when: { text: \"5 June – 6 August\", sort: [0, 6, 5] }\n      setting:\n", StringComparison.Ordinal));
+        Assert.Equal(
+            $"'setting' in {Six} ({BookFile}) is written with no value, so 'remove' has no list item to take out. " +
+            "To replace it, send a 'set' change with the whole value; to go back to what the chapter inherits from chapter_defaults, send a 'clear' change.",
+            Refused("""[{"op": "remove", "field": "setting", "item": 0}]""").Message);
+
+        // A null isn't a fault, so nothing is listed as ignored.
+        Assert.Null(Tools.GetChapter("dracula", "6").Chapters[0].Ignored);
+
+        // Fields that aren't a mapping are ignored, and nothing in them can be changed in place.
+        _den.Write(BookFile, _den.Read(BookFile).Replace(
+            "    fields:\n      pov: [\"[[mina-harker]]\", \"[[john-seward]]\"]\n      when: { text: \"5 June – 6 August\", sort: [0, 6, 5] }\n      setting:\n",
+            "    fields: Mina and Seward\n",
+            StringComparison.Ordinal));
+        var fields = Assert.Throws<DenToolException>(() => Tools.UpdateChapterFields("dracula", "6", Tools.GetChapter("dracula", "6").Hash, Json("""[{"op": "set", "field": "tense", "value": "present"}]""")));
+        Assert.Equal(ToolErrorCodes.UnsupportedEdit, fields.Code);
+        Assert.Equal(
+            $"In {BookFile}, the fields of {Six} are written as 'Mina and Seward', not a mapping from chapter field to value, so they're ignored, " +
+            "and 'tense' can't be changed in place. Fix them by hand first, such as '{ tense: ... }'.",
+            fields.Message);
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-MCP-21")]
     public void NothingInAFinalBookIsWritten()
     {

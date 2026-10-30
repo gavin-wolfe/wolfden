@@ -508,8 +508,10 @@ public sealed partial class DenTools
             {
                 throw new DenToolException(
                     ToolErrorCodes.UnsupportedEdit,
-                    $"Chapter '{ch.Key}' is written as a bare key in book.md, so it has no place for fields. Write it as '{{ key: {ch.Key} }}' first.");
+                    $"In {path}, {ChapterName(ch)} is written as a bare key, so it has no place for fields. Write it as '{{ key: {ch.Key} }}' first.");
             }
+
+            var place = ChapterPlace(ch, itemPath, structure.Types);
 
             var touched = new List<string>();
             var notes = new List<string>();
@@ -521,7 +523,7 @@ public sealed partial class DenTools
                 string[] fieldPath = [.. itemPath, "fields", field];
                 var before = file;
                 var notesBefore = notes.Count;
-                file = Apply(op.Op switch
+                file = ApplyToField(place, op, file, op.Op switch
                 {
                     "set" => () => file.WithFrontmatterValue(fieldPath, op.Value!),
                     "add" => () => file.WithNewListItem(fieldPath, op.Value!, op.Index),
@@ -1749,7 +1751,8 @@ public sealed partial class DenTools
     {
         if ((file.GetFrontmatterValue(fieldPath[..^1]) as YamlMapping)?.ContainsKey(field) != true)
         {
-            throw new DenToolException(ToolErrorCodes.BadArgument, $"Chapter '{chapter.Key}' doesn't set '{field}' itself, so there's nothing to clear: it already inherits.");
+            throw new DenToolException(
+                ToolErrorCodes.BadArgument, $"{ToolWords.Cap(ChapterName(chapter))} doesn't set '{field}' itself, so there's nothing to clear: it already inherits.");
         }
 
         return NoteEmptied(notes, file.WithoutFrontmatterValue(fieldPath, EmptiedList.Null, out var comments), comments, $"the fields of chapter '{chapter.Key}'");
@@ -1758,7 +1761,7 @@ public sealed partial class DenTools
     private static List<string> ChapterEffects(Chapter before, Chapter after, IReadOnlyList<string> fields)
     {
         var effects = new List<string>();
-        var label = $"Chapter {after.Book.Key}:{after.Key}{(after.Title is { } t ? $" ({t})" : "")}";
+        var label = ToolWords.Cap(ChapterName(after));
         foreach (var name in fields)
         {
             var own = after.OwnFields.GetValueOrDefault(name);
@@ -1827,7 +1830,10 @@ public sealed partial class DenTools
                 inherited is null ? null : JsonOf(inherited.Value),
                 inherited?.DefaultFrom is { } d ? d.Kind.ToString().ToLowerInvariant() : null);
         }).ToList();
-        return new ChapterView(chapter.Book.Key, chapter.Key, chapter.Number, chapter.Title, chapter.Line, fields, HeadingOf(chapter, links));
+        var ignored = chapter.IgnoredFields.OrderBy(i => i.Name, StringComparer.Ordinal).ThenBy(i => i.Item)
+            .Select(i => new IgnoredFieldView(i.Name, i.Item, JsonOf(i.Value), i.Reason)).ToList();
+        return new ChapterView(
+            chapter.Book.Key, chapter.Key, chapter.Number, chapter.Title, chapter.Line, fields, HeadingOf(chapter, links), ignored.Count == 0 ? null : ignored);
     }
 
     // ------------------------------------------------------------- values

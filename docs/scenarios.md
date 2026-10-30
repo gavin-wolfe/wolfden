@@ -2584,6 +2584,56 @@ Bistritz out of chapter 1's setting.
 Spec: format.md F-CTR-6 (#227). Covered by:
 `WriteToolTests.EachChapterGivesTheHeadingTheWriterSees` (MCP).
 
+### SC-MCP-34. My assistant finds a chapter value it can't add to
+
+Chapter 7 of Dracula says `setting: Whitby harbour`, written as plain
+text before the core pack made `setting` a list of links to locations,
+so the den ignores it (types.md F-CHAP-3). The writer asks the assistant
+to add Whitby to chapter 7's setting.
+
+- `get_chapter` lists the value under the chapter's `ignored`, as
+  written and why: `{"field": "setting", "as_written": "Whitby harbour",
+  "reason": "setting is a link to one entity, such as …, not 'Whitby
+  harbour'."}`. Its `fields` leave it out, and a chapter with nothing
+  ignored has no `ignored`. A list item that doesn't fit (`setting:
+  ["[[bistritz]]", Borgo Pass]`) is listed with its number, `item: 1`,
+  and the rest of the list holds. A field written with no value
+  (`setting:`) isn't a fault, so it isn't listed. `get_chapter_defaults`
+  marks an ignored default with `ignored: true`, `written`, and `reason`.
+- An `add` to it is refused (`bad_argument`), naming the chapter and its
+  file, what's written, and why it's ignored, then what to do: "'setting'
+  in chapter dracula:7 (Cutting from "The Dailygraph," 8 August)
+  (universes/dracula/books/dracula/book.md) is written as one value,
+  'Whitby harbour', not a list, so 'add' has no list to add an item to.
+  That value is ignored: … To replace it, send a 'set' change with the
+  whole value; to go back to what the chapter inherits from
+  chapter_defaults, send a 'clear' change." A `remove` says the same, and
+  nothing is written. A `set` with `["[[whitby]]"]` replaces it.
+- One value that holds, such as `setting: "[[whitby]]"`, isn't a list
+  either: an `add` is refused the same way, without calling it ignored.
+- A field that takes one value has no list, whatever is written: an
+  `add` to `tense` is refused ("takes one value, not a list … To change
+  it, send a 'set' change with the new value"), so it never writes
+  `tense: [past]`, which would be ignored.
+- In a universe's `chapter_defaults` there's nothing above to go back
+  to, so the refusal says `clear` takes the value out, so its books have
+  none unless their series or book sets one.
+- No refusal of `update_chapter_fields` or `update_chapter_defaults`
+  names a YAML path such as `chapters.6.fields.setting`, and each names
+  the file. An item that isn't there (by number or by text, which adds
+  that `get_chapter` lists the items), a place past the end of a list, a
+  `remove` from a field the chapter doesn't write or writes with no
+  value, a field the chapter doesn't set, and `fields` that aren't a
+  mapping each name the chapter (or "the chapter_defaults of book
+  'ember'") and the field. A chapter's title is folded onto one line and
+  cut short with "…" past 60 characters.
+
+Spec: types.md F-CHAP-3, F-CHAP-5 (#233). Covered by:
+`WriteToolTests.AnIgnoredChapterValueIsShownAndItsRefusalsSayWhatToDo`,
+`WriteToolTests.ChapterFieldRefusalsNameTheChapterNotAYamlPath`,
+`WriteToolTests.ARefusalNamesAChapterByItsTitleOnOneLine`,
+`ChapterDefaultsToolTests.AnAddToADefaultThatIsntAListNamesTheContainerAndSaysWhatToDo` (MCP).
+
 ## STORE: Wolfden saves, moves, and deletes notes
 
 Background: the den store (design.md §6, #121) is how Wolfden writes a
@@ -4153,8 +4203,9 @@ The note's type is a den-local `specimen` with a field of every type.
   `1893-08-08 06:40` with the time of day, sorts by itself; "early
   August" with sort key `1893, 8` is written
   `{ text: early August, sort: [1893, 8] }`.
-- A `ref` searches as I type a few letters, offers the notes of its
-  types whose name or slug starts so (not notes that only mention it),
+- A `ref` looks notes up as I type a few letters, offers the notes of its
+  types whose name, alias, or slug starts so (not notes that only
+  mention it; SC-WEB-78),
   and the arrow keys and Enter (or a click) write `[[jonathan-harker]]`.
   If another note of the universe has the same file name, the link is
   by id, `[[01J...]]`, so it reaches only the note I picked (file names
@@ -4557,7 +4608,13 @@ prologue writes `fields: { pov: [], when: "2284" }`, and chapter 3
   series 'long-dark' defaults"; `narration` is "not set". The prologue's
   `pov` is "none (none in this chapter, [])".
 - Chapter 3's `futur` isn't a tense, so it's shown as written and
-  ignored, and the chapter has `past` from the series (F-CHAP-3).
+  ignored, with why ("written here as "futur", which is ignored: tense
+  is one of past, present, future, not 'futur'. Did you mean
+  'future'?"), and the chapter has `past` from the series (F-CHAP-3).
+  **Edit** says the same before a save replaces it, in a note the form
+  is described by (#233). An item of a list that doesn't fit is shown as
+  left out ("item 2, "Borgo Pass", is left out: …"); a field written
+  with no value isn't flagged.
 - Reading as of `ember:1`, chapters after it show no fields in the
   book's list (and no chapter does until the page knows where `ember:1`
   is), and a link in a shown value to a note the reader hasn't
@@ -4566,7 +4623,7 @@ prologue writes `fields: { pov: [], when: "2284" }`, and chapter 3
   from, what each would inherit, and the den's chapter field definitions
   (`GET /api/book/chapter-fields`).
 
-Spec: types.md §8 (F-CHAP-1..5), design.md §9 (#225). Covered by:
+Spec: types.md §8 (F-CHAP-1..5), design.md §9 (#225, #233). Covered by:
 `ChapterFieldEndpointTests.EachChaptersFieldsSayWhatHoldsAndWhereItComesFrom` (API),
 `ChapterFields.test.tsx` (web).
 
@@ -4652,6 +4709,15 @@ Spec: types.md F-CHAP-5, design.md §9 (#215, #225). Covered by:
   nothing. A chapter written as a bare key (`chapters: [1, 2]`) has no
   place for fields: the API refuses (`unsupported_edit`), and the page
   says to write it as `{ key: 1 }` first.
+- An `add` to a field that takes one value (chapter 3's `tense`) is
+  refused naming the chapter and its file, in the page's words: "To
+  change it, edit the field and save the new value." An `add` to a
+  default that isn't a list (`setting: Kessan Reach`) says what's
+  written, why it's ignored, and "To replace it, edit the field and save
+  the whole value; to go back to what its books inherit from above,
+  choose Clear" (**Use the default** for a chapter). A `remove` of an
+  item that isn't there says to reload the page. No refusal names a YAML
+  path (#233).
 - `/api/book/chapter-fields` and `/api/chapter-defaults` answer GET only,
   and the edits POST only, as JSON.
 
@@ -4692,3 +4758,56 @@ Spec: format.md F-CTR-6, design.md §9 (#227, #26). Covered by:
 `ChapterHeadingIndexTests.AHeadingNamesANoteByItsNameNow` (index),
 `ChapterHeadingEndpointTests`, `SpoilerTests.NothingAsOfAPositionNamesAnEntityTheReaderHasntMet` (API),
 `ChapterHeading.test.tsx` (web).
+
+### SC-WEB-78. I link a note by an alias I remember
+
+In the Dracula sample, I edit a field that links a character, or a
+section, and remember Mina only as "Madam Mina" (#198).
+
+- Typing `madam` in the field's link picker offers "Mina Harker, as
+  *Madam Mina*"; picking it writes `[[mina-harker]]`, as any pick does
+  (`[[01J...]]` where the file name could reach another note). `mur wil`
+  finds her by "Wilhelmina Murray": each word typed starts a word, in any
+  order, ignoring case and accents (`zoe ark` would find a Zoë Arkwright).
+- Typing `mina` offers Mina Harker first (an alias, exactly), then
+  "Mina and Jonathan marry" (a name that starts so), then "The Count
+  visits Mina" (a name that holds it). The picker offers only the
+  field's `to` types: for a character field, Mina Harker alone.
+- `lucys` finds "Lucy's three proposals" by its file name, and an id
+  typed or pasted (ten characters or more) finds its note.
+- In a section, `[[madam` offers the same, and picking it writes
+  `[[Madam Mina]]`: prose links by the text matched, a name or an alias.
+  If Quincey Harker also had the alias "Harker", `[[harker` would write
+  `[[Jonathan Harker]]` for Jonathan: an alias that would reach another
+  note too gives way to the name, then to `[[jonathan-harker]]`, then to
+  the id. A note no link is sure to reach (no id, and a file name and
+  name another note could take) is offered with "add an id with Edit
+  file", and picking it writes nothing.
+- Reading as of chapter 1, an editor still offers Van Helsing, whom the
+  reader meets at chapter 9: editing shows everything (#28). The
+  lookup's `asOf`, which the editors don't send, offers only the notes
+  the reader has met (`professor` finds nobody as of `dracula:1`), and
+  never names one they haven't.
+
+Spec: design.md §9 "Looking notes up by name and alias" (#198, #28,
+#26). Covered by: `EntityLookupTests` (index),
+`EntityLookupEndpointTests`,
+`SpoilerTests.NothingAsOfAPositionNamesAnEntityTheReaderHasntMet` (API),
+`FieldEditing.test.tsx`, `LinkLookup.test.tsx` (web).
+
+### SC-WEB-79. The lookup is guarded
+
+- `/api/entities/lookup` answers GET only, refuses a cross-site request
+  like every endpoint, and under `serve --universe` looks in the pinned
+  universe and refuses another (or `*`).
+- A query with no letters or digits, a parameter it doesn't take (`q`),
+  a `limit` outside 1 to 100, `type` naming no known type, and a blank
+  `asOf` are refused (`bad_argument`, `unknown_type`). A `type` list
+  with one type no pack enables (`character,vampire`, as a field's
+  `to` may have) skips it and looks among the rest. If the lookup
+  fails, the field's picker says so, and the link can still be typed.
+
+Spec: design.md §9 (#198, #23). Covered by:
+`EntityLookupEndpointTests.ALookupIsGuarded`,
+`EntityLookupEndpointTests.TypesNarrowALookupToAFieldsToTypes`,
+`EntityLookupEndpointTests.AsOfAPositionOnlyNotesTheReaderHasMetAreOffered`.

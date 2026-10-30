@@ -539,6 +539,96 @@ public sealed class DenReader
     }
 
     /// <summary>
+    /// The notes of one universe whose name, alias, slug, or id matches what
+    /// was typed (#198), for a link picker: each word typed starts a word of
+    /// it, ignoring case and accents, ranked as <see cref="EntityLookup.Match"/>
+    /// ranks them, then by name and path. <paramref name="types"/> narrows
+    /// them to those types (a ref field's <c>to</c>).
+    /// </summary>
+    /// <remarks>
+    /// The editors don't give <paramref name="asOf"/>: an editing surface
+    /// shows everything (#28). With it, only the notes the reader has met by
+    /// then are looked at (#26). Aliases aren't positional (format.md §9.5),
+    /// so a met note matches by any of them.
+    /// </remarks>
+    public LookupResult LookupEntities(
+        string query, string? universe = null, IReadOnlyList<string>? types = null, string? asOf = null, int limit = 20)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        if (SearchWords.Tokens(query).Count == 0)
+        {
+            throw new DenToolException(ToolErrorCodes.BadArgument, "Give a few letters of a note's name, alias, or file name in 'query'.");
+        }
+
+        CheckLimit(limit, 100);
+        return WithIndex(index =>
+        {
+            var db = index.Context;
+            var u = ChooseUniverse(db, universe, asOf, allowAll: false)!;
+            if (types is { Count: > 0 })
+            {
+                // As a ref field's to: does (types.md F-FT-9), a type no pack defines and no
+                // note uses is skipped; only when none of them is known is it refused.
+                var known = KnownTypes(db, u.Id, types);
+                if (known.Count == 0)
+                {
+                    CheckTypes(db, u.Id, types, listUsed: asOf is null);
+                }
+
+                types = known;
+            }
+
+            var met = asOf is null ? null : CanonView(index, u.Key, asOf, null).Entities.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
+            var all = db.Entities.Where(e => e.UniverseId == u.Id).ToList();
+            var entities = all
+                .Where(e => types is not { Count: > 0 } || types.Contains(e.Type))
+                .Where(e => met is null || met.Contains(e.Path))
+                .ToList();
+            var allIds = all.Select(e => e.Id).ToList();
+            var aliasRows = db.Aliases.Where(a => allIds.Contains(a.EntityId)).ToList();
+            var aliases = aliasRows.OrderBy(a => a.Order).ToLookup(a => a.EntityId, a => a.Alias);
+            var resolvable = aliasRows.Select(a => (a.EntityId, a.AliasNormalized)).ToList();
+
+            // The text matched, where a link of it reaches this note alone, as links resolve
+            // (F-LINK-6) across the universe. As of a position, among the notes met by then,
+            // as get_entity matches a name there, so the answer says nothing of a later namesake.
+            var among = met is null ? all : all.Where(e => met.Contains(e.Path)).ToList();
+            // An alias that doesn't reach it alone gives way to its name.
+            string? LinkTextOf(EntityRecord e, LookupMatch m) => m.By switch
+            {
+                "alias" => Reaching(e, m.Alias) ?? Reaching(e, e.Name),
+                "slug" => Reaching(e, e.Slug),
+                "id" => Reaching(e, e.Ulid),
+                _ => Reaching(e, e.Name),
+            };
+
+            string? Reaching(EntityRecord e, string? text)
+            {
+                if (text is null || text.Trim().Length == 0 || text.IndexOfAny(['[', ']', '|', '#', '\r', '\n']) >= 0)
+                {
+                    return null;
+                }
+
+                return DenIndex.MatchAmong(text, among, resolvable) is [var only] && only.Id == e.Id ? text.Trim() : null;
+            }
+
+            var matches = entities
+                .Select(e => (Entity: e, Match: EntityLookup.Match(query, e.Name, e.Slug, e.Ulid, aliases[e.Id].ToList())))
+                .Where(x => x.Match is not null)
+                .OrderBy(x => x.Match!.Rank)
+                .ThenBy(x => x.Entity.NameNormalized, StringComparer.Ordinal)
+                .ThenBy(x => x.Entity.Path, StringComparer.Ordinal)
+                .ToList();
+            var universes = new Dictionary<int, string> { [u.Id] = u.Key };
+            var scopes = Scopes(db);
+            var shown = matches.Take(limit)
+                .Select(x => new LookupHit(Summary(x.Entity, universes, scopes), x.Match!.By, x.Match.Alias) { LinkText = LinkTextOf(x.Entity, x.Match) })
+                .ToList();
+            return new LookupResult(ResultVersion, u.Key, query, asOf, shown.Count, matches.Count > limit, shown);
+        });
+    }
+
+    /// <summary>
     /// The canon-as-of view of a universe at <paramref name="position"/>, or
     /// at the end of the story (all canon so far): pinned canon first
     /// (F-VIEW-2), then every entity the reader has met by then with the
@@ -751,6 +841,34 @@ public sealed class DenReader
                     (listUsed ? $" Types in use: {string.Join(", ", used.Order(StringComparer.Ordinal))}." : ""));
             }
         }
+    }
+
+    /// <summary>
+    /// The types of <paramref name="types"/> that an enabled pack defines or
+    /// an entity of the universe uses, as <see cref="CheckTypes"/> knows them, in order.
+    /// </summary>
+    public List<string> KnownTypes(IndexDbContext db, int universeId, IEnumerable<string> types)
+    {
+        ArgumentNullException.ThrowIfNull(db);
+        ArgumentNullException.ThrowIfNull(types);
+        var used = db.Entities.Where(e => e.UniverseId == universeId).Select(e => e.Type).Distinct().ToHashSet(StringComparer.Ordinal);
+        HashSet<string>? defined = null;
+        var known = new List<string>();
+        foreach (var type in types)
+        {
+            if (!used.Contains(type))
+            {
+                defined ??= DenStructure.Load(Root).Types.Types.Select(t => t.Key).ToHashSet(StringComparer.Ordinal);
+                if (!defined.Contains(type))
+                {
+                    continue;
+                }
+            }
+
+            known.Add(type);
+        }
+
+        return known;
     }
 
     /// <summary>Refuses a <c>limit</c> outside 1 to <paramref name="max"/>.</summary>

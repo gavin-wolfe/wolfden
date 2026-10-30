@@ -4,12 +4,15 @@ import { EditorView, keymap, placeholder as placeholderText } from '@codemirror/
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
 import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
-import { autocompletion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete'
-import { apiPath, getJson, type SearchResult } from '../api'
+import { autocompletion, type Completion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete'
+import { useQuery } from '@tanstack/react-query'
+import { entitiesQuery } from '../api'
+import { linkFor } from '../fieldModel'
+import { lookupable, lookupEntities, matchLabel, noSureLink, type LookupResult } from '../lookupApi'
 
 /**
  * A Markdown source editor (#28): CodeMirror 6, with Markdown highlighting
- * and `[[` autocomplete of note names from the search API. Ctrl+Enter (⌘+Enter
+ * and `[[` autocomplete of notes by name or alias (`noteLinks`). Ctrl+Enter (⌘+Enter
  * on a Mac) saves and Escape cancels. Tab is left to move focus, so the
  * editor is never a keyboard trap; Ctrl+] and Ctrl+[ (⌘ on a Mac) indent.
  *
@@ -43,6 +46,10 @@ export function MarkdownEditor({
   // The latest callbacks, so the editor made once always calls them.
   const handlers = useRef({ onChange, onSave, onCancel })
   handlers.current = { onChange, onSave, onCancel }
+  // Every note of the universe, to tell whether a slug reaches only the note picked.
+  const all = useQuery(entitiesQuery(universe, undefined))
+  const others = useRef<readonly { path: string; name?: string }[] | null>(null)
+  others.current = all.data && !all.data.truncated ? all.data.entities : null
 
   useEffect(() => {
     const element = host.current!
@@ -56,7 +63,7 @@ export function MarkdownEditor({
           history(),
           markdown(),
           syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-          autocompletion({ override: [noteLinks(universe)], icons: false }),
+          autocompletion({ override: [noteLinks(universe, () => others.current)], icons: false }),
           EditorView.lineWrapping,
           placeholderText('Write in Markdown…'),
           keymap.of([
@@ -105,26 +112,34 @@ export function editorViewIn(element: Element | null): EditorView | null {
 }
 
 /**
- * `[[` autocomplete: after `[[` and at least one letter, the notes whose name
- * or alias starts with what's typed, from /api/search, inserted by name with
- * the closing `]]`.
+ * `[[` autocomplete: after `[[` and at least one letter, the notes whose
+ * name, alias, or file name has a word starting with each word typed, from
+ * the lookup (#198), whatever the story position (#28). Prose stays
+ * readable: a pick is linked by the text it matched, `[[Mina Harker]]` for a
+ * name and `[[Madam Mina]]` for an alias (shown "as Madam Mina"), where the
+ * lookup says that reaches only this note (`linkText`; for an alias that
+ * doesn't, the name if that does). Otherwise it's linked as the field
+ * pickers link it (`linkFor`): `[[slug]]`, or `[[id]]`. A note no link is
+ * sure to reach is offered with the field picker's hint (add an id) and
+ * inserts nothing, since a link by its name could quietly reach another note.
+ * `others` gives the universe's notes when they're known, null if not.
  */
-function noteLinks(universe: string) {
+
+export function noteLinks(universe: string, others: () => readonly { path: string; name?: string }[] | null) {
   return async (context: CompletionContext): Promise<CompletionResult | null> => {
     const before = context.matchBefore(/\[\[[^[\]|#\n]*$/)
     if (!before) {
       return null
     }
 
-    const typed = before.text.slice(2)
-    const words = typed.trim()
-    if (!/[\p{L}\p{N}]$/u.test(words)) {
+    const words = before.text.slice(2).trim()
+    if (!lookupable(words)) {
       return null
     }
 
-    let result: SearchResult
+    let result: LookupResult
     try {
-      result = await getJson<SearchResult>(apiPath('/api/search', { query: `${words}*`, universe, limit: 20 }))
+      result = await lookupEntities(universe, words, { limit: 20 })
     } catch {
       return null
     }
@@ -133,11 +148,19 @@ function noteLinks(universe: string) {
       return null
     }
 
-    const seen = new Set<string>()
     const closed = context.state.sliceDoc(context.pos, context.pos + 2) === ']]'
-    const options = result.hits
-      .filter((h) => !seen.has(h.entity.key) && (seen.add(h.entity.key), true))
-      .map((h) => ({ label: h.entity.name, detail: h.entity.type, apply: closed ? h.entity.name : `${h.entity.name}]]` }))
+    const notes = others()
+    const options = result.matches.map((hit): Completion => {
+      const { name, alias } = matchLabel(hit)
+      const detail = alias !== null ? `as ${alias} · ${hit.entity.type}` : hit.entity.type
+      const text = hit.linkText ?? linkFor(hit.entity, notes)?.slice(2, -2) ?? null
+      if (text === null) {
+        // No link is sure to reach it: never write one that may reach another note. Picking it leaves the text as typed.
+        return { label: name, detail: `${detail} · no sure link`, info: noSureLink(name), apply: () => {} }
+      }
+
+      return { label: name, detail, apply: closed ? text : `${text}]]` }
+    })
     return { from: before.from + 2, options, filter: false }
   }
 }

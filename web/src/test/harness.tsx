@@ -143,7 +143,7 @@ export const chapterFieldTypes: SourceFieldType[] = [
 
 /** A chapter field nothing sets, to build on. */
 export function unsetValue(name: string, extra: Partial<ChapterValueView> = {}): ChapterValueView {
-  return { name, set: false, own: null, ignored: false, value: null, from: null, fromKey: null, none: false, default: null, defaultFrom: null, defaultFromKey: null, links: [], text: '', ...extra }
+  return { name, set: false, own: null, ignored: false, ignoredReason: null, value: null, from: null, fromKey: null, none: false, default: null, defaultFrom: null, defaultFromKey: null, links: [], text: '', ...extra }
 }
 
 /** A value the book's chapter_defaults give, as a chapter inherits it. */

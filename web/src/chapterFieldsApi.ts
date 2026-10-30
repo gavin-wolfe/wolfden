@@ -33,6 +33,8 @@ export interface ChapterValueView {
   own: Json | null
   /** Written, but null or not a value of the field, so it's ignored and the value is inherited (F-CHAP-3). */
   ignored: boolean
+  /** If ignored, why, in words for the writer, such as "setting is a link to one entity, … not 'Whitby harbour'." (#233). */
+  ignoredReason: string | null
   /** The value that holds, or null if nothing sets it. */
   value: Json | null
   from: ValueFrom | null

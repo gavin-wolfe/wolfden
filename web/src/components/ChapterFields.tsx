@@ -309,12 +309,7 @@ function ChapterValues({
                 <>
                   <dd>
                     <ChapterValueText universe={target.universe} view={view} none={target.noneWords} /> <Origin view={view} own={target.own} />
-                    {view.ignored && (
-                      <span className="muted">
-                        {' '}
-                        (written here as {view.own === null ? 'no value' : valueLines(view.own)}, which isn't a value of {view.name}, so it's ignored)
-                      </span>
-                    )}
+                    {view.ignored && <IgnoredNote view={view} />}
                     {!type && <span className="muted"> (not a chapter field the den's packs define: change it in the file)</span>}
                   </dd>
                   {!locked && type && (
@@ -393,6 +388,20 @@ function ChapterValues({
       </dl>
       </div>
     </>
+  )
+}
+
+/** What a field writes that's ignored, and why (F-CHAP-3, #233), so the writer sees it before replacing it. */
+function IgnoredNote({ view }: { view: ChapterValueView }) {
+  if (view.own === null) {
+    return <span className="muted"> (written here with no value, so it's ignored)</span>
+  }
+
+  return (
+    <span className="muted ignored-value">
+      {' '}
+      (written here as {valueLines(view.own)}, which is ignored: {view.ignoredReason ?? `it isn't a value of ${view.name}.`})
+    </span>
   )
 }
 
@@ -586,7 +595,14 @@ function FieldForm({
   }
 
   let start: ReactNode = null
-  if (!view.set && view.default !== null) {
+  if (view.ignored && view.own !== null) {
+    // What's written stays in the file until a save replaces it (#233).
+    start = (
+      <p className="muted" role="note">
+        Written here as {valueLines(view.own)}, which is ignored: {view.ignoredReason ?? `it isn't a value of ${view.name}.`} Saving replaces it.
+      </p>
+    )
+  } else if (!view.set && view.default !== null) {
     start = (
       <p className="muted">
         This starts from the value inherited now, from {defaultsWords(view.defaultFrom!, view.defaultFromKey)}. A change you save is set here, in place of it.

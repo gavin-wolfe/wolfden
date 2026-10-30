@@ -74,12 +74,24 @@ describe('SC-WEB-61: the changes a field edit sends', () => {
     const added = newItem()
     added.draft.text = 'Carfax'
     list.items = [chapel, { ...soil, draft: { ...soil.draft, text: 'earth' } }, added]
+    // Chapel is moved in place, so a comment on it stays with it (#197).
     expect(fieldChanges(types.tags, before, d)).toEqual([
       { op: 'remove', path: [1] },
-      { op: 'remove', path: [1] },
-      { op: 'add', path: [], value: 'chapel', index: 0 },
+      { op: 'move', path: [1], index: 0 },
       { op: 'add', path: [], value: 'Carfax' },
       { op: 'set', path: [1], value: 'earth' },
+    ])
+
+    // A reorder alone is moves, from the top, and a moved item that changed is set where it ends up.
+    list.items = [{ ...chapel, draft: { ...chapel.draft, text: 'crypt' } }, soil, box]
+    expect(fieldChanges(types.tags, before, d)).toEqual([
+      { op: 'move', path: [2], index: 0 },
+      { op: 'set', path: [0], value: 'crypt' },
+    ])
+    list.items = [box, chapel, soil]
+    expect(fieldChanges(types.tags, before, d)).toEqual([
+      { op: 'move', path: [1], index: 0 },
+      { op: 'move', path: [2], index: 1 },
     ])
 
     // Every item out: each is removed, so the file follows format.md F-RT-6.
@@ -457,8 +469,7 @@ describe('SC-WEB-60: editing a field with a control for its type', () => {
     await waitFor(() => expect(posts).toHaveLength(1))
     expect(posts[0].body.changes).toEqual([
       { op: 'remove', path: [0] },
-      { op: 'remove', path: [1] },
-      { op: 'add', path: [], value: 'typist', index: 0 },
+      { op: 'move', path: [1], index: 0 },
       { op: 'add', path: [], value: 'author' },
     ])
   })

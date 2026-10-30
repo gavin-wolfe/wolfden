@@ -228,6 +228,49 @@ public sealed partial class MarkdownFile : DenFile
     }
 
     /// <summary>
+    /// Moves item <paramref name="from"/> of the list at <paramref name="path"/>
+    /// so it becomes item <paramref name="to"/>, in place (#197): the items
+    /// between shift by one, and nothing else changes (format.md F-RT-1,
+    /// F-RT-2). In a block list, the item's own lines move: a comment on
+    /// them, comment lines right after it indented under it, and comment
+    /// lines right above its dash (no blank line between, not left of the
+    /// dash, and not indented under the item before), which are a heading
+    /// for it. Blank lines stay where they are. In a flow list, the item's
+    /// text moves, with a comment on its line if it has a line of its own,
+    /// and the commas stay in place; a comment anywhere else between the
+    /// brackets makes the move refused. Moving an item to where it is
+    /// changes nothing.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="from"/> or <paramref name="to"/> isn't an item of the list.</exception>
+    /// <exception cref="InvalidOperationException">The file can't be edited, or the value at the path isn't a list.</exception>
+    /// <exception cref="NotSupportedException">The item can't be moved in place without leaving a comment behind or reformatting.</exception>
+    /// <exception cref="EditVerificationException">The edit didn't read back as intended (a bug).</exception>
+    public MarkdownFile WithListItemMoved(IReadOnlyList<string> path, int from, int to)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        var what = $"Moving item {from} of '{string.Join('.', path)}' to {to}";
+        if (_frontmatter is not null && GetFrontmatterValue(path) is not YamlSequence)
+        {
+            throw new InvalidOperationException($"'{string.Join('.', path)}' isn't a list.");
+        }
+
+        var result = EditFrontmatter(
+            block => YamlEditor.MoveItem(Source!, block, path, from, to),
+            (before, after) => YamlTreeCheck.SameExcept(before, after, path, (b, a) => YamlTreeCheck.MovedItem(b, a, from, to)),
+            addFrontmatter: false,
+            what);
+        if (!SameComments(FrontmatterComments, result.FrontmatterComments))
+        {
+            throw new EditVerificationException($"{what} lost or added a comment, so the edit was refused.");
+        }
+
+        return result;
+
+        static bool SameComments(IReadOnlyList<string> a, IReadOnlyList<string> b) =>
+            a.Count == b.Count && a.Order(StringComparer.Ordinal).SequenceEqual(b.Order(StringComparer.Ordinal), StringComparer.Ordinal);
+    }
+
+    /// <summary>
     /// Sets the value at <paramref name="path"/> (paths as in
     /// <see cref="WithFrontmatterValue(IReadOnlyList{string}, YamlScalarValue)"/>)
     /// to a scalar, a list, or a mapping, such as a field's whole value.

@@ -291,6 +291,7 @@ internal sealed class IndexWriter
                 Title = chapter.Title,
                 Line = chapter.Line,
                 Ordinal = chapter.Point.Ordinal,
+                HeadingJson = ChapterHeadingRows.Serialize(chapter),
             });
         }
     }

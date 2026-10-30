@@ -735,6 +735,23 @@ public sealed class WriteToolTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "SC-MCP-33")]
+    public void EachChapterGivesTheHeadingTheWriterSees()
+    {
+        // Without chapter_heading, the heading is the title.
+        Assert.Equal("Jonathan Harker's Journal", Tools.GetChapter("dracula", "1").Chapters[0].Heading);
+
+        _den.Write(BookFile, _den.Read(BookFile).Replace("chapter_defaults:\n", "chapter_heading: [pov, setting, when]\nchapter_defaults:\n", StringComparison.Ordinal));
+        var chapter = Tools.GetChapter("dracula", "1");
+
+        Assert.Equal("Jonathan Harker's Journal · Jonathan Harker — Bistritz & Castle Dracula, 3–5 May", chapter.Chapters[0].Heading);
+
+        // A write's result gives the heading as it is now.
+        var written = Tools.UpdateChapterFields("dracula", "1", chapter.Hash, Json("""[{"op": "remove", "field": "setting", "item": 0}]"""));
+        Assert.Equal("Jonathan Harker's Journal · Jonathan Harker — Castle Dracula, 3–5 May", written.Chapter!.Heading);
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-MCP-21")]
     public void NothingInAFinalBookIsWritten()
     {

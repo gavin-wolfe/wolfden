@@ -1817,7 +1817,11 @@ docs/
     the top), and each one kept has only its changed keys set where it
     ends up (`[1, "until"]`). A move keeps the item's quoting and the
     comments that belong to it (format.md F-RT-7, #197); so does a
-    changed item, which is set in place. Removing an item with a comment
+    changed item, which is set in place. A reorder may be sent as
+    several moves (each kept item moved up into its place in turn),
+    which give the same bytes as one move would. Dated entries are
+    never moved (F-TMP-7): the form has no control for it, and the
+    server refuses a `move` of one. Removing an item with a comment
     says so in `effects`, and so does a client that takes an item out
     and adds it again, which writes it afresh ("Moved an item of
     fields.tags to item 0, written afresh, so the comment on it was

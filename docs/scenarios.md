@@ -951,8 +951,9 @@ comma sits before a comment on the same line, removing an explicit
 removing or moving a section so that its neighbors (or the lead) would
 run together into one heading, removing a section that holds a link
 reference definition (`[map]: https://…`) other sections may use, moving
-sections that define the same reference label (the first one wins), or
-treating a list as a mapping.
+sections that define the same reference label (the first one wins),
+moving a flow list item when a comment sits between items rather than
+on an item's own line, or treating a list as a mapping.
 
 - The edit is refused with a message that says why, and the file is left
   exactly as it was. Wolfden never rewrites the rest of the file to make
@@ -966,6 +967,7 @@ Spec: F-RT-1, F-RT-2. Covered by:
 `CollectionEditTests.RemovingAnExplicitFlowKeyIsRefused`,
 `CollectionEditTests.RemovingTheFlowKeyBeforeAnExplicitKeyIsRefused`,
 `CollectionEditTests.AddingToOrRemovingFromALeadingCommaFlowListIsRefused`,
+`ListItemMoveTests.AFlowMoveIsRefusedWhenACommentIsntOnAnItemsLine`,
 `CollectionEditTests.EmptyingACollectionIsRefusedWhenACommentAboveItMayBeAboutTheParent`,
 `SectionEditTests.RemovingASectionThatWouldMergeTheTextAroundItIsRefused`,
 `SectionEditTests.MovingASectionThatWouldMergeWithTheTextBeforeItIsRefused`,
@@ -1038,25 +1040,34 @@ Spec: F-RT-6, F-RT-2. Covered by:
 
 ### SC-RT-17. I reorder a list, or change one item, and its comments stay with it
 
-Chapter 27's `pov` is a block list: `# the journal chapters` above Mina,
-`- "[[mina-harker]]"  # main`, then Jonathan and Seward. The writer
-moves Mina to the end, then changes Jonathan to Lucy. A note's `tags`
-are a flow list with each item on its own line and a comment after
-some of them.
+Chapter 27's `pov` is a block list: `# the journal chapters` heading
+it, `- "[[mina-harker]]"  # main`, then `# letters` above Jonathan, and
+Seward. The writer moves Mina to the end, then Jonathan to the top, then
+changes Jonathan to Lucy. A note's `tags` are a flow list with each item
+on its own line and a comment after some of them. Lucy's `role` is a
+list of dated entries.
 
-- Mina's lines move: the comment line above her, her line with its
-  `# main`, and any comment lines indented under her. Blank lines, a
-  comment line left of the dashes, and a commented-out item after the
-  last one stay where they were. Moving an item back gives back the
-  same bytes. CRLF lines stay CRLF.
+- Mina's lines move: her line with its `# main`, and any comment lines
+  indented under her. `# the journal chapters`, above the first item,
+  heads the list and stays at the top; `# letters` moves with Jonathan.
+  Blank lines, a comment line left of the dashes, and a commented-out
+  item after the last one stay where they were. Moving an item back
+  gives back the same bytes, unless it went to the top, where its own
+  heading joins the list's. CRLF lines stay CRLF.
+- Dated entries are never reordered (F-TMP-7): a move of one is refused,
+  since entries with the same `from` are read in file order (F-TMP-5)
+  and a move could unseat pinned canon. The web page has no control to
+  move an entry.
 - In the flow list the item moves with the comment on its line, and the
   commas stay put, so the last item still has none. A comment line of
   its own between flow items can't be placed for sure, so that move is
   refused and the file is unchanged.
 - Changing Jonathan to Lucy changes only the link's characters: the
-  comment on the item, and the comment lines above it, stay.
+  comment on the item, and the comment lines above it, stay. An item
+  written over several lines is replaced whole, and the result says
+  which comments inside it went. A list given as one item is refused.
 
-Spec: format.md F-RT-7, F-RT-1, F-RT-2 (#197). Covered by:
+Spec: format.md F-RT-7, F-TMP-7, F-RT-1, F-RT-2 (#197). Covered by:
 `ListItemMoveTests` (Core),
 `FieldEditEndpointTests.ListItemsAreAddedRemovedAndReorderedInTheListsOwnStyle`,
 `ChapterFieldEndpointTests.MovingOrReplacingAnItemKeepsItsComments` (API),

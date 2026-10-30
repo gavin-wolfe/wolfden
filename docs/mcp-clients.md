@@ -248,7 +248,9 @@ prompts. This list is for knowing what the assistant can do.
   changes something else. Moving or changing one list item in place
   (`move`, `replace`, or `set` on an item's path) keeps the comments
   that belong to it. Removing an item, or taking it out and adding it
-  again, drops its comment, and the result quotes what went.
+  again, drops its comment, and the result quotes what went, as it
+  does for comments inside a multi-line value that's replaced whole.
+  Dated entries are never moved (format.md F-TMP-7).
 - **Files only, until a checkpoint.** Writes go to the files, not to git.
   `checkpoint` commits them, and lists which files the session wrote and
   which were changed outside it, so your own edits are never hidden in an

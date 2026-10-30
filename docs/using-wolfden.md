@@ -472,7 +472,9 @@ A list field, such as a character's `occupation`, has **Add item**,
 the items you touched. A comment you wrote in the file goes with its
 item when you reorder or change it: `- "[[mina-harker]]"  # main` keeps
 its `# main`, and a comment line right above an item moves with it.
-Blank lines stay where they are. Removing an item removes the comment on
+Comment lines above the first item head the whole list, so they stay at
+the top, and blank lines stay where they are. Dated entries keep the
+order they're written in, so they have no move buttons. Removing an item removes the comment on
 it too, and the notice after saving says so. The same goes for chapter
 fields and chapter defaults.
 

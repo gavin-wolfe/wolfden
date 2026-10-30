@@ -43,8 +43,12 @@ internal static partial class YamlEditor
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="from"/> or <paramref name="to"/> isn't an item of the list.</exception>
     /// <exception cref="InvalidOperationException">The value at the path isn't a list.</exception>
     /// <exception cref="NotSupportedException">The list is written in a way an item can't be moved in place.</exception>
-    public static List<TextEdit> MoveItem(SourceText source, YamlBlock block, IReadOnlyList<string> path, int from, int to)
+    /// <param name="heading">When the move changes which item is first, the comment lines above the
+    /// list's first item, which head the whole list and stay at the top: those that were there
+    /// (<see cref="ListHeading.Kept"/>), and those that came up with the new first item (<see cref="ListHeading.Joined"/>).</param>
+    public static List<TextEdit> MoveItem(SourceText source, YamlBlock block, IReadOnlyList<string> path, int from, int to, out ListHeading heading)
     {
+        heading = ListHeading.None;
         CheckPath(path);
         if (Find(block.Root, path) is not YamlSequence sequence)
         {
@@ -67,7 +71,52 @@ internal static partial class YamlEditor
             return [];
         }
 
-        return sequence.IsFlow ? FlowMove(source, sequence, from, to) : BlockMove(source, sequence, from, to);
+        if (sequence.IsFlow)
+        {
+            return FlowMove(source, sequence, from, to);
+        }
+
+        var edits = BlockMove(source, sequence, from, to);
+        heading = HeadingAfterMove(source, sequence, from, to);
+        return edits;
+    }
+
+    /// <summary>
+    /// When the first item changes, the comment lines above the list's first
+    /// item (format.md F-RT-7): those that stay at the top, and those of the
+    /// item that comes up into the first slot, which join them there.
+    /// </summary>
+    private static ListHeading HeadingAfterMove(SourceText source, YamlSequence sequence, int from, int to)
+    {
+        if (from != 0 && to != 0)
+        {
+            return ListHeading.None;
+        }
+
+        var spans = BlockItemLines(source, sequence);
+        var (firstDash, firstLineStart) = Dash(source, sequence.Items[0]);
+        var column = firstDash - firstLineStart;
+        var kept = new List<string>();
+        for (var i = source.LineIndexOf(firstDash) - 1; i >= 0 && IsCommentLine(source, i) && Indent(source, i) >= column; i--)
+        {
+            kept.Insert(0, CommentText(source, i));
+        }
+
+        var newFirst = MovedOrder(spans.Length, from, to)[0];
+        var (dash, _) = Dash(source, sequence.Items[newFirst]);
+        var joined = Enumerable.Range(spans[newFirst].First, source.LineIndexOf(dash) - spans[newFirst].First)
+            .Where(i => IsCommentLine(source, i))
+            .Select(i => CommentText(source, i))
+            .ToList();
+        return new ListHeading(kept, joined);
+
+        static string CommentText(SourceText source, int line) => source.LineText(line).Trim().TrimStart('#').Trim();
+    }
+
+    /// <summary>The comment lines heading a list around a move (<see cref="MoveItem"/>), as their text after <c>#</c>.</summary>
+    internal sealed record ListHeading(IReadOnlyList<string> Kept, IReadOnlyList<string> Joined)
+    {
+        public static readonly ListHeading None = new([], []);
     }
 
     /// <summary>The first and last lines that belong to each item of a block list (see the remarks on the class).</summary>

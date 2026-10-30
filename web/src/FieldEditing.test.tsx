@@ -458,7 +458,9 @@ describe('SC-WEB-60: editing a field with a control for its type', () => {
   })
 
   it('moves, removes, and adds list items with the keyboard-reachable buttons', async () => {
-    const { posts } = stubFields()
+    // A move that changes the first item says what now heads the list (format.md F-RT-7), and the save notice shows it.
+    const heading = "'# about typing' is now above the whole fields.occupation list, and stays at the top when items move (format.md F-RT-7)."
+    const { posts } = stubFields({ onPost: () => written({ effects: [heading] }) })
     renderApp('/u/dracula/e/E-MINA')
     const form = await openField('occupation')
 
@@ -479,6 +481,7 @@ describe('SC-WEB-60: editing a field with a control for its type', () => {
       { op: 'move', path: [1], index: 0 },
       { op: 'add', path: [], value: 'author' },
     ])
+    expect(await screen.findByText(heading)).toBeTruthy()
   })
 
   it('gives each dated entry a From and an Until picked from the books and chapters, and adds, ends, and removes entries', async () => {

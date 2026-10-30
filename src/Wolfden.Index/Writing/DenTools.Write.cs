@@ -255,7 +255,7 @@ public sealed partial class DenTools
                 {
                     "set" => () => file.WithFrontmatterValue(path, op.Value!, inTemplateOrder: true),
                     "add" => () => file.WithNewListItem(path, op.Value!, op.Index, inTemplateOrder: true),
-                    "move" => () => MoveItem(file, path, op.Index!.Value),
+                    "move" => () => MoveItem(file, path, op.Index!.Value, notes),
                     _ => () => Remove(file, path, notes),
                 });
 

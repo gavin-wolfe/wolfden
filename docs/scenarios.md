@@ -1053,7 +1053,9 @@ list of dated entries.
   Blank lines, a comment line left of the dashes, and a commented-out
   item after the last one stay where they were. Moving an item back
   gives back the same bytes, unless it went to the top, where its own
-  heading joins the list's. CRLF lines stay CRLF.
+  heading joins the list's. A move that changes the first item says, in
+  the effects and the web page's notice, which comment lines stayed at
+  the top and which now head the list. CRLF lines stay CRLF.
 - Dated entries are never reordered (F-TMP-7): a move of one is refused,
   since entries with the same `from` are read in file order (F-TMP-5)
   and a move could unseat pinned canon. The web page has no control to

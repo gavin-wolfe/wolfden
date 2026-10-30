@@ -351,6 +351,39 @@ public class ListItemMoveTests
     }
 
     [Fact]
+    public void AMoveThatChangesTheFirstItemSaysWhatHeadsTheList()
+    {
+        const string before = """
+            pov:
+              # in order of appearance
+              - a
+              # about b
+              - b
+              - c
+
+            """;
+        var file = Md(before);
+
+        var up = file.WithListItemMoved(["pov"], 1, 0, out var kept, out var joined);
+        Assert.Equal(["in order of appearance"], kept);
+        Assert.Equal(["about b"], joined);
+        Assert.Equal("pov:\n  # in order of appearance\n  # about b\n  - b\n  - a\n  - c\n", Fm(up));
+
+        // Moving the first item away: what was above it stays, and b's heading comes up.
+        file.WithListItemMoved(["pov"], 0, 2, out kept, out joined);
+        Assert.Equal(["in order of appearance"], kept);
+        Assert.Equal(["about b"], joined);
+
+        // The first item doesn't change: nothing to say.
+        file.WithListItemMoved(["pov"], 1, 2, out kept, out joined);
+        Assert.Empty(kept);
+        Assert.Empty(joined);
+        Md("pov: [a, b]\n").WithListItemMoved(["pov"], 1, 0, out kept, out joined);
+        Assert.Empty(kept);
+        Assert.Empty(joined);
+    }
+
+    [Fact]
     public void DatedEntriesAreNeverReordered()
     {
         // F-TMP-7: of two entries with the same from, the later one holds (F-TMP-5), so a move could unseat pinned canon.

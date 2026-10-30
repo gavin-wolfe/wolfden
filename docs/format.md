@@ -1685,14 +1685,18 @@ they are. So a commented-out item after the last one
 (`# - "[[lucy-westenra]]"` at the dash's indent) stays at the end of the
 list, and an item moved to the top goes under the list's heading. Its
 own heading comes with it and then reads as part of the list's, so it
-stays at the top if the item moves down again.
+stays at the top if the item moves down again. A move that changes
+which item is first says so: the MCP write tools, and the web page's
+notice after saving, name the comment lines that stayed at the top and
+those that now head the list.
 
 A list of dated entries (§7.3) is never reordered (F-TMP-7): of two
 entries with the same `from`, the later one in the file holds (F-TMP-5),
 so a move could change what holds, pinned canon included. A writer
-refuses such a move. In a flow list, the item's
-text moves, with a comment on its line if it has a line of its own, and
-the commas stay in their places, so a list whose last item has no comma
+refuses such a move.
+
+In a flow list, the item's text moves, with a comment on its line if it
+has a line of its own, and the commas stay in their places, so a list whose last item has no comma
 still has none. A comment anywhere else between the brackets, such as a
 line of its own between items, can't be placed for sure, so the move is
 refused (SC-RT-14).

@@ -17,7 +17,7 @@ namespace Wolfden.Index.Writing;
 public sealed partial class DenTools
 {
     /// <summary>Moves the list item at <paramref name="path"/> (the list's path, then its item number) so it becomes item <paramref name="to"/>.</summary>
-    private static MarkdownFile MoveItem(MarkdownFile file, IReadOnlyList<string> path, int to)
+    private static MarkdownFile MoveItem(MarkdownFile file, IReadOnlyList<string> path, int to, List<string> notes)
     {
         var listPath = path.Take(path.Count - 1).ToList();
         if (!file.CanEdit)
@@ -40,7 +40,31 @@ public sealed partial class DenTools
             throw new DenToolException(ToolErrorCodes.BadArgument, $"'{string.Join('.', listPath)}' has {list.Items.Count} item(s), so there's no item {from}.");
         }
 
-        return file.WithListItemMoved(listPath, from, to);
+        var moved = file.WithListItemMoved(listPath, from, to, out var kept, out var joined);
+        NoteListHeading(kept, joined, string.Join('.', listPath), notes);
+        return moved;
+    }
+
+    /// <summary>
+    /// Says, in <paramref name="notes"/>, when a move changed which comment
+    /// lines head a block list (format.md F-RT-7): those above the first
+    /// item stay at the top whichever item is first, so a heading the old
+    /// first item seemed to have stays, and one the new first item brought
+    /// up now heads the whole list.
+    /// </summary>
+    private static void NoteListHeading(IReadOnlyList<string> kept, IReadOnlyList<string> joined, string list, List<string> notes)
+    {
+        if (kept.Count > 0)
+        {
+            notes.Add($"{Quoted(kept)} {(kept.Count == 1 ? "is" : "are")} above the whole {list} list, so {(kept.Count == 1 ? "it" : "they")} stayed at the top, over the new first item, rather than moving with the old one (format.md F-RT-7).");
+        }
+
+        if (joined.Count > 0)
+        {
+            notes.Add($"{Quoted(joined)} {(joined.Count == 1 ? "is" : "are")} now above the whole {list} list, and {(joined.Count == 1 ? "stays" : "stay")} at the top when items move (format.md F-RT-7).");
+        }
+
+        static string Quoted(IReadOnlyList<string> comments) => string.Join(", ", comments.Select(c => $"'# {c}'"));
     }
 
     /// <summary>
@@ -76,7 +100,9 @@ public sealed partial class DenTools
         if (op.Op == "move")
         {
             RefuseEntryMove(list, op.Field!);
-            return file.WithListItemMoved(fieldPath, item, op.Index!.Value);
+            var moved = file.WithListItemMoved(fieldPath, item, op.Index!.Value, out var kept, out var joined);
+            NoteListHeading(kept, joined, op.Field!, notes);
+            return moved;
         }
 
         var before = file.FrontmatterComments;

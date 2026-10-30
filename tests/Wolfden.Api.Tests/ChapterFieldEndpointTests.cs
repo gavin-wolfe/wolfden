@@ -204,6 +204,9 @@ public sealed class ChapterFieldEndpointTests : IDisposable
         Assert.True(moved.GetProperty("changed").GetBoolean());
         Assert.DoesNotContain(moved.GetProperty("effects").EnumerateArray(), e => e.GetString()!.Contains("dropped", StringComparison.Ordinal));
         Assert.Contains(
+            "'# relief' is now above the whole pov list, and stays at the top when items move (format.md F-RT-7).",
+            moved.GetProperty("effects").EnumerateArray().Select(e => e.GetString()));
+        Assert.Contains(
             "      pov:\n        # relief\n        - \"[[halden-pike]]\"\n        - \"[[mara-voss]]\"  # her watch\n",
             _den.Read(Ember),
             StringComparison.Ordinal);

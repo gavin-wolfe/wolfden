@@ -65,8 +65,11 @@ public sealed class ListItemToolTests : IDisposable
 
         Assert.True(result.Changed);
         Assert.DoesNotContain(result.Effects, e => e.Contains("comment", StringComparison.Ordinal));
-        // The comment line above the first alias heads the list, so it stays at the top (format.md F-RT-7).
+        // The comment line above the first alias heads the list, so it stays at the top (format.md F-RT-7), and the result says so.
         Assert.Contains("aliases:\n  # what the crew call him\n  - the Pilot\n  - Tom   # mostly\nstatus: canon\n", _den.Read(Tomas), StringComparison.Ordinal);
+        Assert.Contains(
+            "'# what the crew call him' is above the whole aliases list, so it stayed at the top, over the new first item, rather than moving with the old one (format.md F-RT-7).",
+            result.Effects);
 
         // A move needs an index, and an item that's there; nothing is written otherwise.
         var before = _den.Read(Tomas);

@@ -248,9 +248,20 @@ public sealed partial class MarkdownFile : DenFile
     /// <exception cref="NotSupportedException">The item can't be moved in place without leaving a comment behind or reformatting,
     /// or the list holds dated entries (F-TMP-7).</exception>
     /// <exception cref="EditVerificationException">The edit didn't read back as intended (a bug).</exception>
-    public MarkdownFile WithListItemMoved(IReadOnlyList<string> path, int from, int to)
+    public MarkdownFile WithListItemMoved(IReadOnlyList<string> path, int from, int to) =>
+        WithListItemMoved(path, from, to, out _, out _);
+
+    /// <inheritdoc cref="WithListItemMoved(IReadOnlyList{string}, int, int)"/>
+    /// <param name="headingKept">When the move changes which item is first in a block list, the comment lines
+    /// (their text after <c>#</c>) that were above the first item: they head the whole list, so they stayed
+    /// at the top rather than going with it (format.md F-RT-7). Otherwise empty.</param>
+    /// <param name="headingJoined">Likewise, the comment lines that were the new first item's own heading:
+    /// they're now above the whole list, and stay at the top when items move again.</param>
+    public MarkdownFile WithListItemMoved(IReadOnlyList<string> path, int from, int to, out IReadOnlyList<string> headingKept, out IReadOnlyList<string> headingJoined)
     {
         ArgumentNullException.ThrowIfNull(path);
+        headingKept = [];
+        headingJoined = [];
         var what = $"Moving item {from} of '{string.Join('.', path)}' to {to}";
         EnsureEditable(_frontmatter is null ? _missingFrontmatter : null);
         if (GetFrontmatterValue(path) is not YamlSequence list)
@@ -264,8 +275,9 @@ public sealed partial class MarkdownFile : DenFile
                 $"'{string.Join('.', path)}' is a list of dated entries, which are never reordered (F-TMP-7): of two entries with the same 'from', the later one in the file holds (F-TMP-5), so a move could change what holds.");
         }
 
+        var heading = YamlEditor.ListHeading.None;
         var result = EditFrontmatter(
-            block => YamlEditor.MoveItem(Source!, block, path, from, to),
+            block => YamlEditor.MoveItem(Source!, block, path, from, to, out heading),
             (before, after) => YamlTreeCheck.SameExcept(before, after, path, (b, a) => YamlTreeCheck.MovedItem(b, a, from, to)),
             addFrontmatter: false,
             what);
@@ -274,6 +286,8 @@ public sealed partial class MarkdownFile : DenFile
             throw new EditVerificationException($"{what} lost or added a comment, so the edit was refused.");
         }
 
+        headingKept = heading.Kept;
+        headingJoined = heading.Joined;
         return result;
 
         static bool IsEntryList(YamlSequence list) => list.Items.Any(i => i is YamlMapping m && m.ContainsKey("value"));

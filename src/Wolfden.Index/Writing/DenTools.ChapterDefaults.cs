@@ -71,7 +71,8 @@ public sealed partial class DenTools
     /// <c>add</c> an item to a list field, <c>remove</c> an item (the last one
     /// leaves <c>[]</c>, "none here", which stops inheritance from above,
     /// format.md F-RT-6), or <c>clear</c> the field, so the books go back to
-    /// inheriting it from the container above. The result says what each
+    /// inheriting it from the container above; <c>move</c> and <c>replace</c>
+    /// move or change one item in place, keeping its comments. The result says what each
     /// book's chapters have now.
     /// </summary>
     /// <param name="numbersAsText">True to take a plain number as <c>{"$number": "2.50"}</c>, its text as written (the web UI's form, <see cref="SourceField.Value"/>).</param>
@@ -112,6 +113,7 @@ public sealed partial class DenTools
                     "add" => () => file.WithNewListItem(fieldPath, op.Value!, op.Index),
                     "remove" => () => NoteEmptied(
                         notes, file.WithoutChapterDefaultItem(field, ItemToRemove(file, fieldPath, op, "The default"), out var comments), comments, $"chapter_defaults.{field}"),
+                    "move" or "replace" => () => InPlace(file, fieldPath, op, "The default"),
                     _ => () => ClearDefault(file, target, field, notes),
                 });
                 itemComments.After(op, before, file, fieldPath, $"chapter_defaults.{field}", notesBefore, notes);

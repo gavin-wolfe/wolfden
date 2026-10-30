@@ -188,8 +188,10 @@ public sealed partial class DenTools
     /// <summary>
     /// Changes an entity's frontmatter: <c>set</c> a value, <c>add</c> an
     /// item to a list (an alias, or an entry of a field that changes over
-    /// time), or <c>remove</c> a key or item, each at a path such as
-    /// <c>fields.rank.1.from</c>. The changes are made in order, and saved
+    /// time), <c>remove</c> a key or item, or <c>move</c> a list item to
+    /// item <c>index</c>, in place with its comments (format.md F-RT-7),
+    /// each at a path such as <c>fields.rank.1.from</c>. Setting an item's
+    /// path changes it in place, keeping its comments too. The changes are made in order, and saved
     /// together or not at all. <c>id</c> never changes (F-ID-4); the
     /// <c>name</c>, and existing aliases, are changed by
     /// <see cref="RenameEntity"/> and <see cref="ChangeAlias"/>, since links
@@ -231,7 +233,7 @@ public sealed partial class DenTools
                     pinned.Add($"'{path[0]}' changes the entity that holds pinned canon ({string.Join(", ", held)}), so it changes how those facts are read");
                 }
 
-                if (path[0] == "aliases")
+                if (path[0] == "aliases" && op.Op == "add")
                 {
                     if (op.RawValue is not { ValueKind: JsonValueKind.String } alias || string.IsNullOrWhiteSpace(alias.GetString()) || alias.GetString()!.Any(char.IsControl))
                     {
@@ -248,6 +250,7 @@ public sealed partial class DenTools
                 {
                     "set" => () => file.WithFrontmatterValue(path, op.Value!, inTemplateOrder: true),
                     "add" => () => file.WithNewListItem(path, op.Value!, op.Index, inTemplateOrder: true),
+                    "move" => () => MoveItem(file, path, op.Index!.Value),
                     _ => () => Remove(file, path, notes),
                 });
 
@@ -269,7 +272,7 @@ public sealed partial class DenTools
                         removedWithComments.RemoveAt(moved);
                         notes.Add(
                             $"Moved an item of {listPath} to item {at}, written afresh, so the comment on it was dropped: {Quoted(r.Comments)}. " +
-                            "Put it back by hand if you want it (moving an item in place is #197).");
+                            "Put it back by hand if you want it; a 'move' change moves an item in place, with its comments.");
                     }
                 }
             }
@@ -452,7 +455,9 @@ public sealed partial class DenTools
     /// <c>set</c> a value, <c>add</c> an item to a list field, <c>remove</c>
     /// an item (the last one leaves <c>[]</c>, "none here", which stops
     /// inheritance, format.md F-RT-6), or <c>clear</c> the field, so the
-    /// chapter goes back to inheriting from <c>chapter_defaults</c>. The
+    /// chapter goes back to inheriting from <c>chapter_defaults</c>.
+    /// <c>move</c> and <c>replace</c> move or change item <c>item</c> in
+    /// place, keeping its comments (<see cref="InPlace"/>). The
     /// result says what each field's effective value is now.
     /// </summary>
     /// <param name="numbersAsText">True to take a plain number as <c>{"$number": "2.50"}</c>, its text as written (the web UI's form, <see cref="SourceField.Value"/>).</param>
@@ -513,6 +518,7 @@ public sealed partial class DenTools
                     "add" => () => file.WithNewListItem(fieldPath, op.Value!, op.Index),
                     "remove" => () => NoteEmptied(
                         notes, file.WithoutChapterFieldItem(ch.Key, field, ItemToRemove(file, fieldPath, op), out var comments), comments, $"{field} of chapter '{ch.Key}'"),
+                    "move" or "replace" => () => InPlace(file, fieldPath, op, "The chapter's"),
                     _ => () => Clear(file, fieldPath, ch, field, notes),
                 });
                 itemComments.After(op, before, file, fieldPath, $"{field} of chapter '{ch.Key}'", notesBefore, notes);
@@ -1451,7 +1457,7 @@ public sealed partial class DenTools
             throw new DenToolException(ToolErrorCodes.BadArgument, "'changes' is a list of changes, such as [{\"op\": \"set\", " + (chapter ? "\"field\": \"tense\"" : "\"path\": \"fields.born\"") + ", \"value\": \"...\"}].");
         }
 
-        var ops = chapter ? new[] { "set", "add", "remove", "clear" } : ["set", "add", "remove"];
+        var ops = chapter ? new[] { "set", "add", "remove", "clear", "move", "replace" } : ["set", "add", "remove", "move"];
         var result = new List<Change>();
         foreach (var item in changes.EnumerateArray())
         {
@@ -1461,9 +1467,14 @@ public sealed partial class DenTools
             }
 
             var hasValue = item.TryGetProperty("value", out var value);
-            if (op is "set" or "add" && !hasValue)
+            if (op is "set" or "add" or "replace" && !hasValue)
             {
                 throw new DenToolException(ToolErrorCodes.BadArgument, $"A '{op}' change needs a 'value'.");
+            }
+
+            if (op == "move" && !item.TryGetProperty("index", out _))
+            {
+                throw new DenToolException(ToolErrorCodes.BadArgument, "A 'move' change needs an 'index': the item's number from 0 once it's moved.");
             }
 
             IReadOnlyList<string>? path = null;
@@ -1528,10 +1539,13 @@ public sealed partial class DenTools
                 throw new DenToolException(
                     ToolErrorCodes.UnsupportedEdit,
                     $"Renaming an entity means rewriting the links that match the old name (F-RT-5), so it isn't done here. {Words.NameLinks}");
+            case "aliases" when op == "move":
+                // Reordering aliases changes no link (F-LINK-6 matches any of them); MoveItem checks the path names an item.
+                break;
             case "aliases" when op != "add" || path.Count != 1:
                 throw new DenToolException(
                     ToolErrorCodes.UnsupportedEdit,
-                    $"Aliases can be added here, but not changed or removed: links that matched the old alias must follow (F-RT-5). {Words.AliasLinks}");
+                    $"Aliases can be added and moved here, but not changed or removed: links that matched the old alias must follow (F-RT-5). {Words.AliasLinks}");
             case "fields" when path.Count == 1 && op != "set":
                 throw new DenToolException(ToolErrorCodes.BadArgument, "Name a field: 'fields.<name>'.");
             case "fields" when path.Count == 1:

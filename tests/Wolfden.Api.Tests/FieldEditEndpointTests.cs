@@ -166,19 +166,32 @@ public class FieldEditEndpointTests
         using var den = NewDen();
         await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
 
-        // Add at the end, then move 'chapel' (now item 2) to the front: a removal and an add, saved together.
+        // Add at the end, then move 'chapel' (now item 2) to the front, in place.
         await SavedAsync(server, "tags", new[] { new { op = "add", value = "Carfax" } });
         Assert.Contains("  tags:\n    - soil\n    - \"box\"   # from Varna\n    - chapel\n    - Carfax\n  seen:", den.Read(BoxPath), StringComparison.Ordinal);
-        var moved = await SavedAsync(server, "tags", new object[] { new { op = "remove", path = new object[] { 2 } }, new { op = "add", value = "chapel", index = 0 } });
+        var moved = await SavedAsync(server, "tags", new object[] { new { op = "move", path = new object[] { 2 }, index = 0 } });
         Assert.Contains("  tags:\n    - chapel\n    - soil\n    - \"box\"   # from Varna\n    - Carfax\n  seen:", den.Read(BoxPath), StringComparison.Ordinal);
         Assert.DoesNotContain(Strings(moved, "effects"), e => e.Contains("comment", StringComparison.Ordinal));
 
-        // A moved item is written afresh, so a comment on it goes (#197), and the result says so.
-        moved = await SavedAsync(server, "tags", new object[] { new { op = "remove", path = new object[] { 2 } }, new { op = "add", value = "box", index = 0 } });
-        Assert.Contains("  tags:\n    - box\n    - chapel\n    - soil\n    - Carfax\n  seen:", den.Read(BoxPath), StringComparison.Ordinal);
+        // A move takes the comment on the item with it (#197).
+        moved = await SavedAsync(server, "tags", new object[] { new { op = "move", path = new object[] { 2 }, index = 0 } });
+        Assert.Contains("  tags:\n    - \"box\"   # from Varna\n    - chapel\n    - soil\n    - Carfax\n  seen:", den.Read(BoxPath), StringComparison.Ordinal);
+        Assert.DoesNotContain(Strings(moved, "effects"), e => e.Contains("comment", StringComparison.Ordinal));
+
+        // Taken out and added again, an item is written afresh, so a comment on it goes, and the result says so.
+        moved = await SavedAsync(server, "tags", new object[] { new { op = "remove", path = new object[] { 0 } }, new { op = "add", value = "box", index = 1 } });
+        Assert.Contains("  tags:\n    - chapel\n    - box\n    - soil\n    - Carfax\n  seen:", den.Read(BoxPath), StringComparison.Ordinal);
         Assert.Contains(
             Strings(moved, "effects"),
-            e => e.StartsWith("Moved an item of fields.tags to item 0", StringComparison.Ordinal) && e.Contains("'# from Varna'", StringComparison.Ordinal) && e.Contains("#197", StringComparison.Ordinal));
+            e => e.StartsWith("Moved an item of fields.tags to item 1", StringComparison.Ordinal) && e.Contains("'# from Varna'", StringComparison.Ordinal) && e.Contains("'move' change", StringComparison.Ordinal));
+
+        // A move with no index, or to a place past the end, is refused.
+        var unmoved = den.Read(BoxPath);
+        var (noIndex, noIndexJson) = await EditAsync(server, await HashAsync(server), "tags", new[] { new { op = "move", path = new object[] { 0 } } });
+        Assert.Equal((HttpStatusCode.BadRequest, "bad_argument"), (noIndex, noIndexJson.GetProperty("code").GetString()));
+        var (past, pastJson) = await EditAsync(server, await HashAsync(server), "tags", new[] { new { op = "move", path = new object[] { 0 }, index = 4 } });
+        Assert.Equal((HttpStatusCode.BadRequest, "bad_argument"), (past, pastJson.GetProperty("code").GetString()));
+        Assert.Equal(unmoved, den.Read(BoxPath));
 
         // A flow list keeps its brackets; an item is set where it is.
         await SavedAsync(server, "seen", new[] { new { op = "set", path = new object[] { 1 }, value = "dracula:8" } });
@@ -205,6 +218,13 @@ public class FieldEditEndpointTests
     {
         using var den = NewDen();
         await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+
+        // Dated entries are never reordered (format.md F-TMP-7).
+        var unmoved = den.Read(BoxPath);
+        var (moveStatus, moveJson) = await EditAsync(server, await HashAsync(server), "keeper", new[] { new { op = "move", path = new object[] { 0 }, index = 1 } });
+        Assert.Equal((HttpStatusCode.UnprocessableEntity, "unsupported_edit"), (moveStatus, moveJson.GetProperty("code").GetString()));
+        Assert.Contains("F-TMP-7", moveJson.GetProperty("message").GetString(), StringComparison.Ordinal);
+        Assert.Equal(unmoved, den.Read(BoxPath));
 
         // End the first entry, and add one after the second.
         await SavedAsync(server, "keeper", new[] { new { op = "set", path = new object[] { 0, "until" }, value = "dracula:5" } });

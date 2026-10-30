@@ -10,8 +10,10 @@ public sealed partial class DenTools
     /// went with it (#225), as <see cref="UpdateFields"/> does for a note's
     /// fields: an item removed with a comment on it, one removed and added
     /// again elsewhere (moved), or one removed and a new value added in its
-    /// place (rewritten, as the web UI changes an item), each written afresh
-    /// without its comment.
+    /// place (rewritten), each written afresh without its comment. The
+    /// <c>move</c> and <c>replace</c> changes keep an item's comments (#197),
+    /// and the web UI sends those, so these notes are for a client that
+    /// takes an item out and adds it again.
     /// </summary>
     private sealed class ItemComments
     {
@@ -41,17 +43,17 @@ public sealed partial class DenTools
                 {
                     var r = _removed[moved];
                     _removed.RemoveAt(moved);
-                    notes.Add($"Moved an item of {label} to item {at}, written afresh, so the comment on it was dropped: {Quoted(r.Comments)}. Put it back by hand if you want it.");
+                    notes.Add($"Moved an item of {label} to item {at}, written afresh, so the comment on it was dropped: {Quoted(r.Comments)}. Put it back by hand if you want it; a 'move' change moves an item in place, with its comments.");
                     return;
                 }
 
-                // Taken out and a new value added in its place: the item was changed in place (the web UI's edit of an item).
+                // Taken out and a new value added in its place: the item was changed (a 'replace' keeps its comments).
                 var rewritten = _removed.FindLastIndex(r => r.List == label && r.Index == at);
                 if (rewritten >= 0)
                 {
                     var r = _removed[rewritten];
                     _removed.RemoveAt(rewritten);
-                    notes.Add($"Rewrote item {at} of {label}; the comment on it was dropped: {Quoted(r.Comments)}. Put it back by hand if you want it.");
+                    notes.Add($"Rewrote item {at} of {label}; the comment on it was dropped: {Quoted(r.Comments)}. Put it back by hand if you want it; a 'replace' change changes an item in place, keeping its comments.");
                 }
             }
         }

@@ -28,9 +28,13 @@ export function numberText(text: string): NumberText {
   return { $number: text }
 }
 
-/** One change of /api/edit/field: `path` is under the field, `[]` for the field itself. */
+/**
+ * One change of /api/edit/field: `path` is under the field, `[]` for the
+ * field itself. A `move` names the item by its path (`[2]`) and where it
+ * goes in `index`, and keeps the comments on it (#197).
+ */
 export interface FieldChange {
-  op: 'set' | 'add' | 'remove'
+  op: 'set' | 'add' | 'remove' | 'move'
   path: (string | number)[]
   value?: Json
   index?: number
@@ -400,8 +404,9 @@ function diff(path: (string | number)[], before: Json | undefined, after: Json, 
 /**
  * The changes that make the field, as written (`before`), what the form
  * says. Items and entries are followed by where they came from: one taken
- * out is removed, a new one added where it goes, one moved is removed and
- * added again, and one that stayed has only its changed keys set.
+ * out is removed, a new one added where it goes, one in another place is
+ * moved there in place, with its comments (#197), and each one kept has
+ * only its changed keys set, where it ends up.
  */
 export function fieldChanges(type: SourceFieldType, before: Json | undefined, field: FieldDraft): FieldChange[] {
   const { value: after, origins } = jsonOfField(type, field)
@@ -431,9 +436,8 @@ export function fieldChanges(type: SourceFieldType, before: Json | undefined, fi
     }
   }
 
-  // Then put each item in its place: new ones added, moved ones taken out and added again.
+  // Then put each item in its place, from the top: new ones added, and kept ones moved up from further down.
   const current = before.map((_, i) => i).filter((i) => kept.has(i)) as (number | null)[]
-  const moved = new Set<number>()
   origins.forEach((origin, k) => {
     if (current[k] === origin && origin !== null) {
       return
@@ -441,18 +445,19 @@ export function fieldChanges(type: SourceFieldType, before: Json | undefined, fi
 
     if (origin !== null) {
       const m = current.indexOf(origin)
-      out.push({ op: 'remove', path: [m] })
+      out.push({ op: 'move', path: [m], index: k })
       current.splice(m, 1)
-      moved.add(origin)
+      current.splice(k, 0, origin)
+      return
     }
 
     out.push({ op: 'add', path: [], value: after[k], ...(k < current.length ? { index: k } : {}) })
     current.splice(k, 0, null)
   })
 
-  // Then what changed in the items that stayed where they are.
+  // Then what changed in the items kept, where they are now.
   origins.forEach((origin, k) => {
-    if (origin !== null && !moved.has(origin)) {
+    if (origin !== null) {
       diff([k], before[origin], after[k], out)
     }
   })
@@ -502,7 +507,7 @@ function draftProblem(type: SourceFieldType, d: Draft): string | null {
 
 /** One change of a chapter field or of a container's chapter_defaults, as the MCP update_chapter_fields takes it. */
 export interface ChapterFieldChange {
-  op: 'set' | 'add' | 'remove' | 'clear'
+  op: 'set' | 'add' | 'remove' | 'clear' | 'move' | 'replace'
   value?: Json
   index?: number
   item?: number
@@ -512,11 +517,11 @@ export interface ChapterFieldChange {
  * The changes that make a chapter field (or default), as written
  * (`before`), what the form says, as the chapter field tools take them
  * (#225): they name no path inside the field, so an item taken out is
- * `remove` by its number and a new one `add` where it goes, as for a note's
- * field, and an item changed in place is taken out and added again; any
- * other change sets the whole value. A list emptied in the form is `[]`,
- * "none here" (types.md F-CHAP-5); going back to the default is `clear`, a
- * separate action.
+ * `remove` by its number, a new one `add` where it goes, one in another
+ * place `move`, and one changed `replace`, as for a note's field; the last
+ * two keep the comments on the item (#197). Any other change sets the whole
+ * value. A list emptied in the form is `[]`, "none here" (types.md
+ * F-CHAP-5); going back to the default is `clear`, a separate action.
  */
 export function chapterFieldChanges(type: SourceFieldType, before: Json | undefined, field: FieldDraft): ChapterFieldChange[] {
   const changes = fieldChanges(type, before, field)
@@ -540,10 +545,10 @@ export function chapterFieldChanges(type: SourceFieldType, before: Json | undefi
       out.push({ op: 'remove', item: c.path[0] })
     } else if (c.op === 'add' && c.path.length === 0) {
       out.push({ op: 'add', value: c.value, ...(c.index !== undefined ? { index: c.index } : {}) })
+    } else if (c.op === 'move' && c.path.length === 1 && typeof c.path[0] === 'number' && c.index !== undefined) {
+      out.push({ op: 'move', item: c.path[0], index: c.index })
     } else if (c.op === 'set' && c.path.length === 1 && typeof c.path[0] === 'number') {
-      // In place: the in-place changes come last, when the list is as long as it will be.
-      const at = c.path[0]
-      out.push({ op: 'remove', item: at }, { op: 'add', value: c.value, ...(at < after.length - 1 ? { index: at } : {}) })
+      out.push({ op: 'replace', item: c.path[0], value: c.value })
     } else {
       return whole
     }

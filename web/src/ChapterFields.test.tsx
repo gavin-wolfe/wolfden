@@ -426,7 +426,7 @@ describe('chapterFieldChanges', () => {
   const when = chapterFieldTypes[3]
   const draft = (raw: Parameters<typeof fieldDraftOf>[1]) => fieldDraftOf(pov, raw) as FieldDraft
 
-  it('removes and adds list items by number, and takes an item changed in place out and back', () => {
+  it('removes, adds, moves, and replaces list items by number, keeping a moved or changed item in place (#197)', () => {
     const d = draft(['[[a]]', '[[b]]', '[[c]]'])
     const items = d.entries[0].value.kind === 'list' ? d.entries[0].value.items : []
     const changed: FieldDraft = {
@@ -435,9 +435,14 @@ describe('chapterFieldChanges', () => {
     }
     expect(chapterFieldChanges(pov, ['[[a]]', '[[b]]', '[[c]]'], changed)).toEqual([
       { op: 'remove', item: 2 },
-      { op: 'remove', item: 1 },
-      { op: 'add', value: '[[x]]' },
+      { op: 'replace', item: 1, value: '[[x]]' },
     ])
+
+    const reordered: FieldDraft = {
+      ...d,
+      entries: [{ ...d.entries[0], value: { kind: 'list', raw: ['[[a]]', '[[b]]', '[[c]]'], items: [items[2], items[0], items[1]] } }],
+    }
+    expect(chapterFieldChanges(pov, ['[[a]]', '[[b]]', '[[c]]'], reordered)).toEqual([{ op: 'move', item: 2, index: 0 }])
   })
 
   it('an emptied list is its items removed, which leaves [], and nothing set is set whole', () => {

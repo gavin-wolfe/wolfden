@@ -228,6 +228,75 @@ public sealed partial class MarkdownFile : DenFile
     }
 
     /// <summary>
+    /// Moves item <paramref name="from"/> of the list at <paramref name="path"/>
+    /// so it becomes item <paramref name="to"/>, in place (#197): the items
+    /// between shift by one, and nothing else changes (format.md F-RT-1,
+    /// F-RT-2). In a block list, the item's own lines move: a comment on
+    /// them, comment lines right after it indented under it, and comment
+    /// lines right above its dash (no blank line between, not left of the
+    /// dash, and not indented under the item before), which are a heading
+    /// for it, except above the first item, where they may head the whole
+    /// list and stay. Blank lines stay where they are. In a flow list, the item's
+    /// text moves, with a comment on its line if it has a line of its own,
+    /// and the commas stay in place; a comment anywhere else between the
+    /// brackets makes the move refused. A list of dated entries (format.md
+    /// §7.3) is never reordered (F-TMP-7). Moving an item to where it is
+    /// changes nothing.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="from"/> or <paramref name="to"/> isn't an item of the list.</exception>
+    /// <exception cref="InvalidOperationException">The file can't be edited, or the value at the path isn't a list.</exception>
+    /// <exception cref="NotSupportedException">The item can't be moved in place without leaving a comment behind or reformatting,
+    /// or the list holds dated entries (F-TMP-7).</exception>
+    /// <exception cref="EditVerificationException">The edit didn't read back as intended (a bug).</exception>
+    public MarkdownFile WithListItemMoved(IReadOnlyList<string> path, int from, int to) =>
+        WithListItemMoved(path, from, to, out _, out _);
+
+    /// <inheritdoc cref="WithListItemMoved(IReadOnlyList{string}, int, int)"/>
+    /// <param name="headingKept">When the move changes which item is first in a block list, the comment lines
+    /// (their text after <c>#</c>) that were above the first item: they head the whole list, so they stayed
+    /// at the top rather than going with it (format.md F-RT-7). Otherwise empty.</param>
+    /// <param name="headingJoined">Likewise, the comment lines that were the new first item's own heading:
+    /// they're now above the whole list, and stay at the top when items move again.</param>
+    public MarkdownFile WithListItemMoved(IReadOnlyList<string> path, int from, int to, out IReadOnlyList<string> headingKept, out IReadOnlyList<string> headingJoined)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        headingKept = [];
+        headingJoined = [];
+        var what = $"Moving item {from} of '{string.Join('.', path)}' to {to}";
+        EnsureEditable(_frontmatter is null ? _missingFrontmatter : null);
+        if (GetFrontmatterValue(path) is not YamlSequence list)
+        {
+            throw new InvalidOperationException($"'{string.Join('.', path)}' isn't a list.");
+        }
+
+        if (IsEntryList(list))
+        {
+            throw new NotSupportedException(
+                $"'{string.Join('.', path)}' is a list of dated entries, which are never reordered (F-TMP-7): of two entries with the same 'from', the later one in the file holds (F-TMP-5), so a move could change what holds.");
+        }
+
+        var heading = YamlEditor.ListHeading.None;
+        var result = EditFrontmatter(
+            block => YamlEditor.MoveItem(Source!, block, path, from, to, out heading),
+            (before, after) => YamlTreeCheck.SameExcept(before, after, path, (b, a) => YamlTreeCheck.MovedItem(b, a, from, to)),
+            addFrontmatter: false,
+            what);
+        if (!SameComments(FrontmatterComments, result.FrontmatterComments))
+        {
+            throw new EditVerificationException($"{what} lost or added a comment, so the edit was refused.");
+        }
+
+        headingKept = heading.Kept;
+        headingJoined = heading.Joined;
+        return result;
+
+        static bool IsEntryList(YamlSequence list) => list.Items.Any(i => i is YamlMapping m && m.ContainsKey("value"));
+
+        static bool SameComments(IReadOnlyList<string> a, IReadOnlyList<string> b) =>
+            a.Count == b.Count && a.Order(StringComparer.Ordinal).SequenceEqual(b.Order(StringComparer.Ordinal), StringComparer.Ordinal);
+    }
+
+    /// <summary>
     /// Sets the value at <paramref name="path"/> (paths as in
     /// <see cref="WithFrontmatterValue(IReadOnlyList{string}, YamlScalarValue)"/>)
     /// to a scalar, a list, or a mapping, such as a field's whole value.

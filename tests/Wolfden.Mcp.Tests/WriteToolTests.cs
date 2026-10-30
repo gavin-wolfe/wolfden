@@ -784,6 +784,11 @@ public sealed class WriteToolTests : IDisposable
         Assert.DoesNotContain("chapters.", add.Message, StringComparison.Ordinal);
         var remove = Assert.Throws<DenToolException>(() => Tools.UpdateChapterFields("dracula", "7", chapter.Hash, Json("""[{"op": "remove", "field": "setting", "item": 0}]""")));
         Assert.Contains("so 'remove' has no list item to take out. That value is ignored", remove.Message, StringComparison.Ordinal);
+        var move = Assert.Throws<DenToolException>(() => Tools.UpdateChapterFields("dracula", "7", chapter.Hash, Json("""[{"op": "move", "field": "setting", "item": 0, "index": 0}]""")));
+        Assert.Contains("is written as one value, 'Whitby harbour', not a list, so 'move' has no list item to move. That value is ignored", move.Message, StringComparison.Ordinal);
+        Assert.EndsWith("send a 'clear' change.", move.Message, StringComparison.Ordinal);
+        var replace = Assert.Throws<DenToolException>(() => Tools.UpdateChapterFields("dracula", "7", chapter.Hash, Json("""[{"op": "replace", "field": "setting", "item": 0, "value": "[[whitby]]"}]""")));
+        Assert.Contains("so 'replace' has no list item to change in place. That value is ignored", replace.Message, StringComparison.Ordinal);
         Assert.Equal(before, _den.Read(BookFile));
 
         // 'set' replaces it, and then nothing is ignored.
@@ -845,7 +850,23 @@ public sealed class WriteToolTests : IDisposable
             one.Message);
 
         // Removing from a field the chapter doesn't write, or writes with no value.
-        Assert.Equal($"Chapter dracula:6 (Mina Murray's Journal) ({BookFile}) doesn't write 'setting', so 'remove' has no list item to take out.", Refused("""[{"op": "remove", "field": "setting", "item": 0}]""").Message);
+        const string Inherits =
+            " It inherits 'setting' from chapter_defaults: to change it there, use update_chapter_defaults; to give it a value of its own here, send a 'set' change with the whole value.";
+        Assert.Equal($"Chapter dracula:6 (Mina Murray's Journal) ({BookFile}) doesn't write 'setting', so 'remove' has no list item to take out.{Inherits}", Refused("""[{"op": "remove", "field": "setting", "item": 0}]""").Message);
+
+        // A move or replace of an item (#197) is refused the same way.
+        Assert.Equal($"Chapter dracula:6 (Mina Murray's Journal) ({BookFile}) doesn't write 'setting', so 'move' has no list item to move.{Inherits}", Refused("""[{"op": "move", "field": "setting", "item": 0, "index": 1}]""").Message);
+        Assert.Equal(
+            $"Chapter dracula:6 (Mina Murray's Journal) ({BookFile}) doesn't write 'setting', so 'replace' has no list item to change in place.{Inherits}",
+            Refused("""[{"op": "replace", "field": "setting", "item": 0, "value": "[[whitby]]"}]""").Message);
+        Assert.Equal(
+            $"'tense' in {Six} ({BookFile}) takes one value, not a list, so 'move' has no list item to move. To change it, send a 'set' change with the new value.",
+            Refused("""[{"op": "move", "field": "tense", "item": 0, "index": 1}]""").Message);
+        Assert.Equal(
+            $"'tense' in {Six} ({BookFile}) takes one value, not a list, so 'replace' has no list item to change in place. To change it, send a 'set' change with the new value.",
+            Refused("""[{"op": "replace", "field": "tense", "item": 0, "value": "present"}]""").Message);
+        Assert.Equal($"'pov' in {Six} ({BookFile}) has 2 item(s), so there's no item 5 to move.{Items}", Refused("""[{"op": "move", "field": "pov", "item": 5, "index": 0}]""").Message);
+        Assert.Equal($"'pov' in {Six} ({BookFile}) has 2 item(s), so there's no item 2 to replace.{Items}", Refused("""[{"op": "replace", "field": "pov", "item": 2, "value": "[[lucy-westenra]]"}]""").Message);
         _den.Write(BookFile, _den.Read(BookFile).Replace("      when: { text: \"5 June – 6 August\", sort: [0, 6, 5] }\n", "      when: { text: \"5 June – 6 August\", sort: [0, 6, 5] }\n      setting:\n", StringComparison.Ordinal));
         Assert.Equal(
             $"'setting' in {Six} ({BookFile}) is written with no value, so 'remove' has no list item to take out. " +

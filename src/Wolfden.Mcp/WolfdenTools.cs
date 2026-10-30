@@ -188,9 +188,11 @@ public sealed class WolfdenTools
         "Changes an entity's frontmatter, keeping everything else as written. 'changes' is a list, made in order and saved together " +
         "or not at all. Each change is {\"op\": \"set\", \"path\": ..., \"value\": ...}, {\"op\": \"add\", \"path\": ..., \"value\": ..., \"index\": n} " +
         "(add an item to a list: an alias, or an entry of a field that changes over time; at the end without index), or " +
-        "{\"op\": \"remove\", \"path\": ...} (a key or list item). A path is dotted: 'status', 'from', 'aliases', 'fields.born', " +
+        "{\"op\": \"remove\", \"path\": ...} (a key or list item), or {\"op\": \"move\", \"path\": \"fields.pov.2\", \"index\": 0} (move a list item so it " +
+        "becomes item 'index', keeping its comments; taking an item out and adding it again drops them; dated entries are never moved, F-TMP-7). Setting a path that ends in an item number " +
+        "('fields.pov.1') changes that item in place, keeping a comment on it. A path is dotted: 'status', 'from', 'aliases', 'fields.born', " +
         "'fields.rank.1.from' (item numbers from 0). An entry is {\"value\": x, \"from\": \"book:chapter\", \"until\": ..., \"status\": ..., \"pin\": true}. " +
-        "The id never changes. Aliases can be added here; to rename the entity, or change or remove an alias, use rename_entity or " +
+        "The id never changes. Aliases can be added and moved here; to rename the entity, or change or remove an alias, use rename_entity or " +
         "change_alias, which rewrite the links that used the old text. A 'from', 'until', or position field value you set must be a position the " +
         "universe has (bad_position otherwise); null leaves it out." + WriteHelp)]
     public CallToolResult UpdateFields(
@@ -376,7 +378,9 @@ public sealed class WolfdenTools
         "Changes a chapter's own fields in book.md. 'changes' is a list of {\"op\": \"set\", \"field\": \"tense\", \"value\": \"present\"}, " +
         "{\"op\": \"add\", \"field\": \"pov\", \"value\": \"[[mina-harker]]\"}, {\"op\": \"remove\", \"field\": \"pov\", \"item\": 0} (or \"value\": the " +
         "item's text, compared ignoring case and spacing; a link matches only if it's written the same way, so [[Mina]] doesn't match " +
-        "[[mina-harker]]: use 'item' from get_chapter if unsure), and {\"op\": \"clear\", \"field\": \"pov\"}. Removing a list's last item leaves [], 'none here', which stops the chapter " +
+        "[[mina-harker]]: use 'item' from get_chapter if unsure), {\"op\": \"replace\", \"field\": \"pov\", \"item\": 1, \"value\": \"[[jonathan-harker]]\"} " +
+        "and {\"op\": \"move\", \"field\": \"pov\", \"item\": 2, \"index\": 0} (change or move one item in place, keeping its comments; taking it out " +
+        "and adding it again drops them), and {\"op\": \"clear\", \"field\": \"pov\"}. Removing a list's last item leaves [], 'none here', which stops the chapter " +
         "inheriting the field; 'clear' removes the chapter's own value so it inherits from chapter_defaults again. The result says " +
         "what each field's effective value is now, and what the chapter would inherit, so check with the writer which they meant." + WriteHelp)]
     public CallToolResult UpdateChapterFields(
@@ -407,8 +411,9 @@ public sealed class WolfdenTools
     [Description(
         "Changes the chapter_defaults of a universe, a series (with 'series'), or a book (with 'book'), such as 'make Mina the default POV " +
         "for this book'. 'changes' is a list of {\"op\": \"set\", \"field\": \"tense\", \"value\": \"past\"}, {\"op\": \"add\", \"field\": \"pov\", " +
-        "\"value\": \"[[mina-harker]]\"}, {\"op\": \"remove\", \"field\": \"pov\", \"item\": 0} (or \"value\": the item's text), and " +
-        "{\"op\": \"clear\", \"field\": \"pov\"}. Removing a list's last item leaves [], 'none here', which stops the books below inheriting " +
+        "\"value\": \"[[mina-harker]]\"}, {\"op\": \"remove\", \"field\": \"pov\", \"item\": 0} (or \"value\": the item's text), " +
+        "{\"op\": \"replace\", \"field\": \"pov\", \"item\": 0, \"value\": ...} and {\"op\": \"move\", \"field\": \"pov\", \"item\": 1, \"index\": 0} " +
+        "(change or move one item in place, keeping its comments), and {\"op\": \"clear\", \"field\": \"pov\"}. Removing a list's last item leaves [], 'none here', which stops the books below inheriting " +
         "the field from further up; 'clear' removes the value so they inherit from the container above again. The result says, book by " +
         "book, which chapters now have what, and which keep their own value or a nearer default, so check with the writer that's what " +
         "they meant. A final (frozen) book's defaults can't be changed, nor a series' or universe's where that would change what a " +

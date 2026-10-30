@@ -488,6 +488,17 @@ it.
 Any value can have its own status, such as `candidate` for an option
 you haven't settled, and can be **Pinned** as hard canon.
 
+A list field, such as a character's `occupation`, has **Add item**,
+**Remove**, and buttons to move an item up or down. Saving changes only
+the items you touched. A comment you wrote in the file goes with its
+item when you reorder or change it: `- "[[mina-harker]]"  # main` keeps
+its `# main`, and a comment line right above an item moves with it.
+Comment lines above the first item head the whole list, so they stay at
+the top, and blank lines stay where they are. Dated entries keep the
+order they're written in, so they have no move buttons. Removing an item removes the comment on
+it too, and the notice after saving says so. The same goes for chapter
+fields and chapter defaults.
+
 A field your note's type doesn't define, or one written in a way the
 form can't show, has **Edit in file** instead, which says why.
 

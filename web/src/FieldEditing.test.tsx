@@ -75,12 +75,24 @@ describe('SC-WEB-61: the changes a field edit sends', () => {
     const added = newItem()
     added.draft.text = 'Carfax'
     list.items = [chapel, { ...soil, draft: { ...soil.draft, text: 'earth' } }, added]
+    // Chapel is moved in place, so a comment on it stays with it (#197).
     expect(fieldChanges(types.tags, before, d)).toEqual([
       { op: 'remove', path: [1] },
-      { op: 'remove', path: [1] },
-      { op: 'add', path: [], value: 'chapel', index: 0 },
+      { op: 'move', path: [1], index: 0 },
       { op: 'add', path: [], value: 'Carfax' },
       { op: 'set', path: [1], value: 'earth' },
+    ])
+
+    // A reorder alone is moves, from the top, and a moved item that changed is set where it ends up.
+    list.items = [{ ...chapel, draft: { ...chapel.draft, text: 'crypt' } }, soil, box]
+    expect(fieldChanges(types.tags, before, d)).toEqual([
+      { op: 'move', path: [2], index: 0 },
+      { op: 'set', path: [0], value: 'crypt' },
+    ])
+    list.items = [box, chapel, soil]
+    expect(fieldChanges(types.tags, before, d)).toEqual([
+      { op: 'move', path: [1], index: 0 },
+      { op: 'move', path: [2], index: 1 },
     ])
 
     // Every item out: each is removed, so the file follows format.md F-RT-6.
@@ -115,6 +127,13 @@ describe('SC-WEB-61: the changes a field edit sends', () => {
 
     d.entries = [count]
     expect(fieldChanges(types.keeper, before, d)).toEqual([{ op: 'remove', path: [1] }])
+
+    // Entries are never reordered (F-TMP-7): the form only takes them out and adds new ones at the end, so nothing is moved.
+    d.entries = [jonathan, later]
+    expect(fieldChanges(types.keeper, before, d)).toEqual([
+      { op: 'remove', path: [0] },
+      { op: 'add', path: [], value: { value: '[[abraham-van-helsing]]', from: 'dracula:20' } },
+    ])
   })
 
   it('writes a plain value that gains a date as a dated list, and a cleared field as a removal', () => {
@@ -443,7 +462,9 @@ describe('SC-WEB-60: editing a field with a control for its type', () => {
   })
 
   it('moves, removes, and adds list items with the keyboard-reachable buttons', async () => {
-    const { posts } = stubFields()
+    // A move that changes the first item says what now heads the list (format.md F-RT-7), and the save notice shows it.
+    const heading = "'# about typing' is now above the whole fields.occupation list, and stays at the top when items move (format.md F-RT-7)."
+    const { posts } = stubFields({ onPost: () => written({ effects: [heading] }) })
     renderApp('/u/dracula/e/E-MINA')
     const form = await openField('occupation')
 
@@ -461,10 +482,10 @@ describe('SC-WEB-60: editing a field with a control for its type', () => {
     await waitFor(() => expect(posts).toHaveLength(1))
     expect(posts[0].body.changes).toEqual([
       { op: 'remove', path: [0] },
-      { op: 'remove', path: [1] },
-      { op: 'add', path: [], value: 'typist', index: 0 },
+      { op: 'move', path: [1], index: 0 },
       { op: 'add', path: [], value: 'author' },
     ])
+    expect(await screen.findByText(heading)).toBeTruthy()
   })
 
   it('gives each dated entry a From and an Until picked from the books and chapters, and adds, ends, and removes entries', async () => {
@@ -473,7 +494,9 @@ describe('SC-WEB-60: editing a field with a control for its type', () => {
     const form = await openField('role')
 
     expect(within(form).getByText(/which can change over the story/)).toBeTruthy()
-    const second = within(form).getByRole('group', { name: 'Entry 2 of 2: holds from Dracula chapter 3' })
+    // Dated entries keep their order (F-TMP-7): there's no control to move one.
+    expect(within(form).queryAllByRole('button', { name: /^Move entry/ })).toHaveLength(0)
+    const second =within(form).getByRole('group', { name: 'Entry 2 of 2: holds from Dracula chapter 3' })
     const until = within(second).getByRole('group', { name: 'Until' })
     fireEvent.change(within(until).getByRole('combobox', { name: 'Book' }), { target: { value: 'dracula' } })
     fireEvent.change(within(until).getByRole('combobox', { name: 'Chapter' }), { target: { value: 'dracula:5' } })

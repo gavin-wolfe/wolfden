@@ -60,6 +60,32 @@ internal static class YamlTreeCheck
     }
 
     /// <summary>
+    /// True if <paramref name="after"/> is the list at <paramref name="before"/>
+    /// with item <paramref name="from"/> moved to <paramref name="to"/>, every
+    /// item reading as it did.
+    /// </summary>
+    public static bool MovedItem(YamlNode? before, YamlNode? after, int from, int to)
+    {
+        if (before is not YamlSequence old || after is not YamlSequence edited || old.IsFlow != edited.IsFlow || old.Items.Count != edited.Items.Count)
+        {
+            return false;
+        }
+
+        var order = Enumerable.Range(0, old.Items.Count).ToList();
+        order.RemoveAt(from);
+        order.Insert(to, from);
+        for (var i = 0; i < order.Count; i++)
+        {
+            if (!Same(old.Items[order[i]], edited.Items[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
     /// True if <paramref name="after"/> is the mapping or list at
     /// <paramref name="before"/> without its key or item
     /// <paramref name="segment"/>. A block collection that loses its last

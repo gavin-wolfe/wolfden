@@ -951,8 +951,9 @@ comma sits before a comment on the same line, removing an explicit
 removing or moving a section so that its neighbors (or the lead) would
 run together into one heading, removing a section that holds a link
 reference definition (`[map]: https://…`) other sections may use, moving
-sections that define the same reference label (the first one wins), or
-treating a list as a mapping.
+sections that define the same reference label (the first one wins),
+moving a flow list item when a comment sits between items rather than
+on an item's own line, or treating a list as a mapping.
 
 - The edit is refused with a message that says why, and the file is left
   exactly as it was. Wolfden never rewrites the rest of the file to make
@@ -966,6 +967,7 @@ Spec: F-RT-1, F-RT-2. Covered by:
 `CollectionEditTests.RemovingAnExplicitFlowKeyIsRefused`,
 `CollectionEditTests.RemovingTheFlowKeyBeforeAnExplicitKeyIsRefused`,
 `CollectionEditTests.AddingToOrRemovingFromALeadingCommaFlowListIsRefused`,
+`ListItemMoveTests.AFlowMoveIsRefusedWhenACommentIsntOnAnItemsLine`,
 `CollectionEditTests.EmptyingACollectionIsRefusedWhenACommentAboveItMayBeAboutTheParent`,
 `SectionEditTests.RemovingASectionThatWouldMergeTheTextAroundItIsRefused`,
 `SectionEditTests.MovingASectionThatWouldMergeWithTheTextBeforeItIsRefused`,
@@ -1035,6 +1037,43 @@ Spec: F-RT-6, F-RT-2. Covered by:
 `CollectionEditTests.EmptyingANestedMappingInAYamlFileKeepsItsLineEndings`,
 `WriteToolTests.EmptyingAMappingOrListSaysWhichCommentLinesWentWithIt`,
 `RenameEntityToolTests.DroppingTheLastAliasSaysWhichCommentLinesWentWithIt`.
+
+### SC-RT-17. I reorder a list, or change one item, and its comments stay with it
+
+Chapter 27's `pov` is a block list: `# the journal chapters` heading
+it, `- "[[mina-harker]]"  # main`, then `# letters` above Jonathan, and
+Seward. The writer moves Mina to the end, then Jonathan to the top, then
+changes Jonathan to Lucy. A note's `tags` are a flow list with each item
+on its own line and a comment after some of them. Lucy's `role` is a
+list of dated entries.
+
+- Mina's lines move: her line with its `# main`, and any comment lines
+  indented under her. `# the journal chapters`, above the first item,
+  heads the list and stays at the top; `# letters` moves with Jonathan.
+  Blank lines, a comment line left of the dashes, and a commented-out
+  item after the last one stay where they were. Moving an item back
+  gives back the same bytes, unless it went to the top, where its own
+  heading joins the list's. A move that changes the first item says, in
+  the effects and the web page's notice, which comment lines stayed at
+  the top and which now head the list. CRLF lines stay CRLF.
+- Dated entries are never reordered (F-TMP-7): a move of one is refused,
+  since entries with the same `from` are read in file order (F-TMP-5)
+  and a move could unseat pinned canon. The web page has no control to
+  move an entry.
+- In the flow list the item moves with the comment on its line, and the
+  commas stay put, so the last item still has none. A comment line of
+  its own between flow items can't be placed for sure, so that move is
+  refused and the file is unchanged.
+- Changing Jonathan to Lucy changes only the link's characters: the
+  comment on the item, and the comment lines above it, stay. An item
+  written over several lines is replaced whole, and the result says
+  which comments inside it went. A list given as one item is refused.
+
+Spec: format.md F-RT-7, F-TMP-7, F-RT-1, F-RT-2 (#197). Covered by:
+`ListItemMoveTests` (Core),
+`FieldEditEndpointTests.ListItemsAreAddedRemovedAndReorderedInTheListsOwnStyle`,
+`ChapterFieldEndpointTests.MovingOrReplacingAnItemKeepsItsComments` (API),
+`ListItemToolTests` (MCP).
 
 ## CLI: working with a den from the command line
 
@@ -1910,6 +1949,8 @@ pinned species.
   alias that's another note's name or slug says what links by it now
   reach; an alias with control characters, or a slug Windows can't
   hold (`nul`), is refused, and a name like "Con" gets `con-2`.
+- A list item, an alias included, moves in place with a `move` change,
+  keeping its comments (SC-RT-17).
 
 Spec: format.md §1.3, F-ID-4, F-RT-2, F-RT-5, F-PIN-1, types.md F-TPL-7
 (maintainer decisions, 2026-10-22 and 2026-10-23). Covered by:
@@ -1922,7 +1963,8 @@ Spec: format.md §1.3, F-ID-4, F-RT-2, F-RT-5, F-PIN-1, types.md F-TPL-7
 `WriteToolTests.BadNamesAndAliasesAreRefusedAndAnAliasThatCollidesSaysSo`,
 `McpServerTests.OverTheWireAWriteTakesItsChangesAsJsonAndAStaleHashIsRefused`,
 `WriteEditTests.InTemplateOrderANewTopLevelKeyGoesInItsPlace`,
-`WriteEditTests.AWholeTemporalListIsWrittenOneEntryPerLine`.
+`WriteEditTests.AWholeTemporalListIsWrittenOneEntryPerLine`,
+`ListItemToolTests.UpdateFieldsMovesAnItemWithItsComments`.
 
 ### SC-MCP-17. My assistant writes into a note's sections
 
@@ -2007,12 +2049,18 @@ The book's `chapter_defaults` give every chapter Mina's POV, and chapter
   can go in at a given place, and come out by its text, compared
   ignoring case and spacing: `[[Mina]]` doesn't match
   `[[mina-harker]]`. A field named like the chapter's own keys (`key`)
-  is refused (types.md F-CHAP-1).
+  is refused (types.md F-CHAP-1). An item can also move (`move`) or be
+  changed (`replace`) in place, keeping its comments (SC-RT-17). Either
+  is refused as `add` and `remove` are (#233) on a field that takes one
+  value, isn't written as a list, or has no such item; on a field the
+  chapter doesn't write, the refusal says it inherits it and where to
+  change it.
 
 Spec: format.md F-RT-6, types.md F-CHAP-5 (maintainer decisions,
 2026-10-23). Covered by:
 `WriteToolTests.RemovingAChaptersLastPovSaysWhatItNoLongerInherits`,
-`WriteToolTests.ChapterListItemsGoInAtAnIndexAndComeOutByValue`.
+`WriteToolTests.ChapterListItemsGoInAtAnIndexAndComeOutByValue`,
+`ListItemToolTests.ChapterFieldsMoveAndReplaceAnItemKeepingItsComments`.
 
 ### SC-MCP-21. My assistant tries to edit a finished book
 
@@ -2029,7 +2077,8 @@ The writer has frozen the book (`status: final`).
   instead (SC-WEB-44, SC-CLI-15).
 
 Spec: format.md F-BOOK-1 (maintainer decision, 2026-10-22). Covered by:
-`WriteToolTests.NothingInAFinalBookIsWritten`.
+`WriteToolTests.NothingInAFinalBookIsWritten`,
+`ListItemToolTests.AMoveInAFinalBookIsRefused`.
 
 ### SC-MCP-22. My assistant checkpoints a session's edits
 
@@ -2112,7 +2161,8 @@ decisions, 2026-10-23, 2026-10-25). Covered by:
 `ChapterDefaultsToolTests.ABooksDefaultPovReachesTheChaptersThatDontSetTheirOwn`,
 `ChapterDefaultsToolTests.ASeriesDefaultSaysWhichBooksAndChaptersItReaches`,
 `ChapterDefaultsToolTests.ASeriesWithNoBooksYetCanHaveDefaultsAndGetsAnId`,
-`ChapterDefaultsToolTests.AValueThatDoesntFitTheFieldIsSavedWithAWarningAndSaysItsIgnored`.
+`ChapterDefaultsToolTests.AValueThatDoesntFitTheFieldIsSavedWithAWarningAndSaysItsIgnored`,
+`ListItemToolTests.ChapterDefaultsMoveAndReplaceAnItemKeepingItsComments`.
 
 ### SC-MCP-25. My assistant changes a default a finished book inherits
 
@@ -4186,18 +4236,20 @@ Spec: design.md §9 "Editing fields", types.md §5. Covered by:
 
 - A list field has Add item, Remove, and move up and down buttons, which
   keep focus on the item. Saving removes the items taken out, adds new
-  ones where they go, and moves an item by removing it and adding it
-  again; the others keep their bytes, in the list's own style (block or
-  flow). A moved item is written afresh, so a comment on it is dropped,
-  and the result says so, quoting it; moving in place is #197. Removing
-  an item with a comment says the comment went too.
+  ones where they go, and moves an item in place (`move`), with its
+  comments (#197, SC-RT-17); the others keep their bytes, in the list's
+  own style (block or flow). A changed item is set in place, keeping the
+  comment on it. Removing an item with a comment says the comment went
+  too, and so does an API client that takes an item out and adds it
+  again, which writes it afresh.
 - Removing the last item leaves `tags:` for a block list and `seen: []`
   for a flow one (format.md F-RT-6): unset either way, with no warning.
 
 Spec: format.md F-RT-6, types.md F-FT-12. Covered by:
 `FieldEditEndpointTests.ListItemsAreAddedRemovedAndReorderedInTheListsOwnStyle`,
 `FieldEditEndpointTests.RemovingAnItemWithACommentSaysTheCommentWent`,
-`FieldEditing.test.tsx` (web).
+`ChapterFieldEndpointTests.MovingOrReplacingAnItemKeepsItsComments`,
+`FieldEditing.test.tsx`, `ChapterFields.test.tsx` (web).
 
 ### SC-WEB-62. I give a fact dates: from chapter 3 until chapter 9
 
@@ -4644,15 +4696,17 @@ Spec: types.md F-CHAP-5, design.md §9 (#215, #225). Covered by:
 - A stale `book.md` (or container file) is refused (`stale_file`). The
   page sends the same changes again on the new file only if they add or
   remove items and the chapter's item (or the default's entry) is byte
-  for byte as it was; otherwise it shows both values, with **Keep mine**
+  for byte as it was (moves and changes of one item count, as `move` and
+  `replace`); otherwise it shows both values, with **Keep mine**
   and **Take theirs**. A refetch while the form is open doesn't change
   what it's based on. **Use the default** on a stale file shows what the
   file has now, or says it was already cleared; it never clears a value
   the writer didn't see.
-- Removing, moving, or changing in place a list item that has a comment
-  on it says, in the effects, that the comment went with it ("Rewrote
-  item 0 of pov of chapter '1'; the comment on it was dropped" for a
-  change in place).
+- The page moves and changes a list item in place (`move`, `replace`),
+  keeping its comments (#197). Removing an item that has a comment on it
+  says, in the effects, that the comment went with it, and so does a
+  client's remove and add of an item ("Rewrote item 0 of pov of chapter
+  '1'; the comment on it was dropped", with a pointer to `replace`).
 - A reserved name (`key`, `number`, …, F-CHAP-1), a change member the
   endpoint doesn't take (`field` inside a change), a missing `field`, an
   unknown chapter, and `fields` that isn't an object are refused and write

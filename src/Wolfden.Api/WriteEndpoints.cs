@@ -63,6 +63,7 @@ public static partial class WriteEndpoints
         ReplaceOrClear = "To replace it, edit the field and save the whole value; to {0}, choose {1}.",
         SetOne = "To change it, edit the field and save the new value.",
         ItemsListed = "Reload the page to see its items as they are now.",
+        NotWritten = "It inherits '{0}' from {1}: to change it there, edit Chapter defaults on the page of the book, series, or universe that sets it; to give it a value of its own here, edit the field and save the whole value.",
     };
 
     /// <summary>Maps the editing endpoints onto <paramref name="api"/>.</summary>

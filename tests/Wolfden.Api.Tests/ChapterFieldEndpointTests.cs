@@ -171,9 +171,9 @@ public sealed class ChapterFieldEndpointTests : IDisposable
             book = "ember", universe = "starfall", chapter = "2", field = "pov", expectedHash = await HashAsync(server),
             changes = new object[] { new { op = "remove", item = 0 }, new { op = "add", value = "[[mara-voss]]" } },
         });
-        Assert.Contains("Moved an item of pov of chapter '2' to item 1, written afresh, so the comment on it was dropped: '# her watch'. Put it back by hand if you want it.", moved.GetProperty("effects").EnumerateArray().Select(e => e.GetString()));
+        Assert.Contains("Moved an item of pov of chapter '2' to item 1, written afresh, so the comment on it was dropped: '# her watch'. Put it back by hand if you want it; a 'move' change moves an item in place, with its comments.", moved.GetProperty("effects").EnumerateArray().Select(e => e.GetString()));
 
-        // Rewritten: the web UI changes an item in place as a remove and an add at the same place.
+        // Rewritten: a remove and an add at the same place.
         Assert.Contains("        - \"[[mara-voss]]\"\n", _den.Read(Ember), StringComparison.Ordinal);
         _den.Write(Ember, _den.Read(Ember).Replace("        - \"[[mara-voss]]\"\n", "        - \"[[mara-voss]]\"  # main\n", StringComparison.Ordinal));
         var rewritten = await EditAsync(server, new
@@ -182,7 +182,7 @@ public sealed class ChapterFieldEndpointTests : IDisposable
             changes = new object[] { new { op = "remove", item = 1 }, new { op = "add", value = "[[tomas-reyes]]" } },
         });
         var rewriteEffects = rewritten.GetProperty("effects").EnumerateArray().Select(e => e.GetString()).ToList();
-        Assert.Contains("Rewrote item 1 of pov of chapter '2'; the comment on it was dropped: '# main'. Put it back by hand if you want it.", rewriteEffects);
+        Assert.Contains("Rewrote item 1 of pov of chapter '2'; the comment on it was dropped: '# main'. Put it back by hand if you want it; a 'replace' change changes an item in place, keeping its comments.", rewriteEffects);
         Assert.DoesNotContain(rewriteEffects, e => e!.StartsWith("Removed item", StringComparison.Ordinal));
 
         // Removed: the comment goes with it, and the effects say so.
@@ -193,6 +193,50 @@ public sealed class ChapterFieldEndpointTests : IDisposable
             changes = new object[] { new { op = "remove", item = 0 } },
         });
         Assert.Contains("Removed item 0 of pov of chapter '2' with the comment on it: '# relief pilot'.", removed.GetProperty("effects").EnumerateArray().Select(e => e.GetString()));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-61")]
+    public async Task MovingOrReplacingAnItemKeepsItsComments()
+    {
+        _den.Write(Ember, _den.Read(Ember).Replace(
+            "  - { key: \"2\", number: 2 }\n",
+            "  - key: \"2\"\n    number: 2\n    fields:\n      pov:\n        - \"[[mara-voss]]\"  # her watch\n        # relief\n        - \"[[halden-pike]]\"\n",
+            StringComparison.Ordinal));
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(_den.Root));
+
+        var moved = await EditAsync(server, new
+        {
+            book = "ember", universe = "starfall", chapter = "2", field = "pov", expectedHash = await HashAsync(server),
+            changes = new object[] { new { op = "move", item = 0, index = 1 } },
+        });
+        Assert.True(moved.GetProperty("changed").GetBoolean());
+        Assert.DoesNotContain(moved.GetProperty("effects").EnumerateArray(), e => e.GetString()!.Contains("dropped", StringComparison.Ordinal));
+        Assert.Contains(
+            "'# relief' is now above the whole pov list, and stays at the top when items move (format.md F-RT-7).",
+            moved.GetProperty("effects").EnumerateArray().Select(e => e.GetString()));
+        Assert.Contains(
+            "      pov:\n        # relief\n        - \"[[halden-pike]]\"\n        - \"[[mara-voss]]\"  # her watch\n",
+            _den.Read(Ember),
+            StringComparison.Ordinal);
+
+        var replaced = await EditAsync(server, new
+        {
+            book = "ember", universe = "starfall", chapter = "2", field = "pov", expectedHash = moved.GetProperty("hash").GetString(),
+            changes = new object[] { new { op = "replace", item = 1, value = "[[tomas-reyes]]" } },
+        });
+        Assert.DoesNotContain(replaced.GetProperty("effects").EnumerateArray(), e => e.GetString()!.Contains("dropped", StringComparison.Ordinal));
+        Assert.Contains("        # relief\n        - \"[[halden-pike]]\"\n        - \"[[tomas-reyes]]\"  # her watch\n", _den.Read(Ember), StringComparison.Ordinal);
+
+        // Chapter defaults take the same changes.
+        var container = await server.GetJsonAsync("/api/chapter-defaults?universe=starfall&book=ember", HttpStatusCode.OK);
+        var (status, json) = await PostAsync(server, "/api/chapter-defaults/edit", new
+        {
+            universe = "starfall", book = "ember", field = "pov", expectedHash = container.GetProperty("hash").GetString(),
+            changes = new object[] { new { op = "move", item = 0, index = 5 } },
+        });
+        Assert.Equal((HttpStatusCode.BadRequest, "bad_argument"), (status, json.GetProperty("code").GetString()));
+        Assert.Contains("has 1 item(s), so an item can move to 0 to 0", json.GetProperty("message").GetString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -245,6 +289,21 @@ public sealed class ChapterFieldEndpointTests : IDisposable
             HttpStatusCode.BadRequest,
             "bad_argument",
             $"'pov' in chapter ember:prologue (Before the Dark) ({Ember}) has no item '[[nobody]]'. Reload the page to see its items as they are now.");
+
+        // So are a move and a replace of an item (#197), in the page's words.
+        await Refused(
+            "/api/chapter/edit",
+            new { book = "ember", universe = "starfall", chapter = "3", field = "tense", expectedHash = hash, changes = new object[] { new { op = "move", item = 0, index = 1 } } },
+            HttpStatusCode.BadRequest,
+            "bad_argument",
+            $"'tense' in chapter ember:3 ({Ember}) takes one value, not a list, so 'move' has no list item to move. To change it, edit the field and save the new value.");
+        await Refused(
+            "/api/chapter/edit",
+            new { book = "ember", universe = "starfall", chapter = "1", field = "pov", expectedHash = hash, changes = new object[] { new { op = "replace", item = 0, value = "[[halden-pike]]" } } },
+            HttpStatusCode.BadRequest,
+            "bad_argument",
+            $"Chapter ember:1 (Kessan Reach) ({Ember}) doesn't write 'pov', so 'replace' has no list item to change in place. It inherits 'pov' from chapter_defaults: " +
+            "to change it there, edit Chapter defaults on the page of the book, series, or universe that sets it; to give it a value of its own here, edit the field and save the whole value.");
         var seriesText = _den.Read(Series);
         _den.Write(Series, seriesText.Replace("{ tense: past }", "{ tense: past, setting: Kessan Reach }", StringComparison.Ordinal));
         var seriesHash = (await server.GetJsonAsync("/api/chapter-defaults?universe=starfall&series=long-dark", HttpStatusCode.OK)).GetProperty("hash").GetString();

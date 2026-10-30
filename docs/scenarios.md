@@ -2538,6 +2538,41 @@ Bistritz out of chapter 1's setting.
 Spec: format.md F-CTR-6 (#227). Covered by:
 `WriteToolTests.EachChapterGivesTheHeadingTheWriterSees` (MCP).
 
+### SC-MCP-34. My assistant finds a chapter value it can't add to
+
+Chapter 7 of Dracula says `setting: Whitby harbour`, written as plain
+text before the core pack made `setting` a list of links to locations,
+so the den ignores it (types.md F-CHAP-3). The writer asks the assistant
+to add Whitby to chapter 7's setting.
+
+- `get_chapter` lists the value under the chapter's `ignored`, as
+  written and why: `{"field": "setting", "as_written": "Whitby harbour",
+  "reason": "setting is a link to one entity, such as …, not 'Whitby
+  harbour'."}`. Its `fields` leave it out, and a chapter with nothing
+  ignored has no `ignored`. `get_chapter_defaults` marks an ignored
+  default the same way: `ignored: true`, `written`, and `reason`.
+- An `add` to it is refused (`bad_argument`), naming the chapter and its
+  file, what's written, and why it's ignored, then what to do: "'setting'
+  in chapter dracula:7 (Cutting from "The Dailygraph," 8 August)
+  (universes/dracula/books/dracula/book.md) is written as one value,
+  'Whitby harbour', not a list, so 'add' has no list to add an item to.
+  That value is ignored: … To replace it, send a 'set' change with the
+  whole value; to go back to what the chapter inherits from
+  chapter_defaults, send a 'clear' change." A `remove` says the same, and
+  nothing is written. A `set` with `["[[whitby]]"]` replaces it.
+- One value that holds, such as `setting: "[[whitby]]"`, isn't a list
+  either: an `add` is refused the same way, without calling it ignored.
+- No refusal of `update_chapter_fields` or `update_chapter_defaults`
+  names a YAML path such as `chapters.6.fields.setting`. An item that
+  isn't there, a place past the end of a list, a field the chapter
+  doesn't set, and `fields` that aren't a mapping each name the chapter
+  (or "the chapter_defaults of book 'ember'") and the field.
+
+Spec: types.md F-CHAP-3, F-CHAP-5 (#233). Covered by:
+`WriteToolTests.AnIgnoredChapterValueIsShownAndItsRefusalsSayWhatToDo`,
+`WriteToolTests.ChapterFieldRefusalsNameTheChapterNotAYamlPath`,
+`ChapterDefaultsToolTests.AnAddToADefaultThatIsntAListNamesTheContainerAndSaysWhatToDo` (MCP).
+
 ## STORE: Wolfden saves, moves, and deletes notes
 
 Background: the den store (design.md §6, #121) is how Wolfden writes a
@@ -4509,7 +4544,10 @@ prologue writes `fields: { pov: [], when: "2284" }`, and chapter 3
   series 'long-dark' defaults"; `narration` is "not set". The prologue's
   `pov` is "none (none in this chapter, [])".
 - Chapter 3's `futur` isn't a tense, so it's shown as written and
-  ignored, and the chapter has `past` from the series (F-CHAP-3).
+  ignored, with why ("written here as "futur", which is ignored: tense
+  is one of past, present, future, not 'futur'. Did you mean
+  'future'?"), and the chapter has `past` from the series (F-CHAP-3).
+  **Edit** says the same before a save replaces it (#233).
 - Reading as of `ember:1`, chapters after it show no fields in the
   book's list (and no chapter does until the page knows where `ember:1`
   is), and a link in a shown value to a note the reader hasn't
@@ -4518,7 +4556,7 @@ prologue writes `fields: { pov: [], when: "2284" }`, and chapter 3
   from, what each would inherit, and the den's chapter field definitions
   (`GET /api/book/chapter-fields`).
 
-Spec: types.md §8 (F-CHAP-1..5), design.md §9 (#225). Covered by:
+Spec: types.md §8 (F-CHAP-1..5), design.md §9 (#225, #233). Covered by:
 `ChapterFieldEndpointTests.EachChaptersFieldsSayWhatHoldsAndWhereItComesFrom` (API),
 `ChapterFields.test.tsx` (web).
 
@@ -4602,6 +4640,12 @@ Spec: types.md F-CHAP-5, design.md §9 (#215, #225). Covered by:
   nothing. A chapter written as a bare key (`chapters: [1, 2]`) has no
   place for fields: the API refuses (`unsupported_edit`), and the page
   says to write it as `{ key: 1 }` first.
+- An `add` to a value that isn't a list (chapter 3's `tense: futur`) is
+  refused naming the chapter, its file, what's written and why it's
+  ignored, in the page's words: "To replace it, edit the field and save
+  the whole value; to go back to what the chapter inherits from
+  chapter_defaults, choose Use the default" (**Clear** for chapter
+  defaults). No refusal names a YAML path (#233).
 - `/api/book/chapter-fields` and `/api/chapter-defaults` answer GET only,
   and the edits POST only, as JSON.
 

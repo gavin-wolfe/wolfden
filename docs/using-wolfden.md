@@ -306,6 +306,13 @@ then its book, then its series, then the universe. The rules are in
 - **Chapter defaults** are edited the same way on the universe's,
   series', and book's pages. **Clear** takes a default out, so the
   chapters inherit from further up again.
+- **A value that's ignored is still shown.** If the file holds a value
+  the field can't take, such as `setting: Whitby harbour` where
+  `setting` takes links to locations, the page shows it as written and
+  why it's ignored ("written here as "Whitby harbour", which is ignored:
+  setting is a link to one entity, …"), and the chapter has the default
+  meanwhile. **Edit** says so again before you replace it; **Use the
+  default** (or **Clear**, for chapter defaults) takes it out instead.
 
 A final book's chapters and defaults can't be edited until it's
 unfrozen. A series' or universe's default that would change what a
@@ -325,7 +332,9 @@ If you wrote `setting:` as plain text without defining it (say,
 `setting: Kessan Reach`), `wolfden check` now warns about it and ignores
 the value, since the core field takes links to location notes. Make it a
 link to a location note (`setting: "[[kessan-reach]]"`), or define a
-text `setting` in your den's pack to keep it as it is.
+text `setting` in your den's pack to keep it as it is. Until then the
+chapter's page, and an AI assistant's `get_chapter`, show the text as
+written and why it's ignored, so it isn't replaced unseen.
 
 ### Chapter headings from fields
 

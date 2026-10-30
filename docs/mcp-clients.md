@@ -201,8 +201,8 @@ prompts. This list is for knowing what the assistant can do.
 | `get_entity` | One entity, by name, alias, file name, id, key, or path; with `as_of`, only what the reader knows at that position. |
 | `list_entities` | Entities by type, status, series, or book. |
 | `canon_as_of` | Canon at a story position (or the end of the story), pinned canon first. |
-| `get_chapter` | A book's chapters and their fields, with each value's source (the chapter, or `chapter_defaults` above it), and each chapter's `heading`: its title, then the fields a `chapter_heading` lists, such as `"Ardent — Vesta Yards, 2350-04-12"`. |
-| `get_chapter_defaults` | A universe's, series', or book's `chapter_defaults`, and the books they reach. |
+| `get_chapter` | A book's chapters and their fields, with each value's source (the chapter, or `chapter_defaults` above it), and each chapter's `heading`: its title, then the fields a `chapter_heading` lists, such as `"Ardent — Vesta Yards, 2350-04-12"`. A field the chapter writes with a value that's ignored is listed in the chapter's `ignored`, as written and why, such as `{"field": "setting", "as_written": "Whitby harbour", "reason": "setting is a link to one entity, …"}`. |
+| `get_chapter_defaults` | A universe's, series', or book's `chapter_defaults`, and the books they reach. A default written with a value that's ignored has `ignored: true`, the value in `written`, and why in `reason`. |
 | `check` | The continuity check, as `wolfden check` runs it. |
 | `get_history` | The checkpoints that changed an entity's file, and optionally a diff. |
 
@@ -320,6 +320,16 @@ docs. The writer's own list is in
   `allow_relinks` only if they agree. The same goes for
   `entry_outside_scope` from `move_entity`: the writer picks
   `keep_entry` or `enter_at_new_scope`.
+- **Show an ignored chapter value before replacing it.** A chapter
+  field (or chapter default) can hold a value the field can't take, such
+  as `setting: Whitby harbour` where `setting` takes links to locations.
+  The den ignores it, but it's the writer's text. `get_chapter` lists it
+  under `ignored` (and `get_chapter_defaults` marks it `ignored`), with
+  why. An `add` or `remove` on a value that isn't a list is refused,
+  naming the chapter (`chapter dracula:7 (…)`), the file, what's written,
+  and why it's ignored, and saying what to do: a `set` with the whole
+  value replaces it, and `clear` goes back to the default. Ask the writer
+  before either.
 - **Positions must resolve.** A position is `book:chapter`, by key
   (`dracula:5`), and must be a chapter the book lists; `get_chapter`
   lists them. A read at one that doesn't is `bad_position`, and so is a

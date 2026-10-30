@@ -424,7 +424,12 @@ the pages don't have a form for it yet. The rules are in
 - **In place.** Each section has **Edit**, **Rename**, and **Remove**,
   and the opening (the text before the first section) has **Edit
   opening**. Edit opens the text as Markdown, as it's written in the
-  file. Type `[[` and a few letters to pick a note to link to, and use
+  file. Type `[[` and a few letters of a note's name or alias to pick a
+  note to link to. The link is the text you matched, so it reads well:
+  `[[Mina Harker]]`, or `[[Madam Mina]]` if you typed her alias. When
+  that text could mean another note too, it uses her name instead, or
+  failing that her file name (`[[mina-harker]]`). A note that no link
+  is sure to reach says to add an id with **Edit file** first. Use
   **Preview** to see it as the page shows it. **Save** (or Ctrl+Enter,
   ⌘+Enter on a Mac) saves; **Cancel** (or Escape) leaves it as it was.
   **Add section** adds one at the end or before another. Renaming a
@@ -452,7 +457,11 @@ unfrozen; their Edit controls are off, and the page says why. See
 Each field on a note's page has its own **Edit**. The form fits the
 field: a dropdown for a field with set choices, yes or no, a number, a
 date, or a link, where you type a few letters of a note's name and pick
-it. **Add field** offers the fields the note's type has that the note
+it. A link finds notes by their aliases and file names too, a word at a
+time and ignoring case and accents: `madam` offers "Mina Harker, as
+*Madam Mina*", and picking it links `[[mina-harker]]`. It offers every
+note of the field's types, wherever you are in the story, since editing
+shows everything. **Add field** offers the fields the note's type has that the note
 doesn't set yet, and **Clear field** takes one out.
 
 A fact that changes over the story is a list of dated values. Each has

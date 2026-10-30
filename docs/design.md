@@ -1369,6 +1369,7 @@ docs/
   | `/api/hierarchy` | `universe`, `asOf` | The universe, its series in story order with their books, its standalone books, and each book's chapters (key, number, title, position). Each scope counts the entities filed in it, in all and by type; as of a position, only those in the canon view there. |
   | `/api/positions` | `universe` | Every story position in order, with its book's name and series and the chapter's number and title, for a position picker. A book with no chapters yet is listed by its bare key. |
   | `/api/entities` | `universe`, `type`, `status`, `series`, `book`, `asOf`, `limit` | `list_entities`; with `asOf`, only the entities in the canon view there, in its order. |
+  | `/api/entities/lookup` | `query`, `universe`, `type`, `asOf`, `limit` | The notes whose name, alias, file name, or id has a word starting with each word typed, best first, each with what matched and which alias, for the link pickers (#198; "Looking notes up by name and alias" below). `type` takes several types separated by commas; with `asOf`, only notes the reader has met by then. |
   | `/api/entity` | `entity`, `universe`, `asOf` | `get_entity`, as a page: each field value or entry and each section lists its links, resolved from the index (the entity reached, or broken or ambiguous); also the scope's container chain, where the entity enters canon (its `from`, or its scope's start, inherited, format.md F-ENT-6), and its backlinks (which entity, field, section, chapter, or outline row). As of a position, a link to an entity the reader hasn't met doesn't say what it reaches, and only links in what the reader has met count as backlinks. |
   | `/api/canon` | `universe`, `asOf`, `series`, `book`, `type`, `brief` | `canon_as_of`. |
   | `/api/search` | `query`, `universe`, `type`, `canonOnly`, `limit`, `status`, `series`, `book`, `asOf`, `field` | `search`, with snippets; it can also keep entities of one status, those a series or book filter covers (as in a canon view), or, as of a position, hits in the entities, sections, and field values in the canon view there. Each hit adds `text`, the snippet without marks, and `matches`, the `start` and `length` of each match in it (UTF-16 code units), so the page never mistakes a note's own brackets for a match (#179). |
@@ -1759,8 +1760,19 @@ docs/
     and mounted in a shadow root: its styles are a constructed style
     sheet there, which the page's Content-Security-Policy doesn't
     govern, where in the page they'd be an inline `<style>` that
-    `style-src 'self'` refuses. `[[` autocomplete asks `/api/search` for
-    the words typed so far, as a prefix. Preview uses the page's own
+    `style-src 'self'` refuses. `[[` autocomplete asks the lookup
+    (`/api/entities/lookup`, "Looking notes up by name and alias" below)
+    for the words typed so far. Prose stays readable as plain Markdown,
+    so a pick is linked by the text it matched: `[[Mina Harker]]` for a
+    name, `[[Madam Mina]]` for an alias (aliases resolve like names,
+    F-LINK-6). An alias that wouldn't reach the picked note alone gives
+    way to its name, if that would (the lookup's `linkText`, resolved as
+    links are); failing both, it's linked as a `ref` field's picker
+    links it, `[[slug]]` or `[[id]]`. A note no link is sure to reach is
+    offered with the picker's hint (add an id with Edit file) and picking
+    it inserts nothing: a link by its name could reach another note
+    cleanly, by a file name, with nothing for `wolfden check` to report.
+    Preview uses the page's own
     renderer, with links shown as written until the note is saved. One
     piece is edited at a time, and an editor opens only on the source
     fetched when it opened, never a cached answer. Leaving through the
@@ -1840,10 +1852,11 @@ docs/
     its key; one that isn't a value shows as written, so the form never
     changes it unasked), `date` its text and an optional sort key (the
     mapping form of F-FT-11 when there's a sort key), `ref` a combobox
-    that searches `/api/search` as letters are typed and offers the notes
-    of the field's `to` types whose name or slug has a word starting with
-    each word typed (not notes that only mention it; a lookup by alias
-    needs a name-and-alias endpoint, a follow-up), and `position`,
+    that asks the lookup (`/api/entities/lookup`, below) as letters are
+    typed and offers the notes of the field's `to` types whose name,
+    alias, or file name has a word starting with each word typed (not
+    notes that only mention it), showing the alias a note was found by
+    ("Mina Harker, as *Madam Mina*"), and `position`,
     `from`, and `until` a book
     and chapter picker from the den's positions, with "Type a
     position…" for any other text. Status is a dropdown of the six
@@ -1861,6 +1874,44 @@ docs/
     an id with Edit file", rather than writing a link that may not reach
     it. Typed words are split as names are, so `dr. van` finds "Dr. Van
     Helsing".
+  - **Looking notes up by name and alias** (#198; v0 behaviour, not a
+    recorded decision). `GET /api/entities/lookup?query=&universe=&type=&asOf=&limit=`
+    gives the notes of one universe (the pinned one under
+    `serve --universe`) that each word typed starts a word of: of the
+    name, an alias, or the file name, or the id when 10 or more of its
+    characters are typed (a ULID's first ten are its time, which notes
+    made together share). Words are split and compared as search does
+    (`unicode61`, `remove_diacritics 2`), so `zoe ark` finds Zoë
+    Arkwright and `mur wil` finds the alias Wilhelmina Murray. Matches
+    come best first: the whole text as a link would match it (F-LINK-4)
+    to the name, then to the file name or id, then to an alias; then a
+    name that starts with the words, in order; a name that holds them;
+    a file name that holds them; an alias that starts with them; an
+    alias that holds them; the start of the id. The exact tiers compare
+    as links do (F-LINK-4: case folded, accents kept), so `zoe arkwright`
+    isn't an exact match for Zoë Arkwright, and ranks as a name that
+    starts with the words. Ties go by name, then
+    path. Each match says what matched (`matchedBy`: name, slug, id, or
+    alias) and, for an alias, which one (`alias`), and gives `linkText`:
+    that text where `[[text]]` reaches the note and no other, by the
+    link resolver's tiers (F-LINK-6; a tie, F-LINK-7, has no file's scope
+    to break it, so it doesn't count), or for an alias that doesn't, the
+    name where that does; otherwise null. As of a position, it's
+    resolved among the notes met by then, as `get_entity` matches a name
+    there. `type` is a type key,
+    or several separated by commas (a `ref` field's `to`). A type no
+    enabled pack defines and no note uses is skipped, as `to` skips it
+    (types.md F-FT-9, a warning); only when none of them is known is the
+    lookup refused (`unknown_type`), and the picker then says it couldn't
+    look notes up rather than showing an empty list. `limit` is 1
+    to 100, 20 by default, and `truncated` says more matched. The
+    editors never send `asOf`: an editing surface shows everything
+    (#28), so a field or section can link a note the reader meets later.
+    With `asOf`, only the notes met by then are looked at (#26), for a
+    reading view; aliases aren't positional (format.md §9.5), so a met
+    note matches by any of them. The MCP tools have no lookup of their
+    own: `search` matches names and aliases (`madam*`), and `get_entity`
+    takes a name or alias as a link does.
   - **Checked in the page.** Numbers, links, sort keys, one-line
     strings, empty values, and empty list items are checked before
     sending, with the message by the control and focus on the first.

@@ -25,7 +25,7 @@ export function findBook(u: UniverseNode, key: string): { book: BookNode; series
   return book ? { book, series: null } : null
 }
 
-/** A book: its chapters with their titles and fields, each a link to the chapter, and its chapter defaults. */
+/** A book: its chapters with their headings and fields, each a link to the chapter, and its chapter defaults. */
 export function BookPage() {
   const { universe, book } = route.useParams()
   const { at } = usePosition()
@@ -93,7 +93,8 @@ export function BookPage() {
               <li key={c.key} className={later ? 'later' : undefined} aria-current={c.position === at ? 'step' : undefined}>
                 <Link to="/u/$universe/b/$book/c/$chapter" params={{ universe, book: b.key, chapter: c.key }}>
                   <span className="chapter-number">{c.number ?? ''}</span>
-                  <span className="chapter-title">{c.title ?? `Chapter ${c.key}`}</span>
+                  {/* The hierarchy is asked as of the position, so the heading names only what the reader has met (#227, #26). */}
+                  <span className="chapter-title">{c.heading ?? `Chapter ${c.key}`}</span>
                 </Link>
                 {c.position === at && <span className="badge">you are here</span>}
                 {chapterFields && <ChapterFieldSummary universe={universe} chapter={chapterFields} met={met ?? undefined} />}

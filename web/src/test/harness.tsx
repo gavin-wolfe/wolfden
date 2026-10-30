@@ -107,7 +107,7 @@ export const hierarchy: HierarchyResult = {
         status: 'draft',
         position: 'dracula',
         entities: { total: 5, byType: { character: 4, event: 1 } },
-        chapters: positions.map((p) => ({ key: p.chapter!, number: p.number, title: p.title, position: p.position })),
+        chapters: positions.map((p) => ({ key: p.chapter!, number: p.number, title: p.title, position: p.position, heading: p.title })),
       },
     ],
   },

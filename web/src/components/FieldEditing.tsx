@@ -1,7 +1,8 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { STATUSES, apiPath, entitiesQuery, getJson, type PositionView, type SearchResult } from '../api'
+import { STATUSES, entitiesQuery, type PositionView } from '../api'
 import { EditError, postEdit, sourceQuery, type EntitySource, type SourceFieldType } from '../editApi'
+import { lookupable, lookupEntities, matchLabel } from '../lookupApi'
 import {
   controlId,
   fieldChanges,
@@ -9,7 +10,6 @@ import {
   fieldProblems,
   jsonOfField,
   linkFor,
-  nameMatches,
   newEntry,
   newItem,
   valueLines,
@@ -841,9 +841,11 @@ function PositionInput({
 }
 
 /**
- * A link to one note: type a few letters of its name, and pick it from the
- * notes the search finds (of the field's types, if it has them), with the
- * arrow keys and Enter, or the mouse. It writes the link as the den writes
+ * A link to one note: type a few letters of its name, an alias, or its file
+ * name, and pick it from the notes the lookup finds (#198; of the field's
+ * types, if it has them, and whatever the story position, #28), with the
+ * arrow keys and Enter, or the mouse. A note found by an alias shows it:
+ * "Mina Harker, as *Madam Mina*". It writes the link as the den writes
  * them, `[[slug]]`. A link can also be typed in full.
  */
 function RefInput({
@@ -868,21 +870,15 @@ function RefInput({
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
   const words = draft.text.replace(/^\[\[/, '').replace(/\]\]$/, '').trim()
-  const searchable = open && /[\p{L}\p{N}]$/u.test(words)
-  const search = useQuery({
-    queryKey: ['ref-search', universe, words, to],
-    queryFn: () => getJson<SearchResult>(apiPath('/api/search', { query: `${words}*`, universe, limit: 20, type: to?.length === 1 ? to[0] : undefined })),
+  const searchable = open && lookupable(words)
+  // Every note of the field's types, whatever the story position: an editor shows everything (#28).
+  const lookup = useQuery({
+    queryKey: ['entity-lookup', universe, words, to],
+    queryFn: () => lookupEntities(universe, words, { types: to }),
     enabled: searchable,
     staleTime: 30_000,
   })
-  const options = useMemo(() => {
-    const seen = new Set<string>()
-    return (search.data?.hits ?? [])
-      .map((h) => h.entity)
-      // Only notes whose name or slug matches what's typed, not ones that just mention it.
-      .filter((e) => (!to || to.includes(e.type)) && nameMatches(e, words) && !seen.has(e.key) && (seen.add(e.key), true))
-      .slice(0, 8)
-  }, [search.data, to, words])
+  const options = lookup.data?.matches ?? []
   const listId = `${id}-options`
   const showing = searchable && options.length > 0
   // Every note of the universe, to tell whether a slug reaches only the note picked.
@@ -931,7 +927,7 @@ function RefInput({
             setActive((a) => (a + (e.key === 'ArrowDown' ? 1 : options.length - 1)) % options.length)
           } else if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
             e.preventDefault()
-            pick(options[active])
+            pick(options[active].entity)
           } else if (e.key === 'Escape') {
             // Closes the list, not the editor.
             e.preventDefault()
@@ -950,20 +946,29 @@ function RefInput({
       )}
       {showing && (
         <ul className="ref-options" role="listbox" id={listId} aria-label={`Notes for ${label}`}>
-          {options.map((e, i) => (
-            <li
-              key={e.key}
-              id={`${listId}-${i}`}
-              role="option"
-              aria-selected={i === active}
-              onMouseDown={(ev) => {
-                ev.preventDefault()
-                pick(e)
-              }}
-            >
-              {e.name} <span className="muted">{e.type}</span>
-            </li>
-          ))}
+          {options.map((hit, i) => {
+            const { name, alias } = matchLabel(hit)
+            return (
+              <li
+                key={hit.entity.key}
+                id={`${listId}-${i}`}
+                role="option"
+                aria-selected={i === active}
+                onMouseDown={(ev) => {
+                  ev.preventDefault()
+                  pick(hit.entity)
+                }}
+              >
+                {name}
+                {alias !== null && (
+                  <>
+                    , as <em>{alias}</em>
+                  </>
+                )}{' '}
+                <span className="muted">{hit.entity.type}</span>
+              </li>
+            )
+          })}
         </ul>
       )}
       {note}

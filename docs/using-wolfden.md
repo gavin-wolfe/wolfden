@@ -413,8 +413,10 @@ the pages don't have a form for it yet. The rules are in
   and the opening (the text before the first section) has **Edit
   opening**. Edit opens the text as Markdown, as it's written in the
   file. Type `[[` and a few letters of a note's name or alias to pick a
-  note to link to (one picked by an alias keeps it as the link's label,
-  `[[mina-harker|Madam Mina]]`), and use
+  note to link to. The link is the text you matched, so it reads well:
+  `[[Mina Harker]]`, or `[[Madam Mina]]` if you typed her alias. Only
+  when that text could mean another note too does it use the file name
+  instead (`[[mina-harker]]`). Use
   **Preview** to see it as the page shows it. **Save** (or Ctrl+Enter,
   ⌘+Enter on a Mac) saves; **Cancel** (or Escape) leaves it as it was.
   **Add section** adds one at the end or before another. Renaming a

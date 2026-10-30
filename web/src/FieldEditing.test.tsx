@@ -371,11 +371,11 @@ function stubFields(options: { onPost?: (post: Post, n: number) => Response | Wr
       const notes: [typeof mina, string[]][] = [[jonathan, []], [mina, ['Mina Murray', 'Madam Mina']], [year, []]]
       const matches: LookupHit[] = notes.flatMap(([e, aliases]): LookupHit[] => {
         if (has(e.name)) {
-          return [{ entity: e, matchedBy: 'name', alias: null }]
+          return [{ entity: e, matchedBy: 'name', alias: null, linkText: e.name }]
         }
 
         const alias = aliases.find(has)
-        return alias ? [{ entity: e, matchedBy: 'alias', alias }] : []
+        return alias ? [{ entity: e, matchedBy: 'alias', alias, linkText: alias }] : []
       })
       return Response.json({ version: 1, universe: 'dracula', query, position: null, count: matches.length, truncated: false, matches } satisfies LookupResult)
     }

@@ -6,6 +6,11 @@ export interface LookupHit {
   matchedBy: 'name' | 'slug' | 'id' | 'alias'
   /** The alias that matched, for an alias match. */
   alias: string | null
+  /**
+   * The text that matched (name, alias, file name, or id), where `[[text]]`
+   * reaches this note and no other as links resolve; null where it wouldn't.
+   */
+  linkText: string | null
 }
 
 export interface LookupResult {

@@ -1762,10 +1762,14 @@ docs/
     govern, where in the page they'd be an inline `<style>` that
     `style-src 'self'` refuses. `[[` autocomplete asks the lookup
     (`/api/entities/lookup`, "Looking notes up by name and alias" below)
-    for the words typed so far, and links a pick as a `ref` field's
-    picker does (`[[slug]]`, or `[[id]]`); a note found by an alias keeps
-    it as the label (`[[mina-harker|Madam Mina]]`), and one no link is
-    sure to reach is linked by its name, as before. Preview uses the page's own
+    for the words typed so far. Prose stays readable as plain Markdown,
+    so a pick is linked by the text it matched: `[[Mina Harker]]` for a
+    name, `[[Madam Mina]]` for an alias (aliases resolve like names,
+    F-LINK-6). Only where that text wouldn't reach the picked note alone
+    (the lookup's `linkText`, resolved as links are) is it linked as a
+    `ref` field's picker links it, `[[slug]]` or `[[id]]`; a note no
+    link is sure to reach is linked by its name, for `wolfden check` to
+    flag. Preview uses the page's own
     renderer, with links shown as written until the note is saved. One
     piece is edited at a time, and an editor opens only on the source
     fetched when it opened, never a cached answer. Leaving through the
@@ -1882,7 +1886,12 @@ docs/
     a file name that holds them; an alias that starts with them; an
     alias that holds them; the start of the id. Ties go by name, then
     path. Each match says what matched (`matchedBy`: name, slug, id, or
-    alias) and, for an alias, which one (`alias`). `type` is a type key,
+    alias) and, for an alias, which one (`alias`), and gives `linkText`:
+    that text where `[[text]]` reaches the note and no other, by the
+    link resolver's tiers (F-LINK-6; a tie, F-LINK-7, has no file's scope
+    to break it, so it doesn't count), or null. As of a position, it's
+    resolved among the notes met by then, as `get_entity` matches a name
+    there. `type` is a type key,
     or several separated by commas (a `ref` field's `to`); `limit` is 1
     to 100, 20 by default, and `truncated` says more matched. The
     editors never send `asOf`: an editing surface shows everything

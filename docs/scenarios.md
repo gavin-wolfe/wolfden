@@ -4661,7 +4661,10 @@ section, and remember Mina only as "Madam Mina" (#198).
 - `lucys` finds "Lucy's three proposals" by its file name, and an id
   typed or pasted (ten characters or more) finds its note.
 - In a section, `[[madam` offers the same, and picking it writes
-  `[[mina-harker|Madam Mina]]`, so the text still reads "Madam Mina".
+  `[[Madam Mina]]`: prose links by the text matched, a name or an alias.
+  Where that text would reach another note too (Quincey Harker sharing
+  Jonathan's alias "Harker"), it writes `[[jonathan-harker]]`, or the id
+  where the file name isn't sure either.
 - Reading as of chapter 1, an editor still offers Van Helsing, whom the
   reader meets at chapter 9: editing shows everything (#28). The
   lookup's `asOf`, which the editors don't send, offers only the notes

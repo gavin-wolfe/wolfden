@@ -114,12 +114,13 @@ export function editorViewIn(element: Element | null): EditorView | null {
 /**
  * `[[` autocomplete: after `[[` and at least one letter, the notes whose
  * name, alias, or file name has a word starting with each word typed, from
- * the lookup (#198), whatever the story position (#28). A pick is linked as
- * the field pickers link it (`linkFor`): `[[slug]]`, or `[[id]]` where the
- * slug could reach another note. A note found by an alias shows it ("as
- * Madam Mina") and keeps it as the link's label, `[[mina-harker|Madam Mina]]`,
- * so the text reads as typed. A note no link is sure to reach is linked by
- * its name, as written, for `wolfden check` to flag if that's ambiguous.
+ * the lookup (#198), whatever the story position (#28). Prose stays
+ * readable: a pick is linked by the text it matched, `[[Mina Harker]]` for a
+ * name and `[[Madam Mina]]` for an alias (shown "as Madam Mina"), where the
+ * lookup says that reaches only this note (`linkText`). Otherwise it's linked
+ * as the field pickers link it (`linkFor`): `[[slug]]`, or `[[id]]`. A note
+ * no link is sure to reach is linked by its name, as written, for
+ * `wolfden check` to flag.
  * `others` gives the universe's notes when they're known, null if not.
  */
 export function noteLinks(universe: string, others: () => readonly { path: string; name?: string }[] | null) {
@@ -149,10 +150,8 @@ export function noteLinks(universe: string, others: () => readonly { path: strin
     const notes = others()
     const options = result.matches.map((hit) => {
       const { name, alias } = matchLabel(hit)
-      const link = linkFor(hit.entity, notes)
-      const target = link === null ? hit.entity.name.trim() : link.slice(2, -2)
-      // A label can hold anything but brackets (format.md §10.1).
-      const text = alias !== null && !/[[\]\n]/.test(alias) ? `${target}|${alias.trim()}` : target
+      const link = hit.linkText === null ? linkFor(hit.entity, notes) : null
+      const text = hit.linkText ?? (link === null ? hit.entity.name.trim() : link.slice(2, -2))
       return { label: name, detail: alias !== null ? `as ${alias} · ${hit.entity.type}` : hit.entity.type, apply: closed ? text : `${text}]]` }
     })
     return { from: before.from + 2, options, filter: false }

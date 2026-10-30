@@ -364,7 +364,17 @@ public sealed record HistoryFileDiffView(HistoryChangeView Change, string Patch)
 /// <param name="Entity">The note.</param>
 /// <param name="MatchedBy">What matched what was typed: name, slug, id, or alias.</param>
 /// <param name="Alias">The alias that matched, for an alias match; otherwise null.</param>
-public sealed record LookupHit(EntitySummary Entity, string MatchedBy, string? Alias);
+public sealed record LookupHit(EntitySummary Entity, string MatchedBy, string? Alias)
+{
+    /// <summary>
+    /// The text that matched (the name, the alias, the file name, or the id),
+    /// where a link written with it, <c>[[text]]</c>, reaches this note and
+    /// no other, as links resolve (format.md F-LINK-6, F-LINK-7, with no
+    /// file's scope to break a tie); null where it wouldn't, or can't be
+    /// written in a link.
+    /// </summary>
+    public string? LinkText { get; init; }
+}
 
 /// <summary>The result of a lookup by name and alias (#198).</summary>
 /// <param name="Version">The shape version.</param>

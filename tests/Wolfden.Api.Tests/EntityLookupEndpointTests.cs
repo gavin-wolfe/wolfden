@@ -76,6 +76,31 @@ public class EntityLookupEndpointTests
 
     [Fact]
     [Trait("Scenario", "SC-WEB-78")]
+    public async Task EachMatchSaysWhetherTheTextItMatchedLinksToItAlone()
+    {
+        using var den = TempDen.Dracula();
+        // Quincey Harker shares Jonathan's alias "Harker", as in the spoiler tests.
+        const string quincey = "universes/dracula/books/dracula/entities/characters/quincey-harker.md";
+        den.Write(quincey, den.Read(quincey).Replace("aliases: [little Quincey]", "aliases: [little Quincey, Harker]", StringComparison.Ordinal));
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+
+        async Task<JsonElement> First(string query) =>
+            Matches(await server.GetJsonAsync($"/api/entities/lookup?universe=dracula&query={Uri.EscapeDataString(query)}", HttpStatusCode.OK))[0];
+
+        Assert.Equal("Madam Mina", (await First("madam")).GetProperty("linkText").GetString());
+        Assert.Equal("Jonathan Harker", (await First("jonathan har")).GetProperty("linkText").GetString());
+        Assert.Equal("lucys-three-proposals", (await First("lucys")).GetProperty("linkText").GetString());
+        Assert.Equal(MinaId, (await First(MinaId)).GetProperty("linkText").GetString());
+
+        // [[Harker]] ties Jonathan with Quincey Harker (F-LINK-7), so it isn't offered as Jonathan's link.
+        var harker = Matches(await server.GetJsonAsync("/api/entities/lookup?universe=dracula&query=harker&type=character", HttpStatusCode.OK))
+            .Single(m => m.GetProperty("entity").GetProperty("name").GetString() == "Jonathan Harker");
+        Assert.Equal("Harker", harker.GetProperty("alias").GetString());
+        Assert.Equal(JsonValueKind.Null, harker.GetProperty("linkText").ValueKind);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-78")]
     public async Task TypesNarrowALookupToAFieldsToTypes()
     {
         using var den = TempDen.Dracula();

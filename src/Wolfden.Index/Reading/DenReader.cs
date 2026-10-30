@@ -571,13 +571,37 @@ public sealed class DenReader
             }
 
             var met = asOf is null ? null : CanonView(index, u.Key, asOf, null).Entities.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
-            var entities = db.Entities.Where(e => e.UniverseId == u.Id).ToList()
+            var all = db.Entities.Where(e => e.UniverseId == u.Id).ToList();
+            var entities = all
                 .Where(e => types is not { Count: > 0 } || types.Contains(e.Type))
                 .Where(e => met is null || met.Contains(e.Path))
                 .ToList();
-            var ids = entities.Select(e => e.Id).ToList();
-            var aliases = db.Aliases.Where(a => ids.Contains(a.EntityId)).ToList()
-                .OrderBy(a => a.Order).ToLookup(a => a.EntityId, a => a.Alias);
+            var allIds = all.Select(e => e.Id).ToList();
+            var aliasRows = db.Aliases.Where(a => allIds.Contains(a.EntityId)).ToList();
+            var aliases = aliasRows.OrderBy(a => a.Order).ToLookup(a => a.EntityId, a => a.Alias);
+            var resolvable = aliasRows.Select(a => (a.EntityId, a.AliasNormalized)).ToList();
+
+            // The text matched, where a link of it reaches this note alone, as links resolve
+            // (F-LINK-6) across the universe. As of a position, among the notes met by then,
+            // as get_entity matches a name there, so the answer says nothing of a later namesake.
+            var among = met is null ? all : all.Where(e => met.Contains(e.Path)).ToList();
+            string? LinkTextOf(EntityRecord e, LookupMatch m)
+            {
+                var text = m.By switch
+                {
+                    "alias" => m.Alias,
+                    "slug" => e.Slug,
+                    "id" => e.Ulid,
+                    _ => e.Name,
+                };
+                if (text is null || text.Trim().Length == 0 || text.IndexOfAny(['[', ']', '|', '#', '\r', '\n']) >= 0)
+                {
+                    return null;
+                }
+
+                return DenIndex.MatchAmong(text, among, resolvable) is [var only] && only.Id == e.Id ? text.Trim() : null;
+            }
+
             var matches = entities
                 .Select(e => (Entity: e, Match: EntityLookup.Match(query, e.Name, e.Slug, e.Ulid, aliases[e.Id].ToList())))
                 .Where(x => x.Match is not null)
@@ -587,7 +611,9 @@ public sealed class DenReader
                 .ToList();
             var universes = new Dictionary<int, string> { [u.Id] = u.Key };
             var scopes = Scopes(db);
-            var shown = matches.Take(limit).Select(x => new LookupHit(Summary(x.Entity, universes, scopes), x.Match!.By, x.Match.Alias)).ToList();
+            var shown = matches.Take(limit)
+                .Select(x => new LookupHit(Summary(x.Entity, universes, scopes), x.Match!.By, x.Match.Alias) { LinkText = LinkTextOf(x.Entity, x.Match) })
+                .ToList();
             return new LookupResult(ResultVersion, u.Key, query, asOf, shown.Count, matches.Count > limit, shown);
         });
     }

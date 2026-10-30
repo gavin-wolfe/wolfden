@@ -138,14 +138,26 @@ public sealed class DenIndex : IDisposable
             .Where(e => amongPaths is null || amongPaths.Contains(e.Path))
             .ToList();
         var ids = entities.Select(e => e.Id).ToList();
-        var aliases = Context.Aliases.Where(a => ids.Contains(a.EntityId)).Select(a => new { a.EntityId, a.AliasNormalized }).ToList();
+        var aliases = Context.Aliases.Where(a => ids.Contains(a.EntityId)).Select(a => new { a.EntityId, a.AliasNormalized }).ToList()
+            .Select(a => (a.EntityId, a.AliasNormalized)).ToList();
+        return MatchAmong(name, entities, aliases);
+    }
+
+    /// <summary>
+    /// <see cref="MatchEntities"/> over entities and their aliases already
+    /// read: every match in the first tier that has any, in path order.
+    /// </summary>
+    internal static IReadOnlyList<EntityRecord> MatchAmong(
+        string name, IReadOnlyList<EntityRecord> entities, IReadOnlyList<(int EntityId, string AliasNormalized)> aliases)
+    {
         var byId = entities.ToDictionary(e => e.Id);
         var (_, matches) = LinkMatching.FirstTier<EntityRecord>(
             name,
             id => entities.Where(e => e.Ulid == id).ToList(),
             slug => entities.Where(e => e.Slug is not null && LinkText.Normalize(e.Slug) == slug).ToList(),
             normalized => entities.Where(e => e.NameNormalized == normalized).ToList(),
-            normalized => aliases.Where(a => a.AliasNormalized == normalized).Select(a => a.EntityId).Distinct().Select(id => byId[id]).ToList());
+            normalized => aliases.Where(a => a.AliasNormalized == normalized && byId.ContainsKey(a.EntityId))
+                .Select(a => a.EntityId).Distinct().Select(id => byId[id]).ToList());
         return matches.DistinctBy(e => e.Id).OrderBy(e => e.Path, StringComparer.Ordinal).ToList();
     }
 

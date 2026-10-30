@@ -38,6 +38,73 @@ public sealed class NewChapterTests
 
     [Fact]
     [Trait("Scenario", "SC-WEB-71")]
+    public void AnInsertedKeySortsBetweenItsNeighboursWhenOneCan()
+    {
+        string? Key(string after, params string[] keys) => NewChapter.Plan(keys.Select(k => C(k)).ToList(), after)?.Key;
+
+        // Between a key and the same key with letters added (maintainer decision on #229).
+        Assert.Equal("2a", Key("2", "1", "2", "2b", "3"));
+        Assert.Equal("2ba", Key("2b", "2b", "2bb", "3"));
+        Assert.Equal("2a", Key("2", "2", "2ab", "3"));
+        Assert.Equal("prologuea", Key("prologue", "prologue", "prologueb", "1"));
+
+        // KeyAfter's suffixes come first, so b is still first after a digit; then a, before any longer suffix.
+        Assert.Equal("2b", Key("2", "2", "2d", "3"));
+        Assert.Equal("2c", Key("2", "2", "2d", "2b", "3"));
+        Assert.Equal("2a", Key("2", "2", "2c", "2b", "3"));
+        Assert.Equal("2ba", Key("2", "2", "2c", "2b", "2a", "3"));
+
+        // Taken suffixes are passed over, longer ones too: 2a is taken, so 2aa.
+        Assert.Equal("2aa", Key("2", "1", "2", "2b", "2a", "3"));
+        Assert.Equal("2bab", Key("2ba", "2ba", "2bac", "2baa", "3"));
+        Assert.Equal("2baaa", Key("2ba", "2ba", "2bab", "2baa", "3"));
+
+        // Nothing sorts between: the first unused suffix, which sorts after the next key.
+        Assert.Equal("2b", Key("2", "2", "2a", "3"));
+        Assert.Equal("2c", Key("2", "2", "2a", "2b", "3"));
+        Assert.Equal("prologueb", Key("prologue", "prologue", "prologuea", "1"));
+
+        // The next key isn't this one with letters added: the first unused suffix, as before.
+        Assert.Equal("2b", Key("2", "2", "3"));
+        Assert.Equal("2b", Key("2", "2", "20"));
+        Assert.Equal("2b", Key("2", "2", "2-x"));
+        Assert.Equal("2aa", Key("2a", "2", "2a", "2b"));
+        Assert.Equal("prologuea", Key("prologue", "prologue", "interlude"));
+
+        // Nothing sorts between at the 64-character limit either: the first unused.
+        var long63 = new string('a', 63);
+        Assert.Equal(long63 + "b", Key(long63, long63, long63 + "a", "1"));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-71")]
+    public void InsertingAgainAndAgainKeepsKeysInOrderWhereItCan()
+    {
+        // Each insert goes right after the chapter named; the list is the chapter order (F-BOOK-2).
+        var chapters = new List<ChapterSlot> { C("1"), C("2"), C("3") };
+        string Insert(string after)
+        {
+            var plan = NewChapter.Plan(chapters, after)!;
+            chapters.Insert(plan.Index, C(plan.Key));
+            return plan.Key;
+        }
+
+        // After the newest each time: every key sorts after the one before.
+        Assert.Equal("2b", Insert("2"));
+        Assert.Equal("2ba", Insert("2b"));
+        Assert.Equal("2baa", Insert("2ba"));
+
+        // After 2 twice more: 2a sorts between 2 and 2b; then nothing sorts between 2 and 2a, so 2c.
+        Assert.Equal("2a", Insert("2"));
+        Assert.Equal("2c", Insert("2"));
+        Assert.Equal(["1", "2", "2c", "2a", "2b", "2ba", "2baa", "3"], chapters.Select(c => c.Key));
+
+        // After 2a, with 2b next: 2aa, in order.
+        Assert.Equal("2aa", Insert("2a"));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-71")]
     public void AtTheEndItsTheNextWholeNumber()
     {
         Assert.Equal("1", NewChapter.NextWholeNumber([]));
@@ -72,8 +139,9 @@ public sealed class NewChapterTests
         // After the last chapter is the end, so it's a whole number too.
         Assert.Equal("4", NewChapter.Plan(ember, "3")!.Key);
 
+        // Between 2 and 2b, a suffix that sorts between them (#229).
         var after2 = NewChapter.Plan(ember, "2")!;
-        Assert.Equal(("2c", 3, 3L), (after2.Key, after2.Index, after2.Number));
+        Assert.Equal(("2a", 3, 3L), (after2.Key, after2.Index, after2.Number));
         Assert.Equal([new Renumbering("2b", 4, 3, 4), new Renumbering("3", 5, 4, 5)], after2.Renumbered);
 
         var after2b = NewChapter.Plan(ember, "2b")!;

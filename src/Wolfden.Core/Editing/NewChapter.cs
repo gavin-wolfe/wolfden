@@ -39,7 +39,11 @@ public sealed record ChapterPlan(string Key, int Index, long? Number, IReadOnlyL
 /// were <c>2a</c>), and a key that ends in a letter starts at <c>a</c>,
 /// so <c>prologue</c> gives <c>prologuea</c> (rule chosen, #215). When
 /// every single letter is taken, two letters follow (<c>2ba</c>,
-/// <c>2bb</c>, …; <see cref="KeyAfter"/>). Inserting after the last
+/// <c>2bb</c>, …; <see cref="KeyAfter"/>). When the chapter after it is
+/// <c>K</c> with letters added, the new key takes a suffix that sorts
+/// between the two if there's one, so between <c>2</c> and <c>2b</c> it's
+/// <c>2a</c> (maintainer decision on #229; <see cref="InsertedKey"/>).
+/// Inserting after the last
 /// chapter is adding at the end (rule chosen, #215), so the end of a book
 /// always gets a whole number.
 /// </para>
@@ -127,15 +131,38 @@ public static class NewChapter
     /// <summary>
     /// The key of a chapter inserted after chapter <paramref name="at"/>,
     /// which isn't the last: the one place the rule for inserted keys is
-    /// chosen. Today it's <see cref="KeyAfter"/> of that chapter's key, so
-    /// inserting after <c>2</c> while <c>2b</c> follows it gives <c>2c</c>,
-    /// placed before <c>2b</c> (the order of such keys is waiting on the
-    /// maintainer, #228); the whole list is passed in so a rule that looks
-    /// at both neighbors can replace this one without touching
-    /// <see cref="Plan"/>.
+    /// chosen (maintainer decision on #229, 2026-10-30). When the next
+    /// chapter's key is this one's with letters added (<c>2</c>, then
+    /// <c>2b</c>), the new key is the first unused suffix that sorts
+    /// between them, comparing the suffixes as ASCII strings as F-OUT-4
+    /// does for rows, so inserting between <c>2</c> and <c>2b</c> gives
+    /// <c>2a</c>, and between <c>2b</c> and <c>2bb</c> gives <c>2ba</c>.
+    /// Shorter suffixes come first. Within each length, the ones
+    /// <see cref="KeyAfter"/> would try come first, so between <c>2</c>
+    /// and <c>2d</c> it's still <c>2b</c>; then, for a key that ends in a
+    /// digit, those of the same length that start with <c>a</c>, so
+    /// between <c>2</c> and <c>2c</c> it's <c>2a</c> when <c>2b</c> is
+    /// taken, but <c>2ba</c> before <c>2aa</c> when <c>2a</c> is taken too
+    /// (rules chosen, #229). When no unused suffix sorts between them
+    /// (between <c>2</c> and <c>2a</c>), or the next key isn't this one with letters added, it's
+    /// <see cref="KeyAfter"/>: the first unused suffix. Any other next key
+    /// already sorts after every suffix of this one, or never could, so
+    /// only this case needs a choice.
     /// </summary>
-    internal static string? InsertedKey(IReadOnlyList<ChapterSlot> chapters, int at, IReadOnlySet<string> taken) =>
-        KeyAfter(chapters[at].Key, taken);
+    internal static string? InsertedKey(IReadOnlyList<ChapterSlot> chapters, int at, IReadOnlySet<string> taken)
+    {
+        var key = chapters[at].Key;
+        if (at + 1 < chapters.Count && chapters[at + 1].Key is var next
+            && next.Length > key.Length && next.StartsWith(key, StringComparison.Ordinal) && char.IsAsciiLetterLower(next[key.Length]))
+        {
+            if (KeyBetween(key, next[key.Length..], taken) is { } between)
+            {
+                return between;
+            }
+        }
+
+        return KeyAfter(key, taken);
+    }
 
     /// <summary>
     /// The key of a chapter inserted after <paramref name="key"/>: the
@@ -148,7 +175,7 @@ public static class NewChapter
     {
         ArgumentNullException.ThrowIfNull(key);
         ArgumentNullException.ThrowIfNull(taken);
-        var first = key.Length > 0 && char.IsAsciiDigit(key[^1]) ? 'b' : 'a';
+        var first = FirstLetter(key);
         for (var length = 1; key.Length + length <= Structure.Keys.MaxLength; length++)
         {
             if (Suffixes(length, first).Select(s => key + s).FirstOrDefault(k => !taken.Contains(k) && Structure.Keys.IsChapterKey(k)) is { } found)
@@ -159,6 +186,53 @@ public static class NewChapter
 
         return null;
     }
+
+    /// <summary>
+    /// The first of <paramref name="key"/>'s suffixes that's below
+    /// <paramref name="limit"/> as an ASCII string and isn't in
+    /// <paramref name="taken"/>, or null. Shorter suffixes come first; within
+    /// a length, those <see cref="KeyAfter"/> tries (from <c>b</c> after a
+    /// digit), then, after a digit, those that start with <c>a</c>. Within a
+    /// length each run rises, so it ends at the first suffix at or above
+    /// the limit; and when no suffix of a length is below it, no longer one
+    /// is either, so the search stops.
+    /// </summary>
+    private static string? KeyBetween(string key, string limit, IReadOnlySet<string> taken)
+    {
+        var first = FirstLetter(key);
+        for (var length = 1; key.Length + length <= Structure.Keys.MaxLength; length++)
+        {
+            var below = Below(Suffixes(length, first), limit);
+            if (first != 'a')
+            {
+                below = below.Concat(Below(length == 1 ? ["a"] : Suffixes(length - 1, 'a').Select(s => "a" + s), limit));
+            }
+
+            var any = false;
+            foreach (var suffix in below)
+            {
+                any = true;
+                var candidate = key + suffix;
+                if (!taken.Contains(candidate) && Structure.Keys.IsChapterKey(candidate))
+                {
+                    return candidate;
+                }
+            }
+
+            if (!any)
+            {
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<string> Below(IEnumerable<string> suffixes, string limit) =>
+        suffixes.TakeWhile(s => string.CompareOrdinal(s, limit) < 0);
+
+    /// <summary>The letter a key's suffixes start at: <c>b</c> after a digit (as if <c>2</c> were <c>2a</c>), else <c>a</c>.</summary>
+    private static char FirstLetter(string key) => key.Length > 0 && char.IsAsciiDigit(key[^1]) ? 'b' : 'a';
 
     /// <summary>One more than the largest key that's all digits (<c>"1"</c> if none is), or null if that's longer than 64 characters.</summary>
     public static string? NextWholeNumber(IEnumerable<string> keys)

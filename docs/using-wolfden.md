@@ -223,8 +223,17 @@ for none. Wolfden writes it into the `chapters` list in the book's
 - **At the end**, the new chapter's key is the next whole number: after
   chapters 1 to 24, it's `25`.
 - **Inserted after a chapter**, it gets that chapter's key with a letter
-  added: after `2` it's `2b`, then `2c` if `2b` is taken. After `2b`,
-  it's `2ba`. After a word key such as `prologue`, it's `prologuea`.
+  added: after `2` it's `2b`. After `2b`, it's `2ba`. After a word key
+  such as `prologue`, it's `prologuea`.
+- **Inserted keys read in order where they can.** When the next
+  chapter's key is the same key with letters added, the new key takes a
+  letter that sorts between the two: inserting between `2` and `2b`
+  gives `2a`, and between `2b` and `2bb` gives `2ba`. When no letter fits
+  (between `2` and `2a`), it takes the first unused one instead: `2b`, or
+  `2c` if `2b` is taken. That reads out of order but works the same: the
+  list in `book.md`, not the keys, is the chapter order. Inserting after the newest chapter
+  each time (`2b`, then after it `2ba`, then `2baa`) always reads in
+  order.
 - **Keys are for keeps; numbers move.** The key is what positions use,
   so it never changes, even when the chapter is no longer second. What
   changes is the number shown: inserting `2b` after chapter 2 makes it

@@ -43,19 +43,19 @@ public sealed class ChapterEndpointTests : IDisposable
         });
 
         Assert.Equal(HttpStatusCode.Created, code);
-        Assert.Equal("2c", made.GetProperty("key").GetString());
-        Assert.Equal("ember:2c", made.GetProperty("position").GetString());
+        Assert.Equal("2a", made.GetProperty("key").GetString());
+        Assert.Equal("ember:2a", made.GetProperty("position").GetString());
         Assert.Equal(3, made.GetProperty("number").GetInt64());
         Assert.Equal("The Quiet Hour", made.GetProperty("title").GetString());
         Assert.Equal([("2b", 3L, 4L), ("3", 4L, 5L)], made.GetProperty("renumbered").EnumerateArray().Select(r => (r.GetProperty("key").GetString(), r.GetProperty("from").GetInt64(), r.GetProperty("to").GetInt64())));
         Assert.Equal([Ember], made.GetProperty("files").EnumerateArray().Select(f => f.GetProperty("path").GetString()));
-        Assert.Contains("  - { key: \"2c\", number: 3, title: The Quiet Hour }\n", den.Read(Ember).ReplaceLineEndings("\n"), StringComparison.Ordinal);
+        Assert.Contains("  - { key: \"2a\", number: 3, title: The Quiet Hour }\n", den.Read(Ember).ReplaceLineEndings("\n"), StringComparison.Ordinal);
 
         // The tree has it in its place; at the end, with the new hash, the next whole number.
         var hierarchy = await server.GetJsonAsync("/api/hierarchy?universe=starfall", HttpStatusCode.OK);
         var ember = hierarchy.GetProperty("universe").GetProperty("series").EnumerateArray()
             .SelectMany(s => s.GetProperty("books").EnumerateArray()).Single(b => b.GetProperty("key").GetString() == "ember");
-        Assert.Equal(["prologue", "1", "2", "2c", "2b", "3"], ember.GetProperty("chapters").EnumerateArray().Select(c => c.GetProperty("key").GetString()));
+        Assert.Equal(["prologue", "1", "2", "2a", "2b", "3"], ember.GetProperty("chapters").EnumerateArray().Select(c => c.GetProperty("key").GetString()));
 
         var (endCode, end) = await PostAsync(server, "/api/chapter/create", new { book = "ember", universe = "starfall", expectedHash = made.GetProperty("hash").GetString() });
         Assert.Equal(HttpStatusCode.Created, endCode);

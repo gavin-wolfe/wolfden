@@ -39,31 +39,31 @@ public sealed class AddChapterTests : IDisposable
             "  - { key: prologue, title: Before the Dark }\n" +
             "  - { key: \"1\", number: 1, title: Kessan Reach }\n" +
             "  - { key: \"2\", number: 2 }\n" +
-            "  - { key: \"2c\", number: 3, title: The Quiet Hour }\n" +
+            "  - { key: \"2a\", number: 3, title: The Quiet Hour }\n" +
             "  - { key: 2b, number: 4, title: The Long Watch }   # added in revision\n" +
             "  - { key: \"3\", number: 5 }\n---\n",
             den.Read(Ember).ReplaceLineEndings("\n"));
-        Assert.Equal(("ember", "2c", "ember:2c", 3L, "The Quiet Hour", 3), (made.Book, made.Key, made.Position, made.Number, made.Title, made.Index));
+        Assert.Equal(("ember", "2a", "ember:2a", 3L, "The Quiet Hour", 3), (made.Book, made.Key, made.Position, made.Number, made.Title, made.Index));
         Assert.Equal([new RenumberedView("2b", 3, 4), new RenumberedView("3", 4, 5)], made.Renumbered);
-        Assert.Contains(made.Effects, e => e.Contains("Added chapter '2c' to book 'ember', after '2', with number 3", StringComparison.Ordinal));
+        Assert.Contains(made.Effects, e => e.Contains("Added chapter '2a' to book 'ember', after '2', with number 3", StringComparison.Ordinal));
         Assert.Contains(made.Effects, e => e.Contains("'2b' 3 → 4, '3' 4 → 5", StringComparison.Ordinal));
         Assert.Equal([Ember], made.Files.Select(f => f.Path));
         Assert.Equal(made.Hash, tools.GetChapter("ember", universe: "starfall").Hash);
         Assert.Empty(made.Warnings);
         Assert.Empty(Diagnostics(tools).Except(before));
 
-        // Keys never change, so ember:3 is still the chapter it was, now after 2c.
-        Assert.Equal(["prologue", "1", "2", "2c", "2b", "3"], tools.GetChapter("ember", universe: "starfall").Chapters.Select(c => c.Key));
+        // Between 2 and 2b it takes a suffix that sorts between them (#229). Keys never change, so ember:3 is still the chapter it was.
+        Assert.Equal(["prologue", "1", "2", "2a", "2b", "3"], tools.GetChapter("ember", universe: "starfall").Chapters.Select(c => c.Key));
         Assert.Equal(5L, tools.GetChapter("ember", "3", "starfall").Chapters[0].Number);
-        Assert.Equal("ember:2c", tools.CanonAsOf("starfall", "ember:2c").Position);
+        Assert.Equal("ember:2a", tools.CanonAsOf("starfall", "ember:2a").Position);
 
-        // After 2b, 2ba; after 2 again, the next unused letter; after the prologue, a letter too.
+        // After 2b, 2ba; after 2 again, nothing sorts between 2 and 2a, so the first unused letter; after the prologue, a letter too.
         Assert.Equal("2ba", tools.AddChapter("ember", after: "2b", universe: "starfall").Key);
-        Assert.Equal("2d", tools.AddChapter("ember", after: "2", universe: "starfall").Key);
+        Assert.Equal("2c", tools.AddChapter("ember", after: "2", universe: "starfall").Key);
         var prologue = tools.AddChapter("ember", after: "prologue", universe: "starfall");
         Assert.Equal(("prologuea", 1L), (prologue.Key, prologue.Number));
         Assert.Equal(
-            ["prologue:", "prologuea:1", "1:2", "2:3", "2d:4", "2c:5", "2b:6", "2ba:7", "3:8"],
+            ["prologue:", "prologuea:1", "1:2", "2:3", "2c:4", "2a:5", "2b:6", "2ba:7", "3:8"],
             tools.GetChapter("ember", universe: "starfall").Chapters.Select(c => $"{c.Key}:{c.Number}"));
         Assert.Empty(Diagnostics(tools).Except(before));
     }

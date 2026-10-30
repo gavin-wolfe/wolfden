@@ -175,12 +175,14 @@ public static class NewChapter
     /// The new chapter's item, as format.md §6.4 writes one: <c>key</c>,
     /// then <c>number</c> and <c>title</c> when it has them; or the bare key
     /// when it has neither and <paramref name="bare"/> is true, for a list
-    /// whose items are bare keys (<c>chapters: [1, 2, 3]</c>).
+    /// whose items are bare keys (<c>chapters: [1, 2, 3]</c>). Chapter
+    /// fields (types.md §8), if any, go last, in a <c>fields</c> mapping.
     /// </summary>
-    public static YamlValue Item(string key, long? number, string? title, bool bare)
+    public static YamlValue Item(string key, long? number, string? title, bool bare, YamlMappingValue? fields = null)
     {
         ArgumentNullException.ThrowIfNull(key);
-        if (bare && number is null && title is null)
+        var hasFields = fields is { Entries.Count: > 0 };
+        if (bare && number is null && title is null && !hasFields)
         {
             return YamlScalarValue.String(key);
         }
@@ -194,6 +196,11 @@ public static class NewChapter
         if (title is not null)
         {
             item.Add("title", YamlScalarValue.String(title));
+        }
+
+        if (hasFields)
+        {
+            item.Add("fields", fields!);
         }
 
         return item;

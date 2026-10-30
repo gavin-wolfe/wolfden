@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using Wolfden.Core.Editing;
 using Wolfden.Core.Structure;
 using Wolfden.Core.Yaml;
@@ -42,7 +44,13 @@ public sealed partial class DenTools
     /// <param name="after">The key of the chapter it comes after, or null for the end.</param>
     /// <param name="expectedHash">The hash of the <c>book.md</c> the writer saw, or null to take it as it is now.</param>
     /// <param name="universe">The universe, when the den has several.</param>
-    public ChapterAddResult AddChapter(string book, string? title = null, string? after = null, string? expectedHash = null, string? universe = null)
+    /// <param name="fields">
+    /// The chapter's own chapter fields (types.md §8, #225), as a JSON object from field name to value, written in the
+    /// item's <c>fields</c>; null, or a field given null, for none, so the chapter inherits from <c>chapter_defaults</c>.
+    /// A plain number may be given as <c>{"$number": "2.50"}</c>.
+    /// </param>
+    public ChapterAddResult AddChapter(
+        string book, string? title = null, string? after = null, string? expectedHash = null, string? universe = null, JsonElement? fields = null)
     {
         if (string.IsNullOrWhiteSpace(book))
         {
@@ -60,7 +68,8 @@ public sealed partial class DenTools
         }
 
         title = title?.Trim();
-        after = string.IsNullOrWhiteSpace(after) ? null : after.Trim();
+        var own = NewChapterFields(fields);
+        after =string.IsNullOrWhiteSpace(after) ? null : after.Trim();
         var hash = expectedHash is null ? null : RequireHash(expectedHash);
         var key = book.Trim();
         var (universeKey, _) = LocateBook(key, universe);
@@ -101,7 +110,7 @@ public sealed partial class DenTools
             var file = target.File;
             var items = (file.GetFrontmatterValue("chapters") as YamlSequence)?.Items ?? [];
             var like = items.Count == 0 ? null : items[Math.Max(plan.Index - 1, 0)];
-            var item = NewChapter.Item(plan.Key, plan.Number, title, bare: like is YamlScalar);
+            var item = NewChapter.Item(plan.Key, plan.Number, title, bare: like is YamlScalar, own);
             if (file.GetFrontmatterValue("chapters") is YamlSequence)
             {
                 var before = file;
@@ -146,6 +155,11 @@ public sealed partial class DenTools
 
             var chapter = made.Chapters[plan.Index];
             var effects = new List<string> { AddedEffect(made, chapter, plan, after) };
+            if (own is not null)
+            {
+                effects.AddRange(ChapterEffects(chapter, chapter, own.Entries.Select(e => e.Key).ToList()));
+            }
+
             if (plan.Renumbered.Count > 0)
             {
                 static string Change(Renumbering r) => $"'{r.Key}' {r.From.ToString(CultureInfo.InvariantCulture)} → {r.To.ToString(CultureInfo.InvariantCulture)}";
@@ -167,6 +181,56 @@ public sealed partial class DenTools
                 [new WrittenFileView(path, HashOf(bytes), Created: false)], idAdded);
         }
     }
+
+    /// <summary>
+    /// A new chapter's fields, from <c>fields</c>: each name a chapter field
+    /// name (not one F-CHAP-1 reserves), and a field given null left out.
+    /// Null if there are none. Whether a value fits its field is the den's
+    /// check: a chapter field that doesn't fit is a warning, never an error
+    /// (F-CHAP-3).
+    /// </summary>
+    private static YamlMappingValue? NewChapterFields(JsonElement? fields)
+    {
+        if (fields is not { } json || json.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            return null;
+        }
+
+        if (json.ValueKind != JsonValueKind.Object)
+        {
+            throw new DenToolException(ToolErrorCodes.BadArgument, "'fields' is an object from chapter field name to value, such as {\"pov\": [\"[[mara-voss]]\"]}.");
+        }
+
+        var result = new YamlMappingValue();
+        foreach (var field in json.EnumerateObject())
+        {
+            if (!ChapterFieldName().IsMatch(field.Name))
+            {
+                throw new DenToolException(ToolErrorCodes.BadArgument, $"'{field.Name}' isn't a chapter field name: lowercase letters, digits, and '_', starting with a letter.");
+            }
+
+            if (ReservedChapterNames.Contains(field.Name))
+            {
+                throw new DenToolException(
+                    ToolErrorCodes.BadArgument, $"'{field.Name}' is reserved for the chapter item's own keys (types.md F-CHAP-1), so it can't be a chapter field.");
+            }
+
+            if (result.Entries.Any(e => e.Key == field.Name))
+            {
+                throw new DenToolException(ToolErrorCodes.BadArgument, $"Give '{field.Name}' once in 'fields'.");
+            }
+
+            if (field.Value.ValueKind != JsonValueKind.Null)
+            {
+                result.Add(field.Name, ToYaml(field.Value, numbersAsText: true));
+            }
+        }
+
+        return result.Entries.Count == 0 ? null : result;
+    }
+
+    [GeneratedRegex("^[a-z][a-z0-9_]{0,63}\\z", RegexOptions.CultureInvariant)]
+    private static partial Regex ChapterFieldName();
 
     /// <summary>What adding the chapter did, in words: its key, where it went, and its number and title.</summary>
     private static string AddedEffect(Book book, Chapter chapter, ChapterPlan plan, string? after)

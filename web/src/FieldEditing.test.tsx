@@ -126,6 +126,13 @@ describe('SC-WEB-61: the changes a field edit sends', () => {
 
     d.entries = [count]
     expect(fieldChanges(types.keeper, before, d)).toEqual([{ op: 'remove', path: [1] }])
+
+    // Entries are never reordered (F-TMP-7): the form only takes them out and adds new ones at the end, so nothing is moved.
+    d.entries = [jonathan, later]
+    expect(fieldChanges(types.keeper, before, d)).toEqual([
+      { op: 'remove', path: [0] },
+      { op: 'add', path: [], value: { value: '[[abraham-van-helsing]]', from: 'dracula:20' } },
+    ])
   })
 
   it('writes a plain value that gains a date as a dated list, and a cleared field as a removal', () => {
@@ -480,7 +487,9 @@ describe('SC-WEB-60: editing a field with a control for its type', () => {
     const form = await openField('role')
 
     expect(within(form).getByText(/which can change over the story/)).toBeTruthy()
-    const second = within(form).getByRole('group', { name: 'Entry 2 of 2: holds from Dracula chapter 3' })
+    // Dated entries keep their order (F-TMP-7): there's no control to move one.
+    expect(within(form).queryAllByRole('button', { name: /^Move entry/ })).toHaveLength(0)
+    const second =within(form).getByRole('group', { name: 'Entry 2 of 2: holds from Dracula chapter 3' })
     const until = within(second).getByRole('group', { name: 'Until' })
     fireEvent.change(within(until).getByRole('combobox', { name: 'Book' }), { target: { value: 'dracula' } })
     fireEvent.change(within(until).getByRole('combobox', { name: 'Chapter' }), { target: { value: 'dracula:5' } })

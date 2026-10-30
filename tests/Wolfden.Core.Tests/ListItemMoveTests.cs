@@ -80,8 +80,9 @@ public class ListItemMoveTests
     }
 
     [Fact]
-    public void CommentLinesRightAboveAnItemMoveWithIt()
+    public void CommentLinesRightAboveAnItemMoveWithItButTheListsHeadingStays()
     {
+        // Comment lines above the first item may head the whole list, so they stay at the top.
         const string before = """
             pov:
               # the journal chapters
@@ -96,11 +97,11 @@ public class ListItemMoveTests
         Assert.Equal(
             """
             pov:
+              # the journal chapters
               # letters
               # and telegrams
               - "[[jonathan-harker]]"
               - "[[john-seward]]"
-              # the journal chapters
               - "[[mina-harker]]"
 
             """,
@@ -108,10 +109,10 @@ public class ListItemMoveTests
         Assert.Equal(
             """
             pov:
+              # the journal chapters
               # letters
               # and telegrams
               - "[[jonathan-harker]]"
-              # the journal chapters
               - "[[mina-harker]]"
               - "[[john-seward]]"
 
@@ -203,30 +204,30 @@ public class ListItemMoveTests
     public void AMultiLineItemMovesWhole()
     {
         const string before = """
-            role:
-              - value: clerk  # at first
-                from: "dracula:1"
-              - value: solicitor
-                # qualified
-                from: "dracula:5"
-                pin: true
-            name: Jonathan
+            crew:
+              - name: Harker  # at first
+                role: clerk
+              - name: Seward
+                # the asylum
+                role: doctor
+                ward: Renfield
+            tense: past
 
             """;
 
         Assert.Equal(
             """
-            role:
-              - value: solicitor
-                # qualified
-                from: "dracula:5"
-                pin: true
-              - value: clerk  # at first
-                from: "dracula:1"
-            name: Jonathan
+            crew:
+              - name: Seward
+                # the asylum
+                role: doctor
+                ward: Renfield
+              - name: Harker  # at first
+                role: clerk
+            tense: past
 
             """,
-            Moved(before, 1, 0, "role"));
+            Moved(before, 1, 0, "crew"));
     }
 
     [Fact]
@@ -276,7 +277,7 @@ public class ListItemMoveTests
     [InlineData("pov: [ a,b , \"c\" ]  # three\n", 2, 1, "pov: [ a,\"c\" , b ]  # three\n")]
     [InlineData("pov: ['[[mina-harker]]', \"[[john-seward]]\"]\n", 1, 0, "pov: [\"[[john-seward]]\", '[[mina-harker]]']\n")]
     [InlineData("pov: [a, b,]\n", 0, 1, "pov: [b, a,]\n")]
-    [InlineData("pov: [a, { value: b, from: \"dracula:3\" }]\n", 1, 0, "pov: [{ value: b, from: \"dracula:3\" }, a]\n")]
+    [InlineData("pov: [a, { name: b, from: \"dracula:3\" }]\n", 1, 0, "pov: [{ name: b, from: \"dracula:3\" }, a]\n")]
     public void AFlowItemMovesAndTheSeparatorsStay(string before, int from, int to, string after)
     {
         Assert.Equal(after, Moved(before, from, to));
@@ -350,6 +351,31 @@ public class ListItemMoveTests
     }
 
     [Fact]
+    public void DatedEntriesAreNeverReordered()
+    {
+        // F-TMP-7: of two entries with the same from, the later one holds (F-TMP-5), so a move could unseat pinned canon.
+        const string before = """
+            mood:
+              - { value: calm, from: "ember:1" }
+              - { value: angry, from: "ember:1", pin: true }
+
+            """;
+
+        var refused = Assert.Throws<NotSupportedException>(() => Md(before).WithListItemMoved(["mood"], 0, 1));
+        Assert.Contains("F-TMP-7", refused.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AFileThatCantBeEditedSaysSoBeforeAnythingElse()
+    {
+        var file = Md("tense: past\n\t# a tab\npov: [a, b]\n");
+        Assert.False(file.CanEdit);
+
+        var refused = Assert.Throws<InvalidOperationException>(() => file.WithListItemMoved(["tense"], 0, 1));
+        Assert.DoesNotContain("isn't a list", refused.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ReplacingAnItemKeepsTheCommentsOnAndAboveIt()
     {
         const string before = """
@@ -380,10 +406,12 @@ public class ListItemMoveTests
     public void EveryMoveOfAListWithCommentsKeepsEveryLine()
     {
         // Every from and to: the lines are the same lines, in another order,
-        // and moving back gives the bytes it started with (F-RT-3).
+        // and moving back gives the bytes it started with (F-RT-3), except
+        // when c, which has a heading of its own, is moved to the top: its
+        // heading then joins the list's, which stays at the top (F-RT-7).
         const string before = """
             pov:
-              # heading a
+              # the list's heading
               - a  # on a
               - b
                 # under b
@@ -402,7 +430,15 @@ public class ListItemMoveTests
             {
                 var moved = file.WithListItemMoved(["pov"], from, to);
                 Assert.Equal(lines, Fm(moved).Split('\n').Order(StringComparer.Ordinal).ToList());
-                Assert.Equal(before, Fm(moved.WithListItemMoved(["pov"], to, from)));
+                var back = Fm(moved.WithListItemMoved(["pov"], to, from));
+                if (from == 2 && to == 0)
+                {
+                    Assert.StartsWith("pov:\n  # the list's heading\n  # heading c\n  - a  # on a\n", back, StringComparison.Ordinal);
+                }
+                else
+                {
+                    Assert.Equal(before, back);
+                }
             }
         }
     }

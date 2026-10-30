@@ -235,23 +235,33 @@ public sealed partial class MarkdownFile : DenFile
     /// them, comment lines right after it indented under it, and comment
     /// lines right above its dash (no blank line between, not left of the
     /// dash, and not indented under the item before), which are a heading
-    /// for it. Blank lines stay where they are. In a flow list, the item's
+    /// for it, except above the first item, where they may head the whole
+    /// list and stay. Blank lines stay where they are. In a flow list, the item's
     /// text moves, with a comment on its line if it has a line of its own,
     /// and the commas stay in place; a comment anywhere else between the
-    /// brackets makes the move refused. Moving an item to where it is
+    /// brackets makes the move refused. A list of dated entries (format.md
+    /// §7.3) is never reordered (F-TMP-7). Moving an item to where it is
     /// changes nothing.
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="from"/> or <paramref name="to"/> isn't an item of the list.</exception>
     /// <exception cref="InvalidOperationException">The file can't be edited, or the value at the path isn't a list.</exception>
-    /// <exception cref="NotSupportedException">The item can't be moved in place without leaving a comment behind or reformatting.</exception>
+    /// <exception cref="NotSupportedException">The item can't be moved in place without leaving a comment behind or reformatting,
+    /// or the list holds dated entries (F-TMP-7).</exception>
     /// <exception cref="EditVerificationException">The edit didn't read back as intended (a bug).</exception>
     public MarkdownFile WithListItemMoved(IReadOnlyList<string> path, int from, int to)
     {
         ArgumentNullException.ThrowIfNull(path);
         var what = $"Moving item {from} of '{string.Join('.', path)}' to {to}";
-        if (_frontmatter is not null && GetFrontmatterValue(path) is not YamlSequence)
+        EnsureEditable(_frontmatter is null ? _missingFrontmatter : null);
+        if (GetFrontmatterValue(path) is not YamlSequence list)
         {
             throw new InvalidOperationException($"'{string.Join('.', path)}' isn't a list.");
+        }
+
+        if (IsEntryList(list))
+        {
+            throw new NotSupportedException(
+                $"'{string.Join('.', path)}' is a list of dated entries, which are never reordered (F-TMP-7): of two entries with the same 'from', the later one in the file holds (F-TMP-5), so a move could change what holds.");
         }
 
         var result = EditFrontmatter(
@@ -265,6 +275,8 @@ public sealed partial class MarkdownFile : DenFile
         }
 
         return result;
+
+        static bool IsEntryList(YamlSequence list) => list.Items.Any(i => i is YamlMapping m && m.ContainsKey("value"));
 
         static bool SameComments(IReadOnlyList<string> a, IReadOnlyList<string> b) =>
             a.Count == b.Count && a.Order(StringComparer.Ordinal).SequenceEqual(b.Order(StringComparer.Ordinal), StringComparer.Ordinal);

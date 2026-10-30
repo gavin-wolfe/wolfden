@@ -189,7 +189,7 @@ public sealed class WolfdenTools
         "or not at all. Each change is {\"op\": \"set\", \"path\": ..., \"value\": ...}, {\"op\": \"add\", \"path\": ..., \"value\": ..., \"index\": n} " +
         "(add an item to a list: an alias, or an entry of a field that changes over time; at the end without index), or " +
         "{\"op\": \"remove\", \"path\": ...} (a key or list item), or {\"op\": \"move\", \"path\": \"fields.pov.2\", \"index\": 0} (move a list item so it " +
-        "becomes item 'index', keeping its comments; taking an item out and adding it again drops them). Setting a path that ends in an item number " +
+        "becomes item 'index', keeping its comments; taking an item out and adding it again drops them; dated entries are never moved, F-TMP-7). Setting a path that ends in an item number " +
         "('fields.pov.1') changes that item in place, keeping a comment on it. A path is dotted: 'status', 'from', 'aliases', 'fields.born', " +
         "'fields.rank.1.from' (item numbers from 0). An entry is {\"value\": x, \"from\": \"book:chapter\", \"until\": ..., \"status\": ..., \"pin\": true}. " +
         "The id never changes. Aliases can be added and moved here; to rename the entity, or change or remove an alias, use rename_entity or " +

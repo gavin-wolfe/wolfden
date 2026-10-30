@@ -509,7 +509,7 @@ function FieldForm({
           // sets or clears it as a whole, and the lines it's written in, comments and quoting included, are as they were.
           const now = await target.reload()
           const theirs = now?.values.find((v) => v.name === view.name) ?? null
-          const safe = changes.every((c) => c.op !== 'set' && c.op !== 'clear')
+          const safe = changes.every((c) => c.op === 'add' || c.op === 'remove' || c.op === 'move' || c.op === 'replace')
           if (now && theirs && safe && theirs.text === basis && attempt < 2) {
             on = now.hash
             continue

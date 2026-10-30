@@ -16,8 +16,10 @@ namespace Wolfden.Core.Yaml;
 /// dash, with no blank line between, at or right of its dash and not
 /// indented under the item before, are a heading for it (as a new item goes
 /// after the item before and its comments, not between those lines and the
-/// next item), so they move with it too. That includes comment lines above
-/// the first item. Each item's lines are a slot, and the items move
+/// next item), so they move with it too. Comment lines above the first
+/// item are the exception: they may be a heading for the whole list
+/// (<c># in order of appearance</c>), so no item owns them and they stay
+/// at the top. Each item's lines are a slot, and the items move
 /// between the slots: blank lines, and comment lines that aren't an
 /// item's (left of the dash, or after a blank line), stay where they are,
 /// as the blank lines between sections do when a section moves.
@@ -80,7 +82,7 @@ internal static partial class YamlEditor
             var column = dash - lineStart;
             var dashLine = source.LineIndexOf(dash);
             var first = dashLine;
-            while (first - 1 > previousLast && IsCommentLine(source, first - 1) && Indent(source, first - 1) >= column)
+            while (k > 0 && first - 1 > previousLast && IsCommentLine(source, first - 1) && Indent(source, first - 1) >= column)
             {
                 first--;
             }

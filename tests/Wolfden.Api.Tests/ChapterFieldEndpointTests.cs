@@ -192,7 +192,7 @@ public sealed class ChapterFieldEndpointTests : IDisposable
     {
         _den.Write(Ember, _den.Read(Ember).Replace(
             "  - { key: \"2\", number: 2 }\n",
-            "  - key: \"2\"\n    number: 2\n    fields:\n      pov:\n        # lead\n        - \"[[mara-voss]]\"  # her watch\n        - \"[[halden-pike]]\"\n",
+            "  - key: \"2\"\n    number: 2\n    fields:\n      pov:\n        - \"[[mara-voss]]\"  # her watch\n        # relief\n        - \"[[halden-pike]]\"\n",
             StringComparison.Ordinal));
         await using var server = await Server.StartAsync(new WolfdenApiOptions(_den.Root));
 
@@ -204,7 +204,7 @@ public sealed class ChapterFieldEndpointTests : IDisposable
         Assert.True(moved.GetProperty("changed").GetBoolean());
         Assert.DoesNotContain(moved.GetProperty("effects").EnumerateArray(), e => e.GetString()!.Contains("dropped", StringComparison.Ordinal));
         Assert.Contains(
-            "      pov:\n        - \"[[halden-pike]]\"\n        # lead\n        - \"[[mara-voss]]\"  # her watch\n",
+            "      pov:\n        # relief\n        - \"[[halden-pike]]\"\n        - \"[[mara-voss]]\"  # her watch\n",
             _den.Read(Ember),
             StringComparison.Ordinal);
 
@@ -214,7 +214,7 @@ public sealed class ChapterFieldEndpointTests : IDisposable
             changes = new object[] { new { op = "replace", item = 1, value = "[[tomas-reyes]]" } },
         });
         Assert.DoesNotContain(replaced.GetProperty("effects").EnumerateArray(), e => e.GetString()!.Contains("dropped", StringComparison.Ordinal));
-        Assert.Contains("        # lead\n        - \"[[tomas-reyes]]\"  # her watch\n", _den.Read(Ember), StringComparison.Ordinal);
+        Assert.Contains("        # relief\n        - \"[[halden-pike]]\"\n        - \"[[tomas-reyes]]\"  # her watch\n", _den.Read(Ember), StringComparison.Ordinal);
 
         // Chapter defaults take the same changes.
         var container = await server.GetJsonAsync("/api/chapter-defaults?universe=starfall&book=ember", HttpStatusCode.OK);

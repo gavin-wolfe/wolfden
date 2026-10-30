@@ -243,7 +243,12 @@ public sealed partial class DenTools
                     added.Add(alias.GetString()!.Trim());
                 }
 
-                var commentsBefore = op.Op == "remove" ? file.FrontmatterComments : [];
+                if (op.Op == "set" && op.Value is YamlSequenceValue && path.Count > 1 && file.GetFrontmatterValue(path.Take(path.Count - 1).ToList()) is YamlSequence)
+                {
+                    throw ListAsItem();
+                }
+
+                var commentsBefore = op.Op is "remove" or "set" ? file.FrontmatterComments : [];
                 var removedNode = op.Op == "remove" && path.Count > 1 ? file.GetFrontmatterValue(path) : null;
                 var notesBefore = notes.Count;
                 file = Apply(op.Op switch
@@ -254,7 +259,11 @@ public sealed partial class DenTools
                     _ => () => Remove(file, path, notes),
                 });
 
-                if (op.Op == "remove" && notes.Count == notesBefore && Lost(commentsBefore, file.FrontmatterComments) is { Count: > 0 } lost
+                if (op.Op == "set")
+                {
+                    NoteReplacedComments(commentsBefore, file, string.Join('.', path), notes);
+                }
+                else if (op.Op == "remove" && notes.Count == notesBefore && Lost(commentsBefore, file.FrontmatterComments) is { Count: > 0 } lost
                     && file.GetFrontmatterValue(path.Take(path.Count - 1).ToList()) is YamlSequence or YamlScalar { IsNull: true } or null
                     && int.TryParse(path[^1], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out _))
                 {
@@ -518,7 +527,7 @@ public sealed partial class DenTools
                     "add" => () => file.WithNewListItem(fieldPath, op.Value!, op.Index),
                     "remove" => () => NoteEmptied(
                         notes, file.WithoutChapterFieldItem(ch.Key, field, ItemToRemove(file, fieldPath, op), out var comments), comments, $"{field} of chapter '{ch.Key}'"),
-                    "move" or "replace" => () => InPlace(file, fieldPath, op, "The chapter's"),
+                    "move" or "replace" => () => InPlace(file, fieldPath, op, "The chapter's", notes),
                     _ => () => Clear(file, fieldPath, ch, field, notes),
                 });
                 itemComments.After(op, before, file, fieldPath, $"{field} of chapter '{ch.Key}'", notesBefore, notes);
@@ -1470,6 +1479,11 @@ public sealed partial class DenTools
             if (op is "set" or "add" or "replace" && !hasValue)
             {
                 throw new DenToolException(ToolErrorCodes.BadArgument, $"A '{op}' change needs a 'value'.");
+            }
+
+            if (op is "add" or "replace" && value.ValueKind == JsonValueKind.Array)
+            {
+                throw ListAsItem();
             }
 
             if (op == "move" && !item.TryGetProperty("index", out _))

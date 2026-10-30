@@ -113,7 +113,7 @@ public sealed partial class DenTools
                     "add" => () => file.WithNewListItem(fieldPath, op.Value!, op.Index),
                     "remove" => () => NoteEmptied(
                         notes, file.WithoutChapterDefaultItem(field, ItemToRemove(file, fieldPath, op, "The default"), out var comments), comments, $"chapter_defaults.{field}"),
-                    "move" or "replace" => () => InPlace(file, fieldPath, op, "The default"),
+                    "move" or "replace" => () => InPlace(file, fieldPath, op, "The default", notes),
                     _ => () => ClearDefault(file, target, field, notes),
                 });
                 itemComments.After(op, before, file, fieldPath, $"chapter_defaults.{field}", notesBefore, notes);

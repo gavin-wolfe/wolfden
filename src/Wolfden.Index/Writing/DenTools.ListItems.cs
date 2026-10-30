@@ -11,7 +11,8 @@ namespace Wolfden.Index.Writing;
 /// <c>replace</c> changes of <see cref="UpdateChapterFields"/> and
 /// <see cref="UpdateChapterDefaults"/>. Unlike taking an item out and adding
 /// it again, they keep the comments that belong to the item
-/// (<see cref="MarkdownFile.WithListItemMoved"/>).
+/// (<see cref="MarkdownFile.WithListItemMoved"/>, format.md F-RT-7). Dated
+/// entries are never moved (F-TMP-7).
 /// </summary>
 public sealed partial class DenTools
 {
@@ -19,6 +20,12 @@ public sealed partial class DenTools
     private static MarkdownFile MoveItem(MarkdownFile file, IReadOnlyList<string> path, int to)
     {
         var listPath = path.Take(path.Count - 1).ToList();
+        if (!file.CanEdit)
+        {
+            // The file's own error comes first: it's what stops the edit.
+            return file.WithListItemMoved(listPath, 0, to);
+        }
+
         if (path.Count < 2 || !int.TryParse(path[^1], NumberStyles.None, CultureInfo.InvariantCulture, out var from)
             || file.GetFrontmatterValue(listPath) is not YamlSequence list)
         {
@@ -27,6 +34,7 @@ public sealed partial class DenTools
                 $"'{string.Join('.', path)}' isn't an item of a list. A 'move' change names the item by its path, such as 'fields.pov.2', and where it goes in 'index'.");
         }
 
+        RefuseEntryMove(list, string.Join('.', listPath));
         if (from >= list.Items.Count)
         {
             throw new DenToolException(ToolErrorCodes.BadArgument, $"'{string.Join('.', listPath)}' has {list.Items.Count} item(s), so there's no item {from}.");
@@ -38,11 +46,18 @@ public sealed partial class DenTools
     /// <summary>
     /// A chapter field's or default's <c>move</c> (item <c>item</c> to
     /// <c>index</c>) or <c>replace</c> (item <c>item</c> with <c>value</c>),
-    /// keeping the item's comments.
+    /// keeping the item's comments. A replace that drops comments inside a
+    /// multi-line item says so in <paramref name="notes"/>.
     /// </summary>
     /// <param name="owner">How a message names the field's holder: "The chapter's" or "The default".</param>
-    private static MarkdownFile InPlace(MarkdownFile file, string[] fieldPath, Change op, string owner)
+    private static MarkdownFile InPlace(MarkdownFile file, string[] fieldPath, Change op, string owner, List<string> notes)
     {
+        if (!file.CanEdit)
+        {
+            // The file's own error comes first: it's what stops the edit.
+            return file.WithListItemMoved(fieldPath, 0, 0);
+        }
+
         if (file.GetFrontmatterValue(fieldPath) is not YamlSequence list)
         {
             throw new DenToolException(ToolErrorCodes.BadArgument, $"{owner} '{op.Field}' isn't a list, so it has no item to {op.Op}. To change its value, use 'set'.");
@@ -58,8 +73,44 @@ public sealed partial class DenTools
             throw new DenToolException(ToolErrorCodes.BadArgument, $"{owner} '{op.Field}' has {list.Items.Count} item(s), so there's no item {item}.");
         }
 
-        return op.Op == "move"
-            ? file.WithListItemMoved(fieldPath, item, op.Index!.Value)
-            : file.WithFrontmatterValue([.. fieldPath, item.ToString(CultureInfo.InvariantCulture)], op.Value!);
+        if (op.Op == "move")
+        {
+            RefuseEntryMove(list, op.Field!);
+            return file.WithListItemMoved(fieldPath, item, op.Index!.Value);
+        }
+
+        var before = file.FrontmatterComments;
+        var result = file.WithFrontmatterValue([.. fieldPath, item.ToString(CultureInfo.InvariantCulture)], op.Value!);
+        NoteReplacedComments(before, result, $"item {item} of {op.Field}", notes);
+        return result;
     }
+
+    /// <summary>Refuses to reorder a list of dated entries (format.md F-TMP-7).</summary>
+    private static void RefuseEntryMove(YamlSequence list, string what)
+    {
+        if (list.Items.Any(i => i is YamlMapping m && m.ContainsKey("value")))
+        {
+            throw new DenToolException(
+                ToolErrorCodes.UnsupportedEdit,
+                $"'{what}' is a list of dated entries, which are never reordered (F-TMP-7): of two entries with the same 'from', the later one in the file holds (F-TMP-5), so a move could change what holds. Change an entry's 'from' instead.");
+        }
+    }
+
+    /// <summary>
+    /// Says, in <paramref name="notes"/>, which comments a value set or
+    /// replaced in place took with it: those inside a multi-line value it
+    /// replaced whole. A comment on a scalar's line stays (F-RT-7).
+    /// </summary>
+    private static void NoteReplacedComments(IReadOnlyList<string> before, MarkdownFile after, string what, List<string> notes)
+    {
+        var left = after.FrontmatterComments.ToList();
+        var lost = before.Where(c => !left.Remove(c)).ToList();
+        if (lost.Count > 0)
+        {
+            notes.Add($"Replaced {what} whole, so the comment{(lost.Count == 1 ? "" : "s")} inside the old value went: {string.Join(", ", lost.Select(c => $"'# {c.Trim()}'"))}.");
+        }
+    }
+
+    private static DenToolException ListAsItem() =>
+        new(ToolErrorCodes.BadArgument, "A list item is one value, not a list: give the item itself, or 'set' the whole field to a list.");
 }

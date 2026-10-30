@@ -65,7 +65,8 @@ public sealed class ListItemToolTests : IDisposable
 
         Assert.True(result.Changed);
         Assert.DoesNotContain(result.Effects, e => e.Contains("comment", StringComparison.Ordinal));
-        Assert.Contains("aliases:\n  - the Pilot\n  # what the crew call him\n  - Tom   # mostly\nstatus: canon\n", _den.Read(Tomas), StringComparison.Ordinal);
+        // The comment line above the first alias heads the list, so it stays at the top (format.md F-RT-7).
+        Assert.Contains("aliases:\n  # what the crew call him\n  - the Pilot\n  - Tom   # mostly\nstatus: canon\n", _den.Read(Tomas), StringComparison.Ordinal);
 
         // A move needs an index, and an item that's there; nothing is written otherwise.
         var before = _den.Read(Tomas);
@@ -114,6 +115,59 @@ public sealed class ListItemToolTests : IDisposable
 
         // Moving an item to where it is changes nothing.
         Assert.False(Tools.UpdateChapterDefaults(replaced.Hash, Json("""[{"op": "move", "field": "pov", "item": 0, "index": 0}]"""), "starfall", book: "ember").Changed);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-16")]
+    public void DatedEntriesAreNeverMoved()
+    {
+        // F-TMP-7: of two entries with the same from, the later one holds (F-TMP-5), so moving calm after angry would unseat pinned canon.
+        _den.Write(Tomas, _den.Read(Tomas).Replace(
+            "status: canon\n",
+            "status: canon\nfields:\n  x_mood:\n    - { value: calm, from: \"ember:1\" }\n    - { value: angry, from: \"ember:1\", pin: true }\n",
+            StringComparison.Ordinal));
+        var before = _den.Read(Tomas);
+        var hash = Tools.GetEntity("Tomas Reyes", "starfall").Entity!.Hash!;
+
+        var refused = Assert.Throws<DenToolException>(() => Tools.UpdateFields("Tomas Reyes", hash, Json("""[{"op": "move", "path": "fields.x_mood.0", "index": 1}]"""), "starfall"));
+
+        Assert.Equal(ToolErrorCodes.UnsupportedEdit, refused.Code);
+        Assert.Contains("F-TMP-7", refused.Message, StringComparison.Ordinal);
+        Assert.Equal(before, _den.Read(Tomas));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-16")]
+    public void ReplacingAMultiLineItemSaysWhichCommentsInsideItWent()
+    {
+        _den.Write(Tomas, _den.Read(Tomas).Replace(
+            "status: canon\n",
+            "status: canon\nfields:\n  x_crew:\n    - name: Mara\n      # the captain\n      role: captain\n    - Halden\n",
+            StringComparison.Ordinal));
+        var hash = Tools.GetEntity("Tomas Reyes", "starfall").Entity!.Hash!;
+
+        var result = Tools.UpdateFields("Tomas Reyes", hash, Json("""[{"op": "set", "path": "fields.x_crew.0", "value": "Mara"}]"""), "starfall");
+
+        Assert.Contains("    - Mara\n    - Halden\n", _den.Read(Tomas), StringComparison.Ordinal);
+        Assert.Contains("Replaced fields.x_crew.0 whole, so the comment inside the old value went: '# the captain'.", result.Effects);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-20")]
+    public void AListIsntAListItem()
+    {
+        _den.Write(Tomas, _den.Read(Tomas).Replace("status: canon\n", "status: canon\nfields:\n  x_tags: [a, b]\n", StringComparison.Ordinal));
+        var hash = Tools.GetEntity("Tomas Reyes", "starfall").Entity!.Hash!;
+        var before = _den.Read(Tomas);
+        Assert.Equal(ToolErrorCodes.BadArgument, Assert.Throws<DenToolException>(() => Tools.UpdateFields("Tomas Reyes", hash, Json("""[{"op": "add", "path": "aliases", "value": ["Tom"]}]"""), "starfall")).Code);
+        Assert.Equal(ToolErrorCodes.BadArgument, Assert.Throws<DenToolException>(() => Tools.UpdateFields("Tomas Reyes", hash, Json("""[{"op": "set", "path": "fields.x_tags.0", "value": []}]"""), "starfall")).Code);
+        Assert.Equal(before, _den.Read(Tomas));
+
+        var book = Tools.GetChapter("ember", "1", "starfall").Hash;
+        var ember = _den.Read(Ember);
+        Assert.Equal(ToolErrorCodes.BadArgument, Assert.Throws<DenToolException>(() => Tools.UpdateChapterFields("ember", "1", book, Json("""[{"op": "replace", "field": "pov", "item": 0, "value": []}]"""), "starfall")).Code);
+        Assert.Equal(ToolErrorCodes.BadArgument, Assert.Throws<DenToolException>(() => Tools.UpdateChapterDefaults(book, Json("""[{"op": "add", "field": "pov", "value": ["[[mara-voss]]"]}]"""), "starfall", book: "ember")).Code);
+        Assert.Equal(ember, _den.Read(Ember));
     }
 
     [Fact]

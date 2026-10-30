@@ -219,6 +219,13 @@ public class FieldEditEndpointTests
         using var den = NewDen();
         await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
 
+        // Dated entries are never reordered (format.md F-TMP-7).
+        var unmoved = den.Read(BoxPath);
+        var (moveStatus, moveJson) = await EditAsync(server, await HashAsync(server), "keeper", new[] { new { op = "move", path = new object[] { 0 }, index = 1 } });
+        Assert.Equal((HttpStatusCode.UnprocessableEntity, "unsupported_edit"), (moveStatus, moveJson.GetProperty("code").GetString()));
+        Assert.Contains("F-TMP-7", moveJson.GetProperty("message").GetString(), StringComparison.Ordinal);
+        Assert.Equal(unmoved, den.Read(BoxPath));
+
         // End the first entry, and add one after the second.
         await SavedAsync(server, "keeper", new[] { new { op = "set", path = new object[] { 0, "until" }, value = "dracula:5" } });
         await SavedAsync(server, "keeper", new[] { new { op = "add", value = (object)new { value = "[[abraham-van-helsing]]", from = "dracula:20", status = "candidate" } } });

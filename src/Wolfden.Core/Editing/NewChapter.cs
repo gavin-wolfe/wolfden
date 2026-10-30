@@ -137,13 +137,14 @@ public static class NewChapter
     /// between them, comparing the suffixes as ASCII strings as F-OUT-4
     /// does for rows, so inserting between <c>2</c> and <c>2b</c> gives
     /// <c>2a</c>, and between <c>2b</c> and <c>2bb</c> gives <c>2ba</c>.
-    /// Shorter suffixes come first, and within a length the ones
-    /// <see cref="KeyAfter"/> would try, so between <c>2</c> and <c>2d</c>
-    /// it's still <c>2b</c>; a key that ends in a digit tries <c>a</c> after
-    /// those (<c>2a</c> between <c>2</c> and <c>2c</c> when <c>2b</c> is
-    /// taken) and before any longer suffix (rules chosen, #229). When
-    /// no unused suffix sorts between them (between <c>2</c> and
-    /// <c>2a</c>), or the next key isn't this one with letters added, it's
+    /// Shorter suffixes come first. Within each length, the ones
+    /// <see cref="KeyAfter"/> would try come first, so between <c>2</c>
+    /// and <c>2d</c> it's still <c>2b</c>; then, for a key that ends in a
+    /// digit, those of the same length that start with <c>a</c>, so
+    /// between <c>2</c> and <c>2c</c> it's <c>2a</c> when <c>2b</c> is
+    /// taken, but <c>2ba</c> before <c>2aa</c> when <c>2a</c> is taken too
+    /// (rules chosen, #229). When no unused suffix sorts between them
+    /// (between <c>2</c> and <c>2a</c>), or the next key isn't this one with letters added, it's
     /// <see cref="KeyAfter"/>: the first unused suffix. Any other next key
     /// already sorts after every suffix of this one, or never could, so
     /// only this case needs a choice.

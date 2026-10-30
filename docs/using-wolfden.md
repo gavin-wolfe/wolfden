@@ -229,9 +229,9 @@ for none. Wolfden writes it into the `chapters` list in the book's
   chapter's key is the same key with letters added, the new key takes a
   letter that sorts between the two: inserting between `2` and `2b`
   gives `2a`, and between `2b` and `2bb` gives `2ba`. When no letter fits
-  (between `2` and `2a`), it takes the first unused one instead, `2c`,
-  which reads out of order but works the same: the list in `book.md`, not
-  the keys, is the chapter order. Inserting after the newest chapter
+  (between `2` and `2a`), it takes the first unused one instead: `2b`, or
+  `2c` if `2b` is taken. That reads out of order but works the same: the
+  list in `book.md`, not the keys, is the chapter order. Inserting after the newest chapter
   each time (`2b`, then after it `2ba`, then `2baa`) always reads in
   order.
 - **Keys are for keeps; numbers move.** The key is what positions use,

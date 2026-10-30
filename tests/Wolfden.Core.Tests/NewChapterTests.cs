@@ -52,6 +52,7 @@ public sealed class NewChapterTests
         Assert.Equal("2b", Key("2", "2", "2d", "3"));
         Assert.Equal("2c", Key("2", "2", "2d", "2b", "3"));
         Assert.Equal("2a", Key("2", "2", "2c", "2b", "3"));
+        Assert.Equal("2ba", Key("2", "2", "2c", "2b", "2a", "3"));
 
         // Taken suffixes are passed over, longer ones too: 2a is taken, so 2aa.
         Assert.Equal("2aa", Key("2", "1", "2", "2b", "2a", "3"));
@@ -59,6 +60,7 @@ public sealed class NewChapterTests
         Assert.Equal("2baaa", Key("2ba", "2ba", "2bab", "2baa", "3"));
 
         // Nothing sorts between: the first unused suffix, which sorts after the next key.
+        Assert.Equal("2b", Key("2", "2", "2a", "3"));
         Assert.Equal("2c", Key("2", "2", "2a", "2b", "3"));
         Assert.Equal("prologueb", Key("prologue", "prologue", "prologuea", "1"));
 

@@ -2134,9 +2134,9 @@ docs/
   the inserted key takes a suffix that sorts between them as an ASCII
   string, as F-OUT-4 orders row suffixes (between `2` and `2b`, `2a`),
   and falls back to the first unused suffix when none does (between `2`
-  and `2a`, `2c`). Existing keys never change. Removing chapters, and editing a
-  chapter's title from the UI, are out of scope. The rest is v0
-  behaviour, not a recorded decision.
+  and `2a`, with `2b` taken, `2c`). Existing keys never change.
+  Removing chapters, and editing a chapter's title from the UI, are out
+  of scope. The rest is v0 behaviour, not a recorded decision.
   - **Keys** (`NewChapter` in `Wolfden.Core/Editing`). The rule behind
     both suffix examples: a key that ends in a digit starts at `b` (as if
     `2` were `2a`), one that ends in a letter at `a`, so `prologue` gives
@@ -2148,11 +2148,12 @@ docs/
     number. Chapter order is the `chapters` list (F-BOOK-2), so "sorts
     between" only matters when the next key is `K` followed by a letter:
     any other next key sorts after every suffix of `K` already, or
-    before all of them. Between, shorter suffixes come first, and within
-    a length the ones the first-unused rule would try (so between `2`
-    and `2d` it's still `2b`), then, after a digit, those starting with
-    `a` (`2a` between `2` and `2c` when `2b` is taken), before any
-    longer suffix (rules chosen, #229).
+    before all of them. Between, shorter suffixes come first. Within
+    each length, the ones the first-unused rule would try come first (so
+    between `2` and `2d` it's still `2b`), then, after a digit, those
+    starting with `a` of the same length: `2a` between `2` and `2c` when
+    `2b` is taken, but `2ba` before `2aa` when `2a` is taken too (rules
+    chosen, #229).
   - **Numbers.** `number` is display only (F-BOOK-3), and there's no
     rule for renumbering beyond F-BOOK-5 (numbers should rise) and
     F-BOOK-6 (keys stay), so this is Wolfden's reading. The new chapter

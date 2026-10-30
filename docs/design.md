@@ -974,11 +974,24 @@ store, so an edit changes only what it means to (format.md §12):
   can't happen and no process id is guessed at; the file staying behind
   means nothing. It's one lock for the whole den, so a rename's den-wide
   link rewrite can't deadlock with another write. A write that finds it
-  held waits, up to 30 seconds, then gives up with `den_busy` and writes
-  nothing; a command says once that it's waiting. `checkpoint` doesn't
-  take it (it writes no den file, and git has its own lock), but freezing
-  and unfreezing do, around the whole change. `check --fix` takes it
-  too. Other programs don't know the lock, so for an editor a small
+  held waits, then gives up with `den_busy` and writes nothing; a
+  command says once that it's waiting, and for how long. One 30-second
+  wait covers both the wait for the session's own earlier writes (such
+  as `serve`'s other requests) and the wait for other Wolfdens, so a
+  write queued behind several gives up after 30 seconds, not 30 for each.
+  Only a sharing or lock violation counts as held (on Windows; on Linux
+  and macOS, `flock`'s `EWOULDBLOCK`); any other failure to open the
+  lock file is `write_failed` at once. `check --fix` takes the lock too.
+  Freezing and unfreezing hold it around their whole change, git commit
+  and tag included, so a freeze waiting on a signing passphrase makes
+  other Wolfdens' writes `den_busy` after 30 seconds. `checkpoint` (the
+  tool, the API's `/checkpoint`, and automatic checkpoints) doesn't take
+  it: it writes no den file, git has its own lock, and holding the den
+  lock across a commit would stall every other Wolfden's saves. The
+  cost: a checkpoint can record another process's multi-file write (a
+  rename's link rewrites, a move) half done, if it stages the files
+  while that write is part way through. Nothing is lost on disk, and the
+  next checkpoint records the rest. Other programs don't know the lock, so for an editor a small
   window remains, as with the den store (§6): it can save the file after
   that last comparison and before the write replaces it. Closing it
   would need a lock every editor honours.

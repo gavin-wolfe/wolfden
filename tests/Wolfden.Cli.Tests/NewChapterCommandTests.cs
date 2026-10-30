@@ -117,7 +117,7 @@ public sealed class NewChapterCommandTests : IDisposable
             {
                 bound.CancelAfter(TimeSpan.FromSeconds(120));
                 var line = await process.StandardError.ReadLineAsync(bound.Token);
-                Assert.Equal("wolfden new: another Wolfden is writing to the den; waiting for it to finish...", line);
+                Assert.Equal("wolfden new: another Wolfden is writing to the den; waiting up to 30 seconds for it to finish...", line);
             }
 
             Assert.DoesNotContain("key: \"28\"", _den.Read(Book), StringComparison.Ordinal);

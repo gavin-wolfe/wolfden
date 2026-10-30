@@ -675,7 +675,9 @@ in it, which Wolfden calls a checkpoint.
 - **Wolfdens take turns writing.** `wolfden serve`, an AI assistant,
   and a command such as `wolfden new` can all run on one den. Each save
   waits while another is being made, so none is lost; a command that
-  has to wait says so. If one waits more than 30 seconds, it gives up
+  has to wait says so. Freezing or unfreezing a book holds the others
+  up until its checkpoint is made, so if git is waiting for your signing
+  passphrase, other saves wait too. If one waits more than 30 seconds, it gives up
   and saves nothing, so try again. The turns are kept with
   `.wolfden/write.lock`, which can stay there and is safe to leave;
   editors such as Obsidian don't take turns, so a save there is caught

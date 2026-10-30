@@ -57,7 +57,7 @@ public sealed class WriteLockTests : IDisposable
         // A second session, with a lock of its own, edits the same file from the same hash.
         using var waiting = new ManualResetEventSlim();
         using var done = new ManualResetEventSlim();
-        var second = new DenTools(_den.Root) { WaitingForOtherWriter = waiting.Set };
+        var second = new DenTools(_den.Root) { WaitingForOtherWriter = _ => waiting.Set() };
         Exception? secondError = null;
         WriteResult? secondResult = null;
         var secondThread = new Thread(() =>
@@ -120,12 +120,95 @@ public sealed class WriteLockTests : IDisposable
         }
 
         Assert.Equal(ToolErrorCodes.DenBusy, busy.Code);
-        Assert.Contains("Another Wolfden program has been writing to the den", busy.Message, StringComparison.Ordinal);
+        Assert.Contains("Other writes to the den kept it busy for 0 seconds", busy.Message, StringComparison.Ordinal);
         Assert.Equal(before, _den.Read(Swales));
 
         // The file stays behind, and means nothing: the next write goes ahead.
         Assert.True(File.Exists(LockPath));
         Assert.True(tools.AppendSection("Mr. Swales", "Later", "He is buried at Whitby.", hash, newSection: true).Changed);
+    }
+
+    [Fact]
+    public void AWriteQueuedBehindThisSessionsOwnWriteHasTheSameWaitNotOneOfItsOwn()
+    {
+        var hash = new DenTools(_den.Root).GetEntity("Mr. Swales").Entity!.Hash!;
+        var cancel = TestContext.Current.CancellationToken;
+
+        // One session (as 'serve' is), with no time to wait: its first write holds its turn, paused before writing.
+        using var paused = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var calls = 0;
+        var tools = new DenTools(_den.Root)
+        {
+            WriteLockWait = TimeSpan.Zero,
+            BeforeWrite = () =>
+            {
+                if (Interlocked.Increment(ref calls) == 1)
+                {
+                    paused.Set();
+                    release.Wait(Bound, cancel);
+                }
+            },
+        };
+        Exception? firstError = null;
+        var firstThread = new Thread(() =>
+        {
+            try
+            {
+                tools.AppendSection("Mr. Swales", "First pass", "From the first request.", hash, newSection: true);
+            }
+            catch (Exception e)
+            {
+                firstError = e;
+                paused.Set();
+            }
+        });
+        firstThread.Start();
+        Assert.True(paused.Wait(Bound, cancel));
+        Assert.Null(firstError);
+
+        // A second request in the same session gives up within its wait, while the first still holds the turn.
+        using var done = new ManualResetEventSlim();
+        Exception? secondError = null;
+        var secondThread = new Thread(() =>
+        {
+            try
+            {
+                tools.AppendSection("Mr. Swales", "Second pass", "From the second request.", hash, newSection: true);
+            }
+            catch (Exception e)
+            {
+                secondError = e;
+            }
+            finally
+            {
+                done.Set();
+            }
+        });
+        secondThread.Start();
+        var gaveUp = done.Wait(Bound, cancel);
+        release.Set();
+        Assert.True(firstThread.Join(Bound));
+        Assert.True(secondThread.Join(Bound));
+
+        Assert.True(gaveUp, "the queued write should have given up while the first still held the session's turn");
+        Assert.Null(firstError);
+        Assert.Equal(ToolErrorCodes.DenBusy, Assert.IsType<DenToolException>(secondError).Code);
+        Assert.DoesNotContain("From the second request.", _den.Read(Swales), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ALockFileThatCantBeOpenedFailsAtOnceWithWriteFailed()
+    {
+        var hash = new DenTools(_den.Root).GetEntity("Mr. Swales").Entity!.Hash!;
+
+        // A folder where the lock file should be: no other Wolfden holds it, so waiting won't help.
+        File.Delete(LockPath);
+        Directory.CreateDirectory(LockPath);
+        var failed = Assert.Throws<DenToolException>(() => new DenTools(_den.Root).AppendSection("Mr. Swales", "Later", "x", hash, newSection: true));
+
+        Assert.Equal(ToolErrorCodes.WriteFailed, failed.Code);
+        Assert.Contains("write lock", failed.Message, StringComparison.Ordinal);
     }
 
     [Fact]

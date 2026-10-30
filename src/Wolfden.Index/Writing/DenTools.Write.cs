@@ -64,9 +64,10 @@ public sealed partial class DenTools
 
     /// <summary>
     /// Called once when a write has to wait for another Wolfden to finish
-    /// writing to the den, so a command can say why it's waiting (#221).
+    /// writing to the den, with the longest it waits (<see cref="WriteLockWait"/>),
+    /// so a command can say why it's waiting (#221).
     /// </summary>
-    public Action? WaitingForOtherWriter { get; init; }
+    public Action<TimeSpan>? WaitingForOtherWriter { get; init; }
 
     /// <summary>
     /// For tests: called once a write has compared the files it read with
@@ -1195,15 +1196,26 @@ public sealed partial class DenTools
     /// holds it. Dispose the result to end it. Hold it from the first read
     /// a write is based on until its last file is written or put back.
     /// </summary>
-    /// <exception cref="DenToolException"><see cref="ToolErrorCodes.DenBusy"/>: another Wolfden kept the lock for all of <see cref="WriteLockWait"/>.</exception>
+    /// <remarks>
+    /// One <see cref="WriteLockWait"/> covers both waits: for this
+    /// session's other writes (such as <c>serve</c>'s other requests), and
+    /// then for other Wolfdens. So a write queued behind several others
+    /// gives up after that long, not that long for each one ahead of it.
+    /// </remarks>
+    /// <exception cref="DenToolException"><see cref="ToolErrorCodes.DenBusy"/>: other writes kept the den busy for all of <see cref="WriteLockWait"/>.</exception>
     private WriteTurn EnterWrite()
     {
-        _writeLock.Enter();
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        if (!_writeLock.TryEnter(WriteLockWait))
+        {
+            throw DenWriteLock.Busy(WriteLockWait);
+        }
+
         try
         {
             if (_denLockDepth == 0)
             {
-                _denLock = DenWriteLock.Take(Root, WriteLockWait, WaitingForOtherWriter);
+                _denLock = DenWriteLock.Take(Root, WriteLockWait, clock, WaitingForOtherWriter);
             }
 
             _denLockDepth++;

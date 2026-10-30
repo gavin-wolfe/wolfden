@@ -60,14 +60,21 @@ public sealed class DenWriteLock : IDisposable
     /// <summary>
     /// Takes the lock of the den at <paramref name="root"/>, waiting up to
     /// <paramref name="wait"/> while another Wolfden, in this process or
-    /// another, holds it. <paramref name="waiting"/> is called once, when
-    /// the first try finds it held.
+    /// another, holds it. <paramref name="waiting"/> is called once, with
+    /// <paramref name="wait"/>, when the first try finds it held.
     /// </summary>
     /// <exception cref="DenToolException">
     /// <see cref="ToolErrorCodes.DenBusy"/> if it's still held after <paramref name="wait"/>;
-    /// <see cref="ToolErrorCodes.WriteFailed"/> if the lock file can't be made at all.
+    /// <see cref="ToolErrorCodes.WriteFailed"/> if the lock file can't be made or opened at all.
     /// </exception>
-    public static DenWriteLock Take(string root, TimeSpan wait, Action? waiting = null)
+    public static DenWriteLock Take(string root, TimeSpan wait, Action<TimeSpan>? waiting = null) => Take(root, wait, Stopwatch.StartNew(), waiting);
+
+    /// <summary>
+    /// <see cref="Take(string, TimeSpan, Action{TimeSpan}?)"/>, with the wait counted
+    /// on <paramref name="clock"/>, so time a write already spent waiting
+    /// for its turn in this session counts against the same <paramref name="wait"/>.
+    /// </summary>
+    internal static DenWriteLock Take(string root, TimeSpan wait, Stopwatch clock, Action<TimeSpan>? waiting)
     {
         var folder = Path.Combine(root, IndexBuilder.StateFolder);
         var path = Path.Combine(folder, FileName);
@@ -85,7 +92,6 @@ public sealed class DenWriteLock : IDisposable
             throw new DenToolException(ToolErrorCodes.WriteFailed, $"Couldn't make the den's write lock, so nothing was written: {e.Message}");
         }
 
-        var clock = Stopwatch.StartNew();
         var pause = FirstPause;
         var told = false;
         while (true)
@@ -94,37 +100,60 @@ public sealed class DenWriteLock : IDisposable
             {
                 return new DenWriteLock(new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None));
             }
-            catch (UnauthorizedAccessException e)
-            {
-                throw new DenToolException(ToolErrorCodes.WriteFailed, $"Couldn't open the den's write lock, {path}, so nothing was written: {e.Message}");
-            }
-            catch (IOException e) when (e is not (DirectoryNotFoundException or PathTooLongException))
-            {
-                // Held by another Wolfden, most likely; a virus scanner or indexer
-                // opening it for a moment looks the same, and passes.
-                if (clock.Elapsed >= wait)
-                {
-                    throw new DenToolException(
-                        ToolErrorCodes.DenBusy,
-                        $"Another Wolfden program has been writing to the den for {Seconds(wait)}, so nothing was written. Try again in a moment. " +
-                        $"If no other Wolfden (wolfden serve, wolfden mcp, or another command) is running, the system said: {e.Message}");
-                }
-
-                if (!told)
-                {
-                    told = true;
-                    waiting?.Invoke();
-                }
-
-                Thread.Sleep(pause);
-                pause = pause * 2 > LongestPause ? LongestPause : pause * 2;
-            }
             catch (DirectoryNotFoundException)
             {
                 // The folder was deleted (by hand, or a reset index) between making it and opening the file.
                 Directory.CreateDirectory(folder);
             }
+            catch (IOException e) when (IsHeld(e))
+            {
+                // Held by another Wolfden, most likely; a virus scanner or indexer
+                // opening it for a moment looks the same, and passes.
+                if (clock.Elapsed >= wait)
+                {
+                    throw Busy(wait);
+                }
+
+                if (!told)
+                {
+                    told = true;
+                    waiting?.Invoke(wait);
+                }
+
+                var left = wait - clock.Elapsed;
+                Thread.Sleep(pause < left ? pause : left > TimeSpan.Zero ? left : TimeSpan.Zero);
+                pause = pause * 2 > LongestPause ? LongestPause : pause * 2;
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                // Not another holder: waiting won't help.
+                throw new DenToolException(ToolErrorCodes.WriteFailed, $"Couldn't open the den's write lock, {path}, so nothing was written: {e.Message}");
+            }
         }
+    }
+
+    /// <summary>The <see cref="ToolErrorCodes.DenBusy"/> error for a write that waited all of <paramref name="wait"/>.</summary>
+    internal static DenToolException Busy(TimeSpan wait) => new(
+        ToolErrorCodes.DenBusy,
+        $"Other writes to the den kept it busy for {Seconds(wait)}, so nothing was written. They may be another Wolfden's " +
+        "(wolfden serve, wolfden mcp, or a command) or this one's. Try again in a moment.");
+
+    /// <summary>
+    /// True if opening the file failed because another handle holds it:
+    /// a sharing or lock violation on Windows (ERROR_SHARING_VIOLATION,
+    /// ERROR_LOCK_VIOLATION), or, on Linux and macOS, the <c>flock</c> that
+    /// .NET takes for <see cref="FileShare.None"/> finding it taken
+    /// (<c>EWOULDBLOCK</c>, which .NET gives as the exception's HResult).
+    /// </summary>
+    internal static bool IsHeld(IOException e)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return (e.HResult & 0xFFFF) is 32 or 33;
+        }
+
+        // EWOULDBLOCK (= EAGAIN) is 11 on Linux, 35 on macOS and the BSDs.
+        return e.HResult == (OperatingSystem.IsLinux() ? 11 : 35);
     }
 
     /// <summary>Lets go of the lock.</summary>

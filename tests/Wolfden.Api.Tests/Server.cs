@@ -34,6 +34,7 @@ internal sealed class Server : IAsyncDisposable
             Ledger = options.Ledger,
             AutoCheckpoints = options.AutoCheckpoints,
             Time = options.Time,
+            WriteLockWait = options.WriteLockWait,
         });
         configure?.Invoke(app);
         await app.StartAsync(TestContext.Current.CancellationToken);

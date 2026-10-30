@@ -310,9 +310,10 @@ docs. The writer's own list is in
   writer's change.
 - **`den_busy` means wait a moment, then retry.** Another Wolfden
   (`wolfden serve`, another assistant's session, or a command) was
-  writing to the den for the whole 30 seconds a write waits, so nothing
-  was written. Retry the same call; the hash still holds, since nothing
-  changed. If it keeps happening, ask the writer what's running.
+  writing to the den for the whole 30 seconds a write waits. Nothing of
+  yours was written; retry the same call. If it then comes back
+  `stale_file`, read again as usual. If it keeps happening, ask the
+  writer what's running.
 - **`allow_relinks` only with the writer's say-so.** A create, copy,
   rename, or move that would send existing links to a different note is
   refused, with the links listed. Show them to the writer, and set

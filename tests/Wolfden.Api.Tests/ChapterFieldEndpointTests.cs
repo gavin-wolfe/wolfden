@@ -164,6 +164,18 @@ public sealed class ChapterFieldEndpointTests : IDisposable
         });
         Assert.Contains("Moved an item of pov of chapter '2' to item 1, written afresh, so the comment on it was dropped: '# her watch'. Put it back by hand if you want it.", moved.GetProperty("effects").EnumerateArray().Select(e => e.GetString()));
 
+        // Rewritten: the web UI changes an item in place as a remove and an add at the same place.
+        Assert.Contains("        - \"[[mara-voss]]\"\n", _den.Read(Ember), StringComparison.Ordinal);
+        _den.Write(Ember, _den.Read(Ember).Replace("        - \"[[mara-voss]]\"\n", "        - \"[[mara-voss]]\"  # main\n", StringComparison.Ordinal));
+        var rewritten = await EditAsync(server, new
+        {
+            book = "ember", universe = "starfall", chapter = "2", field = "pov", expectedHash = await HashAsync(server),
+            changes = new object[] { new { op = "remove", item = 1 }, new { op = "add", value = "[[tomas-reyes]]" } },
+        });
+        var rewriteEffects = rewritten.GetProperty("effects").EnumerateArray().Select(e => e.GetString()).ToList();
+        Assert.Contains("Rewrote item 1 of pov of chapter '2'; the comment on it was dropped: '# main'. Put it back by hand if you want it.", rewriteEffects);
+        Assert.DoesNotContain(rewriteEffects, e => e!.StartsWith("Removed item", StringComparison.Ordinal));
+
         // Removed: the comment goes with it, and the effects say so.
         _den.Write(Ember, _den.Read(Ember).Replace("        - \"[[halden-pike]]\"\n", "        - \"[[halden-pike]]\"  # relief pilot\n", StringComparison.Ordinal));
         var removed = await EditAsync(server, new

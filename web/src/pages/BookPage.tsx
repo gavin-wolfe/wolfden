@@ -87,7 +87,8 @@ export function BookPage() {
             const ordinal = ordinalOf(c.position, list)
             const later = here !== null && ordinal !== null && ordinal > here
             // A chapter after the position keeps its fields to itself, and until the page knows what the reader has met, so do all.
-            const chapterFields = later || met === null ? undefined : fieldsOf(c.key)
+            // As of a position, a chapter whose place in the story isn't known yet (positions loading or failed) shows none either.
+            const chapterFields = later || met === null || (at !== undefined && (here === null || ordinal === null)) ? undefined : fieldsOf(c.key)
             return (
               <li key={c.key} className={later ? 'later' : undefined} aria-current={c.position === at ? 'step' : undefined}>
                 <Link to="/u/$universe/b/$book/c/$chapter" params={{ universe, book: b.key, chapter: c.key }}>

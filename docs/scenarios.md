@@ -4472,7 +4472,8 @@ prologue writes `fields: { pov: [], when: "2284" }`, and chapter 3
 - Chapter 3's `futur` isn't a tense, so it's shown as written and
   ignored, and the chapter has `past` from the series (F-CHAP-3).
 - Reading as of `ember:1`, chapters after it show no fields in the
-  book's list, and a link in a shown value to a note the reader hasn't
+  book's list (and no chapter does until the page knows where `ember:1`
+  is), and a link in a shown value to a note the reader hasn't
   met yet is plain text that doesn't name the note (#26).
 - The API gives the chapters' fields as written, what holds and where
   from, what each would inherit, and the den's chapter field definitions
@@ -4552,8 +4553,10 @@ Spec: types.md F-CHAP-5, design.md §9 (#215, #225). Covered by:
   what it's based on. **Use the default** on a stale file shows what the
   file has now, or says it was already cleared; it never clears a value
   the writer didn't see.
-- Removing or moving a list item that has a comment on it says, in the
-  effects, that the comment went with it.
+- Removing, moving, or changing in place a list item that has a comment
+  on it says, in the effects, that the comment went with it ("Rewrote
+  item 0 of pov of chapter '1'; the comment on it was dropped" for a
+  change in place).
 - A reserved name (`key`, `number`, …, F-CHAP-1), a change member the
   endpoint doesn't take (`field` inside a change), a missing `field`, an
   unknown chapter, and `fields` that isn't an object are refused and write

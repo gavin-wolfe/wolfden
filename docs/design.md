@@ -2279,7 +2279,8 @@ docs/
     items keep their bytes.
   - **The pages.** A book's chapter list shows each chapter's values
     under its title, inherited ones greyed and marked ("book default").
-    As of a story position, a chapter after it shows no fields, and in the
+    As of a story position, a chapter after it shows no fields (nor does
+    any while the page doesn't yet know where the position is), and in the
     others a link to a note the reader hasn't met is plain text that
     doesn't say what it reaches, as elsewhere in the reading view (#26);
     the chapter page's fields, which are edited there, show everything.
@@ -2310,8 +2311,9 @@ docs/
     shown, and Keep mine sets the writer's value as a whole. **Use the
     default** and **Clear** on a stale file are never sent again: the
     page shows what the file has now to choose from, or says the field
-    was already cleared. A removed or moved list item's comment goes
-    with it, and the effects say so, as for a note's fields.
+    was already cleared. A removed, moved, or rewritten (changed in
+    place) list item's comment goes with it, and the effects say so, as
+    for a note's fields.
   - **Adding a chapter** shows a form for each chapter field, empty, with
     what the chapter will inherit if it stays empty. Only fields given a
     value are sent; an empty list is inherited at create, not `[]`.

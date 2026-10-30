@@ -344,6 +344,22 @@ describe('SC-WEB-76: chapter field edits are guarded', () => {
     expect(items.slice(1).every((li) => li.querySelector('.chapter-field-summary') === null)).toBe(true)
   })
 
+  it('as of a position, no chapter shows its fields while the story’s positions are unknown', async () => {
+    const api = stubApi({
+      override: (path) =>
+        path === '/api/positions' ? new Response(JSON.stringify({ code: 'internal', message: 'The positions failed.' }), { status: 500 }) : undefined,
+    })
+    renderApp('/u/dracula/b/dracula?at=dracula:1')
+    await screen.findByRole('heading', { name: 'Dracula', level: 1 })
+    // The fields and what the reader has met have arrived; only the positions are missing.
+    await waitFor(() => expect(api.calls.some((c) => c.startsWith('/api/book/chapter-fields'))).toBe(true))
+    await waitFor(() => expect(api.calls.some((c) => c.startsWith('/api/entities') && c.includes('asOf='))).toBe(true))
+    await waitFor(() => expect(api.calls.some((c) => c.startsWith('/api/positions'))).toBe(true))
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(document.querySelectorAll('ol.chapters li').length).toBeGreaterThan(0)
+    expect(document.querySelector('.chapter-field-summary')).toBeNull()
+  })
+
   it('a chapter written as a bare key says how to give it fields', async () => {
     stubFields({ book: () => ({ ...bookChapterFields(), chapters: bookChapterFields().chapters.map((c) => ({ ...c, bare: true })) }) })
     renderApp('/u/dracula/b/dracula/c/2')

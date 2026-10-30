@@ -8,13 +8,14 @@ public sealed partial class DenTools
     /// <summary>
     /// Says, in a chapter field edit's effects, when a list item's comment
     /// went with it (#225), as <see cref="UpdateFields"/> does for a note's
-    /// fields: an item removed with a comment on it, or one removed and
-    /// added again (moved, or changed in place by the web UI), which is
-    /// written afresh without its comment.
+    /// fields: an item removed with a comment on it, one removed and added
+    /// again elsewhere (moved), or one removed and a new value added in its
+    /// place (rewritten, as the web UI changes an item), each written afresh
+    /// without its comment.
     /// </summary>
     private sealed class ItemComments
     {
-        private readonly List<(string List, string Value, string Item, List<string> Comments)> _removed = [];
+        private readonly List<(string List, string Value, int Index, string Item, List<string> Comments)> _removed = [];
 
         /// <summary>Notes what <paramref name="op"/> did to the comments of the list at <paramref name="fieldPath"/>, which <paramref name="label"/> names.</summary>
         public void After(Change op, MarkdownFile before, MarkdownFile after, string[] fieldPath, string label, int notesBefore, List<string> notes)
@@ -29,7 +30,7 @@ public sealed partial class DenTools
                 }
 
                 var item = ItemToRemove(before, fieldPath, op);
-                _removed.Add((label, JsonOf(list.Items[item]).GetRawText(), $"item {item} of {label}", lost));
+                _removed.Add((label, JsonOf(list.Items[item]).GetRawText(), item, $"item {item} of {label}", lost));
             }
             else if (op.Op == "add" && after.GetFrontmatterValue(fieldPath) is YamlSequence added)
             {
@@ -41,6 +42,16 @@ public sealed partial class DenTools
                     var r = _removed[moved];
                     _removed.RemoveAt(moved);
                     notes.Add($"Moved an item of {label} to item {at}, written afresh, so the comment on it was dropped: {Quoted(r.Comments)}. Put it back by hand if you want it.");
+                    return;
+                }
+
+                // Taken out and a new value added in its place: the item was changed in place (the web UI's edit of an item).
+                var rewritten = _removed.FindLastIndex(r => r.List == label && r.Index == at);
+                if (rewritten >= 0)
+                {
+                    var r = _removed[rewritten];
+                    _removed.RemoveAt(rewritten);
+                    notes.Add($"Rewrote item {at} of {label}; the comment on it was dropped: {Quoted(r.Comments)}. Put it back by hand if you want it.");
                 }
             }
         }

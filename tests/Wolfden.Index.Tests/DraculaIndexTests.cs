@@ -68,7 +68,7 @@ public sealed class DraculaIndexTests : IClassFixture<DraculaIndexTests.Built>
     {
         var links = Index.Context.Links.OrderBy(l => l.Id).ToList();
 
-        Assert.Equal(372, links.Count);
+        Assert.Equal(378, links.Count);
         Assert.Equal(Core.Links.Count, links.Count);
         Assert.All(links, l => Assert.Equal("resolved", l.Outcome));
         Assert.Equal(

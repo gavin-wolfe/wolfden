@@ -34,9 +34,9 @@ public class IndexWatchTests
         Assert.Equal(CliApp.ExitOk, exitCode);
         Assert.Empty(error);
         var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-        Assert.Matches(@"^\d\d:\d\d:\d\d Rebuilt \.wolfden/index\.db \(the watcher started\) in [\d.]+ m?s: 1 universe, 50 entities, 372 links; 0 errors, \d+ warnings?\.$", lines[0]);
+        Assert.Matches(@"^\d\d:\d\d:\d\d Rebuilt \.wolfden/index\.db \(the watcher started\) in [\d.]+ m?s: 1 universe, 50 entities, 378 links; 0 errors, \d+ warnings?\.$", lines[0]);
         Assert.Equal("Watching for changes. Press Ctrl+C to stop.", lines[1]);
-        Assert.Contains(lines, l => System.Text.RegularExpressions.Regex.IsMatch(l, $@"^\d\d:\d\d:\d\d Updated {Mina} in [\d.]+ m?s: 1 universe, 50 entities, 372 links; "));
+        Assert.Contains(lines, l => System.Text.RegularExpressions.Regex.IsMatch(l, $@"^\d\d:\d\d:\d\d Updated {Mina} in [\d.]+ m?s: 1 universe, 50 entities, 378 links; "));
         Assert.Equal("Stopped watching.", lines[^1]);
     }
 
@@ -97,7 +97,7 @@ public class IndexWatchTests
         var (exitCode, output, _) = run.Stop();
 
         Assert.Equal(CliApp.ExitOk, exitCode);
-        Assert.Contains("1 universe, 50 entities, 372 links", output, StringComparison.Ordinal);
+        Assert.Contains("1 universe, 50 entities, 378 links", output, StringComparison.Ordinal);
     }
 
     [Fact]

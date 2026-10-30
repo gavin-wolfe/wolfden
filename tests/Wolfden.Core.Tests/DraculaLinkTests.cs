@@ -49,7 +49,7 @@ public class DraculaLinkTests
         var written = TestFiles.RepoFiles("samples/dracula/universes")
             .Sum(f => System.Text.RegularExpressions.Regex.Matches(TestFiles.Text(TestFiles.ReadRepoFile(f)), @"\[\[[^\]]*\]\]").Count);
 
-        Assert.Equal(372, written);
+        Assert.Equal(378, written);
         Assert.Equal(written, Index.Value.Links.Count);
     }
 

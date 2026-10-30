@@ -258,6 +258,37 @@ wolfden new chapter "Signal Fires" --in ember --after 2
 book by that key), and `--after` the chapter it comes after; leave it
 out for the end. The title is optional.
 
+### Chapter fields
+
+A chapter can say who tells it and when and where it happens. The core
+fields are `pov` (the point-of-view characters), `narration` (first
+person, third limited, and so on), `tense`, `when` (the in-world date),
+and `setting` (the places it happens, as links to location notes). They
+go in a `fields` mapping on the chapter's item in `book.md`:
+
+```yaml
+chapters:
+  - { key: "1", number: 1, fields: { pov: "[[mara-voss]]", setting: "[[kessan-reach]]" } }
+```
+
+Set a value once for many chapters in the `chapter_defaults` of the
+book, series, or universe, and a chapter that differs sets its own. A
+space opera might set `when` to the story's present in the series'
+`chapter_defaults`, and give a flashback chapter its own. Writing `[]`
+for a list field such as `pov` or `setting` means "none here". An AI
+assistant can read and change these with `get_chapter` and
+`update_chapter_fields` ([`mcp-clients.md`](mcp-clients.md)). The rules
+are in [`types.md`](types.md) §8.
+
+If your den's own pack already defines a chapter field named `setting`,
+yours is used and `wolfden check` warns that it replaces the core one.
+Rename yours, or delete it to use the core field, whichever you prefer.
+If you wrote `setting:` as plain text without defining it (say,
+`setting: Kessan Reach`), `wolfden check` now warns about it and ignores
+the value, since the core field takes links to location notes. Make it a
+link to a location note (`setting: "[[kessan-reach]]"`), or define a
+text `setting` in your den's pack to keep it as it is.
+
 ## Editing notes
 
 `wolfden serve` lets you edit a note on its page, one piece at a time.

@@ -208,7 +208,7 @@ public static partial class FieldValues
             case FieldKind.Ref:
                 if (node is not YamlScalar r || !IsSingleLink(r.Text))
                 {
-                    Problem("F-FT-9", $"{name} is a link to one entity, such as \"[[mara-voss]]\", in quotes, with nothing else in the string, not '{Describe(node)}'.{QuoteHint(field, node)}");
+                    Problem("F-FT-9", $"{name} is a link to one entity, such as \"{ExampleLink(field)}\", in quotes, with nothing else in the string, not '{Describe(node)}'.{QuoteHint(field, node)}");
                 }
 
                 break;
@@ -396,6 +396,17 @@ public static partial class FieldValues
 
         return previous[b.Length];
     }
+
+    /// <summary>An example link for a ref field's message, to a note of a type the field takes.</summary>
+    private static string ExampleLink(FieldDefinition field) =>
+        field.To is not { Count: > 0 } to || to.Contains("character")
+            ? "[[mara-voss]]"
+            : to[0] switch
+            {
+                "location" => "[[kessan-reach]]",
+                "faction" => "[[the-compact]]",
+                var type => $"[[name-of-the-{type}]]",
+            };
 
     /// <summary>F-FLD-6: an unquoted <c>[[x]]</c> is a list inside a list.</summary>
     private static string QuoteHint(FieldDefinition field, YamlNode node) =>

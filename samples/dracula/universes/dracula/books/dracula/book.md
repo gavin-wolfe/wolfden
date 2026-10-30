@@ -8,6 +8,9 @@ status: draft
 # correspondent) are left out here and named in outline.md's pov column.
 # when holds the chapter's span of dated entries (see the note "Dates and
 # the year" for the sort keys).
+# setting lists where a chapter takes place, given here for the chapters
+# that stay in one or two places: Jonathan at the castle, and the
+# Demeter's arrival at Whitby.
 chapter_defaults:
   narration: first
   tense: past
@@ -18,24 +21,28 @@ chapters:
     fields:
       pov: ["[[jonathan-harker]]"]
       when: { text: "3–5 May", sort: [0, 5, 3] }
+      setting: ["[[bistritz]]", "[[castle-dracula]]"]
   - key: 2
     number: 2
     title: Jonathan Harker's Journal
     fields:
       pov: ["[[jonathan-harker]]"]
       when: { text: "5–8 May", sort: [0, 5, 5] }
+      setting: ["[[castle-dracula]]"]
   - key: 3
     number: 3
     title: Jonathan Harker's Journal
     fields:
       pov: ["[[jonathan-harker]]"]
       when: { text: "8–16 May", sort: [0, 5, 8] }
+      setting: ["[[castle-dracula]]"]
   - key: 4
     number: 4
     title: Jonathan Harker's Journal
     fields:
       pov: ["[[jonathan-harker]]"]
       when: { text: "16 May – 30 June", sort: [0, 5, 16] }
+      setting: ["[[castle-dracula]]"]
   - key: 5
     number: 5
     title: Letters—Lucy and Mina
@@ -59,6 +66,7 @@ chapters:
     fields:
       pov: ["[[mina-harker]]"]
       when: { text: "6 July – 10 August", sort: [0, 7, 6] }
+      setting: ["[[whitby]]"]
   - key: 8
     number: 8
     title: Mina Murray's Journal

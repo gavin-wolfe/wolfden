@@ -23,7 +23,8 @@ universes/dracula/
   entities/notes/          how dates work; the rules of the Un-Dead
   books/dracula/
     book.md                27 chapters and the closing Note, with pov,
-                           narration, tense, and in-world dates
+                           narration, tense, in-world dates, and
+                           settings
     outline.md             one table row per beat, by chapter
     entities/characters/
     entities/events/       dated events: in-world `when` vs. story `from`

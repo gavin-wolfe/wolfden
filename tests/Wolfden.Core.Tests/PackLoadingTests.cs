@@ -152,9 +152,29 @@ public class PackLoadingTests
             ("packs/starfall/pack.yaml", "name: Starfall\n"),
             ("packs/starfall/chapter.yaml", "fields:\n  tense: { type: enum, values: [past, present, future, aorist] }\n  weather: text\n")));
 
-        Assert.Equal(["pov", "narration", "when", "tense", "weather"], den.Types.ChapterFields.Select(f => f.Name));
+        Assert.Equal(["pov", "narration", "when", "setting", "tense", "weather"], den.Types.ChapterFields.Select(f => f.Name));
         Assert.Equal("aorist", den.Types.FindChapterField("tense")!.MatchEnum("Aorist"));
         Assert.Equal([("packs/starfall/chapter.yaml", "F-CHAP-2", DiagnosticSeverity.Warning, (int?)2)], Rules(den));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-CHECK-42")]
+    public void ADenLocalSettingWinsOverTheCoreOne()
+    {
+        // A den whose own pack defined setting before core did (#226) keeps
+        // its definition (F-PACK-11), so its prose values stay valid.
+        var den = DenStructure.Load(Den("starfall",
+            ("packs/starfall/pack.yaml", "name: Starfall\n"),
+            ("packs/starfall/chapter.yaml", "fields:\n  setting: text\n"),
+            ("universes/starfall/books/ember/book.md", "---\nname: Ember\nchapters:\n  - { key: \"1\", fields: { setting: the mining town of Kessan Reach } }\n---\n")));
+
+        Assert.Equal(["pov", "narration", "tense", "when", "setting"], den.Types.ChapterFields.Select(f => f.Name));
+        Assert.Equal(FieldKind.Text, den.Types.FindChapterField("setting")!.Kind);
+        Assert.Equal([("packs/starfall/chapter.yaml", "F-CHAP-2", DiagnosticSeverity.Warning, (int?)2)], Rules(den));
+        Assert.Contains("chapter field 'setting'", den.Diagnostics[0].Diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains("using 'starfall'", den.Diagnostics[0].Diagnostic.Message, StringComparison.Ordinal);
+        var setting = den.FindUniverse("starfall")!.FindBook("ember")!.FindChapter("1")!.Fields["setting"];
+        Assert.Equal("the mining town of Kessan Reach", Assert.Single(setting.Items).ToString());
     }
 
     [Fact]

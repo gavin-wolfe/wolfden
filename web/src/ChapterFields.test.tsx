@@ -230,38 +230,118 @@ describe('SC-WEB-76: chapter field edits are guarded', () => {
     expect((await within(form).findByRole('alert')).textContent).toBe(`It can't be saved: ${frozen}`)
   })
 
-  it('a stale book.md is sent again when the field didn’t change, and shows both versions when it did', async () => {
-    let fresh = bookChapterFields({ hash: 'h-book-2' })
-    let answers: (Response | WriteResult)[] = [new Response(JSON.stringify({ code: 'stale_file', message: 'book.md has changed since it was read' }), { status: 409 }), result()]
+  it('a stale book.md is sent again only for added or removed items on unchanged lines; otherwise both versions show', async () => {
+    const STALE = () => new Response(JSON.stringify({ code: 'stale_file', message: 'book.md has changed since it was read' }), { status: 409 })
+    const lines = (b: BookChapterFields, text: string) => ({ ...b, chapters: b.chapters.map((c) => ({ ...c, fields: c.fields.map((f) => ({ ...f, text })) })) })
+    let fresh = lines(bookChapterFields({ hash: 'h-book-2' }), '  - { key: "1" }')
+    let answers: (Response | WriteResult)[] = [STALE(), result()]
     let reads = 0
     const { posted } = stubFields({
       post: () => answers.shift()!,
-      book: () => (reads++ === 0 ? bookChapterFields() : fresh),
+      book: () => (reads++ === 0 ? lines(bookChapterFields(), '  - { key: "1" }') : fresh),
     })
-    renderApp('/u/dracula/b/dracula/c/2')
-    fireEvent.click(await screen.findByRole('button', { name: 'Edit tense' }))
-    let form = screen.getByRole('form', { name: 'Edit tense' })
-    fireEvent.change(within(form).getByLabelText('Value'), { target: { value: 'present' } })
-    fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
-    await screen.findByText('Saved tense.')
-    expect(posted.map((p) => p.body.expectedHash)).toEqual(['h-book', 'h-book-2'])
+    renderApp('/u/dracula/b/dracula/c/1')
 
-    // This time another program set chapter 2's tense meanwhile: both versions, and Keep mine sets mine on the new file.
+    // Another part of book.md changed, and chapter 1's lines are byte for byte as they were: an added POV is sent again.
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit pov' }))
+    let form = screen.getByRole('form', { name: 'Edit pov' })
+    fireEvent.click(within(form).getByRole('button', { name: 'Add item' }))
+    fireEvent.change(within(form).getByLabelText('Item 2'), { target: { value: '[[mina-harker]]' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
+    await screen.findByText('Saved pov.')
+    expect(posted.map((p) => p.body.expectedHash)).toEqual(['h-book', 'h-book-2'])
+    expect(posted[1].body.changes).toEqual([{ op: 'add', value: '[[mina-harker]]' }])
+
+    // A change that sets the field whole is never sent again unseen: both versions, even though tense itself didn't change.
     posted.length = 0
-    fresh = bookChapterFields({ hash: 'h-book-3' })
-    fresh.chapters[1].fields[2] = unsetValue('tense', { set: true, own: 'future', value: 'future', from: 'chapter' })
-    answers = [new Response(JSON.stringify({ code: 'stale_file', message: 'book.md has changed since it was read' }), { status: 409 }), result()]
+    fresh = lines(bookChapterFields({ hash: 'h-book-3' }), '  - { key: "1" }')
+    answers = [STALE(), result()]
     fireEvent.click(screen.getByRole('button', { name: 'Edit tense' }))
     form = screen.getByRole('form', { name: 'Edit tense' })
     fireEvent.change(within(form).getByLabelText('Value'), { target: { value: 'present' } })
     fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
     const conflict = await screen.findByRole('region', { name: 'The file changed while you were editing tense' })
     expect(conflict.textContent).toContain('"present"')
-    expect(conflict.textContent).toContain('"future"')
     fireEvent.click(within(conflict).getByRole('button', { name: 'Keep mine' }))
     await waitFor(() => expect(posted).toHaveLength(2))
     expect(posted.map((p) => p.body.expectedHash)).toEqual(['h-book-2', 'h-book-3'])
     expect(posted[1].body).toMatchObject({ changes: [{ op: 'set', value: 'present' }] })
+  })
+
+  it('a refetch while the form is open doesn’t move it onto the other writer’s file', async () => {
+    let current = bookChapterFields()
+    const answers: (Response | WriteResult)[] = [new Response(JSON.stringify({ code: 'stale_file', message: 'book.md has changed since it was read' }), { status: 409 })]
+    const { posted } = stubFields({ post: () => answers.shift() ?? result(), book: () => current })
+    const { queryClient } = renderApp('/u/dracula/b/dracula/c/2')
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit tense' }))
+    const form = screen.getByRole('form', { name: 'Edit tense' })
+    fireEvent.change(within(form).getByLabelText('Value'), { target: { value: 'present' } })
+
+    // Meanwhile another program set chapter 2's tense, and the page refetched (say, on window focus).
+    current = bookChapterFields({ hash: 'h-other' })
+    current.chapters[1].fields[2] = unsetValue('tense', { set: true, own: 'future', value: 'future', from: 'chapter', text: '  - { key: "2", fields: { tense: future } }' })
+    await queryClient.invalidateQueries()
+    await waitFor(() => expect(screen.getAllByText(/future/).length).toBeGreaterThan(0))
+
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
+    const conflict = await screen.findByRole('region', { name: 'The file changed while you were editing tense' })
+    expect(posted[0].body.expectedHash).toBe('h-book')
+    expect(conflict.textContent).toContain('"future"')
+  })
+
+  it('Use the default on a stale file shows what the file has now, or says it was already cleared', async () => {
+    const STALE = () => new Response(JSON.stringify({ code: 'stale_file', message: 'book.md has changed since it was read' }), { status: 409 })
+    let fresh = bookChapterFields({ hash: 'h-book-2' })
+    fresh.chapters[0].fields[0] = unsetValue('pov', { set: true, own: ['[[mina-harker]]'], value: ['[[mina-harker]]'], from: 'chapter' })
+    let answers: (Response | WriteResult)[] = [STALE(), result()]
+    let reads = 0
+    const { posted } = stubFields({ post: () => answers.shift()!, book: () => (reads++ === 0 ? bookChapterFields() : fresh) })
+    renderApp('/u/dracula/b/dracula/c/1')
+
+    // Another program set a new POV meanwhile: it isn't cleared unseen.
+    fireEvent.click(await screen.findByRole('button', { name: 'Use the default: pov' }))
+    fireEvent.click(within(screen.getByRole('group', { name: /^Use the default for pov\?/ })).getByRole('button', { name: 'Use the default' }))
+    const conflict = await screen.findByRole('region', { name: 'The file changed before pov was cleared' })
+    expect(conflict.textContent).toContain('[[mina-harker]]')
+    expect(screen.queryByText('Saved pov.')).toBeNull()
+    fireEvent.click(within(conflict).getByRole('button', { name: 'Keep mine' }))
+    await screen.findByText('Saved pov.')
+    expect(posted.map((p) => p.body)).toEqual([
+      { universe: 'dracula', book: 'dracula', chapter: '1', field: 'pov', changes: [{ op: 'clear' }], expectedHash: 'h-book' },
+      { universe: 'dracula', book: 'dracula', chapter: '1', field: 'pov', changes: [{ op: 'clear' }], expectedHash: 'h-book-2' },
+    ])
+
+    // This time the field was taken out meanwhile: the page says so.
+    fresh = bookChapterFields({ hash: 'h-book-3' })
+    fresh.chapters[0].fields[0] = unsetValue('pov')
+    answers = [STALE()]
+    reads = 0
+    cleanup()
+    vi.unstubAllGlobals()
+    stubFields({ post: () => answers.shift()!, book: () => (reads++ === 0 ? bookChapterFields() : fresh) })
+    renderApp('/u/dracula/b/dracula/c/1')
+    fireEvent.click(await screen.findByRole('button', { name: 'Use the default: pov' }))
+    fireEvent.click(within(screen.getByRole('group', { name: /^Use the default for pov\?/ })).getByRole('button', { name: 'Use the default' }))
+    expect((await screen.findByText(/was already taken out of the file/)).textContent).toContain('pov was already taken out of the file by something else meanwhile')
+  })
+
+  it('as of a position, later chapters keep their fields to themselves, and links to notes not met yet don’t say what they reach', async () => {
+    const quincey = { text: '[[quincey-harker]]', target: 'quincey-harker', label: null, outcome: 'resolved' as const, entity: 'E-QUINCEY-H', name: 'Quincey Harker', type: 'character', problem: null }
+    const withQuincey = () => {
+      const b = bookChapterFields()
+      b.chapters[0].fields[0] = { ...b.chapters[0].fields[0], value: ['[[jonathan-harker]]', '[[quincey-harker]]'], links: [...b.chapters[0].fields[0].links, quincey] }
+      return b
+    }
+    stubFields({ book: withQuincey })
+    renderApp('/u/dracula/b/dracula?at=dracula:1')
+    await waitFor(() => expect(document.querySelector('ol.chapters li .chapter-field-summary')).not.toBeNull())
+    const items = [...document.querySelectorAll<HTMLElement>('ol.chapters li')]
+    const first = items[0].querySelector<HTMLElement>('.chapter-field-summary')!
+    expect(within(first).getByRole('link', { name: 'Jonathan Harker' })).toBeTruthy()
+    expect(within(first).queryByRole('link', { name: /Quincey/ })).toBeNull()
+    expect(first.textContent).not.toContain('Quincey Harker')
+    // Chapters after the position show no fields.
+    expect(items.slice(1).every((li) => li.querySelector('.chapter-field-summary') === null)).toBe(true)
   })
 
   it('a chapter written as a bare key says how to give it fields', async () => {

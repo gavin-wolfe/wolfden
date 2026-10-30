@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, getRouteApi } from '@tanstack/react-router'
-import { hierarchyQuery, positionsQuery, type BookNode, type SeriesNode, type UniverseNode } from '../api'
+import { entitiesQuery, hierarchyQuery, positionsQuery, type BookNode, type SeriesNode, type UniverseNode } from '../api'
 import { bookChapterFieldsQuery } from '../chapterFieldsApi'
 import { AddChapter } from '../components/AddChapter'
 import { ChapterDefaultsSection, ChapterFieldSummary } from '../components/ChapterFields'
@@ -32,6 +32,9 @@ export function BookPage() {
   const hierarchy = useQuery(hierarchyQuery(universe, at))
   const positions = useQuery(positionsQuery(universe))
   const fields = useQuery(bookChapterFieldsQuery(universe, book))
+  // As of a position, the notes the reader has met: field values link only to those (#26).
+  const metQuery = useQuery({ ...entitiesQuery(universe, at), enabled: at !== undefined })
+  const met = at === undefined ? undefined : metQuery.data ? new Set(metQuery.data.entities.map((e) => e.key)) : null
   useDocumentTitle(hierarchy.data ? findBook(hierarchy.data.universe, book)?.book.name : undefined)
 
   if (hierarchy.isPending) {
@@ -83,6 +86,8 @@ export function BookPage() {
           {b.chapters.map((c) => {
             const ordinal = ordinalOf(c.position, list)
             const later = here !== null && ordinal !== null && ordinal > here
+            // A chapter after the position keeps its fields to itself, and until the page knows what the reader has met, so do all.
+            const chapterFields = later || met === null ? undefined : fieldsOf(c.key)
             return (
               <li key={c.key} className={later ? 'later' : undefined} aria-current={c.position === at ? 'step' : undefined}>
                 <Link to="/u/$universe/b/$book/c/$chapter" params={{ universe, book: b.key, chapter: c.key }}>
@@ -90,14 +95,14 @@ export function BookPage() {
                   <span className="chapter-title">{c.title ?? `Chapter ${c.key}`}</span>
                 </Link>
                 {c.position === at && <span className="badge">you are here</span>}
-                {fieldsOf(c.key) && <ChapterFieldSummary universe={universe} chapter={fieldsOf(c.key)!} />}
+                {chapterFields && <ChapterFieldSummary universe={universe} chapter={chapterFields} met={met ?? undefined} />}
               </li>
             )
           })}
         </ol>
       )}
       <AddChapter key={b.key} universe={universe} book={b.key} bookName={b.name} chapters={b.chapters.length} final={b.status === 'final'} />
-      <ChapterDefaultsSection scope={{ universe, book: b.key }} name={b.name} />
+      <ChapterDefaultsSection key={b.key} scope={{ universe, book: b.key }} name={b.name} />
       <Counts counts={b.entities} title={at === undefined ? 'Filed in this book' : 'Filed in this book, met by this point'} />
     </div>
   )

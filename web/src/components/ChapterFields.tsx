@@ -75,7 +75,7 @@ export function valueWords(v: Json | null): string {
 }
 
 /** The value that holds: with its links, "none" for [], or "not set". */
-export function ChapterValueText({ universe, view, none = 'none here' }: { universe: string; view: ChapterValueView; none?: string }) {
+export function ChapterValueText({ universe, view, none = 'none here', met }: { universe: string; view: ChapterValueView; none?: string; met?: ReadonlySet<string> }) {
   if (view.value === null) {
     return <span className="muted">not set</span>
   }
@@ -88,7 +88,7 @@ export function ChapterValueText({ universe, view, none = 'none here' }: { unive
     )
   }
 
-  return <FieldValue value={shown(view.value)} links={linkViews(view.links)} universe={universe} />
+  return <FieldValue value={shown(view.value)} links={linkViews(view.links, met)} universe={universe} />
 }
 
 /** Where an inherited value comes from: "from book 'ember' defaults". Nothing for a value set here. */
@@ -105,8 +105,13 @@ function Origin({ view, own, short = false }: { view: ChapterValueView; own: Val
   )
 }
 
-/** A chapter's fields under its title in the book's chapter list: what holds, inherited values marked. */
-export function ChapterFieldSummary({ universe, chapter }: { universe: string; chapter: ChapterFieldsView }) {
+/**
+ * A chapter's fields under its title in the book's chapter list: what holds,
+ * inherited values marked. As of a story position, `met` holds the notes the
+ * reader has met, and a link to any other is plain text that doesn't say
+ * what it reaches, as links are in the rest of the reading view (#26).
+ */
+export function ChapterFieldSummary({ universe, chapter, met }: { universe: string; chapter: ChapterFieldsView; met?: ReadonlySet<string> }) {
   const shownFields = chapter.fields.filter((f) => f.value !== null)
   if (shownFields.length === 0) {
     return null
@@ -118,7 +123,7 @@ export function ChapterFieldSummary({ universe, chapter }: { universe: string; c
         <div key={f.name} className={f.from === 'chapter' ? undefined : 'inherited-value'}>
           <dt>{f.name}</dt>
           <dd>
-            <ChapterValueText universe={universe} view={f} /> <Origin view={f} own="chapter" short />
+            <ChapterValueText universe={universe} view={f} met={met} /> <Origin view={f} own="chapter" short />
           </dd>
         </div>
       ))}
@@ -171,7 +176,12 @@ function ChapterValues({
   const positions = useQuery(positionsQuery(target.universe))
   const afterSave = useAfterSave()
   const [editing, setEditing] = useState<string | null>(null)
-  const [clearing, setClearing] = useState<string | null>(null)
+  // The field whose Use the default (or Clear) is being asked about, as it was when the writer asked.
+  const [clearing, setClearing] = useState<{ name: string; hash: string; view: ChapterValueView } | null>(null)
+  // A stale clear: the field as the file has it now, to choose between.
+  const [clearConflict, setClearConflict] = useState<{ name: string; hash: string; theirs: ChapterValueView | null } | null>(null)
+  // A stale clear found the field already gone from the file.
+  const [alreadyClear, setAlreadyClear] = useState<string | null>(null)
   const [saved, setSaved] = useState<{ field: string; result: WriteResult } | null>(null)
   const [error, setError] = useState<Error | null>(null)
   const [busy, setBusy] = useState(false)
@@ -181,52 +191,52 @@ function ChapterValues({
   useEffect(() => {
     if (saved) {
       notice.current?.focus()
-    } else if (editing === null && clearing === null && returnTo.current) {
+    } else if (editing === null && clearing === null && clearConflict === null && returnTo.current) {
       document.getElementById(returnTo.current)?.focus()
       returnTo.current = null
     }
-  }, [saved, editing, clearing])
+  }, [saved, editing, clearing, clearConflict])
 
   const done = async (field: string, result: WriteResult | null) => {
     returnTo.current = editId(field)
     setEditing(null)
     setClearing(null)
+    setClearConflict(null)
     if (result) {
       await afterSave()
       setSaved({ field, result })
     }
   }
 
-  const clear = async (view: ChapterValueView) => {
+  /**
+   * Clears the field on the file whose hash is `on`. If the file changed
+   * meanwhile, it's never cleared unseen (#196): the writer sees what the
+   * file has now and chooses, or is told it's already cleared.
+   */
+  const clear = async (name: string, on: string) => {
     setBusy(true)
     setError(null)
     try {
-      let on = hash
-      for (let attempt = 0; ; attempt++) {
-        try {
-          await done(view.name, await target.save(view.name, [{ op: 'clear' }], on))
-          return
-        } catch (e) {
-          // book.md changed meanwhile: clear on it as it is now, if this field is still set there.
-          if (e instanceof ApiRequestError && e.code === 'stale_file' && attempt < 2) {
-            const now = await target.reload()
-            const field = now?.values.find((v) => v.name === view.name)
-            if (now && field?.set) {
-              on = now.hash
-              continue
-            }
-
-            if (now) {
-              await done(view.name, null)
-              await afterSave()
-              return
-            }
+      await done(name, await target.save(name, [{ op: 'clear' }], on))
+    } catch (e) {
+      if (e instanceof ApiRequestError && e.code === 'stale_file') {
+        const now = await target.reload().catch(() => null)
+        if (now) {
+          const theirs = now.values.find((v) => v.name === name) ?? null
+          setClearing(null)
+          if (theirs?.set) {
+            setClearConflict({ name, hash: now.hash, theirs })
+          } else {
+            returnTo.current = editId(name)
+            setClearConflict(null)
+            setAlreadyClear(name)
+            await afterSave()
           }
 
-          throw e
+          return
         }
       }
-    } catch (e) {
+
       setError(e as Error)
     } finally {
       setBusy(false)
@@ -266,6 +276,14 @@ function ChapterValues({
             Dismiss
           </button>
         </div>
+      )}
+      {alreadyClear && (
+        <p className="save-result" role="status">
+          {alreadyClear} was already taken out of the file by something else meanwhile, so there was nothing to clear. What it has now is shown below.{' '}
+          <button type="button" onClick={() => setAlreadyClear(null)}>
+            Dismiss
+          </button>
+        </p>
       )}
       {locked && <p className="muted">{locked}</p>}
       <div role="group" aria-label={label}>
@@ -309,9 +327,10 @@ function ChapterValues({
                           className="edit-button"
                           id={editId(view.name)}
                           aria-label={`Edit ${view.name}`}
-                          disabled={editing !== null || busy}
+                          disabled={editing !== null || clearConflict !== null || busy}
                           onClick={() => {
                             setSaved(null)
+                            setAlreadyClear(null)
                             setError(null)
                             setClearing(null)
                             setEditing(view.name)
@@ -320,26 +339,27 @@ function ChapterValues({
                           Edit
                         </button>
                       )}{' '}
-                      {view.set && clearing !== view.name && (
+                      {view.set && clearing?.name !== view.name && clearConflict?.name !== view.name && (
                         <button
                           type="button"
                           aria-label={`${target.clear}: ${view.name}`}
-                          disabled={editing !== null || busy}
+                          disabled={editing !== null || clearConflict !== null || busy}
                           onClick={() => {
                             setSaved(null)
+                            setAlreadyClear(null)
                             setError(null)
-                            setClearing(view.name)
+                            setClearing({ name: view.name, hash, view })
                           }}
                         >
                           {target.clear}
                         </button>
                       )}
-                      {clearing === view.name && (
+                      {clearing?.name === view.name && (
                         <ClearPrompt
                           target={target}
-                          view={view}
+                          view={clearing.view}
                           busy={busy}
-                          onClear={() => void clear(view)}
+                          onClear={() => void clear(view.name, clearing.hash)}
                           onKeep={() => {
                             returnTo.current = editId(view.name)
                             setClearing(null)
@@ -347,7 +367,22 @@ function ChapterValues({
                           }}
                         />
                       )}
-                      {clearing === view.name && error && <Refused error={error} />}
+                      {clearConflict?.name === view.name && (
+                        <Conflict
+                          title={`The file changed before ${view.name} was cleared`}
+                          what={view.name}
+                          mine={valueLines(undefined)}
+                          theirs={valueLines(clearConflict.theirs?.own ?? null)}
+                          saving={busy}
+                          onKeepMine={() => void clear(view.name, clearConflict.hash)}
+                          onTakeTheirs={() => {
+                            returnTo.current = editId(view.name)
+                            setClearConflict(null)
+                            void afterSave()
+                          }}
+                        />
+                      )}
+                      {(clearing?.name === view.name || clearConflict?.name === view.name) && error && <Refused error={error} />}
                     </dd>
                   )}
                 </>
@@ -434,6 +469,9 @@ function FieldForm({
   onDone: (result: WriteResult | null) => void
 }) {
   const idBase = `c${useId().replace(/[^a-zA-Z0-9]/g, '')}`
+  // What the form was opened on, kept while it's open: a refetch (say, on window focus) mustn't move it onto a
+  // file the writer never saw, so the changes, the stale check, and the first send all use this.
+  const [opened] = useState(() => ({ hash, set: view.set, own: view.own, text: view.text }))
   const [draft, setDraft] = useState(() => editable(type, view) as FieldDraft)
   const [initial] = useState(() => JSON.stringify(draft))
   const [problems, setProblems] = useState<Problem[]>([])
@@ -443,7 +481,7 @@ function FieldForm({
   const client = useQueryClient()
   const dirty = JSON.stringify(draft) !== initial
   const entry = draft.entries[0]
-  const before = view.set ? (view.own ?? null) : undefined
+  const before = opened.set ? (opened.own ?? null) : undefined
 
   // Focus goes to the first control when the form opens.
   useEffect(() => {
@@ -453,7 +491,8 @@ function FieldForm({
     // Only when it opens.
   }, [])
 
-  const send = async (on: string, changes: ChapterFieldChange[]) => {
+  /** Sends the changes on the file whose hash is `on`, where the field's lines were `basis` as the writer last saw them. */
+  const send = async (on: string, changes: ChapterFieldChange[], basis: string) => {
     setSaving(true)
     setError(null)
     try {
@@ -466,10 +505,12 @@ function FieldForm({
             throw e
           }
 
-          // The file changed meanwhile. If this field didn't, nothing of it can be overwritten: send the same changes again.
+          // The file changed meanwhile. Sent again only where nothing of the field can be overwritten (#196): no change
+          // sets or clears it as a whole, and the lines it's written in, comments and quoting included, are as they were.
           const now = await target.reload()
           const theirs = now?.values.find((v) => v.name === view.name) ?? null
-          if (now && theirs && theirs.set === view.set && JSON.stringify(theirs.own) === JSON.stringify(view.own) && attempt < 2) {
+          const safe = changes.every((c) => c.op === 'add' || c.op === 'remove')
+          if (now && theirs && safe && theirs.text === basis && attempt < 2) {
             on = now.hash
             continue
           }
@@ -507,7 +548,7 @@ function FieldForm({
       return
     }
 
-    await send(hash, changes)
+    await send(opened.hash, changes, opened.text)
   }
 
   if (conflict) {
@@ -522,7 +563,7 @@ function FieldForm({
         onKeepMine={() => {
           const on = conflict.hash
           setConflict(null)
-          void send(on, after === undefined ? [{ op: 'clear' }] : [{ op: 'set', value: after }])
+          void send(on, after === undefined ? [{ op: 'clear' }] : [{ op: 'set', value: after }], conflict.theirs?.text ?? '')
         }}
         onTakeTheirs={() => {
           void client.invalidateQueries()

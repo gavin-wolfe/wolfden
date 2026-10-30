@@ -4471,6 +4471,9 @@ prologue writes `fields: { pov: [], when: "2284" }`, and chapter 3
   `pov` is "none (none in this chapter, [])".
 - Chapter 3's `futur` isn't a tense, so it's shown as written and
   ignored, and the chapter has `past` from the series (F-CHAP-3).
+- Reading as of `ember:1`, chapters after it show no fields in the
+  book's list, and a link in a shown value to a note the reader hasn't
+  met yet is plain text that doesn't name the note (#26).
 - The API gives the chapters' fields as written, what holds and where
   from, what each would inherit, and the den's chapter field definitions
   (`GET /api/book/chapter-fields`).
@@ -4541,10 +4544,16 @@ Spec: types.md F-CHAP-5, design.md §9 (#215, #225). Covered by:
   to unfreeze it in the page's words (**Unfreeze…**). A series' or
   universe's default that would change what a final book's chapters have
   is refused too, naming them.
-- A stale `book.md` (or container file) is refused (`stale_file`); the
-  page sends the same changes again on the new file if this field didn't
-  change, and otherwise shows both values, with **Keep mine** and **Take
-  theirs**.
+- A stale `book.md` (or container file) is refused (`stale_file`). The
+  page sends the same changes again on the new file only if they add or
+  remove items and the chapter's item (or the default's entry) is byte
+  for byte as it was; otherwise it shows both values, with **Keep mine**
+  and **Take theirs**. A refetch while the form is open doesn't change
+  what it's based on. **Use the default** on a stale file shows what the
+  file has now, or says it was already cleared; it never clears a value
+  the writer didn't see.
+- Removing or moving a list item that has a comment on it says, in the
+  effects, that the comment went with it.
 - A reserved name (`key`, `number`, …, F-CHAP-1), a change member the
   endpoint doesn't take (`field` inside a change), a missing `field`, an
   unknown chapter, and `fields` that isn't an object are refused and write
@@ -4555,5 +4564,6 @@ Spec: types.md F-CHAP-5, design.md §9 (#215, #225). Covered by:
   and the edits POST only, as JSON.
 
 Spec: format.md F-BOOK-1, types.md F-CHAP-1, design.md §9 (#225). Covered by:
-`ChapterFieldEndpointTests.ChapterFieldEditsAreGuarded` (API),
+`ChapterFieldEndpointTests.ChapterFieldEditsAreGuarded`,
+`ChapterFieldEndpointTests.AnItemsCommentThatGoesWithItIsReported` (API),
 `ChapterFields.test.tsx` (web).

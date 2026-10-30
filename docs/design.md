@@ -2279,6 +2279,10 @@ docs/
     items keep their bytes.
   - **The pages.** A book's chapter list shows each chapter's values
     under its title, inherited ones greyed and marked ("book default").
+    As of a story position, a chapter after it shows no fields, and in the
+    others a link to a note the reader hasn't met is plain text that
+    doesn't say what it reaches, as elsewhere in the reading view (#26);
+    the chapter page's fields, which are edited there, show everything.
     A chapter's page has **Fields**: each field, what holds, and
     "inherited from book 'x' defaults" where it's inherited, with
     **Edit** for each field the packs define, and **Use the default**
@@ -2296,9 +2300,18 @@ docs/
     there's none, from the inherited value, so a change to it becomes
     the chapter's own and saving it unchanged sends nothing. A list
     emptied in the form says it will save `[]` and what that replaces.
-    A stale `book.md` (or container file) is sent again on the new hash
-    when this field is as it was; otherwise both values are shown, and
-    Keep mine sets the writer's value as a whole.
+    The form keeps the hash and value it was opened on, so a refetch
+    while it's open (on window focus, say) can't move it onto a file the
+    writer never saw. A stale `book.md` (or container file) is sent again
+    on the new hash only as #196 does for a note: every change adds or
+    removes an item, and the lines the field is written in (the
+    chapter's item, or the default's entry; the API gives them as
+    `text`) are byte for byte as they were. Otherwise both values are
+    shown, and Keep mine sets the writer's value as a whole. **Use the
+    default** and **Clear** on a stale file are never sent again: the
+    page shows what the file has now to choose from, or says the field
+    was already cleared. A removed or moved list item's comment goes
+    with it, and the effects say so, as for a note's fields.
   - **Adding a chapter** shows a form for each chapter field, empty, with
     what the chapter will inherit if it stays empty. Only fields given a
     value are sent; an empty list is inherited at create, not `[]`.

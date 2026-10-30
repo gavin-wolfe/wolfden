@@ -147,7 +147,7 @@ public sealed class ChapterFieldEndpointTests : IDisposable
     }
 
     [Fact]
-    [Trait("Scenario", "SC-WEB-74")]
+    [Trait("Scenario", "SC-WEB-76")]
     public async Task AnItemsCommentThatGoesWithItIsReported()
     {
         _den.Write(Ember, _den.Read(Ember).Replace(

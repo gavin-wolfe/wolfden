@@ -44,6 +44,8 @@ export interface ChapterValueView {
   defaultFrom: Exclude<ValueFrom, 'chapter'> | null
   defaultFromKey: string | null
   links: ChapterLinkView[]
+  /** The lines of the file an edit of the field lands in, as written: a stale save is sent again only if they're unchanged. */
+  text: string
 }
 
 export interface ChapterFieldsView {
@@ -137,8 +139,12 @@ async function post(path: string, body: object): Promise<WriteResult> {
   return json as unknown as WriteResult
 }
 
-/** A value's links as the page's link views, so a value renders as a note's field does. */
-export function linkViews(links: ChapterLinkView[]): LinkView[] {
+/**
+ * A value's links as the page's link views, so a value renders as a note's
+ * field does. With `met` (as of a story position, the notes the reader has
+ * met), a link to any other note doesn't say what it reaches (#26).
+ */
+export function linkViews(links: ChapterLinkView[], met?: ReadonlySet<string>): LinkView[] {
   return links.map((l) => ({
     text: l.text,
     target: l.target,
@@ -147,11 +153,11 @@ export function linkViews(links: ChapterLinkView[]): LinkView[] {
     line: 0,
     column: 0,
     outcome: l.outcome,
-    entity: l.entity ? { key: l.entity, id: null, name: l.name ?? l.target, type: l.type ?? '' } : null,
+    entity: l.entity && (!met || met.has(l.entity)) ? { key: l.entity, id: null, name: l.name ?? l.target, type: l.type ?? '' } : null,
     section: null,
     matches: null,
-    problem: l.problem,
-    inView: null,
+    problem: met && l.outcome !== 'resolved' ? null : l.problem,
+    inView: met && l.entity ? met.has(l.entity) : null,
   }))
 }
 

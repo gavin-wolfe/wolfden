@@ -134,7 +134,7 @@ internal static class FreezeCommand
         FreezeResult result;
         try
         {
-            var tools = new DenTools(root) { Words = Words, History = () => GitHistory.ForDen(root, CliApp.Git) };
+            var tools = new DenTools(root) { Words = Words, History = () => GitHistory.ForDen(root, CliApp.Git), WaitingForOtherWriter = CliApp.WaitingForWriter(error, spec.Name) };
             result = freeze
                 ? tools.FreezeBook(line.Arguments[0], null, line.Value("--universe"))
                 : tools.UnfreezeBook(line.Arguments[0], null, line.Value("--universe"));

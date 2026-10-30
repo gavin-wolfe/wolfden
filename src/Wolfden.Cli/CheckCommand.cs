@@ -113,6 +113,12 @@ internal static class CheckCommand
         {
             if (line.Has("--fix"))
             {
+                // A den's write lock (#221), so a Wolfden writing meanwhile, such as
+                // 'wolfden serve', and the fix take turns. A folder that isn't a den
+                // gets no .wolfden/; the fix does nothing there.
+                using var turn = File.Exists(Path.Combine(path, DenLocation.DenFile))
+                    ? DenWriteLock.Take(Path.GetFullPath(path), DenWriteLock.DefaultWait, CliApp.WaitingForWriter(error, "check"))
+                    : null;
                 fixes = IdFix.Run(path);
             }
 
@@ -129,6 +135,12 @@ internal static class CheckCommand
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             error.WriteLine($"wolfden check: couldn't read the den at '{path}': {e.Message}");
+            return CliApp.ExitUsage;
+        }
+        catch (DenToolException e)
+        {
+            // The den's write lock: another Wolfden kept writing, or the lock couldn't be made.
+            error.WriteLine($"wolfden check: {e.Message}");
             return CliApp.ExitUsage;
         }
         catch (Exception e) when (e is not OutOfMemoryException)

@@ -204,7 +204,7 @@ public sealed partial class DenTools
     private WriteResult ChangeText(string entity, string? universe, string hash, bool allowRelinks, Func<CatalogEntity, TextChange?> change)
     {
         var (path, ids) = Locate(entity, universe);
-        lock (_writeLock)
+        using (EnterWrite())
         {
             var den = Snapshot();
             var structure = DenStructure.Load(den);

@@ -64,7 +64,7 @@ public sealed partial class DenTools
         var hash = expectedHash is null ? null : RequireHash(expectedHash);
         var key = book.Trim();
         var (universeKey, _) = LocateBook(key, universe);
-        lock (_writeLock)
+        using (EnterWrite())
         {
             var den = Snapshot();
             var structure = DenStructure.Load(den);

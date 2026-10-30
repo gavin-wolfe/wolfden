@@ -98,7 +98,7 @@ public sealed partial class DenTools
     public FreezeResult FreezeBook(string book, string? expectedHash, string? universe = null)
     {
         var (universeKey, key) = BookArgument(book, universe);
-        lock (_writeLock)
+        using (EnterWrite())
         {
             var (target, bytes, changed, idAdded, warnings) = SetStatus(universeKey, key, expectedHash, BookStatus.Final);
             var said = $"Book '{target.Name}'";
@@ -273,7 +273,7 @@ public sealed partial class DenTools
     public FreezeResult UnfreezeBook(string book, string? expectedHash, string? universe = null)
     {
         var (universeKey, key) = BookArgument(book, universe);
-        lock (_writeLock)
+        using (EnterWrite())
         {
             var (target, bytes, changed, idAdded, warnings) = SetStatus(universeKey, key, expectedHash, BookStatus.Draft);
             var said = $"Book '{target.Name}'";

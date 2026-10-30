@@ -48,6 +48,9 @@ public sealed class WolfdenApiOptions
     /// <summary>The longest a request waits for a running watcher to catch up before it rebuilds the index itself.</summary>
     public TimeSpan WatcherWait { get; init; } = IndexBuilder.WatcherWait;
 
+    /// <summary>How long a save waits while another Wolfden writes to the den (#221). Tests shorten it.</summary>
+    internal TimeSpan WriteLockWait { get; init; } = Wolfden.Index.Writing.DenWriteLock.DefaultWait;
+
     /// <summary>
     /// Finds the den's history provider, for the history endpoints. It's
     /// asked on each request, so a den that becomes a repository while the

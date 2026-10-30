@@ -134,7 +134,7 @@ public static class ReadEndpoints
     /// <summary>The HTTP status for an error code.</summary>
     internal static int StatusOf(string code) => code switch
     {
-        ToolErrorCodes.DenNotLoaded or ToolErrorCodes.DenUnreadable => StatusCodes.Status503ServiceUnavailable,
+        ToolErrorCodes.DenNotLoaded or ToolErrorCodes.DenUnreadable or ToolErrorCodes.DenBusy => StatusCodes.Status503ServiceUnavailable,
         ToolErrorCodes.NoUniverse or ToolErrorCodes.UnknownUniverse or ToolErrorCodes.UnknownScope or ToolErrorCodes.UnknownEntity
             or ToolErrorCodes.UnknownCheckpoint => StatusCodes.Status404NotFound,
         ToolErrorCodes.UnknownSection => StatusCodes.Status404NotFound,

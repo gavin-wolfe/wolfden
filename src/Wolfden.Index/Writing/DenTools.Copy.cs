@@ -73,7 +73,7 @@ public sealed partial class DenTools
             return u.Key;
         });
 
-        lock (_writeLock)
+        using (EnterWrite())
         {
             var den = Snapshot();
             var structure = DenStructure.Load(den);

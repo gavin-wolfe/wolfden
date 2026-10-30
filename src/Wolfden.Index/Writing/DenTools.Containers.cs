@@ -121,7 +121,7 @@ public sealed partial class DenTools
         name = name.Trim();
         after = string.IsNullOrWhiteSpace(after) ? null : after.Trim();
         var (universeKey, ids) = PlaceFor(universe, series);
-        lock (_writeLock)
+        using (EnterWrite())
         {
             var den = Snapshot();
             var structure = DenStructure.Load(den);

@@ -94,6 +94,13 @@ public static class ToolErrorCodes
 
     /// <summary>The den's files couldn't be written; the message says what the system said.</summary>
     public const string WriteFailed = "write_failed";
+
+    /// <summary>
+    /// Another Wolfden (<c>wolfden serve</c>, an MCP session, a command) was
+    /// writing to the den for the whole of the wait, so nothing was written.
+    /// Try again in a moment (#221).
+    /// </summary>
+    public const string DenBusy = "den_busy";
 }
 
 /// <summary>

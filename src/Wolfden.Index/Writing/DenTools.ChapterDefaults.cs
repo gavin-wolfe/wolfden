@@ -81,7 +81,7 @@ public sealed partial class DenTools
         var hash = RequireHash(expectedHash);
         var ops = Changes(changes, chapter: true, numbersAsText);
         var universeKey = LocateContainer(universe, series, book);
-        lock (_writeLock)
+        using (EnterWrite())
         {
             var den = Snapshot();
             var structure = DenStructure.Load(den);

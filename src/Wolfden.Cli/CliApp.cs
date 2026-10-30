@@ -37,6 +37,15 @@ internal static class CliApp
     internal static volatile bool RunsUntilStopped;
 
     /// <summary>
+    /// What a command that writes to the den says when it has to wait for
+    /// another Wolfden, such as <c>wolfden serve</c>, to finish writing (#221).
+    /// </summary>
+    internal static Action<TimeSpan> WaitingForWriter(TextWriter error, string command) =>
+        wait => error.WriteLine(
+            $"wolfden {command}: another Wolfden is writing to the den; waiting up to " +
+            $"{wait.TotalSeconds.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)} seconds for it to finish...");
+
+    /// <summary>
     /// How commands run git (<c>init --git</c>, and history in <c>mcp</c>):
     /// the user's own git, by default. Tests give git a configuration of
     /// their own.

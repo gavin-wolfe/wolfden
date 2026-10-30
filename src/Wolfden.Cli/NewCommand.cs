@@ -185,7 +185,7 @@ internal static class NewCommand
         WriteResult result;
         try
         {
-            result = new DenTools(root) { Words = FreezeCommand.WithDen(Words, line.Value("--den")) }.CreateEntity(
+            result = new DenTools(root) { Words = FreezeCommand.WithDen(Words, line.Value("--den")), WaitingForOtherWriter = CliApp.WaitingForWriter(error, "new") }.CreateEntity(
                 line.Arguments[0], name, universe, series, book, line.Value("--slug"), from: line.Value("--from"), allowRelinks: line.Has("--allow-relinks"));
         }
         catch (DenToolException e)
@@ -292,7 +292,7 @@ internal static class NewCommand
         ContainerCreateResult result;
         try
         {
-            var tools = new DenTools(root) { Words = FreezeCommand.WithDen(Words, line.Value("--den")) };
+            var tools = new DenTools(root) { Words = FreezeCommand.WithDen(Words, line.Value("--den")), WaitingForOtherWriter = CliApp.WaitingForWriter(error, "new") };
             result = series
                 ? tools.CreateSeries(name, universe, line.Value("--after"), first: line.Has("--first"))
                 : tools.CreateBook(name, universe, inSeries, line.Value("--after"), chapters, first: line.Has("--first"));
@@ -386,7 +386,7 @@ internal static class NewCommand
         ChapterAddResult result;
         try
         {
-            result = new DenTools(root) { Words = FreezeCommand.WithDen(Words, line.Value("--den")) }.AddChapter(book, title, line.Value("--after"), universe: universe);
+            result = new DenTools(root) { Words = FreezeCommand.WithDen(Words, line.Value("--den")), WaitingForOtherWriter = CliApp.WaitingForWriter(error, "new") }.AddChapter(book, title, line.Value("--after"), universe: universe);
         }
         catch (DenToolException e)
         {

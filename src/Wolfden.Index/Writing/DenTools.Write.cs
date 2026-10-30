@@ -40,13 +40,40 @@ namespace Wolfden.Index.Writing;
 /// (maintainer decision, 2026-10-23). An existing id never changes (F-ID-4).
 /// </para>
 /// <para>
-/// Writes are made one at a time: a lock keeps two calls from reading the
-/// same file and saving over each other.
+/// Writes are made one at a time, across processes too: each holds the
+/// den's write lock (<see cref="DenWriteLock"/>, #221) from reading the
+/// files it's based on until it has saved them, so two calls, or two
+/// Wolfdens on one den, can't read the same file and save over each other.
 /// </para>
 /// </remarks>
 public sealed partial class DenTools
 {
     private readonly Lock _writeLock = new();
+
+    // The den's write lock while this session holds it, and how many writes
+    // on this thread hold it (one inside another); both under _writeLock.
+    private DenWriteLock? _denLock;
+    private int _denLockDepth;
+
+    /// <summary>
+    /// How long a write waits while another Wolfden, such as <c>wolfden serve</c>
+    /// or an MCP session, is writing to the den, before it gives up with
+    /// <see cref="ToolErrorCodes.DenBusy"/> (#221). 30 seconds by default.
+    /// </summary>
+    public TimeSpan WriteLockWait { get; init; } = DenWriteLock.DefaultWait;
+
+    /// <summary>
+    /// Called once when a write has to wait for another Wolfden to finish
+    /// writing to the den, with the longest it waits (<see cref="WriteLockWait"/>),
+    /// so a command can say why it's waiting (#221).
+    /// </summary>
+    public Action<TimeSpan>? WaitingForOtherWriter { get; init; }
+
+    /// <summary>
+    /// For tests: called once a write has compared the files it read with
+    /// the disk and is about to write them, with the den's write lock held.
+    /// </summary>
+    internal Action? BeforeWrite { get; init; }
 
     /// <summary>
     /// The den files this session's writes saved since a checkpoint last
@@ -314,7 +341,7 @@ public sealed partial class DenTools
         }
 
         var (path, _) = Locate(entity, universe);
-        lock (_writeLock)
+        using (EnterWrite())
         {
             var den = Snapshot();
             var structure = DenStructure.Load(den);
@@ -437,7 +464,7 @@ public sealed partial class DenTools
 
         var ops = Changes(changes, chapter: true, numbersAsText);
         var (universeKey, _) = LocateBook(book.Trim(), universe);
-        lock (_writeLock)
+        using (EnterWrite())
         {
             var den = Snapshot();
             var structure = DenStructure.Load(den);
@@ -542,6 +569,9 @@ public sealed partial class DenTools
                 ToolErrorCodes.BadArgument, "'paths' names files or folders relative to the den root, none empty. Leave it out to checkpoint the whole den.");
         }
 
+        // Only this session's turn, not the den's write lock: a checkpoint writes no den
+        // file, and git keeps its own lock, so another Wolfden's writes needn't wait on
+        // git (or on a signing passphrase).
         lock (_writeLock)
         {
             var history = History();
@@ -601,7 +631,7 @@ public sealed partial class DenTools
             return (u.Key, used);
         });
 
-        lock (_writeLock)
+        using (EnterWrite())
         {
             var den = Snapshot();
             var structure = DenStructure.Load(den);
@@ -1008,7 +1038,7 @@ public sealed partial class DenTools
         Func<MarkdownFile, CatalogEntity, List<string>, (MarkdownFile File, Func<CatalogEntity, CatalogEntity, IEnumerable<string>> Effects)> edit)
     {
         var (path, ids) = Locate(entity, universe);
-        lock (_writeLock)
+        using (EnterWrite())
         {
             var den = Snapshot();
             var structure = DenStructure.Load(den);
@@ -1162,6 +1192,67 @@ public sealed partial class DenTools
     }
 
     /// <summary>
+    /// Starts a write: takes this session's turn, and the den's write lock
+    /// (<see cref="DenWriteLock"/>) unless a write on this thread already
+    /// holds it. Dispose the result to end it. Hold it from the first read
+    /// a write is based on until its last file is written or put back.
+    /// </summary>
+    /// <remarks>
+    /// One <see cref="WriteLockWait"/> covers both waits: for this
+    /// session's other writes (such as <c>serve</c>'s other requests), and
+    /// then for other Wolfdens. So a write queued behind several others
+    /// gives up after that long, not that long for each one ahead of it.
+    /// </remarks>
+    /// <exception cref="DenToolException"><see cref="ToolErrorCodes.DenBusy"/>: other writes kept the den busy for all of <see cref="WriteLockWait"/>.</exception>
+    private WriteTurn EnterWrite()
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        if (!_writeLock.TryEnter(WriteLockWait))
+        {
+            throw DenWriteLock.Busy(WriteLockWait);
+        }
+
+        try
+        {
+            if (_denLockDepth == 0)
+            {
+                _denLock = DenWriteLock.Take(Root, WriteLockWait, clock, WaitingForOtherWriter);
+            }
+
+            _denLockDepth++;
+            return new WriteTurn(this);
+        }
+        catch
+        {
+            _writeLock.Exit();
+            throw;
+        }
+    }
+
+    private void ExitWrite()
+    {
+        try
+        {
+            if (--_denLockDepth == 0)
+            {
+                var held = _denLock;
+                _denLock = null;
+                held?.Dispose();
+            }
+        }
+        finally
+        {
+            _writeLock.Exit();
+        }
+    }
+
+    /// <summary>A write's turn, from <see cref="EnterWrite"/>; disposing it ends the turn.</summary>
+    private readonly struct WriteTurn(DenTools tools) : IDisposable
+    {
+        public void Dispose() => tools.ExitWrite();
+    }
+
+    /// <summary>
     /// Writes the files, after checking that none changed since it was read
     /// (<paramref name="originals"/>), and that a new file isn't there yet.
     /// </summary>
@@ -1177,6 +1268,7 @@ public sealed partial class DenTools
             }
         }
 
+        BeforeWrite?.Invoke();
         var written = new List<string>();
         try
         {

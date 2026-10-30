@@ -307,6 +307,35 @@ public sealed class ChapterDefaultsToolTests : IDisposable
         Assert.True(tense.Ignored);
         Assert.Equal("\"sideways\"", tense.Written!.Value.GetRawText());
         Assert.Null(tense.Own);
+        Assert.StartsWith("tense is one of ", tense.Reason, StringComparison.Ordinal);
+        Assert.EndsWith("not 'sideways'.", tense.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-34")]
+    public void AnAddToADefaultThatIsntAListNamesTheContainerAndSaysWhatToDo()
+    {
+        _den.Write(Ember, _den.Read(Ember).Replace("status: draft\n", "status: draft\nchapter_defaults:\n  setting: Kessan Reach\n", StringComparison.Ordinal));
+        var read = Tools.GetChapterDefaults("starfall", book: "ember");
+        var setting = read.Fields.Single(f => f.Name == "setting");
+        Assert.True(setting.Ignored);
+        Assert.StartsWith("setting is a link to one entity", setting.Reason, StringComparison.Ordinal);
+
+        var refused = Assert.Throws<DenToolException>(() => Tools.UpdateChapterDefaults(
+            read.Hash, Json("""[{"op": "add", "field": "setting", "value": "[[kessan-reach]]"}]"""), "starfall", book: "ember"));
+
+        Assert.Equal(ToolErrorCodes.BadArgument, refused.Code);
+        Assert.StartsWith(
+            $"'setting' in the chapter_defaults of book 'ember' ({Ember}) is written as one value, 'Kessan Reach', not a list, so 'add' has no list to add an item to. " +
+            "That value is ignored: setting is a link to one entity",
+            refused.Message,
+            StringComparison.Ordinal);
+        Assert.EndsWith("to go back to what its books inherit from above, send a 'clear' change.", refused.Message, StringComparison.Ordinal);
+
+        var item = Assert.Throws<DenToolException>(() => Tools.UpdateChapterDefaults(
+            Tools.UpdateChapterDefaults(read.Hash, Json("""[{"op": "set", "field": "setting", "value": ["[[kessan-reach]]"]}]"""), "starfall", book: "ember").Hash,
+            Json("""[{"op": "remove", "field": "setting", "item": 3}]"""), "starfall", book: "ember"));
+        Assert.Equal("'setting' in the chapter_defaults of book 'ember' has 1 item(s), so there's no item 3.", item.Message);
     }
 
     private static JsonElement Json(string json) => JsonDocument.Parse(json).RootElement.Clone();

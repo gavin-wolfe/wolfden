@@ -19,7 +19,9 @@ internal sealed class ChapterFieldReader(DenStructure den, Universe universe)
     {
         foreach (var container in new Container[] { universe }.Concat(universe.Series).Concat(universe.Books))
         {
-            container.ChapterDefaults = ReadDefaults(container);
+            var ignored = new Dictionary<string, IgnoredChapterField>(StringComparer.Ordinal);
+            container.ChapterDefaults = ReadDefaults(container, ignored);
+            container.IgnoredChapterDefaults = ignored;
             container.ChapterHeading = ReadHeading(container);
         }
 
@@ -27,7 +29,9 @@ internal sealed class ChapterFieldReader(DenStructure den, Universe universe)
         {
             foreach (var chapter in book.Chapters)
             {
-                chapter.OwnFields = ReadChapter(book, chapter);
+                var ignored = new Dictionary<string, IgnoredChapterField>(StringComparer.Ordinal);
+                chapter.OwnFields = ReadChapter(book, chapter, ignored);
+                chapter.IgnoredFields = ignored;
                 var effective = new Dictionary<string, ChapterFieldValue>(chapter.OwnFields, StringComparer.Ordinal);
                 foreach (var container in book.ScopeChain)
                 {
@@ -42,7 +46,7 @@ internal sealed class ChapterFieldReader(DenStructure den, Universe universe)
         }
     }
 
-    private Dictionary<string, ChapterFieldValue> ReadDefaults(Container container)
+    private Dictionary<string, ChapterFieldValue> ReadDefaults(Container container, Dictionary<string, IgnoredChapterField> ignored)
     {
         var result = new Dictionary<string, ChapterFieldValue>(StringComparer.Ordinal);
         switch (container.File.Frontmatter?["chapter_defaults"])
@@ -50,7 +54,7 @@ internal sealed class ChapterFieldReader(DenStructure den, Universe universe)
             case null or YamlScalar { IsNull: true }:
                 return result;
             case YamlMapping map:
-                Read(container.FilePath, map, container, result, "chapter_defaults");
+                Read(container.FilePath, map, container, result, ignored, "chapter_defaults");
                 return result;
             case var node:
                 Warn(container.FilePath, "F-CHAP-5", node.Line,
@@ -124,7 +128,7 @@ internal sealed class ChapterFieldReader(DenStructure den, Universe universe)
         return names.Count == 0 ? null : names;
     }
 
-    private Dictionary<string, ChapterFieldValue> ReadChapter(Book book, Chapter chapter)
+    private Dictionary<string, ChapterFieldValue> ReadChapter(Book book, Chapter chapter, Dictionary<string, IgnoredChapterField> ignored)
     {
         var result = new Dictionary<string, ChapterFieldValue>(StringComparer.Ordinal);
         switch (chapter.FieldsNode)
@@ -132,7 +136,7 @@ internal sealed class ChapterFieldReader(DenStructure den, Universe universe)
             case null or YamlScalar { IsNull: true }:
                 return result;
             case YamlMapping map:
-                Read(book.FilePath, map, null, result, $"chapter {chapter}");
+                Read(book.FilePath, map, null, result, ignored, $"chapter {chapter}");
                 return result;
             case var node:
                 Warn(book.FilePath, "F-CHAP-3", node.Line,
@@ -141,7 +145,8 @@ internal sealed class ChapterFieldReader(DenStructure den, Universe universe)
         }
     }
 
-    private void Read(string path, YamlMapping map, Container? defaultFrom, Dictionary<string, ChapterFieldValue> result, string where)
+    private void Read(
+        string path, YamlMapping map, Container? defaultFrom, Dictionary<string, ChapterFieldValue> result, Dictionary<string, IgnoredChapterField> ignored, string where)
     {
         foreach (var entry in map.Entries)
         {
@@ -153,6 +158,7 @@ internal sealed class ChapterFieldReader(DenStructure den, Universe universe)
             var value = entry.Value;
             if (value is YamlScalar { IsNull: true })
             {
+                ignored.TryAdd(name, new IgnoredChapterField(name, value, $"{name} is written with no value (null), which counts as not set."));
                 continue;
             }
 
@@ -160,6 +166,7 @@ internal sealed class ChapterFieldReader(DenStructure den, Universe universe)
             {
                 Warn(path, "F-CHAP-3", value.Line,
                     $"{name} in {where} is an entry, but a chapter field has no entries: write the plain value. It's ignored, as if it were left out.");
+                ignored.TryAdd(name, new IgnoredChapterField(name, value, $"{name} is written as an entry, but a chapter field has no entries: it takes the plain value."));
                 continue;
             }
 
@@ -187,6 +194,12 @@ internal sealed class ChapterFieldReader(DenStructure den, Universe universe)
             if (set)
             {
                 result[name] = new ChapterFieldValue(name, definition, value, check.Items, defaultFrom);
+                ignored.Remove(name);
+            }
+            else
+            {
+                ignored.TryAdd(name, new IgnoredChapterField(
+                    name, value, string.Join(" ", check.Problems.Where(p => !p.IsAdvisory).Select(p => p.Message).Distinct(StringComparer.Ordinal))));
             }
         }
     }

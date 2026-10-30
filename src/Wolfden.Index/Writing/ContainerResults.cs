@@ -99,9 +99,10 @@ public sealed record ChapterAddResult(
 /// whole <c>chapter_defaults</c> when it doesn't set the field, or is written on one line). A page that finds the file
 /// changed sends its changes again only if these are byte for byte as they were.
 /// </param>
+/// <param name="IgnoredReason">If <paramref name="Ignored"/>, why, in words for the writer, such as "setting is a link to one entity, ... not 'Whitby harbour'." (#233); null otherwise.</param>
 public sealed record ChapterValueView(
     string Name, bool Set, JsonElement? Own, bool Ignored, JsonElement? Value, string? From, string? FromKey, bool None, JsonElement? Default,
-    string? DefaultFrom, string? DefaultFromKey, IReadOnlyList<ChapterLinkView> Links, string Text);
+    string? DefaultFrom, string? DefaultFromKey, IReadOnlyList<ChapterLinkView> Links, string Text, string? IgnoredReason = null);
 
 /// <summary>A link in a chapter field's value, resolved (format.md §10.2).</summary>
 /// <param name="Text">The link as written, such as <c>[[mina-harker]]</c>.</param>

@@ -104,6 +104,14 @@ public sealed class ChapterFieldEndpointTests : IDisposable
         Assert.True(futur.GetProperty("ignored").GetBoolean());
         Assert.Equal("\"futur\"", futur.GetProperty("own").GetRawText());
         Assert.Equal(("series", "\"past\""), (futur.GetProperty("from").GetString(), futur.GetProperty("value").GetRawText()));
+        Assert.Equal("tense is one of past, present, future, not 'futur'. Did you mean 'future'?", futur.GetProperty("ignoredReason").GetString());
+        Assert.Equal(JsonValueKind.Null, Field(1, "tense").GetProperty("ignoredReason").ValueKind);
+
+        // The chapters' read lists it too, as written and why (#233).
+        var read = await server.GetJsonAsync("/api/book/chapters?universe=starfall&book=ember", HttpStatusCode.OK);
+        var ignored = Assert.Single(read.GetProperty("chapters")[4].GetProperty("ignored").EnumerateArray());
+        Assert.Equal(("tense", "\"futur\""), (ignored.GetProperty("field").GetString(), ignored.GetProperty("asWritten").GetRawText()));
+        Assert.Equal("tense is one of past, present, future, not 'futur'. Did you mean 'future'?", ignored.GetProperty("reason").GetString());
 
         // Ash writes its chapters as bare keys.
         var ash = await server.GetJsonAsync("/api/book/chapter-fields?universe=starfall&book=ash", HttpStatusCode.OK);
@@ -221,6 +229,25 @@ public sealed class ChapterFieldEndpointTests : IDisposable
         var (bare, bareJson) = await PostAsync(server, "/api/chapter/edit", new { book = "ash", universe = "starfall", chapter = "1", field = "tense", expectedHash = ash, changes = new object[] { new { op = "set", value = "past" } } });
         Assert.Equal(HttpStatusCode.UnprocessableEntity, bare);
         Assert.Equal("unsupported_edit", bareJson.GetProperty("code").GetString());
+        Assert.Contains("chapter ash:1 is written as a bare key", bareJson.GetProperty("message").GetString(), StringComparison.Ordinal);
+
+        // An add to a value that isn't a list names the chapter and says what to do on the page, never a YAML path (#233).
+        await Refused(
+            "/api/chapter/edit",
+            new { book = "ember", universe = "starfall", chapter = "3", field = "tense", expectedHash = hash, changes = new object[] { new { op = "add", value = "past" } } },
+            HttpStatusCode.BadRequest,
+            "bad_argument",
+            $"'tense' in chapter ember:3 ({Ember}) is written as one value, 'futur', not a list, so 'add' has no list to add an item to. That value is ignored: " +
+            "tense is one of past, present, future, not 'futur'. Did you mean 'future'? To replace it, edit the field and save the whole value; to go back to what the chapter " +
+            "inherits from chapter_defaults, choose Use the default.");
+        var seriesHash = (await server.GetJsonAsync("/api/chapter-defaults?universe=starfall&series=long-dark", HttpStatusCode.OK)).GetProperty("hash").GetString();
+        var (notList, notListJson) = await PostAsync(server, "/api/chapter-defaults/edit", new { universe = "starfall", series = "long-dark", field = "tense", expectedHash = seriesHash, changes = new object[] { new { op = "add", value = "past" } } });
+        Assert.Equal(HttpStatusCode.BadRequest, notList);
+        Assert.EndsWith(
+            "'tense' in the chapter_defaults of series 'long-dark' (" + Series + ") is written as one value, 'past', not a list, so 'add' has no list to add an item to. " +
+            "To replace it, edit the field and save the whole value; to go back to what its books inherit from above, choose Clear.",
+            notListJson.GetProperty("message").GetString(),
+            StringComparison.Ordinal);
 
         using var get = await server.Client.GetAsync("/api/chapter/edit", Token);
         Assert.Equal(HttpStatusCode.MethodNotAllowed, get.StatusCode);

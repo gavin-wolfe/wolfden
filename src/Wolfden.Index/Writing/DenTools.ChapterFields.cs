@@ -136,7 +136,8 @@ public sealed partial class DenTools
             inherited?.DefaultFrom is { } d ? KindOf(d) : null,
             inherited?.DefaultFrom?.Key,
             LinksOf(effective, effective?.DefaultFrom ?? chapter.Book, links),
-            text);
+            text,
+            set && !chapter.OwnFields.ContainsKey(name) ? chapter.IgnoredFields.GetValueOrDefault(name)?.Reason : null);
     }
 
     private static ChapterValueView DefaultValue(string name, Container container, YamlMapping? written, Lazy<LinkResolver> links, string text)
@@ -155,7 +156,8 @@ public sealed partial class DenTools
             above?.DefaultFrom is { } d ? KindOf(d) : null,
             above?.DefaultFrom?.Key,
             LinksOf(effective, effective?.DefaultFrom ?? container, links),
-            text);
+            text,
+            set && own is null ? container.IgnoredChapterDefaults.GetValueOrDefault(name)?.Reason : null);
     }
 
     /// <summary>The links in a value's items, resolved from <paramref name="scope"/>, the container that holds the value (types.md F-CHAP-4).</summary>

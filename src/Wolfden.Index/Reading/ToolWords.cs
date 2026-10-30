@@ -45,6 +45,13 @@ namespace Wolfden.Index.Reading;
 /// for its universe's: <c>Ask the writer whether to unfreeze book '{0}'; only they can.</c>
 /// An AI agent can't unfreeze a book, so it asks; a writer is told how.
 /// </param>
+/// <param name="ReplaceOrClear">
+/// What to do about a chapter field (or chapter default) whose value an
+/// edit can't change in place, such as an <c>add</c> to a value that isn't a
+/// list (#233), as a sentence, with <c>{0}</c> for what clearing goes back
+/// to and <c>{1}</c> for the web page's button that does it:
+/// <c>To replace it, send a 'set' change with the whole value; to go back to {0}, send a 'clear' change.</c>
+/// </param>
 public sealed record ToolWords(
     string AllowRelinks, string NewName, string Slug, string Universe, string FindEntity, string CheckDen, string CheckTool, string CheckPath,
     string PinnedTo = "This session is pinned to universe '{0}' (wolfden mcp --universe)",
@@ -53,7 +60,8 @@ public sealed record ToolWords(
     string NameLinks = "Renaming the note (rename_entity) rewrites them.",
     string AliasLinks = "Changing an alias with change_alias rewrites them.",
     string ChapterKeys = "take chapter keys from get_chapter",
-    string Unfreeze = "Ask the writer whether to unfreeze book '{0}'; only they can.")
+    string Unfreeze = "Ask the writer whether to unfreeze book '{0}'; only they can.",
+    string ReplaceOrClear = "To replace it, send a 'set' change with the whole value; to go back to {0}, send a 'clear' change.")
 {
     /// <summary>The MCP tools' own words, the default.</summary>
     public static ToolWords Mcp { get; } = new(
@@ -68,6 +76,9 @@ public sealed record ToolWords(
 
     /// <summary><see cref="Unfreeze"/> for book <paramref name="book"/> of universe <paramref name="universe"/>.</summary>
     public string Unfreezing(string book, string universe) => string.Format(CultureInfo.InvariantCulture, Unfreeze, book, universe);
+
+    /// <summary><see cref="ReplaceOrClear"/>, where clearing goes back to <paramref name="clearTo"/> and the web page's button is <paramref name="clearButton"/>.</summary>
+    public string Replacing(string clearTo, string clearButton) => string.Format(CultureInfo.InvariantCulture, ReplaceOrClear, clearTo, clearButton);
 
     /// <summary><paramref name="words"/> with its first letter capitalized, to start a sentence.</summary>
     public static string Cap(string words) => words.Length == 0 ? words : char.ToUpperInvariant(words[0]) + words[1..];

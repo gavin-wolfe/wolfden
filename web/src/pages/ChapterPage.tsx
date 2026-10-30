@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, getRouteApi } from '@tanstack/react-router'
 import { hierarchyQuery } from '../api'
+import { ChapterFieldsSection } from '../components/ChapterFields'
 import { EntityList } from '../components/EntityList'
 import { ErrorState, Loading } from '../components/States'
 import { useDocumentTitle, useEntitiesInView, usePosition } from '../hooks'
@@ -10,8 +11,8 @@ import { findBook } from './BookPage'
 const route = getRouteApi('/u/$universe/b/$book/c/$chapter')
 
 /**
- * A chapter: its number and title, a way to read the den as of it, and the
- * notes that enter the story there. Chapter fields come later.
+ * A chapter: its number and title, its chapter fields (POV, when, …), a
+ * way to read the den as of it, and the notes that enter the story there.
  */
 export function ChapterPage() {
   const { universe, book, chapter } = route.useParams()
@@ -73,6 +74,8 @@ export function ChapterPage() {
           </button>
         )}
       </p>
+      <h2>Fields</h2>
+      <ChapterFieldsSection key={`${b.key}:${c.key}`} universe={universe} book={b.key} chapter={c.key} label="this chapter" />
       <h2>Enters the story here</h2>
       {view.isPending ? (
         <Loading what="the notes" />

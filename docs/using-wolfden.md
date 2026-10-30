@@ -258,27 +258,65 @@ wolfden new chapter "Signal Fires" --in ember --after 2
 book by that key), and `--after` the chapter it comes after; leave it
 out for the end. The title is optional.
 
-### Chapter fields
+The web form also has the chapter's **Chapter fields**, such as its POV
+and when it takes place (see the next section). They're optional: a
+field you leave empty is inherited from the chapter defaults, and the
+form says what that will be.
 
-A chapter can say who tells it and when and where it happens. The core
+## Chapter fields: POV, when, and the rest
+
+A chapter can say who tells it, and when and where it happens. The core
 fields are `pov` (the point-of-view characters), `narration` (first
 person, third limited, and so on), `tense`, `when` (the in-world date),
-and `setting` (the places it happens, as links to location notes). They
-go in a `fields` mapping on the chapter's item in `book.md`:
+and `setting` (the places it happens, as links to location notes). Your
+den's packs can add more; the pages show whatever chapter fields your
+packs define. In `book.md` they go in a `fields` mapping on the
+chapter's item:
 
 ```yaml
 chapters:
   - { key: "1", number: 1, fields: { pov: "[[mara-voss]]", setting: "[[kessan-reach]]" } }
 ```
 
-Set a value once for many chapters in the `chapter_defaults` of the
-book, series, or universe, and a chapter that differs sets its own. A
-space opera might set `when` to the story's present in the series'
-`chapter_defaults`, and give a flashback chapter its own. Writing `[]`
-for a list field such as `pov` or `setting` means "none here". An AI
-assistant can read and change these with `get_chapter` and
-`update_chapter_fields` ([`mcp-clients.md`](mcp-clients.md)). The rules
-are in [`types.md`](types.md) §8.
+**Set it once, change it where it differs.** A value that holds for
+most chapters goes in the **Chapter defaults** (`chapter_defaults`) of
+the book, its series, or the universe, each on its own page. A chapter
+that differs sets its own value, which wins: a space opera might set
+`when` to the story's present in the series' defaults, and give a
+flashback chapter its own date and POV. The nearest wins: the chapter,
+then its book, then its series, then the universe. The rules are in
+[types.md §8](types.md#8-chapter-fields).
+
+- **On a book's page,** each chapter in the list shows its fields under
+  its title. A value the chapter inherits is greyed and marked where it
+  comes from, such as "book default".
+- **On a chapter's page,** **Fields** lists every chapter field, with
+  what the chapter has and where that comes from. **Edit** opens the
+  same controls as a note's fields: a link picker for `pov` and
+  `setting`, a dropdown for `narration` and `tense`, a date (with an
+  optional sort key) for `when`. If the chapter inherits the field, the
+  form starts from the inherited value; what you save becomes the
+  chapter's own.
+- **"None here" and "use the default" are different.** Removing the last
+  POV and saving writes `pov: []` (in the file, `[]` for any list field
+  such as `pov` or `setting`): this chapter has none, even though the
+  book has a default (an omniscient prologue, say, or a found document).
+  To have the chapter inherit the default again, use **Use the
+  default**, which says first what the chapter will have.
+- **Chapter defaults** are edited the same way on the universe's,
+  series', and book's pages. **Clear** takes a default out, so the
+  chapters inherit from further up again.
+
+A final book's chapters and defaults can't be edited until it's
+unfrozen. A series' or universe's default that would change what a
+final book's chapters have is refused too, with the books named; set
+the value in the draft books' own defaults instead. A chapter written
+in `book.md` as a bare key (`chapters: [1, 2, 3]`) has no place for
+fields: write it as `{ key: 1 }` first.
+
+AI assistants working through Wolfden read and change the same fields
+with `get_chapter`, `update_chapter_fields`, and
+`update_chapter_defaults` ([`mcp-clients.md`](mcp-clients.md)).
 
 If your den's own pack already defines a chapter field named `setting`,
 yours is used and `wolfden check` warns that it replaces the core one.

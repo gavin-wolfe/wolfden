@@ -500,8 +500,60 @@ function draftProblem(type: SourceFieldType, d: Draft): string | null {
   }
 }
 
+/** One change of a chapter field or of a container's chapter_defaults, as the MCP update_chapter_fields takes it. */
+export interface ChapterFieldChange {
+  op: 'set' | 'add' | 'remove' | 'clear'
+  value?: Json
+  index?: number
+  item?: number
+}
+
+/**
+ * The changes that make a chapter field (or default), as written
+ * (`before`), what the form says, as the chapter field tools take them
+ * (#225): they name no path inside the field, so an item taken out is
+ * `remove` by its number and a new one `add` where it goes, as for a note's
+ * field, and an item changed in place is taken out and added again; any
+ * other change sets the whole value. A list emptied in the form is `[]`,
+ * "none here" (types.md F-CHAP-5); going back to the default is `clear`, a
+ * separate action.
+ */
+export function chapterFieldChanges(type: SourceFieldType, before: Json | undefined, field: FieldDraft): ChapterFieldChange[] {
+  const changes = fieldChanges(type, before, field)
+  if (changes.length === 0) {
+    return []
+  }
+
+  const after = jsonOfField(type, field).value
+  if (after === undefined) {
+    return [{ op: 'clear' }]
+  }
+
+  const whole: ChapterFieldChange[] = [{ op: 'set', value: after }]
+  if (!Array.isArray(before) || !Array.isArray(after)) {
+    return whole
+  }
+
+  const out: ChapterFieldChange[] = []
+  for (const c of changes) {
+    if (c.op === 'remove' && c.path.length === 1 && typeof c.path[0] === 'number') {
+      out.push({ op: 'remove', item: c.path[0] })
+    } else if (c.op === 'add' && c.path.length === 0) {
+      out.push({ op: 'add', value: c.value, ...(c.index !== undefined ? { index: c.index } : {}) })
+    } else if (c.op === 'set' && c.path.length === 1 && typeof c.path[0] === 'number') {
+      // In place: the in-place changes come last, when the list is as long as it will be.
+      const at = c.path[0]
+      out.push({ op: 'remove', item: at }, { op: 'add', value: c.value, ...(at < after.length - 1 ? { index: at } : {}) })
+    } else {
+      return whole
+    }
+  }
+
+  return out
+}
+
 /** What the writer has to fix before the field can be saved; empty if nothing. */
-export function fieldProblems(type: SourceFieldType, field: FieldDraft, base: string): Problem[] {
+export function fieldProblems(type: SourceFieldType, field: FieldDraft, base: string, chapter?: { clear: string }): Problem[] {
   const problems: Problem[] = []
   const plain = jsonOfField(type, field).value
   for (const entry of field.entries) {
@@ -512,7 +564,9 @@ export function fieldProblems(type: SourceFieldType, field: FieldDraft, base: st
       if (empty && !untouched) {
         // An entry may be unset from its 'from' on (F-TMP-2); a plain value has to be something.
         if (!isObject(plain) && !Array.isArray(plain)) {
-          problems.push({ at: controlId(base, entry, 'value'), message: `Give ${type.name} a value, or use Clear field to take it out of the note.` })
+          problems.push({ at: controlId(base, entry, 'value'), message: chapter
+            ? `Give ${type.name} a value, or use ${chapter.clear} instead.`
+            : `Give ${type.name} a value, or use Clear field to take it out of the note.` })
         }
       } else if (!empty) {
         const problem = draftProblem(type, v.draft)
@@ -530,7 +584,8 @@ export function fieldProblems(type: SourceFieldType, field: FieldDraft, base: st
     }
   }
 
-  if (type.list && field.entries.length === 1 && Array.isArray(plain) && plain.length === 0 && field.shape !== 'entries' && field.shape !== 'entry') {
+  // A chapter field's empty list is a value: [], "none here" (types.md F-CHAP-5).
+  if (!chapter && type.list && field.entries.length === 1 && Array.isArray(plain) && plain.length === 0 && field.shape !== 'entries' && field.shape !== 'entry') {
     problems.push({ at: controlId(base, field.entries[0], 'add-item'), message: `Add an item to ${type.name}, or use Clear field to take it out of the note.` })
   }
 

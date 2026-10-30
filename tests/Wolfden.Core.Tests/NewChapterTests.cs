@@ -189,6 +189,13 @@ public sealed class NewChapterTests
         var item = Assert.IsType<Yaml.YamlMappingValue>(NewChapter.Item("2b", 3, "The Long Watch", bare: true));
         Assert.Equal(["key", "number", "title"], item.Entries.Select(e => e.Key));
         Assert.Equal(["key"], Assert.IsType<Yaml.YamlMappingValue>(NewChapter.Item("4", null, null, bare: false)).Entries.Select(e => e.Key));
+
+        // Chapter fields (#225) go last, and make a bare key a mapping; an empty set of them is none.
+        var fields = new Yaml.YamlMappingValue { { "tense", Yaml.YamlScalarValue.String("present") } };
+        var withFields = Assert.IsType<Yaml.YamlMappingValue>(NewChapter.Item("4", null, null, bare: true, fields));
+        Assert.Equal(["key", "fields"], withFields.Entries.Select(e => e.Key));
+        Assert.Equal(["key", "number", "title", "fields"], Assert.IsType<Yaml.YamlMappingValue>(NewChapter.Item("2b", 3, "The Long Watch", bare: false, fields)).Entries.Select(e => e.Key));
+        Assert.IsType<Yaml.YamlScalarValue>(NewChapter.Item("4", null, null, bare: true, new Yaml.YamlMappingValue()));
     }
 
     private sealed class PlanComparer : IEqualityComparer<ChapterPlan>

@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, getRouteApi } from '@tanstack/react-router'
 import { count, hierarchyQuery, type BookNode, type EntityCounts, type SeriesNode, type UniverseNode } from '../api'
 import { typePlural } from '../components/Links'
+import { ChapterDefaultsSection } from '../components/ChapterFields'
 import { NewContainerButton } from '../components/NewContainer'
 import { ErrorState, Loading } from '../components/States'
 import { useDocumentTitle, usePosition } from '../hooks'
@@ -55,6 +56,7 @@ export function UniversePage() {
           <BookList universe={universe} books={u.books} />
         </section>
       )}
+      <ChapterDefaultsSection key={u.key} scope={{ universe }} name={u.name} />
     </div>
   )
 }

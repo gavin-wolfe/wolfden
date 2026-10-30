@@ -74,10 +74,12 @@ public sealed partial class DenTools
     /// inheriting it from the container above. The result says what each
     /// book's chapters have now.
     /// </summary>
-    public WriteResult UpdateChapterDefaults(string expectedHash, JsonElement changes, string? universe = null, string? series = null, string? book = null)
+    /// <param name="numbersAsText">True to take a plain number as <c>{"$number": "2.50"}</c>, its text as written (the web UI's form, <see cref="SourceField.Value"/>).</param>
+    public WriteResult UpdateChapterDefaults(
+        string expectedHash, JsonElement changes, string? universe = null, string? series = null, string? book = null, bool numbersAsText = false)
     {
         var hash = RequireHash(expectedHash);
-        var ops = Changes(changes, chapter: true);
+        var ops = Changes(changes, chapter: true, numbersAsText);
         var universeKey = LocateContainer(universe, series, book);
         using (EnterWrite())
         {
@@ -96,11 +98,14 @@ public sealed partial class DenTools
             var file = target.File;
             var touched = new List<string>();
             var notes = new List<string>();
+            var itemComments = new ItemComments();
             foreach (var op in ops)
             {
                 var field = op.Field!;
                 touched.Add(field);
                 string[] fieldPath = ["chapter_defaults", field];
+                var before = file;
+                var notesBefore = notes.Count;
                 file = Apply(op.Op switch
                 {
                     "set" => () => file.WithFrontmatterValue(fieldPath, op.Value!),
@@ -109,7 +114,10 @@ public sealed partial class DenTools
                         notes, file.WithoutChapterDefaultItem(field, ItemToRemove(file, fieldPath, op, "The default"), out var comments), comments, $"chapter_defaults.{field}"),
                     _ => () => ClearDefault(file, target, field, notes),
                 });
+                itemComments.After(op, before, file, fieldPath, $"chapter_defaults.{field}", notesBefore, notes);
             }
+
+            itemComments.Finish(notes);
 
             touched = touched.Distinct().ToList();
             if (file.ToBytes().AsSpan().SequenceEqual(original))

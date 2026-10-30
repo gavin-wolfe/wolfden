@@ -43,16 +43,36 @@ namespace Wolfden.Api;
 /// or after the chapter <c>after</c> (<see cref="DenTools.AddChapter"/>),
 /// answering 201 with its key, number, and the numbers it changed. A final
 /// book refuses it (<c>frozen</c>), and a stale <c>book.md</c> too
-/// (<c>stale_file</c>).
+/// (<c>stale_file</c>). It may give the chapter its own chapter fields in
+/// <c>fields</c>, an object from field name to value (#225).
+/// </para>
+/// <para>
+/// Chapter fields (#225): <c>GET /api/book/chapter-fields?book=&lt;key&gt;&amp;universe=&lt;key&gt;</c>
+/// gives each chapter's fields, as written and as they hold, with the den's
+/// chapter field definitions and the hash of <c>book.md</c>
+/// (<see cref="DenTools.GetBookChapterFields"/>), and <c>POST /api/chapter/edit</c>
+/// with <c>{book, universe, chapter, field, changes, expectedHash}</c> changes one
+/// field of one chapter (<see cref="DenTools.UpdateChapterFields"/>, the MCP
+/// <c>update_chapter_fields</c>). <c>GET /api/chapter-defaults?universe=&amp;series=&amp;book=</c>
+/// gives a container's <c>chapter_defaults</c> the same way
+/// (<see cref="DenTools.GetChapterDefaultsSource"/>), and
+/// <c>POST /api/chapter-defaults/edit</c> with
+/// <c>{universe, series, book, field, changes, expectedHash}</c> changes one of
+/// them (<see cref="DenTools.UpdateChapterDefaults"/>). Each change is
+/// <c>{op, value, index, item}</c>, with <c>op</c> one of <c>set</c>,
+/// <c>add</c>, <c>remove</c>, and <c>clear</c>, as the MCP tools take them, and
+/// a plain number as <c>{"$number": "2.50"}</c>. A final book, a stale file,
+/// and an edit of a series' or universe's defaults that would change a final
+/// book's chapters are refused, as for the MCP tools.
 /// </para>
 /// </remarks>
 public static class ContainerEndpoints
 {
     /// <summary>The paths under <c>/api</c> that answer GET.</summary>
-    public static readonly IReadOnlyList<string> GetPaths = ["works", "book/chapters"];
+    public static readonly IReadOnlyList<string> GetPaths = ["works", "book/chapters", "book/chapter-fields", "chapter-defaults"];
 
     /// <summary>The paths under <c>/api</c> that answer POST.</summary>
-    public static readonly IReadOnlyList<string> PostPaths = ["series/create", "book/create", "chapter/create"];
+    public static readonly IReadOnlyList<string> PostPaths = ["series/create", "book/create", "chapter/create", "chapter/edit", "chapter-defaults/edit"];
 
     /// <summary>Maps the endpoints onto <paramref name="api"/>, writing through <paramref name="tools"/>, the server's one set of write tools.</summary>
     internal static void Map(RouteGroupBuilder api, DenTools tools)
@@ -66,7 +86,7 @@ public static class ContainerEndpoints
                 body.OptionalBool("first") ?? false))));
         api.MapGet("/book/chapters", (HttpContext c) => ReadEndpoints.Answer(
             c, ["book", "universe"], q => tools.GetChapter(q.Text("book") ?? "", null, q.Text("universe"))));
-        api.MapPost("/chapter/create", (Func<HttpContext, Task<IResult>>)(c => Create(c, ["book", "universe", "title", "after", "expectedHash"], body =>
+        api.MapPost("/chapter/create", (Func<HttpContext, Task<IResult>>)(c => Create(c, ["book", "universe", "title", "after", "fields", "expectedHash"], body =>
             tools.AddChapter(
                 body.OptionalText("book") ?? throw new DenToolException(ToolErrorCodes.BadArgument, "Give the key of the book the chapter goes in, in 'book'."),
                 body.RawText("title"),
@@ -74,7 +94,79 @@ public static class ContainerEndpoints
                 body.OptionalText("expectedHash") ?? throw new DenToolException(
                     ToolErrorCodes.BadArgument,
                     "Give 'expectedHash': the hash of the book's book.md, from /api/book/chapters. The add is refused if the file has changed since."),
-                body.OptionalText("universe")))));
+                body.OptionalText("universe"),
+                body.OptionalJson("fields")))));
+
+        api.MapGet("/book/chapter-fields", (HttpContext c) => ReadEndpoints.Answer(
+            c, ["book", "universe"], q => tools.GetBookChapterFields(q.Text("book") ?? "", q.Text("universe"))));
+        api.MapPost("/chapter/edit", (Func<HttpContext, Task<IResult>>)(c => Create(
+            c, ["book", "universe", "chapter", "field", "changes", "expectedHash"], body => tools.UpdateChapterFields(
+                body.OptionalText("book") ?? throw new DenToolException(ToolErrorCodes.BadArgument, "Give the key of the chapter's book, in 'book'."),
+                body.OptionalText("chapter") ?? throw new DenToolException(ToolErrorCodes.BadArgument, "Give the chapter's key, in 'chapter'."),
+                EditHash(body, "/api/book/chapter-fields"),
+                ChapterChanges(body),
+                body.OptionalText("universe"),
+                numbersAsText: true),
+            StatusCodes.Status200OK)));
+        api.MapGet("/chapter-defaults", (HttpContext c) => ReadEndpoints.Answer(
+            c, ["universe", "series", "book"], q => tools.GetChapterDefaultsSource(q.Text("universe"), q.Text("series"), q.Text("book"))));
+        api.MapPost("/chapter-defaults/edit", (Func<HttpContext, Task<IResult>>)(c => Create(
+            c, ["universe", "series", "book", "field", "changes", "expectedHash"], body => tools.UpdateChapterDefaults(
+                EditHash(body, "/api/chapter-defaults"),
+                ChapterChanges(body),
+                body.OptionalText("universe"),
+                body.OptionalText("series"),
+                body.OptionalText("book"),
+                numbersAsText: true),
+            StatusCodes.Status200OK)));
+    }
+
+    /// <summary>The members a change of a chapter field or default takes.</summary>
+    private static readonly string[] ChangeMembers = ["op", "value", "index", "item"];
+
+    private static string EditHash(WriteEndpoints.Body body, string from) => body.OptionalText("expectedHash") ?? throw new DenToolException(
+        ToolErrorCodes.BadArgument, $"Give 'expectedHash': the hash of the file, from {from}. The edit is refused if the file has changed since.");
+
+    /// <summary>
+    /// The changes of one chapter field (<c>field</c>), for the write tools:
+    /// each change is <c>{op, value, index, item}</c>, and gets the field, so
+    /// an edit can't reach another field.
+    /// </summary>
+    private static JsonElement ChapterChanges(WriteEndpoints.Body body)
+    {
+        var field = body.OptionalText("field") ?? throw new DenToolException(ToolErrorCodes.BadArgument, "Give the chapter field to change, in 'field', such as 'pov'.");
+        var changes = body.Json("changes");
+        if (changes.ValueKind != JsonValueKind.Array || changes.GetArrayLength() == 0)
+        {
+            throw new DenToolException(ToolErrorCodes.BadArgument, "'changes' is a list of changes, such as [{\"op\": \"set\", \"value\": \"present\"}].");
+        }
+
+        var result = new List<Dictionary<string, object?>>();
+        foreach (var change in changes.EnumerateArray())
+        {
+            if (change.ValueKind != JsonValueKind.Object)
+            {
+                throw new DenToolException(ToolErrorCodes.BadArgument, "Each change is an object: {op, value, index, item}.");
+            }
+
+            var copy = new Dictionary<string, object?>(StringComparer.Ordinal) { ["field"] = field };
+            foreach (var member in change.EnumerateObject())
+            {
+                if (!ChangeMembers.Contains(member.Name, StringComparer.Ordinal))
+                {
+                    throw new DenToolException(ToolErrorCodes.BadArgument, $"A change doesn't take '{member.Name}'. It takes: {string.Join(", ", ChangeMembers)}.");
+                }
+
+                if (!copy.TryAdd(member.Name, member.Value))
+                {
+                    throw new DenToolException(ToolErrorCodes.BadArgument, $"Give '{member.Name}' once in a change.");
+                }
+            }
+
+            result.Add(copy);
+        }
+
+        return JsonSerializer.SerializeToElement(result);
     }
 
     private static string Name(WriteEndpoints.Body body, string what) =>
@@ -84,7 +176,7 @@ public static class ContainerEndpoints
         ToolErrorCodes.BadArgument,
         "Give 'expectedHash': the hash of the universe.md or series.md that lists the works, from /api/works. The create is refused if the file has changed since.");
 
-    private static async Task<IResult> Create<T>(HttpContext context, string[] members, Func<WriteEndpoints.Body, T> create)
+    private static async Task<IResult> Create<T>(HttpContext context, string[] members, Func<WriteEndpoints.Body, T> create, int status = StatusCodes.Status201Created)
     {
         if (!context.Request.HasJsonContentType())
         {
@@ -111,7 +203,7 @@ public static class ContainerEndpoints
                 throw new DenToolException(ToolErrorCodes.BadArgument, $"The body isn't JSON: {e.Message}");
             }
 
-            return Results.Json(create(WriteEndpoints.Body.Of(context, json, members)), statusCode: StatusCodes.Status201Created);
+            return Results.Json(create(WriteEndpoints.Body.Of(context, json, members)), statusCode: status);
         }
         catch (DenToolException e)
         {

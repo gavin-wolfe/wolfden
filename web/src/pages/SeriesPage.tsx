@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, getRouteApi } from '@tanstack/react-router'
 import { hierarchyQuery } from '../api'
+import { ChapterDefaultsSection } from '../components/ChapterFields'
 import { NewContainerButton } from '../components/NewContainer'
 import { ErrorState, Loading } from '../components/States'
 import { useDocumentTitle, usePosition } from '../hooks'
@@ -48,6 +49,7 @@ export function SeriesPage() {
       </p>
       <h2>Books</h2>
       <BookList universe={universe} books={s.books} empty="This series has no books yet." />
+      <ChapterDefaultsSection key={s.key} scope={{ universe, series: s.key }} name={s.name} />
       <Counts counts={s.entities} title="Filed in the series" />
     </div>
   )

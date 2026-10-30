@@ -363,6 +363,9 @@ public static partial class WriteEndpoints
             ? value
             : throw new DenToolException(ToolErrorCodes.BadArgument, $"Give '{name}'.");
 
+        /// <summary>A JSON member as given, or null if it's missing.</summary>
+        public JsonElement? OptionalJson(string name) => _members.TryGetValue(name, out var value) ? value : null;
+
         /// <summary>A whole-number member; refused if it's missing.</summary>
         public int Int(string name) => OptionalInt(name) ?? throw new DenToolException(ToolErrorCodes.BadArgument, $"Give '{name}'.");
 

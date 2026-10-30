@@ -453,7 +453,8 @@ public sealed partial class DenTools
     /// chapter goes back to inheriting from <c>chapter_defaults</c>. The
     /// result says what each field's effective value is now.
     /// </summary>
-    public WriteResult UpdateChapterFields(string book, string chapter, string expectedHash, JsonElement changes, string? universe = null)
+    /// <param name="numbersAsText">True to take a plain number as <c>{"$number": "2.50"}</c>, its text as written (the web UI's form, <see cref="SourceField.Value"/>).</param>
+    public WriteResult UpdateChapterFields(string book, string chapter, string expectedHash, JsonElement changes, string? universe = null, bool numbersAsText = false)
     {
         var hash = RequireHash(expectedHash);
         if (string.IsNullOrWhiteSpace(book) || string.IsNullOrWhiteSpace(chapter))
@@ -461,7 +462,7 @@ public sealed partial class DenTools
             throw new DenToolException(ToolErrorCodes.BadArgument, "Give the book's key in 'book' and the chapter's key in 'chapter'.");
         }
 
-        var ops = Changes(changes, chapter: true);
+        var ops = Changes(changes, chapter: true, numbersAsText);
         var (universeKey, _) = LocateBook(book.Trim(), universe);
         using (EnterWrite())
         {
@@ -496,11 +497,14 @@ public sealed partial class DenTools
 
             var touched = new List<string>();
             var notes = new List<string>();
+            var itemComments = new ItemComments();
             foreach (var op in ops)
             {
                 var field = op.Field!;
                 touched.Add(field);
                 string[] fieldPath = [.. itemPath, "fields", field];
+                var before = file;
+                var notesBefore = notes.Count;
                 file = Apply(op.Op switch
                 {
                     "set" => () => file.WithFrontmatterValue(fieldPath, op.Value!),
@@ -509,7 +513,10 @@ public sealed partial class DenTools
                         notes, file.WithoutChapterFieldItem(ch.Key, field, ItemToRemove(file, fieldPath, op), out var comments), comments, $"{field} of chapter '{ch.Key}'"),
                     _ => () => Clear(file, fieldPath, ch, field, notes),
                 });
+                itemComments.After(op, before, file, fieldPath, $"{field} of chapter '{ch.Key}'", notesBefore, notes);
             }
+
+            itemComments.Finish(notes);
 
             if (file.ToBytes().AsSpan().SequenceEqual(original))
             {

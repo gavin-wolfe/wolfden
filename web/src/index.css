@@ -463,6 +463,37 @@ button.peek {
   font-weight: 600;
 }
 
+/* A chapter's fields under its title in the book's list (#225). */
+.chapter-field-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1rem;
+  margin: 0.15rem 0 0 2.5rem;
+  font-size: 0.85rem;
+}
+
+.chapter-field-summary > div {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.chapter-field-summary dt {
+  color: var(--text-muted);
+}
+
+.chapter-field-summary dt::after {
+  content: ':';
+}
+
+.chapter-field-summary dd {
+  margin: 0;
+}
+
+.chapter-field-summary .inherited-value dd,
+.chapter-fields .badge.inherited {
+  color: var(--text-muted);
+}
+
 .chapter-number {
   display: inline-block;
   min-width: 2.5rem;

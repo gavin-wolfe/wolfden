@@ -78,9 +78,12 @@ public sealed partial class DenTools
 
             // An images folder that's there already, in any case, is used as it's spelled
             // (Images/ made by hand on Windows); a file or folder link by that name is in the way.
+            // Where names differ by case (Linux) and both images/ and Images/ are there,
+            // images/ wins, so new images go where Wolfden's own earlier ones went.
             var folderName = ImageFolder;
             static bool IsImages(string name) => string.Equals(name, ImageFolder, StringComparison.OrdinalIgnoreCase);
-            var existing = Store.GetDirectories(noteFolder).FirstOrDefault(IsImages);
+            var folders = Store.GetDirectories(noteFolder).ToList();
+            var existing = folders.FirstOrDefault(d => d == ImageFolder) ?? folders.FirstOrDefault(IsImages);
             if (existing is null && Store.GetFolderLinks(noteFolder).FirstOrDefault(IsImages) is { } folderLink)
             {
                 throw new DenToolException(

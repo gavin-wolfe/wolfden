@@ -82,6 +82,43 @@ public class ImageFileTests
     }
 
     [Fact]
+    public void AnEntityMentionedAfterTheDoctypeEndsIsJustDamage()
+    {
+        // The internal subset declares no entity; "<!ENTITY" only turns up later, in a comment,
+        // and the file is broken for another reason (a tag left open).
+        var svg = Encoding.UTF8.GetBytes(
+            "<?xml version=\"1.0\"?>\n<!DOCTYPE svg [\n  <!ATTLIST svg note CDATA \"a ] in quotes\">\n]>\n" +
+            "<svg xmlns=\"http://www.w3.org/2000/svg\"><!-- <!ENTITY was here --><g></svg>");
+
+        var problem = ImageFiles.Problem(".svg", svg);
+        Assert.Contains("damaged", problem, StringComparison.Ordinal);
+        Assert.DoesNotContain("declares entities", problem, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AnEntityDeclaredAfterABracketInQuotesStillCounts()
+    {
+        // A ']' inside a quoted value doesn't end the internal subset.
+        var svg = Encoding.UTF8.GetBytes(
+            "<?xml version=\"1.0\"?>\n<!DOCTYPE svg [\n  <!ENTITY a \"x]>y\">\n  <!ENTITY ns_svg \"http://www.w3.org/2000/svg\">\n]>\n" +
+            "<svg xmlns=\"&ns_svg;\"><rect/></svg>");
+
+        Assert.Contains("declares entities", ImageFiles.Problem(".svg", svg), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AHardCutInAltTextNeverSplitsAnEmoji()
+    {
+        // The 100th character is the first half of an emoji: the cut steps back before it.
+        var alt = ImageFiles.AltText(new string('x', ImageFiles.MaxAltLength - 1) + "\U0001F600more");
+        Assert.Equal(new string('x', ImageFiles.MaxAltLength - 1), alt);
+
+        // One character earlier, the whole emoji fits.
+        var fits = ImageFiles.AltText(new string('x', ImageFiles.MaxAltLength - 2) + "\U0001F600more");
+        Assert.Equal(new string('x', ImageFiles.MaxAltLength - 2) + "\U0001F600", fits);
+    }
+
+    [Fact]
     public void ALongFileNameGivesAltTextCutAtAWord()
     {
         var alt = ImageFiles.AltText(string.Join("-", Enumerable.Repeat("castle", 40)));

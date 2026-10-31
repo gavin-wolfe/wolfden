@@ -158,12 +158,12 @@ describe('SC-WEB-61: the changes a field edit sends', () => {
 
   it('reads numbers, dates with a sort key, and booleans, and changes a date mapping key by key', () => {
     // Numbers come and go as their text, so 2.50 stays 2.50 and a long one keeps every digit.
-    const w = draft(types.weight, { $number: '12.50' })
+    const w = draft(types.weight, { $plain: '12.50' })
     expect(w.entries[0].value).toMatchObject({ draft: { text: '12.50' } })
-    expect(fieldChanges(types.weight, { $number: '12.50' }, w)).toEqual([])
+    expect(fieldChanges(types.weight, { $plain: '12.50' }, w)).toEqual([])
     ;(w.entries[0].value as { kind: 'one'; draft: { text: string } }).draft.text = '3.250'
-    expect(fieldChanges(types.weight, { $number: '12.50' }, w)).toEqual([{ op: 'set', path: [], value: { $number: '3.250' } }])
-    const serial = draft(types.label, { $number: '12345678901234567890' })
+    expect(fieldChanges(types.weight, { $plain: '12.50' }, w)).toEqual([{ op: 'set', path: [], value: { $plain: '3.250' } }])
+    const serial = draft(types.label, { $plain: '12345678901234567890' })
     expect(serial.entries[0].value).toMatchObject({ draft: { text: '12345678901234567890' } })
 
     const f = draft(types.found, '1893-08-08')
@@ -171,10 +171,10 @@ describe('SC-WEB-61: the changes a field edit sends', () => {
     fv.draft.text = 'early August'
     fv.draft.sort = '1893, 8'
     expect(fieldChanges(types.found, '1893-08-08', f)).toEqual([
-      { op: 'set', path: [], value: { text: 'early August', sort: [{ $number: '1893' }, { $number: '8' }] } },
+      { op: 'set', path: [], value: { text: 'early August', sort: [{ $plain: '1893' }, { $plain: '8' }] } },
     ])
 
-    const before: Json = { text: 'early August', sort: [{ $number: '1893' }, { $number: '8' }] }
+    const before: Json = { text: 'early August', sort: [{ $plain: '1893' }, { $plain: '8' }] }
     const m = draft(types.found, before)
     ;(m.entries[0].value as { kind: 'one'; draft: { text: string } }).draft.text = 'August'
     expect(fieldChanges(types.found, before, m)).toEqual([{ op: 'set', path: ['text'], value: 'August' }])
@@ -237,7 +237,7 @@ describe('SC-WEB-61: the changes a field edit sends', () => {
 })
 
 describe('B1: an untouched form sends nothing, whatever the value', () => {
-  const n = (t: string) => ({ $number: t })
+  const n = (t: string) => ({ $plain: t })
   const scalars: Json[] = ['text', 'Dried', n('2.50'), n('12345678901234567890'), true, false, '[[mina-harker]]', 'dracula:5', '1893-08-08', '']
   const lists: Json[] = [[], ['a', 'b'], [n('1'), 'x'], ['[[a]]']]
   const dates: Json[] = [{ text: 'late spring' }, { sort: n('1893') }, { text: 'x', sort: [n('1893'), n('8')] }]
@@ -344,7 +344,7 @@ function source(hash = 'h1', fields: EntitySource['fields'] | null = null): Enti
       { name: 'role', line: 6, value: [{ value: 'A schoolmistress' }, { value: 'A wife', from: 'dracula:3' }] },
       { name: 'occupation', line: 8, value: ['teacher', 'secretary', 'typist'] },
       { name: 'state', line: 9, value: 'Dried' },
-      { name: 'weight', line: 10, value: { $number: '12' } },
+      { name: 'weight', line: 10, value: { $plain: '12' } },
       { name: 'x_odd', line: 11, value: 'kept' },
       { name: 'species', line: 12, value: [['velari']] },
     ],
@@ -458,7 +458,7 @@ describe('SC-WEB-60: editing a field with a control for its type', () => {
     fireEvent.change(input, { target: { value: '12.75' } })
     fireEvent.keyDown(input, { key: 'Enter', ctrlKey: true })
     await waitFor(() => expect(posts).toHaveLength(1))
-    expect(posts[0].body.changes).toEqual([{ op: 'set', path: [], value: { $number: '12.75' } }])
+    expect(posts[0].body.changes).toEqual([{ op: 'set', path: [], value: { $plain: '12.75' } }])
   })
 
   it('moves, removes, and adds list items with the keyboard-reachable buttons', async () => {
@@ -598,7 +598,7 @@ describe('SC-WEB-63: adding and clearing fields, and what only the file can chan
     fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(posts).toHaveLength(1))
-    expect(posts[0].body).toMatchObject({ field: 'born', changes: [{ op: 'set', path: [], value: { text: 'the year of the storm', sort: { $number: '1870' } } }] })
+    expect(posts[0].body).toMatchObject({ field: 'born', changes: [{ op: 'set', path: [], value: { text: 'the year of the storm', sort: { $plain: '1870' } } }] })
   })
 
   it('clears a field after asking in the page', async () => {
@@ -688,7 +688,7 @@ describe('SC-WEB-65: field edits are guarded', () => {
     })
     renderApp('/u/dracula/e/E-MINA')
     const form = await openField('weight')
-    file.source = source('h9', source().fields.map((f) => (f.name === 'weight' ? { ...f, value: { $number: '14' } } : f)))
+    file.source = source('h9', source().fields.map((f) => (f.name === 'weight' ? { ...f, value: { $plain: '14' } } : f)))
     fireEvent.click(within(form).getByRole('button', { name: 'Clear field' }))
     fireEvent.click(within(within(form).getByRole('group', { name: /Clear weight\?/ })).getByRole('button', { name: 'Clear field' }))
 

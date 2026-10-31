@@ -47,7 +47,7 @@ public sealed partial class DenTools
     /// <param name="fields">
     /// The chapter's own chapter fields (types.md §8, #225), as a JSON object from field name to value, written in the
     /// item's <c>fields</c>; null, or a field given null, for none, so the chapter inherits from <c>chapter_defaults</c>.
-    /// A plain number may be given as <c>{"$number": "2.50"}</c>.
+    /// A plain number may be given as <c>{"$plain": "2.50"}</c>.
     /// </param>
     public ChapterAddResult AddChapter(
         string book, string? title = null, string? after = null, string? expectedHash = null, string? universe = null, JsonElement? fields = null)

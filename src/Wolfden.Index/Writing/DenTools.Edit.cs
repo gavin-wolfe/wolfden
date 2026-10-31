@@ -82,9 +82,11 @@ public sealed partial class DenTools
     /// A YAML value as JSON, keeping what kind of scalar it is (<see cref="SourceField.Value"/>):
     /// a plain <c>true</c> or <c>false</c> as a boolean, any other plain scalar that YAML doesn't read as
     /// a string (a number in any form, <c>.inf</c>, <c>1_000</c>, <c>True</c>, <c>yes</c>, a YAML 1.1
-    /// timestamp) as <c>{"$number": "2.50"}</c> with its text as written (a browser's JSON number would
+    /// timestamp) as <c>{"$plain": "2.50"}</c> with its text as written (a browser's JSON number would
     /// lose <c>2.50</c>'s last digit and a long number's precision, and other values their form), a null
-    /// as null, and any other scalar as its text.
+    /// as null, and any other scalar as its text. A mapping whose only key is <c>$plain</c> (or
+    /// <c>$$plain</c>, …) is sent with one more <c>$</c> on that key, so it isn't taken for a plain
+    /// value; the write takes it off again (<see cref="ToYaml"/>).
     /// </summary>
     private static JsonElement AsWritten(YamlNode? node)
     {
@@ -94,13 +96,17 @@ public sealed partial class DenTools
         {
             null or YamlScalar { IsNull: true } => null,
             YamlScalar { Style: YamlScalarStyle.Plain, Text: "true" or "false" } s => s.Text == "true",
-            YamlScalar { Style: YamlScalarStyle.Plain } s when YamlScalarValue.IsPlainNonString(s.Text) => new Dictionary<string, string> { ["$number"] = s.Text },
+            YamlScalar { Style: YamlScalarStyle.Plain } s when YamlScalarValue.IsPlainNonString(s.Text) => new Dictionary<string, string> { ["$plain"] = s.Text },
             YamlScalar s => s.Text,
             YamlSequence l => l.Items.Select(Plain).ToList(),
-            YamlMapping m => m.Entries.Where(e => e.KeyText is not null).GroupBy(e => e.KeyText!).ToDictionary(g => g.Key, g => Plain(g.First().Value)),
+            YamlMapping m => m.Entries.Where(e => e.KeyText is not null).GroupBy(e => e.KeyText!).ToDictionary(
+                g => m.Entries.Count == 1 && IsPlainKey(g.Key) ? "$" + g.Key : g.Key, g => Plain(g.First().Value)),
             _ => null,
         };
     }
+
+    /// <summary>True for <c>$plain</c>, <c>$$plain</c>, and so on: the key of a plain value as written, or one escaped.</summary>
+    private static bool IsPlainKey(string key) => key.Length > 5 && key.EndsWith("plain", StringComparison.Ordinal) && key[..^5].All(c => c == '$');
 
     /// <summary>A Markdown heading's opening marks (<c>## </c>), or the marks alone.</summary>
     [GeneratedRegex(@"^#+(?:\s+|\z)", RegexOptions.CultureInvariant)]

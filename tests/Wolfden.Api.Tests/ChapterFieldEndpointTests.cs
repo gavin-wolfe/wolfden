@@ -149,7 +149,7 @@ public sealed class ChapterFieldEndpointTests : IDisposable
         var when = await EditAsync(server, new
         {
             book = "ember", universe = "starfall", chapter = "1", field = "when", expectedHash = cleared.GetProperty("hash").GetString(),
-            changes = new object[] { new { op = "set", value = new Dictionary<string, object> { ["text"] = "Year 2290", ["sort"] = new Dictionary<string, string> { ["$number"] = "2290" } } } },
+            changes = new object[] { new { op = "set", value = new Dictionary<string, object> { ["text"] = "Year 2290", ["sort"] = new Dictionary<string, string> { ["$plain"] = "2290" } } } },
         });
         Assert.True(when.GetProperty("changed").GetBoolean());
         Assert.Contains("title: Kessan Reach, fields: { when: { text: Year 2290, sort: 2290 } } }", _den.Read(Ember), StringComparison.Ordinal);

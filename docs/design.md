@@ -1802,7 +1802,7 @@ docs/
     `value` as written, as JSON, with a plain `true`/`false` as one, any
     other plain scalar YAML doesn't read as a string (a number in any
     form, `0x1F`, `1_000`, `.inf`, `True`, `yes`) as
-    `{"$number": "2.50"}` with its text as written, and every other
+    `{"$plain": "2.50"}` with its text as written, and every other
     scalar as its text) and `fieldTypes` (the
     type's fields in field order, each with `type`, `list`,
     `temporal`, `required`, enum `values`, ref `to`, `description`,
@@ -1814,11 +1814,17 @@ docs/
     path under `fields.<field>`, so an edit can't reach `id`, `name`,
     `status`, or another field, and it has the same hash check, frozen
     books, write check, pinned canon, effects, ledger, and lossless
-    edits. Numbers go both ways as text (`{"$number": "2.50"}`), since a
+    edits. Numbers go both ways as text (`{"$plain": "2.50"}`), since a
     browser's JSON number would turn `2.50` into `2.5` and cut a long
     number's digits; the server writes the text as given, plain, so a
     value rewritten whole or moved keeps its form (`0x1F`, `.inf`) and
-    never gains quotes. A
+    never gains quotes. `$plain` (it was `$number` before #199, and
+    carries `True`, `yes`, and timestamps too) takes only such a
+    value: text YAML reads as a string, a null (`~`, `null`), YAML 1.1's
+    `<<` and `=`, and anything with a line break are `bad_argument`. A
+    mapping whose only key is `$plain` is sent as `{"$$plain": …}`, one
+    more `$`, and the write takes it off again, so it's never read as a
+    plain value. A
     number that isn't whole is written plain by the MCP tools too now,
     and one too large to be a number (`1e400`) is `invalid_edit` for
     both.
@@ -2305,7 +2311,7 @@ docs/
     define (in pack order, then any other name the chapter writes or
     inherits): whether the chapter writes it (`set`), its value as
     written (`own`, in the form of `/api/entity/source`'s values,
-    numbers as `{"$number": "2.50"}`), whether that's `ignored`
+    numbers as `{"$plain": "2.50"}`), whether that's `ignored`
     (F-CHAP-3), the value that holds and where from (`chapter`, or the
     `book`, `series`, or `universe` and its key), whether it's `none`,
     what it would inherit without its own (`default`), and the links in

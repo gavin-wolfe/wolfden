@@ -61,7 +61,7 @@ namespace Wolfden.Api;
 /// them (<see cref="DenTools.UpdateChapterDefaults"/>). Each change is
 /// <c>{op, value, index, item}</c>, with <c>op</c> one of <c>set</c>,
 /// <c>add</c>, <c>remove</c>, <c>clear</c>, <c>move</c>, and <c>replace</c>, as the MCP tools take them, and
-/// a plain number as <c>{"$number": "2.50"}</c>. A final book, a stale file,
+/// a plain number as <c>{"$plain": "2.50"}</c>. A final book, a stale file,
 /// and an edit of a series' or universe's defaults that would change a final
 /// book's chapters are refused, as for the MCP tools.
 /// </para>

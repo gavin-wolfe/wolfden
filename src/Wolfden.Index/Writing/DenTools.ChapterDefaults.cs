@@ -75,7 +75,7 @@ public sealed partial class DenTools
     /// move or change one item in place, keeping its comments. The result says what each
     /// book's chapters have now.
     /// </summary>
-    /// <param name="numbersAsText">True to take a plain number as <c>{"$number": "2.50"}</c>, its text as written (the web UI's form, <see cref="SourceField.Value"/>).</param>
+    /// <param name="numbersAsText">True to take a plain number as <c>{"$plain": "2.50"}</c>, its text as written (the web UI's form, <see cref="SourceField.Value"/>).</param>
     public WriteResult UpdateChapterDefaults(
         string expectedHash, JsonElement changes, string? universe = null, string? series = null, string? book = null, bool numbersAsText = false)
     {

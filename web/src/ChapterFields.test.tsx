@@ -285,7 +285,7 @@ describe('SC-WEB-74: I edit a chapter’s fields, and go back to the default', (
     fireEvent.change(within(form).getByLabelText('Date'), { target: { value: '3–6 May' } })
     fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
     await screen.findByText('Saved when.')
-    expect(posted[0].body.changes).toEqual([{ op: 'set', value: { text: '3–6 May', sort: [{ $number: '0' }, { $number: '5' }, { $number: '3' }] } }])
+    expect(posted[0].body.changes).toEqual([{ op: 'set', value: { text: '3–6 May', sort: [{ $plain: '0' }, { $plain: '5' }, { $plain: '3' }] } }])
   })
 })
 
@@ -518,7 +518,7 @@ describe('chapterFieldChanges', () => {
     const v = date.entries[0].value
     if (v.kind === 'one') {
       const next: FieldDraft = { ...date, entries: [{ ...date.entries[0], value: { kind: 'one', draft: { ...v.draft, sort: '1893' } } }] }
-      expect(chapterFieldChanges(when, '1893', next)).toEqual([{ op: 'set', value: { text: '1893', sort: { $number: '1893' } } }])
+      expect(chapterFieldChanges(when, '1893', next)).toEqual([{ op: 'set', value: { text: '1893', sort: { $plain: '1893' } } }])
     }
   })
 })

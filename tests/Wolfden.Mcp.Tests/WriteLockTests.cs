@@ -120,7 +120,7 @@ public sealed class WriteLockTests : IDisposable
         }
 
         Assert.Equal(ToolErrorCodes.DenBusy, busy.Code);
-        Assert.Contains("Other writes to the den kept it busy for 0 seconds", busy.Message, StringComparison.Ordinal);
+        Assert.Contains("Other writes to the den, or a checkpoint, kept it busy for 0 seconds", busy.Message, StringComparison.Ordinal);
         Assert.Equal(before, _den.Read(Swales));
 
         // The file stays behind, and means nothing: the next write goes ahead.
@@ -195,6 +195,185 @@ public sealed class WriteLockTests : IDisposable
         Assert.Null(firstError);
         Assert.Equal(ToolErrorCodes.DenBusy, Assert.IsType<DenToolException>(secondError).Code);
         Assert.DoesNotContain("From the second request.", _den.Read(Swales), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ACancelledWriteStopsWaitingForAnotherWolfdenAndWritesNothing()
+    {
+        var hash = new DenTools(_den.Root).GetEntity("Mr. Swales").Entity!.Hash!;
+        var before = _den.Read(Swales);
+        var cancel = TestContext.Current.CancellationToken;
+
+        // A wait far longer than the test's bound: only the cancellation can end it in time.
+        using var waiting = new ManualResetEventSlim();
+        var tools = new DenTools(_den.Root) { WriteLockWait = TimeSpan.FromMinutes(10), WaitingForOtherWriter = _ => waiting.Set() };
+        using var call = new CancellationTokenSource();
+        Exception? error = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                using (tools.CancelWith(call.Token))
+                {
+                    tools.AppendSection("Mr. Swales", "Later", "He is buried at Whitby.", hash, newSection: true);
+                }
+            }
+            catch (Exception e)
+            {
+                error = e;
+            }
+        });
+
+        using (new FileStream(LockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
+        {
+            thread.Start();
+            Assert.True(waiting.Wait(Bound, cancel));
+            call.Cancel();
+            Assert.True(thread.Join(Bound), "a cancelled write should stop waiting for the lock");
+        }
+
+        Assert.IsAssignableFrom<OperationCanceledException>(error);
+        Assert.Equal(before, _den.Read(Swales));
+
+        // The cancellation was the call's: the session's next write goes ahead.
+        Assert.True(tools.AppendSection("Mr. Swales", "Later", "He is buried at Whitby.", hash, newSection: true).Changed);
+    }
+
+    [Fact]
+    public void ACancelledWriteStopsWaitingForThisSessionsOwnWrite()
+    {
+        var hash = new DenTools(_den.Root).GetEntity("Mr. Swales").Entity!.Hash!;
+        var cancel = TestContext.Current.CancellationToken;
+
+        // One session; its first write holds its turn, paused before writing.
+        using var paused = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var calls = 0;
+        var tools = new DenTools(_den.Root)
+        {
+            WriteLockWait = TimeSpan.FromMinutes(10),
+            BeforeWrite = () =>
+            {
+                if (Interlocked.Increment(ref calls) == 1)
+                {
+                    paused.Set();
+                    release.Wait(Bound, cancel);
+                }
+            },
+        };
+        var first = new Thread(() => tools.AppendSection("Mr. Swales", "First pass", "From the first request.", hash, newSection: true));
+        first.Start();
+        Assert.True(paused.Wait(Bound, cancel));
+
+        // A second call, cancelled while it waits for the session's turn, ends with the cancellation, not den_busy.
+        using var call = new CancellationTokenSource();
+        Exception? error = null;
+        var second = new Thread(() =>
+        {
+            try
+            {
+                using (tools.CancelWith(call.Token))
+                {
+                    tools.AppendSection("Mr. Swales", "Second pass", "From the second request.", hash, newSection: true);
+                }
+            }
+            catch (Exception e)
+            {
+                error = e;
+            }
+        });
+        second.Start();
+        call.CancelAfter(TimeSpan.FromMilliseconds(200));
+        var stopped = second.Join(Bound);
+        release.Set();
+        Assert.True(first.Join(Bound));
+
+        Assert.True(stopped, "a cancelled write should stop waiting while the first still holds the session's turn");
+        Assert.IsAssignableFrom<OperationCanceledException>(error);
+        Assert.DoesNotContain("From the second request.", _den.Read(Swales), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ACancelledCheckpointStopsWaitingForThisSessionsWrite()
+    {
+        var hash = new DenTools(_den.Root).GetEntity("Mr. Swales").Entity!.Hash!;
+        var cancel = TestContext.Current.CancellationToken;
+        using var paused = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var tools = new DenTools(_den.Root)
+        {
+            BeforeWrite = () =>
+            {
+                paused.Set();
+                release.Wait(Bound, cancel);
+            },
+        };
+        var write = new Thread(() => tools.AppendSection("Mr. Swales", "First pass", "From the write.", hash, newSection: true));
+        write.Start();
+        Assert.True(paused.Wait(Bound, cancel));
+
+        // A checkpoint waits for the session's write with no time limit, but a cancelled call stops waiting.
+        using var call = new CancellationTokenSource();
+        Exception? error = null;
+        var checkpoint = new Thread(() =>
+        {
+            try
+            {
+                using (tools.CancelWith(call.Token))
+                {
+                    tools.Checkpoint("Notes pass", "Claude <noreply@anthropic.com>");
+                }
+            }
+            catch (Exception e)
+            {
+                error = e;
+            }
+        });
+        checkpoint.Start();
+        call.CancelAfter(TimeSpan.FromMilliseconds(200));
+        var stopped = checkpoint.Join(Bound);
+        release.Set();
+        Assert.True(write.Join(Bound));
+
+        Assert.True(stopped, "a cancelled checkpoint should stop waiting for the session's turn");
+        Assert.IsAssignableFrom<OperationCanceledException>(error);
+    }
+
+    [Fact]
+    public void AnMcpCallCancelledWhileItWaitsIsCancelledNotAnErrorResult()
+    {
+        var hash = new DenTools(_den.Root).GetEntity("Mr. Swales").Entity!.Hash!;
+        var before = _den.Read(Swales);
+        var cancel = TestContext.Current.CancellationToken;
+        using var waiting = new ManualResetEventSlim();
+        var mcp = new WolfdenTools(new DenTools(_den.Root) { WriteLockWait = TimeSpan.FromMinutes(10), WaitingForOtherWriter = _ => waiting.Set() });
+        using var call = new CancellationTokenSource();
+        Exception? error = null;
+        ModelContextProtocol.Protocol.CallToolResult? result = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                result = mcp.AppendSection("Mr. Swales", "Later", "He is buried at Whitby.", hash, new_section: true, cancellationToken: call.Token);
+            }
+            catch (Exception e)
+            {
+                error = e;
+            }
+        });
+
+        using (new FileStream(LockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
+        {
+            thread.Start();
+            Assert.True(waiting.Wait(Bound, cancel));
+            call.Cancel();
+            Assert.True(thread.Join(Bound));
+        }
+
+        // The SDK answers a cancelled call as MCP says; a result here would be sent as an error instead.
+        Assert.Null(result);
+        Assert.IsAssignableFrom<OperationCanceledException>(error);
+        Assert.Equal(before, _den.Read(Swales));
     }
 
     [Fact]

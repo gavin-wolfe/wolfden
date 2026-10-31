@@ -78,15 +78,15 @@ public static class ContainerEndpoints
     internal static void Map(RouteGroupBuilder api, DenTools tools)
     {
         api.MapGet("/works", (HttpContext c) => ReadEndpoints.Answer(c, ["universe", "series"], q => tools.GetWorks(q.Text("universe"), q.Text("series"))));
-        api.MapPost("/series/create", (Func<HttpContext, Task<IResult>>)(c => Create(c, ["name", "universe", "after", "first", "expectedHash"], body =>
+        api.MapPost("/series/create", (Func<HttpContext, Task<IResult>>)(c => Create(c, tools, ["name", "universe", "after", "first", "expectedHash"], body =>
             tools.CreateSeries(Name(body, "series"), body.OptionalText("universe"), body.OptionalText("after"), Hash(body), body.OptionalBool("first") ?? false))));
-        api.MapPost("/book/create", (Func<HttpContext, Task<IResult>>)(c => Create(c, ["name", "universe", "series", "after", "first", "chapters", "expectedHash"], body =>
+        api.MapPost("/book/create", (Func<HttpContext, Task<IResult>>)(c => Create(c, tools, ["name", "universe", "series", "after", "first", "chapters", "expectedHash"], body =>
             tools.CreateBook(
                 Name(body, "book"), body.OptionalText("universe"), body.OptionalText("series"), body.OptionalText("after"), body.OptionalInt("chapters"), Hash(body),
                 body.OptionalBool("first") ?? false))));
         api.MapGet("/book/chapters", (HttpContext c) => ReadEndpoints.Answer(
             c, ["book", "universe"], q => tools.GetChapter(q.Text("book") ?? "", null, q.Text("universe"))));
-        api.MapPost("/chapter/create", (Func<HttpContext, Task<IResult>>)(c => Create(c, ["book", "universe", "title", "after", "fields", "expectedHash"], body =>
+        api.MapPost("/chapter/create", (Func<HttpContext, Task<IResult>>)(c => Create(c, tools, ["book", "universe", "title", "after", "fields", "expectedHash"], body =>
             tools.AddChapter(
                 body.OptionalText("book") ?? throw new DenToolException(ToolErrorCodes.BadArgument, "Give the key of the book the chapter goes in, in 'book'."),
                 body.RawText("title"),
@@ -100,7 +100,9 @@ public static class ContainerEndpoints
         api.MapGet("/book/chapter-fields", (HttpContext c) => ReadEndpoints.Answer(
             c, ["book", "universe"], q => tools.GetBookChapterFields(q.Text("book") ?? "", q.Text("universe"))));
         api.MapPost("/chapter/edit", (Func<HttpContext, Task<IResult>>)(c => Create(
-            c, ["book", "universe", "chapter", "field", "changes", "expectedHash"], body => tools.UpdateChapterFields(
+            c,
+            tools,
+            ["book", "universe", "chapter", "field", "changes", "expectedHash"], body => tools.UpdateChapterFields(
                 body.OptionalText("book") ?? throw new DenToolException(ToolErrorCodes.BadArgument, "Give the key of the chapter's book, in 'book'."),
                 body.OptionalText("chapter") ?? throw new DenToolException(ToolErrorCodes.BadArgument, "Give the chapter's key, in 'chapter'."),
                 EditHash(body, "/api/book/chapter-fields"),
@@ -111,7 +113,9 @@ public static class ContainerEndpoints
         api.MapGet("/chapter-defaults", (HttpContext c) => ReadEndpoints.Answer(
             c, ["universe", "series", "book"], q => tools.GetChapterDefaultsSource(q.Text("universe"), q.Text("series"), q.Text("book"))));
         api.MapPost("/chapter-defaults/edit", (Func<HttpContext, Task<IResult>>)(c => Create(
-            c, ["universe", "series", "book", "field", "changes", "expectedHash"], body => tools.UpdateChapterDefaults(
+            c,
+            tools,
+            ["universe", "series", "book", "field", "changes", "expectedHash"], body => tools.UpdateChapterDefaults(
                 EditHash(body, "/api/chapter-defaults"),
                 ChapterChanges(body),
                 body.OptionalText("universe"),
@@ -176,7 +180,7 @@ public static class ContainerEndpoints
         ToolErrorCodes.BadArgument,
         "Give 'expectedHash': the hash of the universe.md or series.md that lists the works, from /api/works. The create is refused if the file has changed since.");
 
-    private static async Task<IResult> Create<T>(HttpContext context, string[] members, Func<WriteEndpoints.Body, T> create, int status = StatusCodes.Status201Created)
+    private static async Task<IResult> Create<T>(HttpContext context, DenTools tools, string[] members, Func<WriteEndpoints.Body, T> create, int status = StatusCodes.Status201Created)
     {
         if (!context.Request.HasJsonContentType())
         {
@@ -203,7 +207,11 @@ public static class ContainerEndpoints
                 throw new DenToolException(ToolErrorCodes.BadArgument, $"The body isn't JSON: {e.Message}");
             }
 
-            return Results.Json(create(WriteEndpoints.Body.Of(context, json, members)), statusCode: status);
+            // A dropped request stops waiting for its turn to write (#234).
+            using (tools.CancelWith(context.RequestAborted))
+            {
+                return Results.Json(create(WriteEndpoints.Body.Of(context, json, members)), statusCode: status);
+            }
         }
         catch (DenToolException e)
         {

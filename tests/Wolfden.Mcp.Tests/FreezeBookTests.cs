@@ -309,6 +309,65 @@ public sealed class FreezeBookTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "SC-HIST-13")]
+    public void ABookMdGitIgnoresIsFinalButNotTagged()
+    {
+        RunGit("init", "--quiet");
+
+        // Ignored through .git/info/exclude, which isn't a den file, so the den's own files say nothing of it.
+        Directory.CreateDirectory(Path.Combine(_den.Root, ".git", "info"));
+        File.AppendAllText(Path.Combine(_den.Root, ".git", "info", "exclude"), "\n/" + BookFile + "\n", new UTF8Encoding(false));
+        var start = Commit("Start the Dracula notes, without book.md");
+        Assert.Equal("", RunGit("ls-files", "--", BookFile));
+        var tools = WithGit();
+
+        var frozen = tools.FreezeBook("dracula", null);
+
+        Assert.True(frozen.Changed);
+        Assert.Equal("final", frozen.Status);
+        Assert.Contains("\nstatus: final\n", _den.Read(BookFile), StringComparison.Ordinal);
+        Assert.Equal(FreezeSnapshot.NotTagged, frozen.Snapshot);
+        Assert.Null(frozen.Tag);
+        Assert.Contains("no checkpoint holds the book as it is now", frozen.Message, StringComparison.Ordinal);
+        Assert.Contains("git may be ignoring some of its files", frozen.Message, StringComparison.Ordinal);
+        Assert.Equal("", RunGit("tag", "--list"));
+        Assert.Equal(start, RunGit("rev-parse", "HEAD").Trim());
+        Assert.True(tools.GetBookFreeze("dracula").Unfinished);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-13")]
+    public void AFreezeTagAtALaterCheckpointCountsButOneOnAnotherBranchDoesNot()
+    {
+        RunGit("init", "--quiet");
+        _den.Write(BookFile, _den.Read(BookFile).Replace("status: draft\n", "status: final\n", StringComparison.Ordinal));
+        Commit("Mark Dracula final by hand");
+        var main = RunGit("rev-parse", "--abbrev-ref", "HEAD").Trim();
+
+        // A freeze tag on a branch made from that checkpoint, which the den isn't on: it doesn't count.
+        RunGit("checkout", "--quiet", "-b", "side");
+        _den.Write(PurfleetFile, _den.Read(PurfleetFile) + "\nOn the side.\n");
+        Commit("Side notes");
+        RunGit("tag", Tag);
+        RunGit("checkout", "--quiet", main);
+        var tools = WithGit();
+        Assert.True(tools.GetBookFreeze("dracula").Unfinished);
+
+        // One at a later checkpoint in the den's history, which holds the book the same, counts.
+        RunGit("tag", "-d", Tag);
+        _den.Write(PurfleetFile, _den.Read(PurfleetFile) + "\nCarfax is here.\n");
+        var later = Commit("Later notes outside the book");
+        RunGit("tag", Tag + "-2", later);
+        Assert.False(tools.GetBookFreeze("dracula").Unfinished);
+
+        var frozen = tools.FreezeBook("dracula", null);
+
+        Assert.Equal(FreezeSnapshot.AlreadyTagged, frozen.Snapshot);
+        Assert.Equal(Tag + "-2", frozen.Tag);
+        Assert.Equal(later, RunGit("rev-parse", "HEAD").Trim());
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-HIST-12")]
     public void FreezingAndUnfreezingKeepTheRestOfBookMdByteForByte()
     {

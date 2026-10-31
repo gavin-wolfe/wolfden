@@ -247,7 +247,7 @@ public sealed record SourceSection(int Index, string Name, int Level, int Line, 
 /// <param name="History">True if the den has history, so freezing checkpoints (and tags) and unfreezing checkpoints.</param>
 /// <param name="Reason">Why it has no history, in words for the writer, or null.</param>
 /// <param name="NextTag">For a draft book in a den whose history can make tags, the tag a freeze would add; otherwise null.</param>
-/// <param name="Unfinished">For a final book in a den with history, true if its freeze is unfinished: its <c>book.md</c> isn't checkpointed as it is, or that checkpoint isn't tagged (a step failed). Freezing again finishes it.</param>
+/// <param name="Unfinished">For a final book in a den with history, true if the book has changed since its snapshot: something in its folder isn't checkpointed as it is (edited outside Wolfden, or the checkpoint failed), or no freeze tag holds that checkpoint (the tag failed). Freezing again takes the snapshot.</param>
 /// <param name="OtherChanges">With history, how many changed den files outside the book a checkpoint now would also record (counted, never named, so a pinned server names nothing in other universes).</param>
 public sealed record BookFreezeView(
     int Version, string Universe, string Book, string Name, string Path, string Hash, string Status, string Backend, bool History, string? Reason, string? NextTag, bool Unfinished, int OtherChanges);

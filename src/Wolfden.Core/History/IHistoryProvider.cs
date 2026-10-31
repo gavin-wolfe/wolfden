@@ -122,6 +122,20 @@ public interface IHistoryProvider
         HistoryResult<bool>.Unavailable("This history backend can't compare a file with its latest recorded state.");
 
     /// <summary>
+    /// True if the checkpoint <paramref name="later"/> comes after
+    /// <paramref name="earlier"/> in the history the den is at now: it was
+    /// made from <paramref name="earlier"/> (or from a checkpoint made from
+    /// it), and the latest recorded state (for git, HEAD) is it or was made
+    /// from it. False for the same checkpoint, or one on another branch.
+    /// Freezing uses it to tell whether a freeze tag is at a checkpoint
+    /// later than the one that last changed the book (#201). A backend
+    /// without it says it isn't available.
+    /// </summary>
+    /// <exception cref="HistoryRevisionException">Either isn't a checkpoint in the history.</exception>
+    HistoryResult<bool> ComesAfter(string earlier, string later, CancellationToken cancellationToken = default) =>
+        HistoryResult<bool>.Unavailable("This history backend can't tell which of two checkpoints came first.");
+
+    /// <summary>
     /// The den files that a checkpoint made now would record: what changed
     /// since the latest checkpoint, or every den file when nothing has been
     /// checkpointed yet (#30). Paths only, no patches. By default it's

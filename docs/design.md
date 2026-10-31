@@ -372,13 +372,14 @@ a book final by hand and edit it after: if anything in the book's folder
 (`book.md`, the outline, its notes) differs from the latest checkpoint,
 it checkpoints; then it tags the latest checkpoint that changed the
 book's folder, which holds the book as it is now, unless one of the
-book's freeze tags already names that checkpoint or a later one, in
-which case it does nothing. A tag from an earlier freeze doesn't count,
+book's freeze tags already names that checkpoint or a later one (one
+made from it, in the history the den is on: two `git merge-base
+--is-ancestor` checks, #201), in which case it does nothing. A tag from an earlier freeze doesn't count,
 so a book unfrozen and frozen again gets its own tag. If git records
 nothing of the book (it ignores `book.md`, say), no tag is added, since
 no checkpoint would hold the book final. The web UI uses the same test
-to offer **Finish freezing** on a final book whose snapshot isn't
-finished.
+to offer **Finish freezing** on a final book that has changed since its
+snapshot (edited outside Wolfden), or whose checkpoint or tag failed.
 
 ## 6. History and versioning
 
@@ -982,6 +983,9 @@ store, so an edit changes only what it means to (format.md §12):
   wait covers both the wait for the session's own earlier writes (such
   as `serve`'s other requests) and the wait for other Wolfdens, so a
   write queued behind several gives up after 30 seconds, not 30 for each.
+  A call that's cancelled while it waits (an MCP client's cancel, or a
+  browser that goes away from `serve`) stops waiting at once and writes
+  nothing (#234); it ends as a cancelled call does, not with `den_busy`.
   Only a sharing or lock violation counts as held (on Windows; on Linux
   and macOS, `flock`'s `EWOULDBLOCK`); any other failure to open the
   lock file is `write_failed` at once. `check --fix` takes the lock too.
@@ -989,12 +993,21 @@ store, so an edit changes only what it means to (format.md §12):
   and tag included, so a freeze waiting on a signing passphrase makes
   other Wolfdens' writes `den_busy` after 30 seconds. `checkpoint` (the
   tool, the API's `/checkpoint`, and automatic checkpoints) doesn't take
-  it: it writes no den file, git has its own lock, and holding the den
-  lock across a commit would stall every other Wolfden's saves. The
-  cost: a checkpoint can record another process's multi-file write (a
-  rename's link rewrites, a move) half done, if it stages the files
-  while that write is part way through. Nothing is lost on disk, and the
-  next checkpoint records the rest. Other programs don't know the lock, so for an editor a small
+  it: it writes no den file, git has its own lock, and a save mustn't
+  wait on a checkpoint that's waiting on git (SC-WEB-53). The cost: a
+  checkpoint can record another process's multi-file write (a rename's
+  link rewrites, a move) half done, if git reads the files while that
+  write is part way through. Nothing is lost on disk, and the next
+  checkpoint records the rest. Taking the lock only while the files are
+  staged, then committing and signing outside it, wouldn't close this
+  (#234): a checkpoint is `git commit --only -- <den paths>`, which
+  reads the files from the disk itself as it commits, whatever was
+  staged before. Closing it without holding the lock across the commit
+  would mean committing a tree staged under the lock (a temporary
+  index, then a commit of it), a change to how every checkpoint is
+  made. The `checkpoint` tool holds its own session's turn across the
+  commit, so that session's next write waits for it, and `den_busy`
+  names "other writes to the den, or a checkpoint". Other programs don't know the lock, so for an editor a small
   window remains, as with the den store (§6): it can save the file after
   that last comparison and before the write replaces it. Closing it
   would need a lock every editor honours.
@@ -2136,8 +2149,9 @@ docs/
     or Cancel closes it. Afterwards it shows the result's message,
     marked as a warning when a step failed, and every cached answer is
     asked again (the control waits only for its own status), so the book's notes lose (or regain)
-    their edit controls. A final book whose freeze is unfinished also
-    has **Finish freezing…**, which freezes again.
+    their edit controls. A final book that has changed since its
+    snapshot, or whose checkpoint or tag failed, also has **Finish
+    freezing…**, which freezes again.
 - **New notes in the web UI** (#29). Four choices are maintainer
   decisions (on #29, 2026-10-28): a minimal form (the type, the name, and
   where the note goes, by default where the writer is), then the new

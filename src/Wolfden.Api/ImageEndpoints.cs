@@ -62,8 +62,12 @@ public static class ImageEndpoints
                 return TooLarge();
             }
 
-            var result = tools.AddImage(entity!, query.Text("name"), bytes, query.Text("universe"));
-            return Results.Json(result, statusCode: StatusCodes.Status201Created);
+            // A dropped request stops waiting for its turn to write (#234).
+            using (tools.CancelWith(context.RequestAborted))
+            {
+                var result = tools.AddImage(entity!, query.Text("name"), bytes, query.Text("universe"));
+                return Results.Json(result, statusCode: StatusCodes.Status201Created);
+            }
         }
         catch (DenToolException e)
         {

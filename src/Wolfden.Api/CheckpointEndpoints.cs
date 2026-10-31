@@ -93,7 +93,7 @@ public static class CheckpointEndpoints
                 return Error(StatusCodes.Status413PayloadTooLarge, "too_large", $"A checkpoint request is at most {LargestBody / 1024} KB.");
             }
 
-            return Answer(() => Make(options, Message(body)));
+            return Answer(() => Make(options, Message(body), c.RequestAborted));
         });
     }
 
@@ -132,7 +132,7 @@ public static class CheckpointEndpoints
     }
 
     /// <summary>Makes a checkpoint of the whole den with <paramref name="message"/>.</summary>
-    internal static IResult Make(WolfdenApiOptions options, string message)
+    internal static IResult Make(WolfdenApiOptions options, string message, CancellationToken cancellationToken)
     {
         var history = options.History();
         LedgerCheckpoint done;
@@ -147,7 +147,8 @@ public static class CheckpointEndpoints
                 inProgress = InProgress(history);
             }
 
-            done = options.Ledger.Checkpoint(history, new CheckpointRequest(message));
+            // A dropped request stops the checkpoint up to git's commit (#234), which is never stopped part way.
+            done = options.Ledger.Checkpoint(history, new CheckpointRequest(message), cancellationToken);
         }
         catch (ArgumentException e)
         {

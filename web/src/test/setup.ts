@@ -9,4 +9,4 @@ import { configure } from '@testing-library/dom'
 // went on running and clicked through the next test's page. So the waits
 // are long: they cost nothing when the page is quick, since a wait ends as
 // soon as what it waits for is there.
-configure({ asyncUtilTimeout: 10_000 })
+configure({ asyncUtilTimeout: 20_000 })

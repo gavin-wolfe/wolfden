@@ -47,6 +47,6 @@ export default defineConfig({
   test: {
     // Long waits, so a busy machine doesn't fail a test (#207): see src/test/setup.ts.
     setupFiles: ['./src/test/setup.ts'],
-    testTimeout: 30_000,
+    testTimeout: 60_000,
   },
 })

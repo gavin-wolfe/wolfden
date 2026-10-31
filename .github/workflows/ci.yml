@@ -35,8 +35,21 @@ jobs:
       - name: Build
         run: dotnet build --no-restore -c Release
 
+      # Blame mode names a test that hangs, and an assembly that misses
+      # xUnit's 60-second start-up check gets one more try (#248). See the
+      # script for both.
       - name: Test
-        run: dotnet test --no-build -c Release
+        shell: bash
+        run: scripts/ci/dotnet-test.sh TestResults
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-${{ matrix.os }}
+          path: TestResults
+          if-no-files-found: ignore
+          retention-days: 14
 
   wiki:
     # The wiki is built from docs/ on merge (wiki.yml). Check here that the

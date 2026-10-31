@@ -3,6 +3,7 @@ import { Link, getRouteApi } from '@tanstack/react-router'
 import { hierarchyQuery } from '../api'
 import { ChapterDefaultsSection } from '../components/ChapterFields'
 import { NewContainerButton } from '../components/NewContainer'
+import { NewMenu } from '../components/NewEntity'
 import { ErrorState, Loading } from '../components/States'
 import { useDocumentTitle, usePosition } from '../hooks'
 import { BookList, Counts } from './UniversePage'
@@ -44,9 +45,10 @@ export function SeriesPage() {
       </nav>
       <p className="eyebrow">Series</p>
       <h1>{s.name}</h1>
-      <p className="editor-actions">
+      <div className="editor-actions">
         <NewContainerButton kind="book" series={s.key} inName={s.name} />
-      </p>
+        <NewMenu universe={universe} place={{ scope: { kind: 'series', key: s.key }, name: s.name }} />
+      </div>
       <h2>Books</h2>
       <BookList universe={universe} books={s.books} empty="This series has no books yet." />
       <ChapterDefaultsSection key={s.key} scope={{ universe, series: s.key }} name={s.name} />

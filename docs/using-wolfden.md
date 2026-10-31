@@ -107,9 +107,17 @@ Set things up in this order. Each step builds on the ones before it.
 
 In `wolfden serve`, choose **New ▾** in the top bar and pick a type:
 character, location, event, and so on, plus any types your den's own
-packs add. Or, in the contents tree, open a type's list (Characters, say)
-under a book or the universe and choose **New Character** there: the type
-and the place are filled in for you.
+packs add. There are two shortcuts that fill in the place for you:
+
+- **New note ▾** on a universe's, series', or book's page. It lists every
+  type, including ones that place has no notes of yet, so a book you've
+  just made can have its first character. The note goes in that
+  universe, series, or book. A book marked final has no **New note ▾**,
+  since it takes nothing new until it's unfrozen.
+- **New Character** (or Location, and so on) under a type's list in the
+  contents tree. The type and the place are both filled in. A list only
+  shows up once that place has a note of that type, so for the first
+  one, use **New note ▾** on the page.
 
 The form asks for three things:
 
@@ -118,8 +126,9 @@ The form asks for three things:
 - **Name.** What you'll call it, and what links use (`[[Sister Agatha]]`).
   The file is named from it.
 - **Where it goes.** The universe, a series, or a book. It starts as the
-  place you're looking at: the book on a book or chapter page, the place a
-  note is filed on that note's page, and otherwise the universe. A book
+  place you're looking at: the book on a book or chapter page, the series
+  on a series page, the place a note is filed on that note's page, and
+  otherwise the universe. A book
   marked final takes nothing new until it's unfrozen.
 
 Choose **Create**, and Wolfden makes the file from the template and opens

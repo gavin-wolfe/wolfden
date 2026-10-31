@@ -31,9 +31,10 @@ import '../newEntity.css'
  * it goes, unless the writer is viewing at a story position and ticks
  * "Enters the story at …".
  *
- * Two ways in: the top bar's **New ▾** menu (any type) and a **New <type>**
- * button in each type's list in the contents tree (the type and the place
- * filled in).
+ * Three ways in: the top bar's **New ▾** menu (any type, where the writer
+ * is), a **New note ▾** menu on each universe, series, and book page (any
+ * type, in that place; #203), and a **New <type>** button in each type's
+ * list in the contents tree (the type and the place filled in).
  */
 
 interface NewEntityRequest {
@@ -165,16 +166,30 @@ export function CreatedNotice() {
   )
 }
 
+/** A fixed place for a page's New note menu: the universe, series, or book the page is about, and its name. */
+export interface NewMenuPlace {
+  scope: NewScope
+  name: string
+}
+
 /**
- * The top bar's **New ▾** menu: every type the den's packs define. It's a
- * menu button: Enter, Space, or the down arrow opens it on the first type,
- * the arrows, Home, and End move through the types, Escape closes it and
- * returns to the button, and choosing a type opens the New note form.
+ * A **New ▾** menu: every type the den's packs define. Types belong to the
+ * whole den, so every one is offered at every place, including types with no
+ * notes there yet. It's a menu button: Enter, Space, or the down arrow opens
+ * it on the first type, the arrows, Home, and End move through the types,
+ * Escape closes it and returns to the button, and choosing a type opens the
+ * New note form.
+ *
+ * Without `place` it's the top bar's menu, and the form starts where the
+ * writer is. With `place` it's a universe, series, or book page's
+ * **New note ▾** (#203), and the form starts in that place.
  */
-export function NewMenu({ universe }: { universe: string }) {
+export function NewMenu({ universe, place }: { universe: string; place?: NewMenuPlace }) {
   const types = useQuery(typesQuery)
   const openForm = useNewEntity()
-  const scope = useContextScope(universe)
+  const here = useContextScope(universe)
+  const scope = place?.scope ?? here
+  const menuLabel = place ? `New note in ${place.name}` : 'New note'
   const [open, setOpen] = useState(false)
   const menuId = useId()
   const buttonRef = useRef<HTMLButtonElement>(null)
@@ -265,6 +280,7 @@ export function NewMenu({ universe }: { universe: string }) {
       <button
         type="button"
         ref={buttonRef}
+        aria-label={place ? menuLabel : undefined}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
@@ -279,10 +295,10 @@ export function NewMenu({ universe }: { universe: string }) {
           }
         }}
       >
-        New <span aria-hidden="true">▾</span>
+        {place ? 'New note' : 'New'} <span aria-hidden="true">▾</span>
       </button>
       {open && (
-        <ul id={menuId} role="menu" aria-label="New note" className="new-menu-list" ref={menuRef} tabIndex={-1} onKeyDown={onMenuKey}>
+        <ul id={menuId} role="menu" aria-label={menuLabel}className="new-menu-list" ref={menuRef} tabIndex={-1} onKeyDown={onMenuKey}>
           {types.isPending ? (
             <li role="menuitem" aria-disabled="true" tabIndex={-1}>
               Loading the types…

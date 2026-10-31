@@ -4,6 +4,7 @@ import { count, hierarchyQuery, type BookNode, type EntityCounts, type SeriesNod
 import { typePlural } from '../components/Links'
 import { ChapterDefaultsSection } from '../components/ChapterFields'
 import { NewContainerButton } from '../components/NewContainer'
+import { NewMenu } from '../components/NewEntity'
 import { ErrorState, Loading } from '../components/States'
 import { useDocumentTitle, usePosition } from '../hooks'
 
@@ -35,10 +36,11 @@ export function UniversePage() {
         {u.series.length > 0 && `${count(u.series.length, 'series', 'series')} and `}
         {count(u.books.length + u.series.reduce((n, s) => n + s.books.length, 0), 'book', 'books')}.
       </p>
-      <p className="editor-actions">
+      <div className="editor-actions">
         <NewContainerButton kind="series" inName={u.name} />
         <NewContainerButton kind="book" inName={u.name} />
-      </p>
+        <NewMenu universe={universe} place={{ scope: { kind: 'universe', key: u.key }, name: u.name }} />
+      </div>
       <Counts counts={u.entities} title="Filed in the universe" />
       {u.series.map((s) => (
         <section key={s.key}>

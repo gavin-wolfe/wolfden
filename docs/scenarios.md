@@ -4370,6 +4370,14 @@ then Character, names her "Sister Agatha", and creates her.
   indicator ask again. Leaving the page ends the notice.
 - Each type's list in the contents tree has **New <type>**, with the type
   and that place filled in; both can still be changed.
+- Each universe, series, and book page has **New note ▾** (#203), a menu
+  button like the top bar's, named for its place ("New note in The
+  Harker Papers"). It lists every enabled type, including types with no
+  notes there yet, so a new book with no type lists in the tree can
+  still have its first character; choosing one opens the form with the
+  type and that place filled in. A final book's page has none, as it has
+  no Add chapter; the top bar's **New ▾** still reaches the form, which
+  explains why the book takes nothing.
 - Viewing at a story position the universe has, the form offers "Enters
   the story at <position>", off by default; ticked, the note gets `from:`
   that position. It's offered only where the chosen place can see the

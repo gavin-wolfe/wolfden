@@ -828,6 +828,38 @@ public sealed partial class GitHistory : IHistoryProvider
 
     /// <inheritdoc />
     /// <remarks>
+    /// Two <c>git merge-base --is-ancestor</c> checks (#201): <paramref name="earlier"/>
+    /// is an ancestor of <paramref name="later"/>, and <paramref name="later"/> of HEAD.
+    /// Each reads only the commits between the two, however long the history.
+    /// </remarks>
+    public HistoryResult<bool> ComesAfter(string earlier, string later, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(earlier);
+        ArgumentNullException.ThrowIfNull(later);
+        var from = Resolve(earlier, cancellationToken);
+        var to = Resolve(later, cancellationToken);
+        if (from == to || Head(cancellationToken) is not { } head)
+        {
+            return HistoryResult<bool>.Done(false);
+        }
+
+        return HistoryResult<bool>.Done(IsAncestor(from, to, cancellationToken) && IsAncestor(to, head, cancellationToken));
+    }
+
+    /// <summary>True if the commit <paramref name="ancestor"/> is <paramref name="commit"/> or one it was made from; both are commit hashes.</summary>
+    private bool IsAncestor(string ancestor, string commit, CancellationToken cancellationToken)
+    {
+        var run = Run(["merge-base", "--is-ancestor", ancestor, commit], cancellationToken);
+        return run.ExitCode switch
+        {
+            0 => true,
+            1 => false,
+            _ => throw Failed("merge-base", run),
+        };
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
     /// The same comparison as a diff since the latest checkpoint (new files
     /// included, through a temporary index, #142), but before the first
     /// checkpoint it compares with nothing, so every den file is added.

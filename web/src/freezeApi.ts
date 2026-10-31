@@ -24,7 +24,7 @@ export interface BookFreeze {
   reason: string | null
   /** For a draft book in a den with history, the tag a freeze would add, such as book/dracula/dracula/final. */
   nextTag: string | null
-  /** For a final book in a den with history: its snapshot isn't finished (git refused the checkpoint or the tag), and freezing again finishes it. */
+  /** For a final book in a den with history: the book has changed since its snapshot (edited outside Wolfden, or git refused the checkpoint or the tag), and freezing again takes a new one. */
   unfinished: boolean
   /** With history, how many changed files outside the book a checkpoint now would also record (counted, never named). */
   otherChanges: number

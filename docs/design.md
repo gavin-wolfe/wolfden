@@ -372,13 +372,14 @@ a book final by hand and edit it after: if anything in the book's folder
 (`book.md`, the outline, its notes) differs from the latest checkpoint,
 it checkpoints; then it tags the latest checkpoint that changed the
 book's folder, which holds the book as it is now, unless one of the
-book's freeze tags already names that checkpoint or a later one, in
-which case it does nothing. A tag from an earlier freeze doesn't count,
+book's freeze tags already names that checkpoint or a later one (one
+made from it, in the history the den is on: two `git merge-base
+--is-ancestor` checks, #201), in which case it does nothing. A tag from an earlier freeze doesn't count,
 so a book unfrozen and frozen again gets its own tag. If git records
 nothing of the book (it ignores `book.md`, say), no tag is added, since
 no checkpoint would hold the book final. The web UI uses the same test
-to offer **Finish freezing** on a final book whose snapshot isn't
-finished.
+to offer **Finish freezing** on a final book that has changed since its
+snapshot (edited outside Wolfden), or whose checkpoint or tag failed.
 
 ## 6. History and versioning
 
@@ -2136,8 +2137,9 @@ docs/
     or Cancel closes it. Afterwards it shows the result's message,
     marked as a warning when a step failed, and every cached answer is
     asked again (the control waits only for its own status), so the book's notes lose (or regain)
-    their edit controls. A final book whose freeze is unfinished also
-    has **Finish freezing…**, which freezes again.
+    their edit controls. A final book that has changed since its
+    snapshot, or whose checkpoint or tag failed, also has **Finish
+    freezing…**, which freezes again.
 - **New notes in the web UI** (#29). Four choices are maintainer
   decisions (on #29, 2026-10-28): a minimal form (the type, the name, and
   where the note goes, by default where the writer is), then the new

@@ -142,7 +142,14 @@ public static class ImageFiles
         }
 
         var cut = alt.LastIndexOf(' ', MaxAltLength);
-        return (cut > MaxAltLength / 2 ? alt[..cut] : alt[..MaxAltLength]).TrimEnd();
+        if (cut <= MaxAltLength / 2)
+        {
+            // No word break in the second half: cut hard, but not between the two halves of a
+            // surrogate pair (an emoji), which would leave half a character.
+            cut = char.IsHighSurrogate(alt[MaxAltLength - 1]) ? MaxAltLength - 1 : MaxAltLength;
+        }
+
+        return alt[..cut].TrimEnd();
     }
 
     /// <summary>The longest alt text <see cref="AltText"/> makes from a file name.</summary>
@@ -231,9 +238,13 @@ public static class ImageFiles
         }
     }
 
-    /// <summary>True if the text has a DOCTYPE whose internal subset declares an entity.</summary>
+    /// <summary>
+    /// True if the text has a DOCTYPE whose internal subset declares an entity. The
+    /// search stops at the first <c>]</c> outside quotes, where the subset ends, so a
+    /// <c>&lt;!ENTITY</c> later in the file (in a comment, say) doesn't count.
+    /// </summary>
     private static bool DeclaresEntities(ReadOnlySpan<byte> bytes) =>
-        SvgText(bytes) is { } text && Regex.IsMatch(text, @"<!DOCTYPE\s[^>\[]*\[[\s\S]*?<!ENTITY", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+        SvgText(bytes) is { } text && Regex.IsMatch(text, @"<!DOCTYPE\s[^>\[]*\[(?:[^\]""']|""[^""]*""|'[^']*')*?<!ENTITY", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 
     /// <summary>The bytes as text: UTF-16 with a byte order mark, or else UTF-8 (with or without one); null if they aren't valid text.</summary>
     private static string? SvgText(ReadOnlySpan<byte> bytes)

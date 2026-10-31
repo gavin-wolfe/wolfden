@@ -108,6 +108,22 @@ async function openLeadEditor() {
   return editorViewIn(group)!
 }
 
+/** Holds the first upload until `hold`'s resolve is called; the rest go straight through. */
+function holdFirstUpload(hold: (resolve: () => void) => void) {
+  let held = false
+  const fetchMock = vi.mocked(fetch)
+  const answer = fetchMock.getMockImplementation()!
+  fetchMock.mockImplementation((async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(String(input), 'http://127.0.0.1')
+    if (url.pathname === '/api/entity/image' && !held) {
+      held = true
+      await new Promise<void>((resolve) => hold(resolve))
+    }
+
+    return answer(input, init)
+  }) as typeof fetch)
+}
+
 function pick(files: File[]) {
   const input = screen.getByLabelText('Image to add') as HTMLInputElement
   Object.defineProperty(input, 'files', { value: files, configurable: true })
@@ -226,6 +242,74 @@ describe('SC-WEB-80: I add a picture to a note while editing it', () => {
     await screen.findByText(/Saved images\/first\.png/)
     expect(uploads.map((u) => u.query.name)).toEqual(['first.png'])
     expect(view.state.doc.toString()).not.toContain('second')
+  })
+
+  it('leaves the cursor where it was when a drop is refused, so the batch in progress goes in there', async () => {
+    let finish: (() => void) | null = null
+    const { uploads } = stubImages()
+    holdFirstUpload((resolve) => (finish = resolve))
+    renderApp('/u/dracula/e/E-MINA')
+    const view = await openLeadEditor()
+    // jsdom has no layout, so say where a drop lands.
+    view.posAtCoords = () => 0
+    act(() => view.dispatch({ selection: { anchor: view.state.doc.length } }))
+
+    pick([png('first.png')])
+    await screen.findByText('Adding first.png…')
+
+    const drop = new Event('drop', { bubbles: true, cancelable: true })
+    Object.defineProperty(drop, 'dataTransfer', { value: { files: [png('second.png')], types: ['Files'] } })
+    act(() => {
+      view.contentDOM.dispatchEvent(drop)
+    })
+    expect(drop.defaultPrevented).toBe(true)
+    await screen.findByText(/One batch of images at a time/)
+    expect(view.state.selection.main.head).toBe(view.state.doc.length)
+
+    act(() => finish!())
+    await screen.findByText(/Saved images\/first\.png/)
+    expect(uploads.map((u) => u.query.name)).toEqual(['first.png'])
+    expect(view.state.doc.toString()).toBe('# Mina Harker\n\nA schoolmistress.![first](images/first.png)')
+
+    // Once it's in, a drop goes where it's dropped.
+    const again = new Event('drop', { bubbles: true, cancelable: true })
+    Object.defineProperty(again, 'dataTransfer', { value: { files: [png('second.png')], types: ['Files'] } })
+    act(() => {
+      view.contentDOM.dispatchEvent(again)
+    })
+    await screen.findByText(/Saved images\/second\.png/)
+    expect(view.state.doc.toString().startsWith('![second](images/second.png)# Mina Harker')).toBe(true)
+  })
+
+  it('turns Save and Cancel off while an image is being added, and Ctrl+Enter and Escape wait', async () => {
+    let finish: (() => void) | null = null
+    stubImages()
+    holdFirstUpload((resolve) => (finish = resolve))
+    renderApp('/u/dracula/e/E-MINA')
+    const view = await openLeadEditor()
+    act(() => view.dispatch({ changes: { from: view.state.doc.length, insert: ' Edited.' } }))
+    const save = screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement
+    const cancel = screen.getByRole('button', { name: 'Cancel' }) as HTMLButtonElement
+    expect(save.disabled).toBe(false)
+
+    pick([png('first.png')])
+    await screen.findByText('Adding first.png…')
+    expect(save.disabled).toBe(true)
+    expect(cancel.disabled).toBe(true)
+    expect(screen.getByText('Save and Cancel come back once the image is added.')).toBeTruthy()
+
+    act(() => {
+      fireEvent.keyDown(view.contentDOM, { key: 'Escape' })
+    })
+    await screen.findByText(/Save and Cancel wait until the image is added\./)
+    expect(screen.getByRole('group', { name: 'Markdown of the opening' })).toBeTruthy()
+
+    act(() => finish!())
+    await screen.findByText(/Saved images\/first\.png/)
+    expect(save.disabled).toBe(false)
+    expect(cancel.disabled).toBe(false)
+    expect(view.state.doc.toString()).toBe('![first](images/first.png)# Mina Harker\n\nA schoolmistress. Edited.')
+    expect(screen.getByText('Ctrl+Enter (⌘+Enter) saves, Escape cancels.')).toBeTruthy()
   })
 
   it('says which dropped files it left out because they aren’t images', async () => {

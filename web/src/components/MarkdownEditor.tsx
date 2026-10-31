@@ -26,7 +26,10 @@ import { imageExtensions, imageMarkdown, imageProblem, looksLikeImage, type Adde
  * With `addImage` (#187), an image picked with Add image…, dropped on the
  * editor, or pasted into it is sent to be saved in the den, and
  * `![alt](path)` goes in at the cursor (or where it was dropped). Dropped or
- * pasted files that aren't images are left to CodeMirror.
+ * pasted files that aren't images are left to CodeMirror. While images are
+ * being added, Ctrl+Enter and Escape wait (saying so), and `onAddingImages`
+ * tells the page, so it can turn its own Save and Cancel off: a save then
+ * would leave the image out of the text.
  */
 export function MarkdownEditor({
   value,
@@ -38,6 +41,7 @@ export function MarkdownEditor({
   autoFocus = false,
   minLines = 4,
   addImage,
+  onAddingImages,
 }: {
   value: string
   onChange: (text: string) => void
@@ -49,17 +53,34 @@ export function MarkdownEditor({
   minLines?: number
   /** Saves an image in the den for this note; without it, the editor doesn't add images. */
   addImage?: (file: File) => Promise<AddedImage>
+  /** Called with true when images start being added, and false once they're in (or failed). */
+  onAddingImages?: (adding: boolean) => void
 }) {
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<EditorView | null>(null)
   // The latest callbacks, so the editor made once always calls them.
-  const handlers = useRef({ onChange, onSave, onCancel, addImage })
-  handlers.current = { onChange, onSave, onCancel, addImage }
+  const handlers = useRef({ onChange, onSave, onCancel, addImage, onAddingImages })
+  handlers.current = { onChange, onSave, onCancel, addImage, onAddingImages }
   const [imageStatus, setImageStatus] = useState<ImageStatus | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
   // True while images are being added. More dropped or pasted then are refused, as the button is off.
   const busy = useRef(false)
+
+  // Says why something waits until the images in progress are added.
+  const wait = (why: string) =>
+    setImageStatus((now) => ({ ...(now ?? { text: '' }), busy: true, waiting: why }))
+
+  // Ctrl+Enter and Escape while images are being added: they wait, so the image isn't left out of the text.
+  const unlessAdding = (action: () => void) => () => {
+    if (busy.current) {
+      wait('Save and Cancel wait until the image is added.')
+    } else {
+      action()
+    }
+
+    return true
+  }
 
   // Adds the files one at a time, each at the cursor, and says what happened.
   // `skipped` names dropped files that aren't images, which aren't added.
@@ -71,15 +92,12 @@ export function MarkdownEditor({
     }
 
     if (busy.current) {
-      setImageStatus((now) => ({
-        ...(now ?? { text: '' }),
-        busy: true,
-        waiting: 'One batch of images at a time: wait until this one is added, then add the others again.',
-      }))
+      wait('One batch of images at a time: wait until this one is added, then add the others again.')
       return
     }
 
     busy.current = true
+    handlers.current.onAddingImages?.(true)
     const saved: string[] = []
     const failed: string[] = []
     const notes: string[] = []
@@ -109,6 +127,7 @@ export function MarkdownEditor({
       }
     } finally {
       busy.current = false
+      handlers.current.onAddingImages?.(false)
     }
 
     const parts: string[] = []
@@ -144,8 +163,8 @@ export function MarkdownEditor({
           EditorView.lineWrapping,
           placeholderText('Write in Markdown…'),
           keymap.of([
-            { key: 'Mod-Enter', run: () => (handlers.current.onSave(), true) },
-            { key: 'Escape', run: () => (handlers.current.onCancel(), true) },
+            { key: 'Mod-Enter', run: unlessAdding(() => handlers.current.onSave()) },
+            { key: 'Escape', run: unlessAdding(() => handlers.current.onCancel()) },
             ...historyKeymap,
             ...defaultKeymap.filter((k) => k.key !== 'Mod-Enter'),
           ]),
@@ -166,9 +185,11 @@ export function MarkdownEditor({
 
               event.preventDefault()
               // Where it was dropped, if the editor can tell (it measures the layout); else at the cursor.
+              // Not while a batch is being added: this drop is refused, and the cursor
+              // stays where the rest of that batch is going in.
               let at: number | null = null
               try {
-                at = editor.posAtCoords({ x: event.clientX, y: event.clientY })
+                at = busy.current ? null : editor.posAtCoords({ x: event.clientX, y: event.clientY })
               } catch {
                 at = null
               }

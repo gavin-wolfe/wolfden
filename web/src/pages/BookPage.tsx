@@ -110,8 +110,8 @@ export function BookPage() {
           })}
         </ol>
       )}
-      <AddChapter key={b.key} universe={universe} book={b.key} bookName={b.name} chapters={b.chapters.length} final={b.status === 'final'} />
-      <ChapterDefaultsSection key={b.key} scope={{ universe, book: b.key }} name={b.name} />
+      <AddChapter key={`add-chapter:${b.key}`} universe={universe} book={b.key} bookName={b.name} chapters={b.chapters.length} final={b.status === 'final'} />
+      <ChapterDefaultsSection key={`chapter-defaults:${b.key}`} scope={{ universe, book: b.key }} name={b.name} />
       <Counts counts={b.entities} title={at === undefined ? 'Filed in this book' : 'Filed in this book, met by this point'} />
     </div>
   )

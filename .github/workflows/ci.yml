@@ -38,6 +38,28 @@ jobs:
       - name: Test
         run: dotnet test --no-build -c Release
 
+  wiki:
+    # The wiki is built from docs/ on merge (wiki.yml). Check here that the
+    # pages build and every link on them resolves, so a broken link shows up
+    # in the PR rather than after it.
+    name: Wiki pages (build and check links)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - name: Test the page builder
+        run: node --test scripts/wiki/wiki.test.mjs
+
+      - name: Build the pages and check their links
+        run: node scripts/wiki/wiki.mjs --out "$RUNNER_TEMP/pages" --check
+
   web:
     name: Web UI (build and test)
     runs-on: ubuntu-latest

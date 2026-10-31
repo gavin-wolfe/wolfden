@@ -77,6 +77,27 @@ If the server runs on another port (`serve --port <n>`), set
 Pin each npm dependency to an exact version, commit `package-lock.json`,
 and check its license first, as for NuGet packages.
 
+## Docs and the wiki
+
+The [wiki](https://github.com/gavin-wolfe/wolfden/wiki) is generated from
+`docs/`, so edit the files in `docs/`, not the wiki. When a change to
+`docs/` merges to `main`, a workflow rebuilds the wiki pages and publishes
+them, and edits made on the wiki itself are overwritten.
+
+- The writer-facing docs (`using-wolfden.md`, `where-to-file.md`,
+  `mcp-clients.md`, `types.md`, and `format.md`) each become a wiki page.
+  The wiki's Home page and sidebar live in `docs/wiki/`. Design docs such
+  as `design.md` and `scenarios.md` aren't published; links to them point
+  at the repo.
+- Link between docs with ordinary relative links (`format.md#62-universemd`).
+  The build turns them into wiki links. CI builds the pages and checks
+  the links in them, and fails if a link or its heading anchor doesn't
+  resolve. Docs that aren't published aren't checked.
+- To publish a new doc, add it to the `PAGES` list in
+  `scripts/wiki/wiki.mjs` and link it from `docs/wiki/_Sidebar.md`.
+- To preview the pages, run
+  `node scripts/wiki/wiki.mjs --out <folder> --check`.
+
 ## Branches and pull requests
 
 - Fork the repo and work on a branch in your fork, never directly on `main`.

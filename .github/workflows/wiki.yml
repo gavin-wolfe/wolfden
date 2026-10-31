@@ -1,0 +1,86 @@
+name: Wiki
+
+# Publishes the GitHub wiki from docs/ (#244). docs/ is the source of
+# truth and is reviewed in pull requests; this workflow rebuilds the wiki
+# pages with scripts/wiki/wiki.mjs and pushes them to the wiki's own git
+# repo. Hand edits on the wiki are overwritten by the next run.
+#
+# The wiki's git repo exists only once a first page has been saved in the
+# web UI, so a maintainer creates a placeholder Home page once. This
+# workflow replaces it.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "scripts/wiki/**"
+      - ".github/workflows/wiki.yml"
+  workflow_dispatch:
+
+# GITHUB_TOKEN with contents: write can push to this repo's wiki. Nothing
+# else is needed, and no other secret is used.
+permissions:
+  contents: write
+
+# One publish at a time. A run that starts while another is going waits.
+# GitHub keeps only one waiting run: a newer one replaces it (cancelling
+# it), which is fine, since the newer run publishes the newer docs.
+concurrency:
+  group: wiki
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    # Only main's docs are published, including from a manual run.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - name: Test the page builder
+        run: node --test scripts/wiki/wiki.test.mjs
+
+      - name: Build the pages and check their links
+        run: node scripts/wiki/wiki.mjs --out "$RUNNER_TEMP/pages" --check
+
+      - name: Publish to the wiki
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          # Pass the token as a header for each command, so it's never
+          # written into the clone's git config or a remote URL.
+          auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)"
+          echo "::add-mask::${auth#AUTHORIZATION: basic }"
+          wiki="$RUNNER_TEMP/wiki"
+
+          if ! git -c http.extraheader="$auth" clone --depth 1 "https://github.com/$REPO.wiki.git" "$wiki"; then
+            echo "::error::Couldn't clone the wiki. If it has no pages yet, create a placeholder Home page in the wiki's web UI once, then run this workflow again."
+            exit 1
+          fi
+
+          # The wiki is exactly the built pages: anything else there (the
+          # placeholder, a hand-made page, a renamed page) is removed.
+          find "$wiki" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp "$RUNNER_TEMP"/pages/*.md "$wiki"/
+
+          cd "$wiki"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "The wiki is up to date."
+            exit 0
+          fi
+          git status --short
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "docs: publish from ${SHA:0:7}" -m "Generated from docs/ at https://github.com/$REPO/commit/$SHA"
+          git -c http.extraheader="$auth" push origin HEAD

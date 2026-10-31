@@ -993,12 +993,21 @@ store, so an edit changes only what it means to (format.md §12):
   and tag included, so a freeze waiting on a signing passphrase makes
   other Wolfdens' writes `den_busy` after 30 seconds. `checkpoint` (the
   tool, the API's `/checkpoint`, and automatic checkpoints) doesn't take
-  it: it writes no den file, git has its own lock, and holding the den
-  lock across a commit would stall every other Wolfden's saves. The
-  cost: a checkpoint can record another process's multi-file write (a
-  rename's link rewrites, a move) half done, if it stages the files
-  while that write is part way through. Nothing is lost on disk, and the
-  next checkpoint records the rest. Other programs don't know the lock, so for an editor a small
+  it: it writes no den file, git has its own lock, and a save mustn't
+  wait on a checkpoint that's waiting on git (SC-WEB-53). The cost: a
+  checkpoint can record another process's multi-file write (a rename's
+  link rewrites, a move) half done, if git reads the files while that
+  write is part way through. Nothing is lost on disk, and the next
+  checkpoint records the rest. Taking the lock only while the files are
+  staged, then committing and signing outside it, wouldn't close this
+  (#234): a checkpoint is `git commit --only -- <den paths>`, which
+  reads the files from the disk itself as it commits, whatever was
+  staged before. Closing it without holding the lock across the commit
+  would mean committing a tree staged under the lock (a temporary
+  index, then a commit of it), a change to how every checkpoint is
+  made. The `checkpoint` tool holds its own session's turn across the
+  commit, so that session's next write waits for it, and `den_busy`
+  names "other writes to the den, or a checkpoint". Other programs don't know the lock, so for an editor a small
   window remains, as with the den store (§6): it can save the file after
   that last comparison and before the write replaces it. Closing it
   would need a lock every editor honours.

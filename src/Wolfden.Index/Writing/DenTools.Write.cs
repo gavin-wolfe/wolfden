@@ -632,7 +632,9 @@ public sealed partial class DenTools
 
         // Only this session's turn, not the den's write lock: a checkpoint writes no den
         // file, and git keeps its own lock, so another Wolfden's writes needn't wait on
-        // git (or on a signing passphrase).
+        // git (or on a signing passphrase). Holding the den lock only while staging
+        // wouldn't keep their writes out of the commit (#234): 'git commit --only'
+        // reads the files from the disk as it commits (design.md §8).
         lock (_writeLock)
         {
             var history = History();

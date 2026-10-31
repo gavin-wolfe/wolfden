@@ -1797,7 +1797,12 @@ docs/
     lead, section, Add section, and Edit file editors have **Add
     image…** under them, and take an image dropped or pasted into the
     text; dropped or pasted files that aren't images are left to
-    CodeMirror. Each file goes to `POST /api/entity/image?entity=&universe=&name=`,
+    CodeMirror, and a drop's other files are named in the status line.
+    A paste whose clipboard has non-empty `text/plain` is left to
+    CodeMirror even when it holds an image too, since Office on Windows
+    adds a bitmap of the copied text. While a batch is being added, the
+    button is off and more images dropped or pasted are refused with a
+    note (not queued). Each file goes to `POST /api/entity/image?entity=&universe=&name=`,
     with the file itself as the body, sent as `application/octet-stream`
     or an `image/...` type (anything else is 415, so a plain HTML form
     can't send one, as for the JSON edits). It's the write tools'
@@ -1805,7 +1810,10 @@ docs/
     atomically through the den store, never replacing a file
     (`DenWriteMode.Create`), lands in the server's checkpoint ledger,
     and doesn't checkpoint. The server picks the path: the `images/`
-    folder beside the note's file (as Obsidian's "In subfolder under
+    folder beside the note's file (an existing one in another case, such
+    as `Images/`, is used as it's spelled, in the path and the link; a
+    file or folder link of that name is `already_exists`, 409, saying
+    what to rename; as Obsidian's "In subfolder under
     current folder" does, and as "Where to put them" in
     `using-wolfden.md` suggests), and a name made from `name` as a slug
     (F-TPL-6's rules; `image` if nothing's left; `-image` added to a
@@ -1814,14 +1822,18 @@ docs/
     result's `effects` says so. Only the image types `serve` shows are
     taken, and the contents must be the type the extension says, by
     their first bytes (an SVG must be well-formed XML whose first
-    element is `svg`; its DOCTYPE is skipped, never read); a mismatch is
+    element is `svg`, in UTF-8 or BOM-marked UTF-16; its DOCTYPE is
+    skipped, never read, so an SVG that declares entities, as
+    Illustrator's SVG 1.1 Save As does, is refused with how to export it
+    without them); a mismatch is
     `bad_argument`, naming the type it is. A body over 10 MiB is 413
     `too_large`. A note in a final book is `frozen`, with the
     Unfreeze hint, and `serve --universe` pins it as it pins edits. The
     answer (201) has the image's den `path`, the `link` to write
     (relative to the note's folder, F-LAY-9, such as
     `images/castle-map.png`), `alt` text made from the file's name
-    (`-` and `_` as spaces, brackets dropped), `bytes`, and `effects`.
+    (`-` and `_` as spaces, brackets dropped, at most 100 characters cut
+    at a word), `bytes`, and `effects`.
     The page puts `![alt](link)` in at the cursor (or where it was
     dropped); the note is saved only when the writer saves it, and an
     image added in an edit that's cancelled stays in the den.

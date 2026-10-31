@@ -548,13 +548,17 @@ When you edit a note's opening, a section, or the whole file in
 
 - Click **Add image…** under the editor and pick one or more files,
   drag an image from your computer onto the text, or paste one (a
-  screenshot, say) into it.
+  screenshot, say) into it. Pasting text copied from Word, Excel, or
+  OneNote pastes the text, even though they copy a picture of it too.
+  Wait for one batch of images to finish before adding the next.
 - Wolfden saves a copy in an `images/` folder beside the note, and puts
   `![alt text](images/name.png)` in the text where your cursor is (or
   where you dropped it). Adding `Castle Map.PNG` to
   `universes/dracula/entities/locations/castle-dracula.md` saves
   `universes/dracula/entities/locations/images/castle-map.png` and
-  writes `![Castle Map](images/castle-map.png)`.
+  writes `![Castle Map](images/castle-map.png)`. If the note's folder
+  already has an `Images/` folder (in any mix of capitals), Wolfden uses
+  that one, spelled as it is.
 - The alt text comes from the file's name. Change it to say what the
   picture shows: it's what shows if the picture can't, and what screen
   readers say.
@@ -569,8 +573,8 @@ When you edit a note's opening, a section, or the whole file in
 - The image is saved at once, but the note isn't: **Save** the note to
   keep the line that shows it. If you cancel instead, the image stays in
   the `images/` folder; delete it there if you don't want it.
-- Adding an image isn't a checkpoint, like saving. The next checkpoint
-  records it with your notes.
+- Like saving, adding an image doesn't make a checkpoint. The next
+  checkpoint records it with your notes.
 - A note in a book marked final can't get new images until the book is
   unfrozen.
 

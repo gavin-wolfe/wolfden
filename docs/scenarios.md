@@ -4834,7 +4834,12 @@ The writer edits the opening of Castle Dracula's note,
 - Dropping `ship.webp` on the text, or pasting a screenshot
   (`image.png`), does the same, at the drop point or the cursor. Pasted
   or dropped text, or a file that isn't an image, is left to the
-  editor.
+  editor. Text copied from Word comes with a picture of it, but it's
+  the text that's pasted, and nothing is uploaded. Dropping `map.png`
+  with `chapter-notes.txt` adds the map and says the notes file wasn't
+  added, since it isn't an image.
+- If the note's folder already has `Images/`, the image goes there and
+  the link says `Images/...`.
 - If the folder already has `castle-map.png`, or `Castle-Map-2.png` in
   another case, a new `castle_map.png` is saved as `castle-map-3.png`
   and the page says why. No file is ever replaced. Several images picked
@@ -4843,6 +4848,7 @@ The writer edits the opening of Castle Dracula's note,
 Spec: design.md §9 ("Adding images", #187), format.md F-LAY-9. Covered by:
 `ImageEndpointTests.AnImageIsSavedBesideTheNoteUnderASlugAndTheNoteIsUnchanged`,
 `ImageEndpointTests.AFileAlreadyThereIsNeverReplacedTheNewOneGetsANumber`,
+`ImageEndpointTests.AnImagesFolderInAnotherCaseIsUsedAsItsSpelled`,
 `EditorImages.test.tsx` (web).
 
 ### SC-WEB-81. Adding an image is guarded
@@ -4866,7 +4872,15 @@ Spec: design.md §9 ("Adding images", #187), format.md F-LAY-9. Covered by:
   **Unfreeze…** on the book's page; the page shows the refusal and
   changes nothing. A server pinned to another universe refuses it.
   While another Wolfden holds the den's write lock past the wait, it's
-  `den_busy` and nothing is written.
+  `den_busy` and nothing is written. A file named `images` beside the
+  note is a conflict (409) that says to rename or move it.
+- While an image is being added, the button is off, and an image dropped
+  or pasted meanwhile is refused with a note to add it again after.
+- An SVG that declares entities in its DOCTYPE (as Illustrator's SVG
+  1.1 Save As writes) is refused, saying to export it without them or
+  add a PNG. If another program saves a file of the chosen name just
+  before Wolfden writes, that file is kept and the image takes the next
+  number.
 
 Spec: design.md §9 ("Adding images", #187). Covered by:
 `ImageEndpointTests.TheServerPicksTheNameSoItStaysInTheNotesImagesFolder`,
@@ -4878,4 +4892,6 @@ Spec: design.md §9 ("Adding images", #187). Covered by:
 `ImageEndpointTests.ANoteInAFinalBookRefusesTheImageWithTheUnfreezeHint`,
 `ImageEndpointTests.APinnedServerAddsImagesOnlyInItsUniverse`,
 `ImageEndpointTests.AnImageWhileAnotherWolfdenKeepsWritingIsDenBusyAndWritesNothing`,
+`ImageEndpointTests.AFileNamedImagesBesideTheNoteIsAConflictThatSaysWhatToRename`,
+`AddImageTests.AFileMadeMeanwhileByAnotherProgramIsKeptAndTheImageTakesTheNextName` (MCP),
 `ImageFileTests` (core), `EditorImages.test.tsx` (web).

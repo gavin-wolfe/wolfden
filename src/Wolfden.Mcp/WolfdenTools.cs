@@ -179,8 +179,9 @@ public sealed class WolfdenTools
         [Description("Where the reader first meets it, as a position such as 'dracula:5'. Leave it out for the start of where it's filed.")] string? from = null,
         [Description("Field values, as an object from field name to value, such as {\"born\": \"1873\", \"occupation\": [\"solicitor\"]}. A value that changes over time is a list of entries: [{\"value\": \"x\", \"from\": \"dracula:3\"}].")] JsonElement? fields = null,
         [Description("Text for the lead, before the first section.")] string? text = null,
-        [Description(RelinksHelp)] bool allow_relinks = false) =>
-        Respond(() => _tools.CreateEntity(type, name, universe, series, book, slug, aliases, status, from, fields, text, allow_relinks));
+        [Description(RelinksHelp)] bool allow_relinks = false,
+        CancellationToken cancellationToken = default) =>
+        Write(() => _tools.CreateEntity(type, name, universe, series, book, slug, aliases, status, from, fields, text, allow_relinks), cancellationToken);
 
     /// <summary>The <c>update_fields</c> tool.</summary>
     [McpServerTool(Name = "update_fields", Title = "Change an entity's fields", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
@@ -199,8 +200,9 @@ public sealed class WolfdenTools
         [Description("The entity: its name, an alias, its file name, its id, its key, or its path.")] string entity,
         [Description(HashHelp)] string expected_hash,
         [Description("The changes, in order: a list of {op, path, value, index}.")] JsonElement changes,
-        [Description(UniverseHelp)] string? universe = null) =>
-        Respond(() => _tools.UpdateFields(entity, expected_hash, changes, universe));
+        [Description(UniverseHelp)] string? universe = null,
+        CancellationToken cancellationToken = default) =>
+        Write(() => _tools.UpdateFields(entity, expected_hash, changes, universe), cancellationToken);
 
     /// <summary>The <c>append_section</c> tool.</summary>
     [McpServerTool(Name = "append_section", Title = "Add to a section", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
@@ -224,8 +226,9 @@ public sealed class WolfdenTools
         [Description("For a new section: where it enters canon, a position such as 'dracula:7'.")] string? from = null,
         [Description("For a new section: where it stops holding (exclusive).")] string? until = null,
         [Description("For a new section: idea, undecided, candidate, draft, canon, or retconned.")] string? status = null,
-        [Description("For a new section: true to pin it as hard canon.")] bool? pin = null) =>
-        Respond(() => _tools.AppendSection(entity, section, text, expected_hash, universe, under, section_line, new_section, from, until, status, pin));
+        [Description("For a new section: true to pin it as hard canon.")] bool? pin = null,
+        CancellationToken cancellationToken = default) =>
+        Write(() => _tools.AppendSection(entity, section, text, expected_hash, universe, under, section_line, new_section, from, until, status, pin), cancellationToken);
 
     /// <summary>The <c>add_idea</c> tool.</summary>
     [McpServerTool(Name = "add_idea", Title = "Record an idea", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
@@ -247,8 +250,9 @@ public sealed class WolfdenTools
         [Description("Without entity: file it in this series.")] string? series = null,
         [Description("Without entity: file it in this book.")] string? book = null,
         [Description("Without entity: field values, such as {\"about\": [\"[[count-dracula]]\"]}.")] JsonElement? fields = null,
-        [Description("Without entity: " + RelinksHelp)] bool allow_relinks = false) =>
-        Respond(() => _tools.AddIdea(text, entity, section, expected_hash, name, type, universe, series, book, fields, allow_relinks));
+        [Description("Without entity: " + RelinksHelp)] bool allow_relinks = false,
+        CancellationToken cancellationToken = default) =>
+        Write(() => _tools.AddIdea(text, entity, section, expected_hash, name, type, universe, series, book, fields, allow_relinks), cancellationToken);
 
     /// <summary>The <c>rename_section</c> tool.</summary>
     [McpServerTool(Name = "rename_section", Title = "Rename a section", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
@@ -262,8 +266,9 @@ public sealed class WolfdenTools
         [Description("The new name: one line, and without [, ], |, or # if links name the section.")] string new_name,
         [Description(HashHelp)] string expected_hash,
         [Description(UniverseHelp)] string? universe = null,
-        [Description("When several sections have the name, the line of the heading you mean.")] int? section_line = null) =>
-        Respond(() => _tools.RenameSection(entity, section, new_name, expected_hash, universe, section_line));
+        [Description("When several sections have the name, the line of the heading you mean.")] int? section_line = null,
+        CancellationToken cancellationToken = default) =>
+        Write(() => _tools.RenameSection(entity, section, new_name, expected_hash, universe, section_line), cancellationToken);
 
     /// <summary>The <c>rename_entity</c> tool.</summary>
     [McpServerTool(Name = "rename_entity", Title = "Rename an entity", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
@@ -281,8 +286,9 @@ public sealed class WolfdenTools
         [Description(HashHelp)] string expected_hash,
         [Description("If true, keep the old name as an alias and leave links as they are.")] bool keep_old_name = false,
         [Description(UniverseHelp)] string? universe = null,
-        [Description(RelinksHelp)] bool allow_relinks = false) =>
-        Respond(() => _tools.RenameEntity(entity, new_name, expected_hash, keep_old_name, universe, allow_relinks));
+        [Description(RelinksHelp)] bool allow_relinks = false,
+        CancellationToken cancellationToken = default) =>
+        Write(() => _tools.RenameEntity(entity, new_name, expected_hash, keep_old_name, universe, allow_relinks), cancellationToken);
 
     /// <summary>The <c>change_alias</c> tool.</summary>
     [McpServerTool(Name = "change_alias", Title = "Change or remove an alias", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
@@ -299,8 +305,9 @@ public sealed class WolfdenTools
         [Description("The new alias; leave it out to remove the alias.")] string? new_alias = null,
         [Description("If true, add new_alias beside the old one and leave links as they are.")] bool keep_old_alias = false,
         [Description(UniverseHelp)] string? universe = null,
-        [Description(RelinksHelp)] bool allow_relinks = false) =>
-        Respond(() => _tools.ChangeAlias(entity, alias, expected_hash, new_alias, keep_old_alias, universe, allow_relinks));
+        [Description(RelinksHelp)] bool allow_relinks = false,
+        CancellationToken cancellationToken = default) =>
+        Write(() => _tools.ChangeAlias(entity, alias, expected_hash, new_alias, keep_old_alias, universe, allow_relinks), cancellationToken);
 
     /// <summary>The <c>move_entity</c> tool.</summary>
     [McpServerTool(Name = "move_entity", Title = "Move an entity to another scope", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
@@ -327,8 +334,9 @@ public sealed class WolfdenTools
         [Description("If it enters canon outside the new scope: true to keep where it enters, as its 'from'.")] bool keep_entry = false,
         [Description("If it enters canon outside the new scope: true to have it enter at the start of the new scope instead.")] bool enter_at_new_scope = false,
         [Description(UniverseHelp)] string? universe = null,
-        [Description(RelinksHelp)] bool allow_relinks = false) =>
-        Respond(() => _tools.MoveEntity(entity, expected_hash, to_series, to_book, keep_entry, enter_at_new_scope, universe, allow_relinks));
+        [Description(RelinksHelp)] bool allow_relinks = false,
+        CancellationToken cancellationToken = default) =>
+        Write(() => _tools.MoveEntity(entity, expected_hash, to_series, to_book, keep_entry, enter_at_new_scope, universe, allow_relinks), cancellationToken);
 
     /// <summary>The <c>copy_entity</c> tool.</summary>
     [McpServerTool(Name = "copy_entity", Title = "Copy an entity", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
@@ -350,8 +358,9 @@ public sealed class WolfdenTools
         [Description("Copy into this book (its key).")] string? to_book = null,
         [Description("The copy's file name without .md: lowercase letters and digits with single hyphens. Leave it out to make one from new_name.")] string? slug = null,
         [Description(RelinksHelp)] bool allow_relinks = false,
-        [Description("Optional: the original's hash from get_entity, to refuse the copy (stale_file) if it has changed since you read it.")] string? expected_hash = null) =>
-        Respond(() => _tools.CopyEntity(entity, new_name, universe, to_universe, to_series, to_book, slug, allow_relinks, expected_hash));
+        [Description("Optional: the original's hash from get_entity, to refuse the copy (stale_file) if it has changed since you read it.")] string? expected_hash = null,
+        CancellationToken cancellationToken = default) =>
+        Write(() => _tools.CopyEntity(entity, new_name, universe, to_universe, to_series, to_book, slug, allow_relinks, expected_hash), cancellationToken);
 
     private const string RelinksHelp =
         "If true, make the change even though links that reach another entity would change target; they're listed in the result's effects. " +
@@ -388,8 +397,9 @@ public sealed class WolfdenTools
         [Description("The chapter's key.")] string chapter,
         [Description("The hash of book.md your edit is based on: 'hash' from get_chapter, or from your last write's result.")] string expected_hash,
         [Description("The changes, in order: a list of {op, field, value, index, item}.")] JsonElement changes,
-        [Description(UniverseHelp)] string? universe = null) =>
-        Respond(() => _tools.UpdateChapterFields(book, chapter, expected_hash, changes, universe));
+        [Description(UniverseHelp)] string? universe = null,
+        CancellationToken cancellationToken = default) =>
+        Write(() => _tools.UpdateChapterFields(book, chapter, expected_hash, changes, universe), cancellationToken);
 
     /// <summary>The <c>get_chapter_defaults</c> tool.</summary>
     [McpServerTool(Name = "get_chapter_defaults", Title = "Read chapter defaults", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
@@ -423,8 +433,9 @@ public sealed class WolfdenTools
         [Description("The changes, in order: a list of {op, field, value, index, item}.")] JsonElement changes,
         [Description(UniverseHelp)] string? universe = null,
         [Description("A series' key, to change that series' defaults.")] string? series = null,
-        [Description("A book's key, to change that book's defaults.")] string? book = null) =>
-        Respond(() => _tools.UpdateChapterDefaults(expected_hash, changes, universe, series, book));
+        [Description("A book's key, to change that book's defaults.")] string? book = null,
+        CancellationToken cancellationToken = default) =>
+        Write(() => _tools.UpdateChapterDefaults(expected_hash, changes, universe, series, book), cancellationToken);
 
     /// <summary>The <c>checkpoint</c> tool.</summary>
     [McpServerTool(Name = "checkpoint", Title = "Make a checkpoint", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
@@ -440,8 +451,9 @@ public sealed class WolfdenTools
     public CallToolResult Checkpoint(
         [Description("What the checkpoint is, such as 'End of chapter 14 session: Lucy's timeline'.")] string message,
         [Description("You, as 'Name <email>' on one line, such as 'Claude <noreply@anthropic.com>'.")] string co_author,
-        [Description("Only these files or folders, relative to the den root. Leave it out for the whole den.")] string[]? paths = null) =>
-        Respond(() => _tools.Checkpoint(message, co_author, paths));
+        [Description("Only these files or folders, relative to the den root. Leave it out for the whole den.")] string[]? paths = null,
+        CancellationToken cancellationToken = default) =>
+        Write(() => _tools.Checkpoint(message, co_author, paths), cancellationToken);
 
     /// <summary>
     /// An error result in Wolfden's shape for one the SDK made itself. Every
@@ -489,14 +501,39 @@ public sealed class WolfdenTools
             $"says (text, number, or true/false).{(detail.Length == 0 ? "" : $" The server said: {detail}")}"));
     }
 
+    /// <summary>
+    /// Runs a tool that writes (or checkpoints) as <see cref="Respond{T}"/>
+    /// does, with the call's <paramref name="cancellationToken"/>: a call
+    /// the client cancels stops waiting for its turn to write (#234), and
+    /// ends as a cancelled call does, not with <c>den_busy</c>.
+    /// </summary>
+    private CallToolResult Write<T>(Func<T> run, CancellationToken cancellationToken)
+    {
+        using (_tools.CancelWith(cancellationToken))
+        {
+            return Answer(run, cancellationToken);
+        }
+    }
+
     /// <summary>Runs a tool and returns its result as JSON, or its error as an error result.</summary>
-    internal static CallToolResult Respond<T>(Func<T> run)
+    internal static CallToolResult Respond<T>(Func<T> run) => Answer(run, CancellationToken.None);
+
+    /// <summary>
+    /// <see cref="Respond{T}"/>, except that once <paramref name="cancellationToken"/>,
+    /// the call's, is cancelled, a cancellation goes on to the SDK, which
+    /// answers it as MCP says, rather than becoming an error result.
+    /// </summary>
+    private static CallToolResult Answer<T>(Func<T> run, CancellationToken cancellationToken)
     {
         object result;
         var isError = false;
         try
         {
             result = run()!;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (DenToolException e)
         {

@@ -983,6 +983,9 @@ store, so an edit changes only what it means to (format.md §12):
   wait covers both the wait for the session's own earlier writes (such
   as `serve`'s other requests) and the wait for other Wolfdens, so a
   write queued behind several gives up after 30 seconds, not 30 for each.
+  A call that's cancelled while it waits (an MCP client's cancel, or a
+  browser that goes away from `serve`) stops waiting at once and writes
+  nothing (#234); it ends as a cancelled call does, not with `den_busy`.
   Only a sharing or lock violation counts as held (on Windows; on Linux
   and macOS, `flock`'s `EWOULDBLOCK`); any other failure to open the
   lock file is `write_failed` at once. `check --fix` takes the lock too.

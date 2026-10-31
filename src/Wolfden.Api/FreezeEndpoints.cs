@@ -37,11 +37,11 @@ public static class FreezeEndpoints
     {
         api.MapGet("/book/freeze", (HttpContext c) => ReadEndpoints.Answer(
             c, ["book", "universe"], q => tools.GetBookFreeze(q.Text("book") ?? "", q.Text("universe"))));
-        api.MapPost("/book/freeze", (Func<HttpContext, Task<IResult>>)(c => Change(c, (book, hash, universe) => tools.FreezeBook(book, hash, universe))));
-        api.MapPost("/book/unfreeze", (Func<HttpContext, Task<IResult>>)(c => Change(c, (book, hash, universe) => tools.UnfreezeBook(book, hash, universe))));
+        api.MapPost("/book/freeze", (Func<HttpContext, Task<IResult>>)(c => Change(c, tools, (book, hash, universe) => tools.FreezeBook(book, hash, universe))));
+        api.MapPost("/book/unfreeze", (Func<HttpContext, Task<IResult>>)(c => Change(c, tools, (book, hash, universe) => tools.UnfreezeBook(book, hash, universe))));
     }
 
-    private static async Task<IResult> Change(HttpContext context, Func<string, string, string?, FreezeResult> change)
+    private static async Task<IResult> Change(HttpContext context, DenTools tools, Func<string, string, string?, FreezeResult> change)
     {
         if (!context.Request.HasJsonContentType())
         {
@@ -73,7 +73,11 @@ public static class FreezeEndpoints
             var hash = body.OptionalText("expectedHash") ?? throw new DenToolException(
                 ToolErrorCodes.BadArgument,
                 "Give 'expectedHash': the hash of the book's book.md, from /api/book/freeze. The change is refused if the file has changed since.");
-            return Results.Json(change(book, hash, body.OptionalText("universe")));
+            // A dropped request stops waiting for its turn to write (#234).
+            using (tools.CancelWith(context.RequestAborted))
+            {
+                return Results.Json(change(book, hash, body.OptionalText("universe")));
+            }
         }
         catch (DenToolException e)
         {

@@ -61,21 +61,25 @@ public sealed class DenWriteLock : IDisposable
     /// Takes the lock of the den at <paramref name="root"/>, waiting up to
     /// <paramref name="wait"/> while another Wolfden, in this process or
     /// another, holds it. <paramref name="waiting"/> is called once, with
-    /// <paramref name="wait"/>, when the first try finds it held.
+    /// <paramref name="wait"/>, when the first try finds it held. Cancelling
+    /// <paramref name="cancellationToken"/> ends the wait straight away (#234).
     /// </summary>
     /// <exception cref="DenToolException">
     /// <see cref="ToolErrorCodes.DenBusy"/> if it's still held after <paramref name="wait"/>;
     /// <see cref="ToolErrorCodes.WriteFailed"/> if the lock file can't be made or opened at all.
     /// </exception>
-    public static DenWriteLock Take(string root, TimeSpan wait, Action<TimeSpan>? waiting = null) => Take(root, wait, Stopwatch.StartNew(), waiting);
+    /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was cancelled before the lock was taken.</exception>
+    public static DenWriteLock Take(string root, TimeSpan wait, Action<TimeSpan>? waiting = null, CancellationToken cancellationToken = default) =>
+        Take(root, wait, Stopwatch.StartNew(), waiting, cancellationToken);
 
     /// <summary>
-    /// <see cref="Take(string, TimeSpan, Action{TimeSpan}?)"/>, with the wait counted
+    /// <see cref="Take(string, TimeSpan, Action{TimeSpan}?, CancellationToken)"/>, with the wait counted
     /// on <paramref name="clock"/>, so time a write already spent waiting
     /// for its turn in this session counts against the same <paramref name="wait"/>.
     /// </summary>
-    internal static DenWriteLock Take(string root, TimeSpan wait, Stopwatch clock, Action<TimeSpan>? waiting)
+    internal static DenWriteLock Take(string root, TimeSpan wait, Stopwatch clock, Action<TimeSpan>? waiting, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var folder = Path.Combine(root, IndexBuilder.StateFolder);
         var path = Path.Combine(folder, FileName);
         try
@@ -120,8 +124,14 @@ public sealed class DenWriteLock : IDisposable
                     waiting?.Invoke(wait);
                 }
 
+                // Waits on the token, so a cancelled call (a dropped request, an MCP
+                // cancel) stops waiting at once instead of at the end of the pause.
                 var left = wait - clock.Elapsed;
-                Thread.Sleep(pause < left ? pause : left > TimeSpan.Zero ? left : TimeSpan.Zero);
+                if (cancellationToken.WaitHandle.WaitOne(pause < left ? pause : left > TimeSpan.Zero ? left : TimeSpan.Zero))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+
                 pause = pause * 2 > LongestPause ? LongestPause : pause * 2;
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
@@ -135,8 +145,8 @@ public sealed class DenWriteLock : IDisposable
     /// <summary>The <see cref="ToolErrorCodes.DenBusy"/> error for a write that waited all of <paramref name="wait"/>.</summary>
     internal static DenToolException Busy(TimeSpan wait) => new(
         ToolErrorCodes.DenBusy,
-        $"Other writes to the den kept it busy for {Seconds(wait)}, so nothing was written. They may be another Wolfden's " +
-        "(wolfden serve, wolfden mcp, or a command) or this one's. Try again in a moment.");
+        $"Other writes to the den, or a checkpoint, kept it busy for {Seconds(wait)}, so nothing was written. They may be another Wolfden's " +
+        "(wolfden serve, wolfden mcp, or a command) or this one's; a checkpoint can wait on git, such as a signing passphrase. Try again in a moment.");
 
     /// <summary>
     /// True if opening the file failed because another handle holds it:

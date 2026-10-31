@@ -251,7 +251,11 @@ public static partial class WriteEndpoints
                 ToolErrorCodes.BadArgument,
                 "Give 'expectedHash': the hash of the file the edit is based on, from /api/entity/source or the last edit's result. " +
                 "The edit is refused if the file has changed since.");
-            return Results.Json(edit(body, entity, universe, hash));
+            // A dropped request stops waiting for its turn to write (#234).
+            using (tools.CancelWith(context.RequestAborted))
+            {
+                return Results.Json(edit(body, entity, universe, hash));
+            }
         }
         catch (DenToolException e) when (e.Code == ToolErrorCodes.StaleFile)
         {

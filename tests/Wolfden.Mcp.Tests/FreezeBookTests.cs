@@ -368,6 +368,29 @@ public sealed class FreezeBookTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "SC-HIST-13")]
+    public void AFreezeTagOnSomethingThatIsntACheckpointIsSkipped()
+    {
+        RunGit("init", "--quiet");
+        Commit("Start the Dracula notes");
+        var tools = WithGit();
+        Assert.Equal(FreezeSnapshot.Tagged, tools.FreezeBook("dracula", null).Snapshot);
+
+        // Edited outside Wolfden and committed, then a hand-made freeze tag on a tree, not a commit (#254 review, S1).
+        _den.Write(LucyFile, _den.Read(LucyFile) + "\nA late fix.\n");
+        var edited = Commit("A late fix to Lucy");
+        RunGit("tag", Tag + "-2", RunGit("rev-parse", "HEAD^{tree}").Trim());
+        Assert.True(tools.GetBookFreeze("dracula").Unfinished);
+
+        var frozen = tools.FreezeBook("dracula", null);
+
+        Assert.Equal(FreezeSnapshot.Tagged, frozen.Snapshot);
+        Assert.Equal(Tag + "-3", frozen.Tag);
+        Assert.Equal(edited, RunGit("rev-parse", $"{Tag}-3^{{commit}}").Trim());
+        Assert.False(tools.GetBookFreeze("dracula").Unfinished);
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-HIST-12")]
     public void FreezingAndUnfreezingKeepTheRestOfBookMdByteForByte()
     {

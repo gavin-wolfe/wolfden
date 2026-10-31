@@ -545,7 +545,8 @@ is never changed, and a name or email given when git already has one
 isn't used, and the result says so. Any name will do, a pen name
 included, and the email can be a placeholder, as long as git will record
 the pair (`git var GIT_COMMITTER_IDENT`: a name made only of characters
-git strips, such as `;`, is refused). A missing one that wasn't given,
+git strips, such as `;`, is refused, and so is an email given that git
+would record as empty, such as `;`, #207). A missing one that wasn't given,
 or a pair git won't record, refuses with nothing changed: the repository
 the run just made, still without a commit, is taken away again: moved
 in one rename to a hidden folder in the den, then deleted (if the rename

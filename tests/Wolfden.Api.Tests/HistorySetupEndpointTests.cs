@@ -131,7 +131,15 @@ public sealed class HistorySetupEndpointTests : IDisposable
         Assert.Equal(HttpStatusCode.BadRequest, refusedCode);
         Assert.Equal("identity_needed", refused.GetProperty("code").GetString());
         Assert.Contains("placeholder", refused.GetProperty("message").GetString(), StringComparison.Ordinal);
+        Assert.True(refused.GetProperty("needsName").GetBoolean());
+        Assert.True(refused.GetProperty("needsEmail").GetBoolean());
         Assert.False(Directory.Exists(Path.Combine(den.Root, ".git")));
+
+        // A name given, the email not: only the email is still needed (#207).
+        var (_, emailOnly) = await Post(server, "/api/history/turn-on", """{"authorName": "Ash Calloway"}""");
+        Assert.Equal("identity_needed", emailOnly.GetProperty("code").GetString());
+        Assert.False(emailOnly.GetProperty("needsName").GetBoolean());
+        Assert.True(emailOnly.GetProperty("needsEmail").GetBoolean());
 
         var (code, made) = await Post(server, "/api/history/turn-on", """{"authorName": "Ash Calloway", "authorEmail": "ash@example.invalid"}""");
 

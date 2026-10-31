@@ -20,7 +20,9 @@ namespace Wolfden.Git;
 /// right after <c>git init</c>, since a setting can depend on where the
 /// repository is (git's <c>includeIf "gitdir:…"</c>), which git can't
 /// apply before. A missing one that wasn't given, or a pair git won't
-/// record (<c>git var GIT_COMMITTER_IDENT</c>), refuses: the repository
+/// record (<c>git var GIT_COMMITTER_IDENT</c>, which also says what git
+/// makes of them: a given email it would record as empty, such as
+/// <c>;</c>, is refused as a name git strips to nothing is), refuses: the repository
 /// this run just made, with no commit yet, is taken away again, so nothing
 /// is changed. One given when git already has one isn't used, and the
 /// result says so.
@@ -202,7 +204,7 @@ public sealed class GitHistorySetup : IHistorySetup
                 return Undo(HistorySetupCodes.IdentityNeeded, missing, hasName is null && name is null, hasEmail is null && email is null);
             }
 
-            if ((hasName is null || hasEmail is null) && Unrecordable(hasName ?? name!, hasEmail ?? email!, cancellationToken) is { } unrecordable)
+            if ((hasName is null || hasEmail is null) && Unrecordable(hasName ?? name!, hasEmail ?? email!, checkEmail: hasEmail is null, cancellationToken) is { } unrecordable)
             {
                 return Undo(HistorySetupCodes.BadArgument, unrecordable);
             }
@@ -402,14 +404,29 @@ public sealed class GitHistorySetup : IHistorySetup
     /// Why git won't record <paramref name="name"/> and <paramref name="email"/>
     /// on a checkpoint, in git's words, or null if it will: git's own rules,
     /// through <c>git var GIT_COMMITTER_IDENT</c>, which refuses, say, a name
-    /// made only of characters git strips (<c>;</c>, <c>,</c>, …).
+    /// made only of characters git strips (<c>;</c>, <c>,</c>, …). Git takes
+    /// such an email but records it as empty (<c>Ann &lt;&gt;</c>), so with
+    /// <paramref name="checkEmail"/> (the email is the one given) that's refused too.
     /// </summary>
-    private string? Unrecordable(string name, string email, CancellationToken cancellationToken)
+    private string? Unrecordable(string name, string email, bool checkEmail, CancellationToken cancellationToken)
     {
         var run = Run(["-c", $"user.name={name}", "-c", $"user.email={email}", "var", "GIT_COMMITTER_IDENT"], cancellationToken);
-        return run.Succeeded
-            ? null
-            : $"Git won't record that name and email on a checkpoint ({Sentence(run.Said)[..^1]}). Choose another; any ordinary name will do, a pen name included.";
+        if (!run.Succeeded)
+        {
+            return $"Git won't record that name and email on a checkpoint ({Sentence(run.Said)[..^1]}). Choose another; any ordinary name will do, a pen name included.";
+        }
+
+        // "Name <email> 1793462796 -0700": the name can't hold '<' or '>' (HistorySetup.IdentityProblem).
+        var ident = run.Output.Trim();
+        var open = ident.IndexOf('<', StringComparison.Ordinal);
+        var close = open < 0 ? -1 : ident.IndexOf('>', open);
+        if (checkEmail && run.OutputComplete && close > open && ident[(open + 1)..close].Trim().Length == 0)
+        {
+            return $"Git won't record that email on a checkpoint: it takes out characters such as ';' and ',' at the ends, which leaves nothing of '{email}'. " +
+                "Give another; a placeholder such as you@example.com will do.";
+        }
+
+        return null;
     }
 
     /// <summary>

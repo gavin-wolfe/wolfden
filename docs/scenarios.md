@@ -3119,7 +3119,8 @@ email. They turn on history for their den.
   it can't be sure.
 - A name or email of more than one line, with a control character, or
   with `<` or `>`, is refused, and so is a name git won't record (only
-  characters it strips, such as `;`), before anything is saved.
+  characters it strips, such as `;`), or an email git would record as
+  empty (the same characters), before anything is saved.
 
 Spec: design.md §6, "Turning history on" (maintainer decision,
 2026-10-28, #195). Covered by:

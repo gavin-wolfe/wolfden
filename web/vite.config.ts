@@ -1,4 +1,5 @@
-import { defineConfig, type ProxyOptions } from 'vite'
+import type { ProxyOptions } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 
 // The port 'wolfden serve' listens on: WOLFDEN_PORT if set, or 9653
@@ -42,5 +43,10 @@ export default defineConfig({
     host: '127.0.0.1',
     // The API, and the den's own images (#186).
     proxy: { '/api': toServe, '/den-files': toServe },
+  },
+  test: {
+    // Long waits, so a busy machine doesn't fail a test (#207): see src/test/setup.ts.
+    setupFiles: ['./src/test/setup.ts'],
+    testTimeout: 30_000,
   },
 })

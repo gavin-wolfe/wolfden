@@ -438,7 +438,7 @@ describe('SC-WEB-60: editing a field with a control for its type', () => {
     expect(posts).toEqual([
       { path: 'field', body: { entity: 'E-MINA', universe: 'dracula', expectedHash: 'h1', field: 'state', changes: [{ op: 'set', path: [], value: 'lost' }] } },
     ])
-    expect(document.activeElement?.id).toBe('edit-saved')
+    await waitFor(() => expect(document.activeElement?.id).toBe('edit-saved'))
   })
 
   it('checks a number before sending it, and points at what to fix', async () => {
@@ -636,7 +636,7 @@ describe('SC-WEB-65: field edits are guarded', () => {
     let form = await openField('state')
     fireEvent.keyDown(within(form).getByRole('combobox', { name: 'Value' }), { key: 'Escape' })
     await waitFor(() => expect(screen.queryByRole('form', { name: 'Edit state' })).toBeNull())
-    expect(document.activeElement?.id).toBe('edit-field-state')
+    await waitFor(() => expect(document.activeElement?.id).toBe('edit-field-state'))
 
     form = await openField('state')
     fireEvent.change(within(form).getByRole('combobox', { name: 'Value' }), { target: { value: 'fresh' } })

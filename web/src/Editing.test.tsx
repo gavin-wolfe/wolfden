@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, waitFor, within, configure } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient } from '@tanstack/react-query'
 import { createBrowserHistory } from '@tanstack/react-router'
 import { App } from './App'
@@ -12,11 +12,6 @@ import { entities, page, renderApp, stubApi } from './test/harness'
 
 // Editing a note in place (#28): the lead and sections in CodeMirror, Edit
 // file, saving with the hash, the conflict view, and the guards around it.
-
-// The first test of a file renders the app cold, which can take over a second
-// when the machine is busy (the whole suite runs files in parallel).
-configure({ asyncUtilTimeout: 5000 })
-vi.setConfig({ testTimeout: 15_000 })
 
 beforeAll(() => {
   // jsdom lays nothing out; CodeMirror measures text ranges.
@@ -151,7 +146,7 @@ describe('SC-WEB-40: editing a section or the opening in place', () => {
     expect(saved.closest('[role="status"]')!.textContent).toContain("Saving doesn't make a checkpoint.")
     expect(screen.queryByRole('group', { name: /Markdown of/ })).toBeNull()
     await waitFor(() => expect(calls.filter((c) => c.startsWith('/api/entity?')).length).toBeGreaterThan(entityCalls))
-    expect(document.activeElement?.id).toBe('edit-saved')
+    await waitFor(() => expect(document.activeElement?.id).toBe('edit-saved'))
   })
 
   it('SC-WEB-50: a save makes the checkpoint indicator ask again at once', async () => {
@@ -186,7 +181,7 @@ describe('SC-WEB-40: editing a section or the opening in place', () => {
 
     fireEvent.keyDown(view.contentDOM, { key: 'Escape' })
     const ask = await screen.findByRole('alertdialog', { name: "Discard the changes you haven't saved?" })
-    expect(document.activeElement).toBe(within(ask).getByRole('button', { name: 'Keep editing' }))
+    await waitFor(() => expect(document.activeElement).toBe(within(ask).getByRole('button', { name: 'Keep editing' })))
     fireEvent.click(within(ask).getByRole('button', { name: 'Keep editing' }))
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
     expect(view.state.doc.toString()).toBe('Not thrown away yet.')
@@ -196,7 +191,7 @@ describe('SC-WEB-40: editing a section or the opening in place', () => {
     fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Discard changes' }))
     await waitFor(() => expect(screen.queryByRole('group', { name: /Markdown of/ })).toBeNull())
     expect(posts).toEqual([])
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Edit “Overview”' }))
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Edit “Overview”' })))
     expect(screen.getByText('Old text.')).toBeTruthy()
 
     // Unchanged, Escape closes without asking.
@@ -331,7 +326,7 @@ describe('SC-WEB-41: adding, renaming, and removing sections', () => {
 
     const ask = await screen.findByRole('group', { name: /Remove the section “Arc” and its 1 subsection\?/ })
     const keep = within(ask).getByRole('button', { name: 'Keep it' })
-    expect(document.activeElement).toBe(keep)
+    await waitFor(() => expect(document.activeElement).toBe(keep))
     fireEvent.click(keep)
     expect(posts).toEqual([])
 
@@ -393,7 +388,8 @@ describe('SC-WEB-43: when the file changed meanwhile', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     const conflict = await screen.findByRole('region', { name: 'The note changed while you were editing the section “Overview”' })
-    expect(document.activeElement).toBe(within(conflict).getByRole('heading', { level: 3 }))
+    // The heading takes focus in an effect, which may run after the region is found (#199).
+    await waitFor(() => expect(document.activeElement).toBe(within(conflict).getByRole('heading', { level: 3 })))
     expect(within(conflict).getByText('My text.').className).toBe('differs')
     expect(within(conflict).getByText('An agent wrote this.').className).toBe('differs')
 

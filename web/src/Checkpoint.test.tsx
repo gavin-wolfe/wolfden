@@ -112,7 +112,7 @@ describe('SC-WEB-50: the top bar says what changed since the last checkpoint', (
 
     // The message box has focus, and no message is made up for the writer.
     const box = within(dialog).getByLabelText('Name this checkpoint') as HTMLTextAreaElement
-    expect(document.activeElement).toBe(box)
+    await waitFor(() => expect(document.activeElement).toBe(box))
     expect(box.value).toBe('')
   })
 
@@ -180,7 +180,7 @@ describe('SC-WEB-52: I name a checkpoint after a notes pass', () => {
     const done = await screen.findByRole('dialog', { name: 'Checkpoint made' })
     expect(posted).toEqual([{ message: 'Notes pass after drafting ch 12' }])
     expect(within(done).getByRole('status').textContent).toMatch(/Recorded “Notes pass after drafting ch 12”, with 3 notes/)
-    expect(document.activeElement).toBe(within(done).getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(document.activeElement).toBe(within(done).getByRole('button', { name: 'Close' })))
 
     // The indicator asked again, and is hidden now that nothing has changed.
     await waitFor(() => expect(calls.filter((c) => c === '/api/checkpoint').length).toBeGreaterThanOrEqual(3))
@@ -408,7 +408,7 @@ describe('SC-WEB-55: I turn on history from the checkpoint dialog', () => {
     expect(within(dialog).getByText(/can be a placeholder/)).toBeTruthy()
     const name = within(dialog).getByLabelText('Name') as HTMLInputElement
     const email = within(dialog).getByLabelText('Email') as HTMLInputElement
-    expect(document.activeElement).toBe(name)
+    await waitFor(() => expect(document.activeElement).toBe(name))
 
     // Nothing given: asked again, and nothing is sent.
     fireEvent.click(within(dialog).getByRole('button', { name: 'Turn on history' }))

@@ -439,6 +439,9 @@ the pages don't have a form for it yet. The rules are in
   is sure to reach says to add an id with **Edit file** first. Use
   **Preview** to see it as the page shows it. **Save** (or Ctrl+Enter,
   ⌘+Enter on a Mac) saves; **Cancel** (or Escape) leaves it as it was.
+  **Add image…** under the editor adds a picture to the note, and so
+  does dropping or pasting one into the text
+  ([Adding an image while you edit](#adding-an-image-while-you-edit)).
   **Add section** adds one at the end or before another. Renaming a
   section changes the links to it in every note; removing one asks first.
 - **Edit file** opens the whole note, frontmatter and all, for anything
@@ -537,6 +540,43 @@ shows it on the note's page.
 Wolfden shows `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.avif`, and `.svg`
 files. It never shows anything in a folder or file whose name starts with
 a dot (such as `.obsidian/` or `.git/`), and nothing outside the den.
+
+### Adding an image while you edit
+
+When you edit a note's opening, a section, or the whole file in
+`wolfden serve`, you can add a picture without leaving the page:
+
+- Click **Add image…** under the editor and pick one or more files,
+  drag an image from your computer onto the text, or paste one (a
+  screenshot, say) into it.
+- Wolfden saves a copy in an `images/` folder beside the note, and puts
+  `![alt text](images/name.png)` in the text where your cursor is (or
+  where you dropped it). Adding `Castle Map.PNG` to
+  `universes/dracula/entities/locations/castle-dracula.md` saves
+  `universes/dracula/entities/locations/images/castle-map.png` and
+  writes `![Castle Map](images/castle-map.png)`.
+- The alt text comes from the file's name. Change it to say what the
+  picture shows: it's what shows if the picture can't, and what screen
+  readers say.
+- The file name is made simple: lowercase, with `-` for spaces and
+  other characters, so the path needs no `%20`. If the folder already
+  has a file by that name, the new one gets a number (`castle-map-2.png`)
+  and the page says so. Wolfden never replaces an image that's there.
+- It takes `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.avif`, and `.svg`
+  files of up to 10 MB, and checks that the file really is the kind of
+  image its name says. A photo that's too big needs making smaller in an
+  image editor first.
+- The image is saved at once, but the note isn't: **Save** the note to
+  keep the line that shows it. If you cancel instead, the image stays in
+  the `images/` folder; delete it there if you don't want it.
+- Adding an image isn't a checkpoint, like saving. The next checkpoint
+  records it with your notes.
+- A note in a book marked final can't get new images until the book is
+  unfrozen.
+
+To put an image somewhere else, such as the den's shared `images/`
+folder, copy the file there yourself and write the path by hand (next
+section).
 
 ### How to point to them
 
@@ -955,6 +995,9 @@ in it, which Wolfden calls a checkpoint.
   be ([Images](#images)).
 - **Moving a note doesn't move its images.** Its image paths stay as
   they were, so move the images too, or use a `/` path.
+- **An image added in the editor stays even if you cancel.** Add
+  image… saves the file at once; cancelling the edit leaves it in the
+  note's `images/` folder, unused. Delete it there if you don't want it.
 - **Website images don't show.** An image from a website is blocked
   unless `den.yaml` has `remote_images: true`, so opening a note
   doesn't tell the website.

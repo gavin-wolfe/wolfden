@@ -3197,7 +3197,8 @@ search page, and SC-WEB-22 and SC-WEB-23 the history page. SC-WEB-24
 and SC-WEB-25 describe field search (#179). SC-WEB-35 to SC-WEB-39
 cover images in notes and what a page may load (#180, #186). SC-WEB-40
 to SC-WEB-46 cover editing a note's lead and sections in the browser
-(#28, part a). SC-WEB-66 covers freezing a book (#31).
+(#28, part a). SC-WEB-66 covers freezing a book (#31). SC-WEB-80 and
+SC-WEB-81 cover adding images from the editor (#187).
 
 ### SC-WEB-1. I open my den in the browser
 
@@ -4815,3 +4816,66 @@ Spec: design.md §9 (#198, #23). Covered by:
 `EntityLookupEndpointTests.ALookupIsGuarded`,
 `EntityLookupEndpointTests.TypesNarrowALookupToAFieldsToTypes`,
 `EntityLookupEndpointTests.AsOfAPositionOnlyNotesTheReaderHasMetAreOffered`.
+
+### SC-WEB-80. I add a picture to a note while editing it
+
+The writer edits the opening of Castle Dracula's note,
+`universes/dracula/entities/locations/castle-dracula.md`, and clicks
+**Add image…**, picking `Castle Map (1832).PNG` from their computer.
+
+- The image is saved as
+  `universes/dracula/entities/locations/images/castle-map-1832.png`,
+  byte for byte, and `![Castle Map (1832)](images/castle-map-1832.png)`
+  goes in at the cursor. The note's file isn't changed until the writer
+  saves; Save is on, since the text now differs. The page says the image
+  is saved in the den and stays there even if they cancel.
+- `serve` shows the image at that path at once, and the checkpoint
+  dialog counts it as saved in Wolfden. Adding it makes no checkpoint.
+- Dropping `ship.webp` on the text, or pasting a screenshot
+  (`image.png`), does the same, at the drop point or the cursor. Pasted
+  or dropped text, or a file that isn't an image, is left to the
+  editor.
+- If the folder already has `castle-map.png`, or `Castle-Map-2.png` in
+  another case, a new `castle_map.png` is saved as `castle-map-3.png`
+  and the page says why. No file is ever replaced. Several images picked
+  at once go in one per line.
+
+Spec: design.md §9 ("Adding images", #187), format.md F-LAY-9. Covered by:
+`ImageEndpointTests.AnImageIsSavedBesideTheNoteUnderASlugAndTheNoteIsUnchanged`,
+`ImageEndpointTests.AFileAlreadyThereIsNeverReplacedTheNewOneGetsANumber`,
+`EditorImages.test.tsx` (web).
+
+### SC-WEB-81. Adding an image is guarded
+
+- The server picks the name, from the file's as a slug, so a name such
+  as `../../../../../escape.png`, `..\..\escape.png`, `/etc/escape.png`,
+  or `%2e%2e%2fmap.png` is saved in the note's `images/` folder and
+  nowhere else; `.hidden.png` becomes `hidden.png`, `CON.png`
+  `con-image.png`, and a name with no letters or digits `image.png`.
+- Only `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.avif`, and `.svg` are
+  taken, and the contents must be that type: a JPEG named `map.png` is
+  refused, saying to rename it `.jpg`; text, HTML named `.svg`, and an
+  empty file are refused (`bad_argument`). The page refuses another
+  type, and a file over 10 MB, without sending it; the server answers a
+  body over 10 MiB with 413 `too_large`.
+- The body must be the file, sent as `application/octet-stream` or an
+  image type: JSON, text, a form, or no type is 415. The endpoint answers
+  POST only, takes only `entity`, `universe`, and `name`, each once, and
+  refuses a cross-site request.
+- A note in a final book refuses the image (`frozen`), saying to use
+  **Unfreeze…** on the book's page; the page shows the refusal and
+  changes nothing. A server pinned to another universe refuses it.
+  While another Wolfden holds the den's write lock past the wait, it's
+  `den_busy` and nothing is written.
+
+Spec: design.md §9 ("Adding images", #187). Covered by:
+`ImageEndpointTests.TheServerPicksTheNameSoItStaysInTheNotesImagesFolder`,
+`ImageEndpointTests.TheContentsMustBeTheImageTypeTheNameSays`,
+`ImageEndpointTests.OnlyTheFileItselfIsTakenNotAFormOrText`,
+`ImageEndpointTests.AnImageOverTenMegabytesIsTooLarge`,
+`ImageEndpointTests.ItTakesOnlyTheNoteTheUniverseAndTheName`,
+`ImageEndpointTests.ItAnswersPostOnlyAndRefusesAnotherSite`,
+`ImageEndpointTests.ANoteInAFinalBookRefusesTheImageWithTheUnfreezeHint`,
+`ImageEndpointTests.APinnedServerAddsImagesOnlyInItsUniverse`,
+`ImageEndpointTests.AnImageWhileAnotherWolfdenKeepsWritingIsDenBusyAndWritesNothing`,
+`ImageFileTests` (core), `EditorImages.test.tsx` (web).

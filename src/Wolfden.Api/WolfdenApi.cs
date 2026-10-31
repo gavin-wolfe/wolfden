@@ -338,7 +338,7 @@ public static class WolfdenApi
           <h1>Wolfden</h1>
           <p>The server is running, but this copy of Wolfden was built without its web UI.</p>
           <p>To build it, run <code>npm ci</code> and <code>npm run build</code> in the repository's <code>web/</code> folder
-          (Node.js 22.12 or later), then <code>dotnet build</code> again and restart <code>wolfden serve</code>.</p>
+          (Node.js 22.22.2 or later on the 22 line, or 24.15 or later), then <code>dotnet build</code> again and restart <code>wolfden serve</code>.</p>
           <p>The API works without it: <a href="/api/den">/api/den</a>.</p>
         </body>
         </html>

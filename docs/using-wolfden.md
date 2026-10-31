@@ -15,7 +15,7 @@ Set things up in this order. Each step builds on the ones before it.
 1. **Build Wolfden.** There's no installer yet, so you build it from a
    clone of the repository. You need the
    [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0), and
-   [Node.js](https://nodejs.org) 22.12 or later for the web UI. Build the
+   [Node.js](https://nodejs.org) 22.22.2 or later on the 22 line, or 24.15 or later on the 24 line, for the web UI. Build the
    web UI first, in the clone's `web/` folder, so the next command
    includes it:
 

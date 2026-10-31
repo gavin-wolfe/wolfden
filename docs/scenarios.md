@@ -4175,7 +4175,8 @@ on…**, then **Turn on history**.
   quiet: the server uses the new history at once, without a restart, for
   the indicator, the History tab, the next checkpoint, and freezing.
 - A refusal shows the server's message; if git turns out to need a name
-  and email after all, the fields appear. When it can't be turned on
+  or email after all, the fields for just what's missing appear, and
+  stay while it tries again. When it can't be turned on
   here (no git, say), the dialog says why and offers no button.
 - A server pinned to one universe may turn it on: history covers the
   whole den, and the result names no files.

@@ -652,7 +652,8 @@ computer. If git already has a name and email, nothing is asked, and if
 you give one anyway, Wolfden says it used git's instead. (If your git
 settings give a name only inside certain folders, the dialog can't tell
 until the den is a repository: it shows the fields, but you can leave
-them empty, and Wolfden asks again only if they're really needed.)
+them empty, and Wolfden asks again, for just what's missing, only if
+they're really needed.)
 
 A few things to know:
 

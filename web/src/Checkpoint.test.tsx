@@ -336,7 +336,10 @@ function noHistory(turnOn: Partial<TurnOnView> = {}): CheckpointStatus {
 }
 
 /** Answers /api/checkpoint with `current`, and /api/history/turn-on with `answer`; records what was sent to turn it on. */
-function stubTurnOn(current: () => CheckpointStatus, answer: (body: TurnOnRequest) => Response | HistoryTurnedOn = () => TURNED_ON) {
+function stubTurnOn(
+  current: () => CheckpointStatus,
+  answer: (body: TurnOnRequest) => Response | HistoryTurnedOn | Promise<Response | HistoryTurnedOn> = () => TURNED_ON,
+) {
   const sent: TurnOnRequest[] = []
   const api = stubApi({
     override: (path, _params, init) => {
@@ -466,6 +469,64 @@ describe('SC-WEB-55: I turn on history from the checkpoint dialog', () => {
     expect((await within(dialog).findByRole('alert')).textContent).toMatch(/has no name or email for this den/)
     expect(within(dialog).getByLabelText('Name')).toBeTruthy()
     expect(within(dialog).getByLabelText('Email')).toBeTruthy()
+    expect(sent).toHaveLength(1)
+  })
+
+  it('after git turns out to need only an email, asks only for that, keeps the name typed, and holds the fields while it tries again', async () => {
+    // Before the den is a repository, git seemed to lack both; once it is, an includeIf gives it a name, but no email.
+    let retry: (answer: Response | HistoryTurnedOn) => void = () => {}
+    const { sent } = stubTurnOn(
+      () => noHistory({ needsName: true, needsEmail: true, identityCertain: false }),
+      (body) =>
+        body.authorEmail === undefined
+          ? new Response(
+              JSON.stringify({ code: 'identity_needed', message: 'Git records who made each checkpoint, and it has no email for this den.', needsName: false, needsEmail: true }),
+              { status: 400 },
+            )
+          : new Promise((resolve) => (retry = resolve)),
+    )
+    const dialog = await openTurnOn()
+    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Mara Voss' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Turn on history' }))
+
+    expect((await within(dialog).findByRole('alert')).textContent).toMatch(/has no email for this den/)
+    const email = within(dialog).getByLabelText('Email') as HTMLInputElement
+    expect(email.required).toBe(true)
+    expect((within(dialog).getByLabelText('Name') as HTMLInputElement).value).toBe('Mara Voss')
+
+    // The email is required now.
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Turn on history' }))
+    expect(await within(dialog).findByText(/Give an email/)).toBeTruthy()
+    expect(sent).toHaveLength(1)
+
+    fireEvent.change(email, { target: { value: 'mara@example.invalid' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Turn on history' }))
+    await waitFor(() => expect(sent).toHaveLength(2))
+    expect(sent[1]).toEqual({ firstCheckpoint: true, authorName: 'Mara Voss', authorEmail: 'mara@example.invalid' })
+
+    // While it's pending, the fields stay where they are.
+    expect(within(dialog).getByRole('button', { name: 'Turning on history…' })).toBeTruthy()
+    expect(within(dialog).getByLabelText('Name')).toBeTruthy()
+    expect(within(dialog).getByLabelText('Email')).toBeTruthy()
+
+    retry(TURNED_ON)
+    await screen.findByRole('dialog', { name: 'History is on' })
+  })
+
+  it('after git turns out to need only an email that wasn’t offered, shows only the email', async () => {
+    const { sent } = stubTurnOn(
+      () => noHistory(),
+      () =>
+        new Response(JSON.stringify({ code: 'identity_needed', message: 'It has no email for this den.', needsName: false, needsEmail: true }), {
+          status: 400,
+        }),
+    )
+    const dialog = await openTurnOn()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Turn on history' }))
+
+    expect(await within(dialog).findByLabelText('Email')).toBeTruthy()
+    expect(within(dialog).queryByLabelText('Name')).toBeNull()
     expect(sent).toHaveLength(1)
   })
 

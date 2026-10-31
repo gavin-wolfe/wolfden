@@ -1,11 +1,12 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ApiRequestError, count } from '../api'
+import { count } from '../api'
 import {
   CHECKPOINT_STATUS_KEY,
   changeWord,
   checkpointStatusQuery,
   groupChanges,
+  IdentityNeededError,
   makeCheckpoint,
   turnOnHistory,
   type CheckpointMade,
@@ -444,21 +445,32 @@ function TurnOnDialog({ status, onClose }: { status: CheckpointStatus; onClose: 
   const [email, setEmail] = useState('')
   const [first, setFirst] = useState(true)
   const [missing, setMissing] = useState<'name' | 'email' | null>(null)
+  // What the server asked for when it refused with identity_needed (#207). Kept in state, not read
+  // from the mutation's error, so the fields don't go and come back while a retry is pending.
+  const [asked, setAsked] = useState<{ name: boolean; email: boolean } | null>(null)
 
   const mutation = useMutation({
     mutationFn: turnOnHistory,
     // Whether or not every step was done, the den may have history now: everything that shows it looks again.
     onSettled: () => client.invalidateQueries(),
+    onError: (error) => {
+      if (error instanceof IdentityNeededError) {
+        // Git needs a name or email after all (it can depend on where the repository is): ask for
+        // just what's missing, and keep a field the writer filled in, since it's sent again.
+        setAsked((was) => ({
+          name: error.needsName || ((was?.name ?? turnOn?.needsName ?? false) && name.trim() !== ''),
+          email: error.needsEmail || ((was?.email ?? turnOn?.needsEmail ?? false) && email.trim() !== ''),
+        }))
+      }
+    },
   })
 
-  // Git said it needs a name or email after all (it can depend on where the repository is): ask for both.
-  const identityAsked = mutation.error instanceof ApiRequestError && mutation.error.code === 'identity_needed'
-  const askName = (turnOn?.needsName ?? false) || identityAsked
-  const askEmail = (turnOn?.needsEmail ?? false) || identityAsked
+  const askName = asked ? asked.name : (turnOn?.needsName ?? false)
+  const askEmail = asked ? asked.email : (turnOn?.needsEmail ?? false)
   // Before the den is a repository, git may have a name and email for it after all (a setting
   // that depends on where the repository is), so the fields are optional until the server says
   // they're really missing.
-  const required = (turnOn?.identityCertain ?? true) || identityAsked
+  const required = (turnOn?.identityCertain ?? true) || asked !== null
   const busy = mutation.isPending
 
   useEffect(() => {

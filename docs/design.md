@@ -2008,7 +2008,11 @@ docs/
     do. Before the den is a repository, the status can't be sure
     (`turnOn.identityCertain` is false), so the fields are optional: git
     may have a name and email for the repository once it's made, and the
-    server asks again only if it doesn't. `POST /api/history/turn-on` takes `{"authorName"?, "authorEmail"?,
+    server asks again only if it doesn't: `identity_needed` carries
+    `needsName` and `needsEmail`, and the dialog then asks for just
+    those, required, keeping a field the writer already filled in. What
+    it asks for stays put while the retry is pending (#207).
+    `POST /api/history/turn-on` takes `{"authorName"?, "authorEmail"?,
     "firstCheckpoint"?}` (it defaults to true), with the same guards as
     the checkpoint POST (cross-site, `application/json`, no query, 64 KB),
     and answers with the steps done, in words, `repositoryMade`,

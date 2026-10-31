@@ -43,16 +43,7 @@ internal static class DenFiles
     public const string Prefix = "/den-files";
 
     /// <summary>The image types served, by extension (lowercase, with the dot).</summary>
-    public static readonly IReadOnlyDictionary<string, string> ContentTypes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-    {
-        [".png"] = "image/png",
-        [".jpg"] = "image/jpeg",
-        [".jpeg"] = "image/jpeg",
-        [".gif"] = "image/gif",
-        [".webp"] = "image/webp",
-        [".avif"] = "image/avif",
-        [".svg"] = "image/svg+xml",
-    };
+    public static readonly IReadOnlyDictionary<string, string> ContentTypes = ImageFiles.ContentTypes;
 
     /// <summary>
     /// The Content-Security-Policy of a den file. An image loaded by a page

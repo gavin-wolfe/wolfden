@@ -377,6 +377,9 @@ function useOpenedPiece(target: TextTarget | { kind: 'rename' | 'remove'; line: 
   return { source, piece, setPiece, missing }
 }
 
+/** Beside Save and Cancel while the editor is adding an image, which turns them off until it's in the text. */
+const AddingImagesHint = 'Save and Cancel come back once the image is added.'
+
 /** Saves an image beside the note being edited (#187), for the editor's Add image…, drop, and paste. */
 function useAddImage(): (file: File) => Promise<AddedImage> {
   const { universe, entityKey } = useEditing()!
@@ -405,6 +408,7 @@ export function PieceEditor({ target, what, file }: { target: TextTarget; what: 
   const [error, setError] = useState<EditError | Error | null>(null)
   const [conflict, setConflict] = useState<EntitySource | null>(null)
   const [copied, setCopied] = useState<{ text: string; note: string } | null>(null)
+  const [addingImages, setAddingImages] = useState(false)
   const labelId = useId()
 
   useEffect(() => {
@@ -419,7 +423,7 @@ export function PieceEditor({ target, what, file }: { target: TextTarget; what: 
   }, [piece, text, setDirty])
 
   const save = async (base: Piece | null = piece) => {
-    if (!base || text === null || saving) {
+    if (!base || text === null || saving || addingImages) {
       return
     }
 
@@ -537,6 +541,7 @@ export function PieceEditor({ target, what, file }: { target: TextTarget; what: 
           autoFocus
           minLines={target.kind === 'file' ? 20 : 4}
           addImage={addImageHere}
+          onAddingImages={setAddingImages}
         />
       </div>
       {preview && (
@@ -548,13 +553,13 @@ export function PieceEditor({ target, what, file }: { target: TextTarget; what: 
       {error && <SaveError error={error} />}
       <DiscardPrompt />
       <p className="editor-actions">
-        <button type="button" className="primary" onClick={() => void save()} disabled={saving || !dirty}>
+        <button type="button" className="primary" onClick={() => void save()} disabled={saving || !dirty || addingImages}>
           {saving ? 'Saving…' : 'Save'}
         </button>
-        <button type="button" onClick={cancel} disabled={saving}>
+        <button type="button" onClick={cancel} disabled={saving || addingImages}>
           Cancel
         </button>
-        <span className="muted">Ctrl+Enter (⌘+Enter) saves, Escape cancels.</span>
+        <span className="muted">{addingImages ? AddingImagesHint : 'Ctrl+Enter (⌘+Enter) saves, Escape cancels.'}</span>
       </p>
       {copied !== null && <CopiedText text={copied.text} note={copied.note} />}
     </div>
@@ -877,6 +882,7 @@ export function AddSection({ file }: { file: string }) {
   const [preview, setPreview] = useState(false)
   const [error, setError] = useState<Error | null>(null)
   const [saving, setSaving] = useState(false)
+  const [addingImages, setAddingImages] = useState(false)
   const nameInput = useRef<HTMLInputElement>(null)
   const listId = useId()
   const { setDirty } = editing
@@ -890,7 +896,7 @@ export function AddSection({ file }: { file: string }) {
   useEffect(() => nameInput.current?.focus(), [base])
 
   const save = async () => {
-    if (!base || saving) {
+    if (!base || saving || addingImages) {
       return
     }
 
@@ -938,7 +944,7 @@ export function AddSection({ file }: { file: string }) {
         void save()
       }}
       onKeyDown={(e) => {
-        if (e.key === 'Escape' && !e.defaultPrevented) {
+        if (e.key === 'Escape' && !e.defaultPrevented && !addingImages) {
           e.preventDefault()
           editing.cancel()
         }
@@ -979,6 +985,7 @@ export function AddSection({ file }: { file: string }) {
           label="Markdown of the new section"
           universe={editing.universe}
           addImage={addImageHere}
+          onAddingImages={setAddingImages}
         />
       </div>
       {preview && (
@@ -989,12 +996,13 @@ export function AddSection({ file }: { file: string }) {
       {error && <SaveError error={error} />}
       <DiscardPrompt />
       <p className="editor-actions">
-        <button type="submit" className="primary" disabled={saving}>
+        <button type="submit" className="primary" disabled={saving || addingImages}>
           {saving ? 'Adding…' : 'Add section'}
         </button>
-        <button type="button" onClick={editing.cancel} disabled={saving}>
+        <button type="button" onClick={editing.cancel} disabled={saving || addingImages}>
           Cancel
         </button>
+        {addingImages && <span className="muted">{AddingImagesHint}</span>}
       </p>
     </form>
   )

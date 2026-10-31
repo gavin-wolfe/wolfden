@@ -560,6 +560,8 @@ When you edit a note's opening, a section, or the whole file in
   screenshot, say) into it. Pasting text copied from Word, Excel, or
   OneNote pastes the text, even though they copy a picture of it too.
   Wait for one batch of images to finish before adding the next.
+  **Save** and **Cancel** (and Ctrl+Enter and Escape) wait too, so the
+  picture isn't left out of the text.
 - Wolfden saves a copy in an `images/` folder beside the note, and puts
   `![alt text](images/name.png)` in the text where your cursor is (or
   where you dropped it). Adding `Castle Map.PNG` to
@@ -567,7 +569,8 @@ When you edit a note's opening, a section, or the whole file in
   `universes/dracula/entities/locations/images/castle-map.png` and
   writes `![Castle Map](images/castle-map.png)`. If the note's folder
   already has an `Images/` folder (in any mix of capitals), Wolfden uses
-  that one, spelled as it is.
+  that one, spelled as it is. (On Linux, where `images/` and `Images/`
+  can sit side by side, it uses `images/`.)
 - The alt text comes from the file's name. Change it to say what the
   picture shows: it's what shows if the picture can't, and what screen
   readers say.

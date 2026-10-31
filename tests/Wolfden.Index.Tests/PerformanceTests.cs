@@ -1,13 +1,17 @@
-using System.Diagnostics;
 using System.Text;
 
 namespace Wolfden.Index.Tests;
 
 /// <summary>
 /// Smoke tests that a rebuild of a large den, and an update after one edit,
-/// stay fast. The bounds are generous, to catch a return to per-row EF
-/// inserts or quadratic time, not to measure speed: in development this den
-/// rebuilds in a few seconds.
+/// stay fast. The bounds are generous, to catch quadratic time or a return
+/// to per-row EF work, not to measure speed: in development this den
+/// rebuilds in a few seconds. They bound the processor time the test's
+/// thread uses, not the time by the clock, which a busy machine can stretch
+/// many times over (#248); the work runs on that thread. Processor time
+/// leaves out waiting, so a slowdown that's mostly waiting (a commit and
+/// flush to disk for every row, say) shows only as far as it costs
+/// processor time too. Both times are written to the test output.
 /// </summary>
 public sealed class PerformanceTests(ITestOutputHelper output)
 {
@@ -26,15 +30,16 @@ public sealed class PerformanceTests(ITestOutputHelper output)
         // Read the new files once untimed: a virus scanner's first look at
         // thousands of new files can take far longer than the rebuild.
         _ = Wolfden.Core.Links.LinkIndex.Load(den.Root);
-        var watch = Stopwatch.StartNew();
+        var watch = ThreadCpuWatch.StartNew();
         IndexBuilder.Rebuild(den.Root);
-        output.WriteLine($"Rebuilt {Count} entities in {watch.Elapsed.TotalSeconds:F1} s.");
+        var rebuild = watch.Cpu;
+        output.WriteLine($"Rebuilt {Count} entities in {watch}.");
 
         using var index = DenIndex.Open(den.Root);
         Assert.Equal(Count, index.Context.Entities.Count());
         Assert.Equal(Count * 12, index.Context.Sections.Count());
         Assert.Equal(Count * 13, index.Context.Links.Count());
-        Assert.True(watch.Elapsed < Bound, $"Took {watch.Elapsed}.");
+        Assert.True(rebuild < Bound, $"Took {rebuild} of processor time.");
     }
 
     /// <summary>
@@ -50,9 +55,9 @@ public sealed class PerformanceTests(ITestOutputHelper output)
         using var den = TempDen.FromFiles(LargeDen());
         _ = Wolfden.Core.Links.LinkIndex.Load(den.Root);
         var updater = new IndexUpdater(den.Root);
-        var watch = Stopwatch.StartNew();
+        var watch = ThreadCpuWatch.StartNew();
         updater.Rebuild("start");
-        var rebuild = watch.Elapsed;
+        var rebuild = watch.Cpu;
 
         // Rename one person: their own rows change, and so do the links that named them.
         const string path = "universes/big/series/saga/entities/characters/person-7.md";
@@ -61,20 +66,20 @@ public sealed class PerformanceTests(ITestOutputHelper output)
         var batch = new ChangeBatch(new HashSet<string>([path]), new HashSet<string>(), false);
         watch.Restart();
         var renamed = updater.Apply(batch, out _);
-        var rename = watch.Elapsed;
+        var rename = watch.Cpu;
 
         // Add a sentence with a link: only this note's rows change.
         File.AppendAllText(full, "\nOne more sentence, with a link to [[person-9]].\n");
         watch.Restart();
         var appended = updater.Apply(batch, out _);
-        var append = watch.Elapsed;
+        var append = watch.Cpu;
 
         output.WriteLine(
-            $"{Count} entities: rebuild {rebuild.TotalMilliseconds:F0} ms; one note renamed {rename.TotalMilliseconds:F0} ms ({renamed!.Rows} rows); " +
-            $"one sentence added {append.TotalMilliseconds:F0} ms ({appended!.Rows} rows).");
+            $"{Count} entities, in processor time: rebuild {rebuild.TotalMilliseconds:F0} ms; one note renamed {rename.TotalMilliseconds:F0} ms ({renamed!.Rows} rows); " +
+            $"one sentence added {append.TotalMilliseconds:F0} ms ({appended!.Rows} rows), {watch.Clock.TotalMilliseconds:F0} ms by the clock.");
         Assert.Equal(IndexUpdateKind.Updated, renamed.Kind);
         Assert.Equal(IndexUpdateKind.Updated, appended.Kind);
-        Assert.True(append < UpdateBound, $"Took {append}.");
+        Assert.True(append < UpdateBound, $"Took {append} of processor time.");
         using var index = DenIndex.Open(den.Root);
         Assert.Equal("Person Seven", index.FindEntity(path)!.Name);
         Assert.Equal(Count * 13 + 1, index.Context.Links.Count());
@@ -96,13 +101,14 @@ public sealed class PerformanceTests(ITestOutputHelper output)
     {
         using var den = TempDen.FromFiles(StandaloneBooks());
         _ = Wolfden.Core.Links.LinkIndex.Load(den.Root);
-        var watch = Stopwatch.StartNew();
+        var watch = ThreadCpuWatch.StartNew();
         var check = Wolfden.Core.Checks.DenCheck.Run(den.Root);
-        var checking = watch.Elapsed;
+        var checking = watch.Cpu;
+        output.WriteLine($"{Books} standalone books: check {watch}.");
         watch.Restart();
         IndexBuilder.Rebuild(den.Root);
-        var rebuild = watch.Elapsed;
-        output.WriteLine($"{Books} standalone books: check {checking.TotalSeconds:F1} s; rebuild {rebuild.TotalSeconds:F1} s.");
+        var rebuild = watch.Cpu;
+        output.WriteLine($"{Books} standalone books: rebuild {watch}.");
 
         Assert.Equal(Books, check.Structure.Universes.Single().Books.Count);
         Assert.Equal(Books * 2, check.Catalog.Entities.Count);
@@ -111,8 +117,8 @@ public sealed class PerformanceTests(ITestOutputHelper output)
         Assert.All(check.Diagnostics, d => Assert.Equal("F-ID-2", d.Diagnostic.RuleId));
         using var index = DenIndex.Open(den.Root);
         Assert.Equal(Books * 2, index.Context.Entities.Count());
-        Assert.True(checking < Bound, $"The check took {checking}.");
-        Assert.True(rebuild < Bound, $"The rebuild took {rebuild}.");
+        Assert.True(checking < Bound, $"The check took {checking} of processor time.");
+        Assert.True(rebuild < Bound, $"The rebuild took {rebuild} of processor time.");
     }
 
     /// <summary>One universe of <see cref="Books"/> standalone books, each with three chapters and two characters who link to each other.</summary>

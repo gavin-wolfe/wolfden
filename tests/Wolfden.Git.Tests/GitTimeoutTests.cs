@@ -34,6 +34,13 @@ public sealed class GitTimeoutTests
     private static readonly TimeSpan Bound = TimeSpan.FromMinutes(2);
 
     /// <summary>
+    /// The read time limit in <see cref="OutputAChildHoldsOpenIsReportedIncompleteAndNotUsed"/>:
+    /// longer than git takes to start and run an alias on a busy machine,
+    /// and shorter than <see cref="Bound"/>.
+    /// </summary>
+    private static readonly TimeSpan HeldOutputLimit = TimeSpan.FromSeconds(30);
+
+    /// <summary>
     /// A shell loop that waits until <c>.git/wolfden-&lt;name&gt;-release</c>
     /// exists, or <see cref="GiveUpSeconds"/> pass. It leaves only then: a
     /// <c>date</c> that fails, as when Wolfden is killing the script's process
@@ -184,7 +191,15 @@ public sealed class GitTimeoutTests
     public async Task OutputAChildHoldsOpenIsReportedIncompleteAndNotUsed()
     {
         using var repo = TestRepo.Create();
-        var options = TestRepo.Options with { ReadTimeout = TimeSpan.FromSeconds(5) };
+
+        // The time limit covers git's own run, and then the wait for the
+        // output the child holds open; this test is about the wait. It used
+        // to be 5 seconds, which a busy machine can use up before git, the
+        // alias's shell, and its forked child have run, or before the reader
+        // has taken in "partial" (#248): git stopped for its time throws, and
+        // a late reader returns "". The test waits out the whole limit, for
+        // output that never closes, so it stays well inside Bound.
+        var options = TestRepo.Options with { ReadTimeout = HeldOutputLimit };
         try
         {
             // An alias runs in the shell: it prints, then leaves a child

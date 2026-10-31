@@ -259,8 +259,9 @@ public sealed class UnlistableFolderTests
     /// Makes the folder at <paramref name="full"/> one the user may not list
     /// until disposed: a deny rule for listing on Windows, or no permissions
     /// elsewhere. Skips the test where that doesn't stop listing, as for
-    /// root. Disposing it restores the permissions, so the temporary den can
-    /// be deleted.
+    /// root, but fails on Windows CI (<see cref="NoSkipOnWindowsCi"/>).
+    /// Disposing it restores the permissions, so the temporary den can be
+    /// deleted.
     /// </summary>
     internal static IDisposable Unlistable(string full)
     {
@@ -271,9 +272,23 @@ public sealed class UnlistableFolderTests
         }
 
         cleanup.Dispose();
+        NoSkipOnWindowsCi();
         Assert.Skip("This user can list a folder without permission to list it.");
         return null!;
     }
+
+    /// <summary>
+    /// On CI's Windows runner a deny rule stops listing, so these tests run
+    /// there; they're the only Windows coverage of unlistable folders. If
+    /// they would skip, as when the test step's shell (Git Bash) turned on
+    /// backup privilege for every process it started (#248), the test fails
+    /// instead, so the coverage can't go without anyone noticing.
+    /// </summary>
+    internal static void NoSkipOnWindowsCi() =>
+        Assert.False(
+            OperatingSystem.IsWindows() && string.Equals(Environment.GetEnvironmentVariable("CI"), "true", StringComparison.OrdinalIgnoreCase),
+            "On Windows CI, a folder with a deny rule for listing could still be listed, so this test would have been skipped. " +
+            "Does the test process have backup privilege, as it does under Git Bash?");
 
     [SupportedOSPlatform("windows")]
     private static Cleanup DenyListing(string full)

@@ -37,13 +37,16 @@ jobs:
 
       # Blame mode names a test that hangs, and an assembly that misses
       # xUnit's 60-second start-up check gets one more try (#248). See the
-      # script for both.
+      # script for both. pwsh on both OSes: under Git Bash, Windows test
+      # processes inherit backup privilege and permission tests skip.
       - name: Test
-        shell: bash
-        run: scripts/ci/dotnet-test.sh TestResults
+        shell: pwsh
+        run: ./scripts/ci/dotnet-test.ps1 TestResults
 
+      # Also when cancelled: a job that hits its time limit is cancelled,
+      # and that's when a hang dump matters most.
       - name: Upload test results
-        if: failure()
+        if: failure() || cancelled()
         uses: actions/upload-artifact@v7
         with:
           name: test-results-${{ matrix.os }}

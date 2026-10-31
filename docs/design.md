@@ -1333,7 +1333,7 @@ docs/
   `/api/health`, `/api/den` (the den's name, its universes, and
   `remoteImages`, F-DEN-8), and the
   read endpoints below for M3's pages (#24 to #27). The UI in `web/` is built with npm (`npm run
-  build`, Node.js 22.22.2+ or 24.15+) into `web/dist`, which `dotnet build`
+  build`, Node.js ^22.22.2, ^24.15 or 26+) into `web/dist`, which `dotnet build`
   copies next to `wolfden` as `wwwroot` when it's there; `dotnet build`
   never runs npm, so .NET work doesn't need Node. Paths that aren't files
   get `index.html`, so the UI's own routes survive a reload. For UI work,

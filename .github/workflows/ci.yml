@@ -74,7 +74,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: "24"   # the active LTS line; web/package.json allows 22.22.2+ or 24.15+
+          node-version: "24"   # the active LTS line; web/package.json allows ^22.22.2, ^24.15 or 26+
           cache: npm
           cache-dependency-path: web/package-lock.json
 

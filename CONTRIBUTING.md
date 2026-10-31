@@ -49,7 +49,7 @@ an issue or PR, add it to that list.
 ### The web UI
 
 The UI is React, TypeScript, Vite, and TanStack Query, in `web/`. You need
-[Node.js](https://nodejs.org) 22.22.2 or later on the 22 line, or 24.15 or later (CI uses the 24 LTS line).
+[Node.js](https://nodejs.org) 22.22.2 or later on the 22 line, or 24.15 or later on the 24 line, or 26+ (CI uses the 24 LTS line).
 From `web/`:
 
 ```sh

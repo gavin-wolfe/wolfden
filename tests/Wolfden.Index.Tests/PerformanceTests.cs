@@ -4,12 +4,14 @@ namespace Wolfden.Index.Tests;
 
 /// <summary>
 /// Smoke tests that a rebuild of a large den, and an update after one edit,
-/// stay fast. The bounds are generous, to catch a return to per-row EF
-/// inserts or quadratic time, not to measure speed: in development this den
+/// stay fast. The bounds are generous, to catch quadratic time or a return
+/// to per-row EF work, not to measure speed: in development this den
 /// rebuilds in a few seconds. They bound the processor time the test's
 /// thread uses, not the time by the clock, which a busy machine can stretch
-/// many times over (#248); the work runs on that thread. Both times are
-/// written to the test output.
+/// many times over (#248); the work runs on that thread. Processor time
+/// leaves out waiting, so a slowdown that's mostly waiting (a commit and
+/// flush to disk for every row, say) shows only as far as it costs
+/// processor time too. Both times are written to the test output.
 /// </summary>
 public sealed class PerformanceTests(ITestOutputHelper output)
 {

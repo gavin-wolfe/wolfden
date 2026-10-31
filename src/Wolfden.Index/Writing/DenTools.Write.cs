@@ -62,6 +62,41 @@ public sealed partial class DenTools
     /// </summary>
     public TimeSpan WriteLockWait { get; init; } = DenWriteLock.DefaultWait;
 
+    /// <summary>The longest single try at this session's turn while a cancellable call waits for it.</summary>
+    private static readonly TimeSpan TurnTry = TimeSpan.FromMilliseconds(50);
+
+    // The token of the call under way on this async flow (CancelWith); one session
+    // serves many calls at once (serve's requests), so it can't be a field of its own.
+    private readonly AsyncLocal<CancellationToken> _cancellation = new();
+
+    /// <summary>The cancellation of the call under way (<see cref="CancelWith"/>), or none.</summary>
+    private CancellationToken Cancellation => _cancellation.Value;
+
+    /// <summary>
+    /// Until the result is disposed, the writes and checkpoints this call
+    /// makes (on this thread, or the async flow it's part of) stop waiting
+    /// when <paramref name="cancellationToken"/> is cancelled (#234): for
+    /// this session's other writes and checkpoints, for the den's write
+    /// lock, and, for a checkpoint, for git up to its commit. They end with
+    /// <see cref="OperationCanceledException"/>, not
+    /// <see cref="ToolErrorCodes.DenBusy"/>, and write nothing. A write that
+    /// has its turn isn't stopped part way. The MCP server passes each
+    /// tool call's token, and <c>wolfden serve</c> each request's.
+    /// </summary>
+    public IDisposable CancelWith(CancellationToken cancellationToken)
+    {
+        var before = _cancellation.Value;
+        _cancellation.Value = cancellationToken;
+        return new CancellationScope(this, before);
+    }
+
+    private sealed class CancellationScope(DenTools tools, CancellationToken before) : IDisposable
+    {
+        public void Dispose() => tools._cancellation.Value = before;
+    }
+
+    private static TimeSpan Shorter(TimeSpan a, TimeSpan b) => a < b ? (a > TimeSpan.Zero ? a : TimeSpan.Zero) : b;
+
     /// <summary>
     /// Called once when a write has to wait for another Wolfden to finish
     /// writing to the den, with the longest it waits (<see cref="WriteLockWait"/>),
@@ -597,8 +632,10 @@ public sealed partial class DenTools
 
         // Only this session's turn, not the den's write lock: a checkpoint writes no den
         // file, and git keeps its own lock, so another Wolfden's writes needn't wait on
-        // git (or on a signing passphrase).
-        lock (_writeLock)
+        // git (or on a signing passphrase). Holding the den lock only while staging
+        // wouldn't keep their writes out of the commit (#234): 'git commit --only'
+        // reads the files from the disk as it commits (design.md §8).
+        using (TakeSessionTurn())
         {
             var history = History();
             try
@@ -606,7 +643,7 @@ public sealed partial class DenTools
                 // Which of the recorded files this session's writes saved, and which changed some
                 // other way (the writer's editor, another tool), so the agent can tell the writer
                 // (maintainer decision, 2026-10-25). Committed files start afresh.
-                var done = SessionWritten.Checkpoint(history, new CheckpointRequest(message.Trim(), given, [coAuthor.Trim()]));
+                var done = SessionWritten.Checkpoint(history, new CheckpointRequest(message.Trim(), given, [coAuthor.Trim()]), Cancellation);
                 if (!done.Result.IsAvailable)
                 {
                     return new CheckpointResult(DenReader.ResultVersion, history.Name, false, done.Result.Reason, false, null);
@@ -1230,19 +1267,50 @@ public sealed partial class DenTools
     /// gives up after that long, not that long for each one ahead of it.
     /// </remarks>
     /// <exception cref="DenToolException"><see cref="ToolErrorCodes.DenBusy"/>: other writes kept the den busy for all of <see cref="WriteLockWait"/>.</exception>
+    /// <exception cref="OperationCanceledException">The call was cancelled (<see cref="CancelWith"/>) before its turn came.</exception>
     private WriteTurn EnterWrite()
     {
         var clock = System.Diagnostics.Stopwatch.StartNew();
-        if (!_writeLock.TryEnter(WriteLockWait))
+        // A write inside one that has the turn already doesn't wait, so it isn't cancelled:
+        // it may be part of a multi-file write under way.
+        var cancellation = _writeLock.IsHeldByCurrentThread ? CancellationToken.None : Cancellation;
+        cancellation.ThrowIfCancellationRequested();
+        if (!cancellation.CanBeCanceled)
         {
-            throw DenWriteLock.Busy(WriteLockWait);
+            if (!_writeLock.TryEnter(WriteLockWait))
+            {
+                throw DenWriteLock.Busy(WriteLockWait);
+            }
+        }
+        else
+        {
+            // The in-process lock's wait can't be cancelled, so it's taken in short tries.
+            if (!_writeLock.TryEnter(TimeSpan.Zero))
+            {
+                Interlocked.Increment(ref _turnWaiters);
+                try
+                {
+                    while (!_writeLock.TryEnter(Shorter(WriteLockWait - clock.Elapsed, TurnTry)))
+                    {
+                        cancellation.ThrowIfCancellationRequested();
+                        if (clock.Elapsed >= WriteLockWait)
+                        {
+                            throw DenWriteLock.Busy(WriteLockWait);
+                        }
+                    }
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref _turnWaiters);
+                }
+            }
         }
 
         try
         {
             if (_denLockDepth == 0)
             {
-                _denLock = DenWriteLock.Take(Root, WriteLockWait, clock, WaitingForOtherWriter);
+                _denLock = DenWriteLock.Take(Root, WriteLockWait, clock, WaitingForOtherWriter, cancellation);
             }
 
             _denLockDepth++;
@@ -1270,6 +1338,58 @@ public sealed partial class DenTools
         {
             _writeLock.Exit();
         }
+    }
+
+    /// <summary>
+    /// This session's turn alone, without the den's write lock, for a
+    /// checkpoint: it waits as long as the session's writes take, with no
+    /// <see cref="WriteLockWait"/>, but stops if the call is cancelled
+    /// (<see cref="CancelWith"/>). Dispose the result to end it.
+    /// </summary>
+    /// <exception cref="OperationCanceledException">The call was cancelled before its turn came.</exception>
+    private SessionTurn TakeSessionTurn()
+    {
+        var cancellation = Cancellation;
+        if (!cancellation.CanBeCanceled)
+        {
+            _writeLock.Enter();
+            return new SessionTurn(_writeLock);
+        }
+
+        cancellation.ThrowIfCancellationRequested();
+        if (!_writeLock.TryEnter(TimeSpan.Zero))
+        {
+            Interlocked.Increment(ref _turnWaiters);
+            try
+            {
+                while (!_writeLock.TryEnter(TurnTry))
+                {
+                    cancellation.ThrowIfCancellationRequested();
+                }
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _turnWaiters);
+            }
+        }
+
+        return new SessionTurn(_writeLock);
+    }
+
+    // How many cancellable calls are waiting for this session's turn (TurnWaiters).
+    private int _turnWaiters;
+
+    /// <summary>
+    /// For tests: how many calls that can be cancelled (<see cref="CancelWith"/>)
+    /// are waiting for this session's turn right now, so a test can cancel
+    /// one it knows is waiting rather than pausing first.
+    /// </summary>
+    internal int TurnWaiters => Volatile.Read(ref _turnWaiters);
+
+    /// <summary>This session's turn, from <see cref="TakeSessionTurn"/>; disposing it ends the turn.</summary>
+    private readonly struct SessionTurn(Lock turn) : IDisposable
+    {
+        public void Dispose() => turn.Exit();
     }
 
     /// <summary>A write's turn, from <see cref="EnterWrite"/>; disposing it ends the turn.</summary>

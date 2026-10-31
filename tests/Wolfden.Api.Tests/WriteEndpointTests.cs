@@ -72,6 +72,17 @@ public class WriteEndpointTests
         return (response.StatusCode, text.Length == 0 ? default : JsonDocument.Parse(text).RootElement.Clone());
     }
 
+    /// <summary>Waits until <paramref name="condition"/> holds, up to a bound only a hung test meets, polling.</summary>
+    private static async Task UntilAsync(Func<bool> condition, string because)
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        while (!condition())
+        {
+            Assert.True(clock.Elapsed < TimeSpan.FromSeconds(60), because);
+            await Task.Delay(5, Token);
+        }
+    }
+
     private static async Task<JsonElement> SourceAsync(Server server, string entity) =>
         await server.GetJsonAsync($"/api/entity/source?entity={Uri.EscapeDataString(entity)}", HttpStatusCode.OK);
 
@@ -332,6 +343,40 @@ public class WriteEndpointTests
 
         // Once it's let go, the same edit goes ahead.
         Assert.Equal(HttpStatusCode.OK, (await PostAsync(server, "/api/edit/lead", new { entity = LinkerPath, expectedHash = Hash(source), text = "Mine." })).Status);
+    }
+
+    [Fact]
+    public async Task ADroppedEditStopsWaitingForTheDensWriteLock()
+    {
+        using var den = NewDen();
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root) { WriteLockWait = TimeSpan.FromMinutes(10) });
+        var source = await SourceAsync(server, LinkerPath);
+
+        using (new FileStream(Path.Combine(den.Root, ".wolfden", "write.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
+        {
+            // The browser goes away while the edit waits for another Wolfden (#234).
+            using var drop = CancellationTokenSource.CreateLinkedTokenSource(Token);
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/edit/lead")
+            {
+                Content = new StringContent(
+                    JsonSerializer.Serialize(new { entity = LinkerPath, expectedHash = Hash(source), text = "Dropped." }), Encoding.UTF8, "application/json"),
+            };
+            var sent = server.Client.SendAsync(request, drop.Token);
+
+            // Cancelled only once the server is waiting for the lock, and the lock let go only once it has
+            // stopped: the server hears of the drop when it handles the closed connection, which on a busy
+            // machine can come after the client has given up.
+            await UntilAsync(() => DenWriteLock.WaitersFor(den.Root) == 1, "the edit should be waiting for the lock");
+            drop.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => sent);
+            await UntilAsync(() => DenWriteLock.WaitersFor(den.Root) == 0, "the server should stop waiting once the request is dropped");
+        }
+
+        // Had the dropped edit still been waiting, it would hold the server's turn, take the lock as it's let go,
+        // and save; this edit, from the same hash, would then be stale.
+        var (status, _) = await PostAsync(server, "/api/edit/lead", new { entity = LinkerPath, expectedHash = Hash(source), text = "Mine." });
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.DoesNotContain("Dropped.", den.Read(LinkerPath), StringComparison.Ordinal);
     }
 
     [Fact]

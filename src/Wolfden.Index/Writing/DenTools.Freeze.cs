@@ -205,45 +205,22 @@ public sealed partial class DenTools
             return new FreezeTargetResult(at, null, true);
         }
 
-        // A tag at that checkpoint, or at a later one, which holds the book's folder the same since
-        // nothing changed it after. A tag from before it (an earlier freeze) doesn't count, even if
-        // the book reads the same, so a book frozen again gets its own tag (maintainer decision, 2026-10-28).
+        // A tag at that checkpoint, or at a later one, which on a straight history holds the book's
+        // folder the same, since no later checkpoint changed it. (Across merges that can fail: a
+        // side branch's change to the book merged away with '-s ours' leaves a tag on that branch
+        // counted. Rare, and the old log walk had the same gap.) A tag from before it (an earlier
+        // freeze) doesn't count, even if the book reads the same, so a book frozen again gets its
+        // own tag (maintainer decision, 2026-10-28). "Later" is by ancestry (#201): made from that
+        // checkpoint, and in the history the den is at; a tag on something that isn't a checkpoint
+        // isn't later. A backend that can't say counts none as later, so freezing adds a tag of its own.
         var tags = FreezeTag.Existing(history, universeKey, target.Key);
         var tag = tags.LastOrDefault(t => t.Id == at);
-        if (tag is null && tags.Count > 0)
+        if (tag is null && tags.Count > 0 && history.LaterOf(at, tags.Select(t => t.Id).ToList()) is { IsAvailable: true } later)
         {
-            var later = CheckpointsAfter(history, at);
-            tag = tags.LastOrDefault(t => later.Contains(t.Id));
+            tag = tags.LastOrDefault(t => later.Value.Contains(t.Id, StringComparer.Ordinal));
         }
 
         return new FreezeTargetResult(at, tag, tag is not null);
-    }
-
-    /// <summary>The checkpoints listed before <paramref name="at"/> in the den's log from the latest: those made after it.</summary>
-    private static HashSet<string> CheckpointsAfter(IHistoryProvider history, string at)
-    {
-        var after = new HashSet<string>(StringComparer.Ordinal);
-        string? before = null;
-        while (true)
-        {
-            var page = history.Log(new HistoryLogQuery(Limit: 100, Before: before));
-            if (!page.IsAvailable || page.Value.Count == 0)
-            {
-                return after;
-            }
-
-            foreach (var entry in page.Value)
-            {
-                if (entry.Id == at)
-                {
-                    return after;
-                }
-
-                after.Add(entry.Id);
-            }
-
-            before = page.Value[^1].Id;
-        }
     }
 
     /// <summary>

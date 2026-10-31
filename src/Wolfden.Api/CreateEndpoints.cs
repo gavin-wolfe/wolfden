@@ -85,9 +85,13 @@ public static class CreateEndpoints
                 throw new DenToolException(ToolErrorCodes.BadArgument, "Give 'series' or 'book', not both: a note goes in one place.");
             }
 
-            var result = tools.CreateEntity(
-                type, name, body.OptionalText("universe"), series, book, from: body.OptionalText("from"), allowRelinks: body.OptionalBool("allowRelinks") ?? false);
-            return Results.Json(result, statusCode: StatusCodes.Status201Created);
+            // A dropped request stops waiting for its turn to write (#234).
+            using (tools.CancelWith(context.RequestAborted))
+            {
+                var result = tools.CreateEntity(
+                    type, name, body.OptionalText("universe"), series, book, from: body.OptionalText("from"), allowRelinks: body.OptionalBool("allowRelinks") ?? false);
+                return Results.Json(result, statusCode: StatusCodes.Status201Created);
+            }
         }
         catch (DenToolException e)
         {

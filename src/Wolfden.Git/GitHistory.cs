@@ -828,6 +828,58 @@ public sealed partial class GitHistory : IHistoryProvider
 
     /// <inheritdoc />
     /// <remarks>
+    /// For each revision, two <c>git merge-base --is-ancestor</c> checks (#201):
+    /// <paramref name="earlier"/> is an ancestor of it, and it of HEAD. Each reads
+    /// only the commits between the two, however long the history. <paramref name="earlier"/>
+    /// and HEAD are resolved once.
+    /// </remarks>
+    public HistoryResult<IReadOnlyList<string>> LaterOf(string earlier, IReadOnlyList<string> revisions, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(earlier);
+        ArgumentNullException.ThrowIfNull(revisions);
+        var from = Resolve(earlier, cancellationToken);
+        List<string> later = [];
+        if (revisions.Count == 0 || Head(cancellationToken) is not { } head)
+        {
+            return HistoryResult<IReadOnlyList<string>>.Done(later);
+        }
+
+        foreach (var revision in revisions)
+        {
+            string to;
+            try
+            {
+                to = Resolve(revision, cancellationToken);
+            }
+            catch (HistoryRevisionException)
+            {
+                // Not a commit (a tag on a tree or a blob, say): no checkpoint, so not later.
+                continue;
+            }
+
+            if (to != from && IsAncestor(from, to, cancellationToken) && IsAncestor(to, head, cancellationToken))
+            {
+                later.Add(revision);
+            }
+        }
+
+        return HistoryResult<IReadOnlyList<string>>.Done(later);
+    }
+
+    /// <summary>True if the commit <paramref name="ancestor"/> is <paramref name="commit"/> or one it was made from; both are commit hashes.</summary>
+    private bool IsAncestor(string ancestor, string commit, CancellationToken cancellationToken)
+    {
+        var run = Run(["merge-base", "--is-ancestor", ancestor, commit], cancellationToken);
+        return run.ExitCode switch
+        {
+            0 => true,
+            1 => false,
+            _ => throw Failed("merge-base", run),
+        };
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
     /// The same comparison as a diff since the latest checkpoint (new files
     /// included, through a temporary index, #142), but before the first
     /// checkpoint it compares with nothing, so every den file is added.

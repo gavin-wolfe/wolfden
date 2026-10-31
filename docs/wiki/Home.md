@@ -7,8 +7,9 @@ timelines, plot threads, outlines, and every invented thing a world needs
 (star systems, factions, ships, spells). Every fact knows where in the story it
 becomes true, so you can always ask *"what's canon as of the end of Book 2?"*
 
-> **Status: early.** There's nothing to install yet. You build it from
-> source (see [Getting started](../using-wolfden.md#getting-started)).
+> **Status: early.** Usable, with rough edges. There's no installer yet:
+> you build it from source (see
+> [Getting started](../using-wolfden.md#getting-started)).
 
 ## Start here
 

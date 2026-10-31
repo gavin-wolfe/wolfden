@@ -5,6 +5,7 @@ import { bookChapterFieldsQuery } from '../chapterFieldsApi'
 import { AddChapter } from '../components/AddChapter'
 import { ChapterDefaultsSection, ChapterFieldSummary } from '../components/ChapterFields'
 import { FreezeControl } from '../components/FreezeControl'
+import { NewMenu } from '../components/NewEntity'
 import { ErrorState, Loading } from '../components/States'
 import { useDocumentTitle, usePosition } from '../hooks'
 import { ordinalOf } from '../story'
@@ -78,6 +79,12 @@ export function BookPage() {
       <p className="eyebrow">Book{b.status === 'final' ? ', final' : ''}</p>
       <h1>{b.name}</h1>
       <FreezeControl universe={universe} book={b.key} />
+      {/* A final book takes nothing new, so it has no New note menu, as it has no Add chapter (#203). */}
+      {b.status !== 'final' && (
+        <div className="editor-actions">
+          <NewMenu universe={universe} place={{ scope: { kind: 'book', key: b.key }, name: b.name }} />
+        </div>
+      )}
       <h2>Chapters</h2>
       {b.chapters.length === 0 ? (
         <p className="muted">This book has no chapters yet.</p>

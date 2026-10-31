@@ -2128,6 +2128,12 @@ docs/
     usual "not met yet" banner, whose **Show it anyway** reveals it to
     edit. Escape or Cancel closes the form and returns focus to what
     opened it.
+  - **New note on the place pages** (#203). A type group exists in the
+    tree only where that type already has notes, so each universe,
+    series, and book page also has **New note ▾**: the same menu as the
+    top bar's, listing every enabled type, but with its place fixed to
+    the page's universe, series, or book. A final book's page has none,
+    as it has no Add chapter.
 - **New series and books** (#213). Maintainer decisions (on #213,
   2026-10-29): series and books are created from the web UI and the CLI
   (`wolfden new series`, `wolfden new book`, §7); a new one goes at the

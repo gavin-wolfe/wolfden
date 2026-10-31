@@ -393,3 +393,140 @@ describe('SC-WEB-68: New notes are guarded', () => {
     await waitFor(() => expect(document.activeElement).toBe(name))
   })
 })
+
+describe('SC-WEB-67: a universe, series, or book page makes a note there (#203)', () => {
+  /** Opens a page's New note menu (not the top bar's) and returns its items. */
+  async function openPageMenu(place: string) {
+    const button = await screen.findByRole('button', { name: `New note in ${place}` })
+    expect(button.textContent).toBe('New note ▾')
+    expect(button.getAttribute('aria-haspopup')).toBe('menu')
+    fireEvent.click(button)
+    const menu = await screen.findByRole('menu', { name: `New note in ${place}` })
+    await waitFor(() => expect(within(menu).getAllByRole('menuitem')[0].textContent).toBe('Character'))
+    return within(menu).getAllByRole('menuitem')
+  }
+
+  const withSeries = {
+    ...hierarchy,
+    universe: {
+      ...hierarchy.universe,
+      series: [
+        {
+          key: 'harker-papers',
+          name: 'The Harker Papers',
+          id: 'S1',
+          path: 'universes/dracula/series/harker-papers',
+          entities: { total: 0, byType: {} },
+          books: [
+            {
+              ...hierarchy.universe.books[0],
+              key: 'guest',
+              name: "Dracula's Guest",
+              id: 'B2',
+              path: 'universes/dracula/series/harker-papers/books/guest',
+              entities: { total: 0, byType: {} },
+              chapters: [],
+            },
+          ],
+        },
+      ],
+    },
+  }
+
+  it("the universe's page offers every type, even one with no notes there, and makes it in the universe", async () => {
+    const { posted } = stubCreate()
+    renderApp('/u/dracula')
+    await screen.findByRole('heading', { name: 'Dracula', level: 1 })
+
+    // The universe has a location and a note, but every type the den's packs define is offered.
+    const items = await openPageMenu('Dracula')
+    expect(items.map((i) => i.textContent)).toEqual(['Character', 'Event', 'Location', 'Note'])
+    fireEvent.click(items[0])
+
+    const form = dialog()
+    expect((within(form).getByLabelText('Type') as HTMLSelectElement).value).toBe('character')
+    await waitFor(() => expect((within(form).getByLabelText('Where it goes') as HTMLSelectElement).value).toBe('universe:dracula'))
+    fireEvent.change(within(form).getByLabelText('Name'), { target: { value: 'Sister Agatha' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Create' }))
+    await waitFor(() => expect(posted).toEqual([{ type: 'character', name: 'Sister Agatha', universe: 'dracula' }]))
+  })
+
+  it("a book's page makes the note in that book, even a type it has no notes of", async () => {
+    const { posted } = stubCreate()
+    renderApp('/u/dracula/b/dracula')
+    await screen.findByRole('heading', { name: 'Dracula', level: 1 })
+
+    // The book has characters and an event, and no locations: Location is offered all the same.
+    const items = await openPageMenu('Dracula')
+    fireEvent.click(items.find((i) => i.textContent === 'Location')!)
+
+    const form = dialog()
+    expect(within(form).getByRole('heading', { name: 'New location' })).toBeTruthy()
+    await waitFor(() => expect((within(form).getByLabelText('Where it goes') as HTMLSelectElement).value).toBe('book:dracula'))
+    fireEvent.change(within(form).getByLabelText('Name'), { target: { value: 'Whitby Abbey' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Create' }))
+    await waitFor(() => expect(posted).toEqual([{ type: 'location', name: 'Whitby Abbey', universe: 'dracula', book: 'dracula' }]))
+  })
+
+  it("a series' page makes the note in the series, and a new book's page in the book", async () => {
+    const { posted } = stubCreate(() => result(), withSeries)
+    const { history } = renderApp('/u/dracula/s/harker-papers')
+    await screen.findByRole('heading', { name: 'The Harker Papers', level: 1 })
+
+    const seriesItems = await openPageMenu('The Harker Papers')
+    fireEvent.click(seriesItems.find((i) => i.textContent === 'Event')!)
+    let form = dialog()
+    await waitFor(() => expect((within(form).getByLabelText('Where it goes') as HTMLSelectElement).value).toBe('series:harker-papers'))
+    expect(within(form).getByText("It's canon from the start of The Harker Papers's first book.")).toBeTruthy()
+    fireEvent.click(within(form).getByRole('button', { name: 'Cancel' }))
+
+    // A book with no notes at all, so no type lists in the tree: its page still offers every type.
+    history.push('/u/dracula/b/guest')
+    await screen.findByRole('heading', { name: "Dracula's Guest", level: 1 })
+    const bookItems = await openPageMenu("Dracula's Guest")
+    expect(bookItems.map((i) => i.textContent)).toEqual(['Character', 'Event', 'Location', 'Note'])
+    fireEvent.click(bookItems[0])
+    form = dialog()
+    await waitFor(() => expect((within(form).getByLabelText('Where it goes') as HTMLSelectElement).value).toBe('book:guest'))
+    fireEvent.change(within(form).getByLabelText('Name'), { target: { value: 'The guest' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Create' }))
+    await waitFor(() => expect(posted).toEqual([{ type: 'character', name: 'The guest', universe: 'dracula', book: 'guest' }]))
+  })
+
+  it('works from the keyboard, and Escape and Cancel return to its button', async () => {
+    stubCreate()
+    renderApp('/u/dracula')
+    const button = await screen.findByRole('button', { name: 'New note in Dracula' })
+
+    fireEvent.keyDown(button, { key: 'ArrowDown' })
+    const menu = await screen.findByRole('menu', { name: 'New note in Dracula' })
+    const items = await within(menu).findAllByRole('menuitem')
+    await waitFor(() => expect(document.activeElement).toBe(items[0]))
+    fireEvent.keyDown(menu, { key: 'Escape' })
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(document.activeElement).toBe(button)
+
+    fireEvent.keyDown(button, { key: 'ArrowUp' })
+    const last = (await within(await screen.findByRole('menu')).findAllByRole('menuitem'))[3]
+    await waitFor(() => expect(document.activeElement).toBe(last))
+    fireEvent.keyDown(last, { key: 'Enter' })
+    const form = dialog()
+    expect((within(form).getByLabelText('Type') as HTMLSelectElement).value).toBe('note')
+    fireEvent.click(within(form).getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    await waitFor(() => expect(document.activeElement).toBe(button))
+  })
+
+  it("a final book's page has no New note menu, as it has no Add chapter", async () => {
+    stubCreate(() => result(), {
+      ...hierarchy,
+      universe: { ...hierarchy.universe, books: hierarchy.universe.books.map((b) => ({ ...b, status: 'final' as const })) },
+    })
+    renderApp('/u/dracula/b/dracula')
+    await screen.findByRole('heading', { name: 'Dracula', level: 1 })
+
+    expect(screen.queryByRole('button', { name: 'New note in Dracula' })).toBeNull()
+    // The top bar's New is still there, and its form explains why the book takes nothing.
+    expect(screen.getByRole('button', { name: 'New' })).toBeTruthy()
+  })
+})

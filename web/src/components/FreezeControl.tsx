@@ -9,9 +9,9 @@ type Action = 'freeze' | 'finish' | 'unfreeze'
  * the book final, so its notes, chapters, and outline can't be edited; with
  * history, it also checkpoints the den and tags the snapshot. Each asks
  * first, then says what happened, including a step in the history that
- * failed. A final book that changed since its snapshot (edited outside
- * Wolfden, or git refused the checkpoint or the tag) offers to finish the
- * freeze, which takes a new one.
+ * failed. A final book that no snapshot holds as it is now (edited outside
+ * Wolfden, marked final by hand, or git refused the checkpoint or the tag)
+ * offers to finish the freeze, which takes one.
  */
 export function FreezeControl({ universe, book }: { universe: string; book: string }) {
   const status = useQuery(bookFreezeQuery(universe, book))
@@ -134,7 +134,7 @@ export function FreezeControl({ universe, book }: { universe: string; book: stri
           <span className="muted">
             {final
               ? current.unfinished
-                ? 'This book is final, but it has changed since its snapshot, or a step of its freeze failed.'
+                ? 'This book is final, but no snapshot holds it as it is now.'
                 : 'This book is final (frozen): its notes can’t be edited.'
               : 'Freeze the book when it’s finished.'}
           </span>
@@ -173,7 +173,7 @@ function prompt(action: Action, current: BookFreeze): ReactNode {
     case 'finish':
       return (
         <>
-          Finish freezing {current.name}? It's already final, but the book has changed since its snapshot, or a step of the freeze failed: Wolfden makes the checkpoint and adds the tag that
+          Finish freezing {current.name}? It's already final, but no snapshot holds it as it is now: it changed since its snapshot, was marked final by hand, or a step of the freeze failed. Wolfden makes the checkpoint and adds the tag that
           are missing.
           {others(current)}
         </>

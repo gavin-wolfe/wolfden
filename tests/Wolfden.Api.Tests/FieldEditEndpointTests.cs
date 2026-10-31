@@ -94,7 +94,7 @@ public class FieldEditEndpointTests
         return json;
     }
 
-    private static Dictionary<string, string> Number(string text) => new() { ["$number"] = text };
+    private static Dictionary<string, string> Number(string text) => new() { ["$plain"] = text };
 
     private static string[] Rules(JsonElement result) => result.GetProperty("warnings").EnumerateArray().Select(w => w.GetProperty("rule").GetString()!).ToArray();
 
@@ -113,7 +113,7 @@ public class FieldEditEndpointTests
         Assert.Equal(["label", "weight", "preserved", "found", "state", "tags", "seen", "keeper", "x_extra"], fields.Keys);
         Assert.Equal(7, fields["label"].GetProperty("line").GetInt32());
         Assert.Equal("Earth box", fields["label"].GetProperty("value").GetString());
-        Assert.Equal("12.50", fields["weight"].GetProperty("value").GetProperty("$number").GetString());
+        Assert.Equal("12.50", fields["weight"].GetProperty("value").GetProperty("$plain").GetString());
         Assert.Equal(JsonValueKind.False, fields["preserved"].GetProperty("value").ValueKind);
         Assert.Equal("1893-08-08", fields["found"].GetProperty("value").GetString());
         Assert.Equal(["soil", "box", "chapel"], fields["tags"].GetProperty("value").EnumerateArray().Select(e => e.GetString()));
@@ -183,7 +183,8 @@ public class FieldEditEndpointTests
         Assert.Contains("  tags:\n    - chapel\n    - box\n    - soil\n    - Carfax\n  seen:", den.Read(BoxPath), StringComparison.Ordinal);
         Assert.Contains(
             Strings(moved, "effects"),
-            e => e.StartsWith("Moved an item of fields.tags to item 1", StringComparison.Ordinal) && e.Contains("'# from Varna'", StringComparison.Ordinal) && e.Contains("'move' change", StringComparison.Ordinal));
+            e => e.StartsWith("Removed fields.tags.0 and added the same value as item 1 of fields.tags", StringComparison.Ordinal) && e.Contains("'# from Varna'", StringComparison.Ordinal)
+                && e.Contains("If that was a move", StringComparison.Ordinal) && !e.StartsWith("Moved", StringComparison.Ordinal));
 
         // A move with no index, or to a place past the end, is refused.
         var unmoved = den.Read(BoxPath);
@@ -383,8 +384,8 @@ public class FieldEditEndpointTests
         // Read: as written, '2.50' and a 20-digit number alike.
         await SavedAsync(server, "label", new[] { new { op = "set", value = Number("12345678901234567890") } });
         var fields = (await SourceAsync(server)).GetProperty("fields").EnumerateArray().ToDictionary(f => f.GetProperty("name").GetString()!, f => f.GetProperty("value"));
-        Assert.Equal("12345678901234567890", fields["label"].GetProperty("$number").GetString());
-        Assert.Equal("12.50", fields["weight"].GetProperty("$number").GetString());
+        Assert.Equal("12345678901234567890", fields["label"].GetProperty("$plain").GetString());
+        Assert.Equal("12.50", fields["weight"].GetProperty("$plain").GetString());
 
         // Written: as given, in a whole value too.
         await SavedAsync(server, "keeper", new[] { new { op = "set", value = (object)new[] { new { value = (object)Number("2.50"), from = "dracula:1" } } } });
@@ -417,8 +418,8 @@ public class FieldEditEndpointTests
 
         // Read: each as its text, so the page can send it back as written.
         var fields = (await SourceAsync(server)).GetProperty("fields").EnumerateArray().ToDictionary(f => f.GetProperty("name").GetString()!, f => f.GetProperty("value"));
-        Assert.Equal("0x1F", fields["weight"].GetProperty("$number").GetString());
-        Assert.Equal(["soil", "box", "0o17", "1_000", ".inf", "True"], fields["tags"].EnumerateArray().Select(t => t.ValueKind == JsonValueKind.String ? t.GetString() : t.GetProperty("$number").GetString()));
+        Assert.Equal("0x1F", fields["weight"].GetProperty("$plain").GetString());
+        Assert.Equal(["soil", "box", "0o17", "1_000", ".inf", "True"], fields["tags"].EnumerateArray().Select(t => t.ValueKind == JsonValueKind.String ? t.GetString() : t.GetProperty("$plain").GetString()));
 
         // Moved: still plain, never quoted.
         await SavedAsync(server, "tags", new object[]
@@ -437,6 +438,64 @@ public class FieldEditEndpointTests
         // Text that YAML reads as a string isn't taken as a plain value.
         var (status, _) = await EditAsync(server, await HashAsync(server), "label", new[] { new { op = "set", value = Number("a box") } });
         Assert.Equal(HttpStatusCode.BadRequest, status);
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-WEB-60")]
+    [InlineData("~")]
+    [InlineData("null")]
+    [InlineData("NULL")]
+    [InlineData("<<")]
+    [InlineData("=")]
+    [InlineData("12\n")]
+    [InlineData("True\n")]
+    [InlineData("")]
+    public async Task APlainValueThatIsNoValueOrEndsInANewlineIsRefused(string text)
+    {
+        // Only a hand-made request sends these (#199): a null is null, '<<' and '=' are YAML 1.1 keys, and a newline isn't plain.
+        using var den = NewDen();
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+        var before = den.Read(BoxPath);
+
+        var (status, json) = await EditAsync(server, await HashAsync(server), "label", new[] { new { op = "set", value = Number(text) } });
+
+        Assert.Equal(HttpStatusCode.BadRequest, status);
+        Assert.Equal("bad_argument", json.GetProperty("code").GetString());
+        Assert.Equal(before, den.Read(BoxPath));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-60")]
+    public async Task AMappingWhoseOnlyKeyIsPlainIsntTakenForAPlainValue()
+    {
+        // A mapping { $plain: x } is sent with one more '$', so the page sees a mapping, and it's written back as it was (#199).
+        using var den = NewDen();
+        den.Write(BoxPath, Box.Replace("  weight: 12.50\n", "  weight: 12.50\n  x_odd: { $plain: \"7\" }\n", StringComparison.Ordinal));
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+
+        var fields = (await SourceAsync(server)).GetProperty("fields").EnumerateArray().ToDictionary(f => f.GetProperty("name").GetString()!, f => f.GetProperty("value"));
+        Assert.Equal("""{"$$plain":"7"}""", fields["x_odd"].GetRawText());
+
+        // Sent back, it's that mapping again: a key of '$plain', which isn't one a writer may add, so it's refused as the file's own key is.
+        var before = den.Read(BoxPath);
+        var (status, json) = await EditAsync(server, await HashAsync(server), "x_odd", new[] { new { op = "set", value = (object)new Dictionary<string, object> { ["$$plain"] = "8" } } });
+        Assert.Equal(HttpStatusCode.BadRequest, status);
+        Assert.Equal("'$plain' can't be written as a plain YAML key.", json.GetProperty("message").GetString());
+        Assert.Equal(before, den.Read(BoxPath));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-60")]
+    public async Task APlainKeyLeftAloneOnceOthersAreDroppedIsStillEscaped()
+    {
+        // Counted as sent (#249 review): a key that isn't text is left out, so $plain is the only key sent.
+        // (A repeated key makes the file unreadable, so that case never gets this far.)
+        using var den = NewDen();
+        den.Write(BoxPath, Box.Replace("  weight: 12.50\n", "  weight: 12.50\n  x_odd:\n    $plain: \"7\"\n    ? [a]\n    : b\n", StringComparison.Ordinal));
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+
+        var fields = (await SourceAsync(server)).GetProperty("fields").EnumerateArray().ToDictionary(f => f.GetProperty("name").GetString()!, f => f.GetProperty("value"));
+        Assert.Equal("""{"$$plain":"7"}""", fields["x_odd"].GetRawText());
     }
 
     [Fact]

@@ -545,7 +545,8 @@ is never changed, and a name or email given when git already has one
 isn't used, and the result says so. Any name will do, a pen name
 included, and the email can be a placeholder, as long as git will record
 the pair (`git var GIT_COMMITTER_IDENT`: a name made only of characters
-git strips, such as `;`, is refused). A missing one that wasn't given,
+git strips, such as `;`, is refused, and so is an email given that git
+would record as empty, such as `;`, #207). A missing one that wasn't given,
 or a pair git won't record, refuses with nothing changed: the repository
 the run just made, still without a commit, is taken away again: moved
 in one rename to a hidden folder in the den, then deleted (if the rename
@@ -1846,7 +1847,7 @@ docs/
     `value` as written, as JSON, with a plain `true`/`false` as one, any
     other plain scalar YAML doesn't read as a string (a number in any
     form, `0x1F`, `1_000`, `.inf`, `True`, `yes`) as
-    `{"$number": "2.50"}` with its text as written, and every other
+    `{"$plain": "2.50"}` with its text as written, and every other
     scalar as its text) and `fieldTypes` (the
     type's fields in field order, each with `type`, `list`,
     `temporal`, `required`, enum `values`, ref `to`, `description`,
@@ -1858,11 +1859,17 @@ docs/
     path under `fields.<field>`, so an edit can't reach `id`, `name`,
     `status`, or another field, and it has the same hash check, frozen
     books, write check, pinned canon, effects, ledger, and lossless
-    edits. Numbers go both ways as text (`{"$number": "2.50"}`), since a
+    edits. Numbers go both ways as text (`{"$plain": "2.50"}`), since a
     browser's JSON number would turn `2.50` into `2.5` and cut a long
     number's digits; the server writes the text as given, plain, so a
     value rewritten whole or moved keeps its form (`0x1F`, `.inf`) and
-    never gains quotes. A
+    never gains quotes. `$plain` (it was `$number` before #199, and
+    carries `True`, `yes`, and timestamps too) takes only such a
+    value: text YAML reads as a string, a null (`~`, `null`), YAML 1.1's
+    `<<` and `=`, and anything with a line break are `bad_argument`. A
+    mapping whose only key is `$plain` is sent as `{"$$plain": …}`, one
+    more `$`, and the write takes it off again, so it's never read as a
+    plain value. A
     number that isn't whole is written plain by the MCP tools too now,
     and one too large to be a number (`1e400`) is `invalid_edit` for
     both.
@@ -1879,9 +1886,11 @@ docs/
     never moved (F-TMP-7): the form has no control for it, and the
     server refuses a `move` of one. Removing an item with a comment
     says so in `effects`, and so does a client that takes an item out
-    and adds it again, which writes it afresh ("Moved an item of
-    fields.tags to item 0, written afresh, so the comment on it was
-    dropped: '# from Varna'"). A value the writer didn't touch,
+    and adds its value again, which writes it afresh ("Removed
+    fields.tags.2 and added the same value as item 0 of fields.tags,
+    written afresh, so the comment on it was dropped: '# from
+    Varna'"). It doesn't call that a move, since another item may just
+    have the same value. A value the writer didn't touch,
     and a list whose items are all as they were, is sent back as
     written, so `Dried` isn't rewritten `dried` and an entry's
     `value: ~` stays `~`. A plain value that gains a date or a pin, or a field whose
@@ -1982,7 +1991,8 @@ docs/
     page sends the same changes again on the new hash without asking,
     but only where nothing of the field can be overwritten: no change
     sets the field as a whole, and the field's lines (from its key to
-    the next field), comments and quoting included, are byte for byte
+    the next field, or for the last one to the closing `---`, in a CRLF
+    file too, #199), comments and quoting included, are byte for byte
     as they were. Otherwise it shows the writer's value (or
     "(not set)" for Clear field) and the file's side by side. Keep mine
     sends the same changes on the new hash if the field itself didn't
@@ -2042,7 +2052,11 @@ docs/
     do. Before the den is a repository, the status can't be sure
     (`turnOn.identityCertain` is false), so the fields are optional: git
     may have a name and email for the repository once it's made, and the
-    server asks again only if it doesn't. `POST /api/history/turn-on` takes `{"authorName"?, "authorEmail"?,
+    server asks again only if it doesn't: `identity_needed` carries
+    `needsName` and `needsEmail`, and the dialog then asks for just
+    those, required, keeping a field the writer already filled in. What
+    it asks for stays put while the retry is pending (#207).
+    `POST /api/history/turn-on` takes `{"authorName"?, "authorEmail"?,
     "firstCheckpoint"?}` (it defaults to true), with the same guards as
     the checkpoint POST (cross-site, `application/json`, no query, 64 KB),
     and answers with the steps done, in words, `repositoryMade`,
@@ -2355,7 +2369,7 @@ docs/
     define (in pack order, then any other name the chapter writes or
     inherits): whether the chapter writes it (`set`), its value as
     written (`own`, in the form of `/api/entity/source`'s values,
-    numbers as `{"$number": "2.50"}`), whether that's `ignored`
+    numbers as `{"$plain": "2.50"}`), whether that's `ignored`
     (F-CHAP-3), the value that holds and where from (`chapter`, or the
     `book`, `series`, or `universe` and its key), whether it's `none`,
     what it would inherit without its own (`default`), and the links in

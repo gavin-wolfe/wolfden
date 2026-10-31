@@ -24,7 +24,7 @@ internal static partial class PlainScalarResolver
           [-+]?[0-9]+|0o[0-7]+|0x[0-9a-fA-F]+|
           [-+]?(?:\.[0-9]+|[0-9]+(?:\.[0-9]*)?)(?:[eE][-+]?[0-9]+)?|
           [-+]?\.(?:inf|Inf|INF)|\.(?:nan|NaN|NAN)
-        )$
+        )\z
         """,
         RegexOptions.IgnorePatternWhitespace | RegexOptions.CultureInvariant)]
     private static partial Regex Core12();
@@ -41,7 +41,7 @@ internal static partial class PlainScalarResolver
           [0-9]{4}-[0-9]{2}-[0-9]{2}|
           [0-9]{4}-[0-9]{1,2}-[0-9]{1,2}(?:[Tt]|[ \t]+)[0-9]{1,2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]*)?(?:[ \t]*(?:Z|[-+][0-9]{1,2}(?::[0-9]{2})?))?|
           <<|=
-        )$
+        )\z
         """,
         RegexOptions.IgnorePatternWhitespace | RegexOptions.CultureInvariant)]
     private static partial Regex Yaml11();

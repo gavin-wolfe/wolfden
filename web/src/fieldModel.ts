@@ -9,23 +9,26 @@ import type { SourceFieldType } from './editApi'
 
 /**
  * A JSON value, as the source gives a field's value as written. A plain
- * number comes as `{ $number: "2.50" }`, its text as written, since a JSON
- * number would lose `2.50`'s last digit or a long number's precision; the
- * page sends numbers back the same way.
+ * number, or another plain value YAML doesn't read as a string (`0x1F`,
+ * `True`, `yes`, a timestamp), comes as `{ $plain: "2.50" }`, its text as
+ * written, since a JSON number would lose `2.50`'s last digit or a long
+ * number's precision, and the others their form; the page sends them back
+ * the same way. A mapping whose only key is `$plain` comes with one more
+ * `$` (`{ $$plain: … }`), so it's never taken for one.
  */
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json }
 
-/** A number as written: `{ $number: "2.50" }`. */
-export type NumberText = { $number: string }
+/** A number or other plain value as written: `{ $plain: "2.50" }`. */
+export type PlainValue = { $plain: string }
 
-/** True for a number as written (`{ $number: "2.50" }`), which is a scalar, not a mapping. */
-export function isNumberText(v: unknown): v is NumberText {
-  return typeof v === 'object' && v !== null && !Array.isArray(v) && Object.keys(v).length === 1 && typeof (v as NumberText).$number === 'string'
+/** True for a plain value as written (`{ $plain: "2.50" }`), which is a scalar, not a mapping. */
+export function isPlainValue(v: unknown): v is PlainValue {
+  return typeof v === 'object' && v !== null && !Array.isArray(v) && Object.keys(v).length === 1 && typeof (v as PlainValue).$plain === 'string'
 }
 
-/** A number to send, as its text. */
-export function numberText(text: string): NumberText {
-  return { $number: text }
+/** A number or other plain value to send, as its text. */
+export function plainValue(text: string): PlainValue {
+  return { $plain: text }
 }
 
 /**
@@ -94,7 +97,7 @@ const ENTRY_KEYS = ['value', 'from', 'until', 'status', 'pin']
 
 /** True for a mapping; a number as written isn't one. */
 function isObject(v: unknown): v is { [key: string]: Json } {
-  return typeof v === 'object' && v !== null && !Array.isArray(v) && !isNumberText(v)
+  return typeof v === 'object' && v !== null && !Array.isArray(v) && !isPlainValue(v)
 }
 
 function isEntry(v: unknown): v is { [key: string]: Json } {
@@ -102,7 +105,7 @@ function isEntry(v: unknown): v is { [key: string]: Json } {
 }
 
 function textOf(v: Json | undefined): string {
-  return v === null || v === undefined ? '' : isNumberText(v) ? v.$number : String(v)
+  return v === null || v === undefined ? '' : isPlainValue(v) ? v.$plain : String(v)
 }
 
 /** A form value for `raw`, or null if the form can't show it (a list or mapping where a scalar goes, a date with other keys). */
@@ -117,8 +120,8 @@ export function draftOf(type: SourceFieldType, raw: Json | undefined): Draft | n
     }
 
     const sort = raw.sort
-    const ints = isNumberText(sort) ? [sort] : Array.isArray(sort) ? sort : sort === undefined || sort === null ? [] : null
-    if (ints === null || ints.some((n) => !isNumberText(n) || !/^-?[0-9]+$/.test(n.$number)) || (raw.text !== undefined && raw.text !== null && typeof raw.text !== 'string')) {
+    const ints = isPlainValue(sort) ? [sort] : Array.isArray(sort) ? sort : sort === undefined || sort === null ? [] : null
+    if (ints === null || ints.some((n) => !isPlainValue(n) || !/^-?[0-9]+$/.test(n.$plain)) || (raw.text !== undefined && raw.text !== null && typeof raw.text !== 'string')) {
       return null
     }
 
@@ -266,7 +269,7 @@ function jsonOfDraft(type: SourceFieldType, d: Draft): Json {
   switch (type.type) {
     case 'number':
       // Sent as its text, so `2.50` is written `2.50`; the server reads it as a number.
-      return NUMBER.test(text) && Number.isFinite(Number(text)) ? numberText(text) : text
+      return NUMBER.test(text) && Number.isFinite(Number(text)) ? plainValue(text) : text
     case 'bool':
       return text === 'true' ? true : text === 'false' ? false : text
     case 'date': {
@@ -274,7 +277,7 @@ function jsonOfDraft(type: SourceFieldType, d: Draft): Json {
         return text
       }
 
-      const ints = d.sort.split(',').map((n) => numberText(n.trim()))
+      const ints = d.sort.split(',').map((n) => plainValue(n.trim()))
       const sort = ints.length === 1 ? ints[0] : ints
       return text === '' ? { sort } : { text, sort }
     }
@@ -329,7 +332,10 @@ function jsonOfEntry(type: SourceFieldType, e: EntryDraft): { [key: string]: Jso
   const out: { [key: string]: Json } = { ...(e.raw ?? {}) }
   out.value = jsonOfValue(type, e.value)
   for (const key of ['from', 'until', 'status'] as const) {
-    if (e[key].trim() !== '') {
+    if (e.raw !== undefined && e[key] === textOf(e.raw[key])) {
+      // As written: a padded "from" isn't trimmed by an edit of something else (#199).
+      continue
+    } else if (e[key].trim() !== '') {
       out[key] = e[key].trim()
     } else if (key in out && out[key] !== null) {
       delete out[key]
@@ -666,9 +672,12 @@ export function valueLines(value: Json | undefined): string {
     }
 
     if (isObject(v)) {
-      return `{ ${Object.entries(v).map(([k, x]) => `${k}: ${flow(x)}`).join(', ')} }`
+      // A mapping whose only key is $plain comes as { $$plain: … }: show the key the file has.
+      const entries = Object.entries(v)
+      const shown = (k: string) => (entries.length === 1 && /^\$\$+plain$/.test(k) ? k.slice(1) : k)
+      return `{ ${entries.map(([k, x]) => `${shown(k)}: ${flow(x)}`).join(', ')} }`
     }
 
-    return v === null ? '~' : typeof v === 'string' ? JSON.stringify(v) : isNumberText(v) ? v.$number : String(v)
+    return v === null ? '~' : typeof v === 'string' ? JSON.stringify(v) : isPlainValue(v) ? v.$plain : String(v)
   }
 }

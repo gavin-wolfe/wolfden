@@ -202,7 +202,7 @@ public sealed partial class DenTools
     /// <param name="changes">The changes, in order.</param>
     /// <param name="universe">The universe, or null.</param>
     /// <param name="numbersAsText">
-    /// True if a number in a value may also be given as <c>{"$number": "2.50"}</c>, its text as written,
+    /// True if a number in a value may also be given as <c>{"$plain": "2.50"}</c>, its text as written,
     /// which is written exactly so. The web UI sends numbers so, since a browser's JSON loses
     /// <c>2.50</c>'s last digit and a long number's precision.
     /// </param>
@@ -279,9 +279,10 @@ public sealed partial class DenTools
                     {
                         var r = removedWithComments[moved];
                         removedWithComments.RemoveAt(moved);
+                        // It may be a move, or another item that happens to have the same value: say what was done, not why.
                         notes.Add(
-                            $"Moved an item of {listPath} to item {at}, written afresh, so the comment on it was dropped: {Quoted(r.Comments)}. " +
-                            "Put it back by hand if you want it; a 'move' change moves an item in place, with its comments.");
+                            $"Removed {r.Path} and added the same value as item {at} of {listPath}, written afresh, so the comment on it was dropped: {Quoted(r.Comments)}. " +
+                            "If that was a move, put the comment back by hand; a 'move' change moves an item in place, with its comments.");
                     }
                 }
             }
@@ -469,7 +470,7 @@ public sealed partial class DenTools
     /// place, keeping its comments (<see cref="InPlace"/>). The
     /// result says what each field's effective value is now.
     /// </summary>
-    /// <param name="numbersAsText">True to take a plain number as <c>{"$number": "2.50"}</c>, its text as written (the web UI's form, <see cref="SourceField.Value"/>).</param>
+    /// <param name="numbersAsText">True to take a plain number as <c>{"$plain": "2.50"}</c>, its text as written (the web UI's form, <see cref="SourceField.Value"/>).</param>
     public WriteResult UpdateChapterFields(string book, string chapter, string expectedHash, JsonElement changes, string? universe = null, bool numbersAsText = false)
     {
         var hash = RequireHash(expectedHash);
@@ -1874,10 +1875,10 @@ public sealed partial class DenTools
                     return YamlScalarValue.Integer(n);
                 case JsonValueKind.Number:
                     return Number(value.GetRawText());
-                case JsonValueKind.Object when numbersAsText && value.EnumerateObject().Count() == 1 && value.TryGetProperty("$number", out var text):
+                case JsonValueKind.Object when numbersAsText && value.EnumerateObject().Count() == 1 && value.TryGetProperty("$plain", out var text):
                     return text.ValueKind == JsonValueKind.String
                         ? Number(text.GetString()!)
-                        : throw new DenToolException(ToolErrorCodes.BadArgument, "A plain value given as {\"$number\": ...} holds its text, such as \"2.50\".");
+                        : throw new DenToolException(ToolErrorCodes.BadArgument, "A plain value given as {\"$plain\": ...} holds its text, such as \"2.50\".");
                 case JsonValueKind.True or JsonValueKind.False:
                     return YamlScalarValue.Boolean(value.GetBoolean());
                 case JsonValueKind.Null:
@@ -1892,9 +1893,12 @@ public sealed partial class DenTools
                     return list;
                 default:
                     var map = new YamlMappingValue();
+                    var only = value.EnumerateObject().Count() == 1;
                     foreach (var p in value.EnumerateObject())
                     {
-                        map.Add(p.Name, ToYaml(p.Value, numbersAsText));
+                        // A mapping whose only key is $plain came with one more '$' (AsWritten), so it isn't read as a plain value.
+                        var key = numbersAsText && only && p.Name.StartsWith("$$", StringComparison.Ordinal) && IsPlainKey(p.Name) ? p.Name[1..] : p.Name;
+                        map.Add(key, ToYaml(p.Value, numbersAsText));
                     }
 
                     return map;

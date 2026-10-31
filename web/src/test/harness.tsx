@@ -179,7 +179,7 @@ export function bookChapterFields(extra: Partial<BookChapterFields> = {}): BookC
           : unsetValue('pov'),
         fromBook('narration', 'first'),
         fromBook('tense', 'past'),
-        p.chapter === '1' ? unsetValue('when', { set: true, own: { text: '3–5 May', sort: [{ $number: '0' }, { $number: '5' }, { $number: '3' }] }, value: { text: '3–5 May', sort: [{ $number: '0' }, { $number: '5' }, { $number: '3' }] }, from: 'chapter' }) : unsetValue('when'),
+        p.chapter === '1' ? unsetValue('when', { set: true, own: { text: '3–5 May', sort: [{ $plain: '0' }, { $plain: '5' }, { $plain: '3' }] }, value: { text: '3–5 May', sort: [{ $plain: '0' }, { $plain: '5' }, { $plain: '3' }] }, from: 'chapter' }) : unsetValue('when'),
         unsetValue('setting'),
       ],
     })),

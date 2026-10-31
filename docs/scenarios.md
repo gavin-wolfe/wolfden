@@ -3119,7 +3119,8 @@ email. They turn on history for their den.
   it can't be sure.
 - A name or email of more than one line, with a control character, or
   with `<` or `>`, is refused, and so is a name git won't record (only
-  characters it strips, such as `;`), before anything is saved.
+  characters it strips, such as `;`), or an email git would record as
+  empty (the same characters), before anything is saved.
 
 Spec: design.md §6, "Turning history on" (maintainer decision,
 2026-10-28, #195). Covered by:
@@ -4175,7 +4176,8 @@ on…**, then **Turn on history**.
   quiet: the server uses the new history at once, without a restart, for
   the indicator, the History tab, the next checkpoint, and freezing.
 - A refusal shows the server's message; if git turns out to need a name
-  and email after all, the fields appear. When it can't be turned on
+  or email after all, the fields for just what's missing appear, and
+  stay while it tries again. When it can't be turned on
   here (no git, say), the dialog says why and offers no button.
 - A server pinned to one universe may turn it on: history covers the
   whole den, and the result names no files.

@@ -149,7 +149,7 @@ public sealed class ChapterFieldEndpointTests : IDisposable
         var when = await EditAsync(server, new
         {
             book = "ember", universe = "starfall", chapter = "1", field = "when", expectedHash = cleared.GetProperty("hash").GetString(),
-            changes = new object[] { new { op = "set", value = new Dictionary<string, object> { ["text"] = "Year 2290", ["sort"] = new Dictionary<string, string> { ["$number"] = "2290" } } } },
+            changes = new object[] { new { op = "set", value = new Dictionary<string, object> { ["text"] = "Year 2290", ["sort"] = new Dictionary<string, string> { ["$plain"] = "2290" } } } },
         });
         Assert.True(when.GetProperty("changed").GetBoolean());
         Assert.Contains("title: Kessan Reach, fields: { when: { text: Year 2290, sort: 2290 } } }", _den.Read(Ember), StringComparison.Ordinal);
@@ -171,7 +171,7 @@ public sealed class ChapterFieldEndpointTests : IDisposable
             book = "ember", universe = "starfall", chapter = "2", field = "pov", expectedHash = await HashAsync(server),
             changes = new object[] { new { op = "remove", item = 0 }, new { op = "add", value = "[[mara-voss]]" } },
         });
-        Assert.Contains("Moved an item of pov of chapter '2' to item 1, written afresh, so the comment on it was dropped: '# her watch'. Put it back by hand if you want it; a 'move' change moves an item in place, with its comments.", moved.GetProperty("effects").EnumerateArray().Select(e => e.GetString()));
+        Assert.Contains("Removed item 0 of pov of chapter '2' and added the same value as item 1, written afresh, so the comment on it was dropped: '# her watch'. If that was a move, put the comment back by hand; a 'move' change moves an item in place, with its comments.", moved.GetProperty("effects").EnumerateArray().Select(e => e.GetString()));
 
         // Rewritten: a remove and an add at the same place.
         Assert.Contains("        - \"[[mara-voss]]\"\n", _den.Read(Ember), StringComparison.Ordinal);

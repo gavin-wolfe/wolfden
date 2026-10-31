@@ -377,6 +377,40 @@ public sealed class HistorySetupTests : IDisposable
         Assert.False(File.Exists(Path.Combine(den, ".gitignore")));
     }
 
+    [Theory]
+    [Trait("Scenario", "SC-HIST-15")]
+    [InlineData(";")]
+    [InlineData(",;:")]
+    [InlineData("\"'")]
+    public void AnEmailGitWouldRecordAsEmptyIsRefusedLikeAName(string email)
+    {
+        // git var takes these, but records "Ash Calloway <>": the same test as the name's (#207).
+        var den = Den();
+        var setup = new GitHistorySetup(den, Without(Config("")));
+
+        var result = setup.TurnOn(new HistorySetupRequest("Ash Calloway", email), Token);
+
+        Assert.Equal(HistorySetupStatus.Refused, result.Status);
+        Assert.Equal(HistorySetupCodes.BadArgument, result.Code);
+        Assert.StartsWith("Git won't record that email on a checkpoint", result.Problem, StringComparison.Ordinal);
+        Assert.EndsWith("Nothing was changed.", result.Problem, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(Path.Combine(den, ".git")));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-15")]
+    public void AnOddEmailGitAlreadyHasIsLeftToGit()
+    {
+        // Only a given email is checked: one git already has is git's business, and the given one isn't used.
+        var den = Den();
+        var setup = new GitHistorySetup(den, Without(Config("[user]\n\temail = \";\"\n")));
+
+        var result = setup.TurnOn(new HistorySetupRequest("Ash Calloway", "ash@example.invalid"), Token);
+
+        Assert.Equal(HistorySetupStatus.Done, result.Status);
+        Assert.Equal(["user.name"], result.IdentitySaved);
+    }
+
     [Fact]
     [Trait("Scenario", "SC-HIST-17")]
     public void AnEmptyDotGitInsideALargerRepositoryDoesntMakeTheDenItsOwnRepository()

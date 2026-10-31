@@ -1,19 +1,15 @@
 // @vitest-environment jsdom
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, screen, waitFor, within, configure } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import type { EntityPageResult, PageField } from './api'
 import type { EntitySource, SourceFieldType, WriteResult } from './editApi'
-import { fieldChanges, fieldDraftOf, fieldProblems, linkFor, newEntry, newItem, type FieldDraft, type Json } from './fieldModel'
+import { fieldChanges, fieldDraftOf, fieldProblems, linkFor, newEntry, newItem, valueLines, type FieldDraft, type Json } from './fieldModel'
 import type { LookupHit, LookupResult } from './lookupApi'
+import { fieldText } from './components/FieldEditing'
 import { entities, page, renderApp, stubApi } from './test/harness'
 
 // Editing a note's fields in place (#28, part b): the changes worked out from
 // the form, the controls for each field type, and saving one field.
-
-// The first test of a file renders the app cold, which can take over a second
-// when the machine is busy (the whole suite runs files in parallel).
-configure({ asyncUtilTimeout: 5000 })
-vi.setConfig({ testTimeout: 15_000 })
 
 beforeAll(() => {
   // jsdom lays nothing out; CodeMirror (Edit file) measures text ranges.
@@ -158,12 +154,12 @@ describe('SC-WEB-61: the changes a field edit sends', () => {
 
   it('reads numbers, dates with a sort key, and booleans, and changes a date mapping key by key', () => {
     // Numbers come and go as their text, so 2.50 stays 2.50 and a long one keeps every digit.
-    const w = draft(types.weight, { $number: '12.50' })
+    const w = draft(types.weight, { $plain: '12.50' })
     expect(w.entries[0].value).toMatchObject({ draft: { text: '12.50' } })
-    expect(fieldChanges(types.weight, { $number: '12.50' }, w)).toEqual([])
+    expect(fieldChanges(types.weight, { $plain: '12.50' }, w)).toEqual([])
     ;(w.entries[0].value as { kind: 'one'; draft: { text: string } }).draft.text = '3.250'
-    expect(fieldChanges(types.weight, { $number: '12.50' }, w)).toEqual([{ op: 'set', path: [], value: { $number: '3.250' } }])
-    const serial = draft(types.label, { $number: '12345678901234567890' })
+    expect(fieldChanges(types.weight, { $plain: '12.50' }, w)).toEqual([{ op: 'set', path: [], value: { $plain: '3.250' } }])
+    const serial = draft(types.label, { $plain: '12345678901234567890' })
     expect(serial.entries[0].value).toMatchObject({ draft: { text: '12345678901234567890' } })
 
     const f = draft(types.found, '1893-08-08')
@@ -171,10 +167,10 @@ describe('SC-WEB-61: the changes a field edit sends', () => {
     fv.draft.text = 'early August'
     fv.draft.sort = '1893, 8'
     expect(fieldChanges(types.found, '1893-08-08', f)).toEqual([
-      { op: 'set', path: [], value: { text: 'early August', sort: [{ $number: '1893' }, { $number: '8' }] } },
+      { op: 'set', path: [], value: { text: 'early August', sort: [{ $plain: '1893' }, { $plain: '8' }] } },
     ])
 
-    const before: Json = { text: 'early August', sort: [{ $number: '1893' }, { $number: '8' }] }
+    const before: Json = { text: 'early August', sort: [{ $plain: '1893' }, { $plain: '8' }] }
     const m = draft(types.found, before)
     ;(m.entries[0].value as { kind: 'one'; draft: { text: string } }).draft.text = 'August'
     expect(fieldChanges(types.found, before, m)).toEqual([{ op: 'set', path: ['text'], value: 'August' }])
@@ -207,6 +203,43 @@ describe('SC-WEB-61: the changes a field edit sends', () => {
     expect(fieldDraftOf(types.keeper, [{ value: 'a' }, 'b'])).toMatch(/F-TMP-1/)
     expect(fieldDraftOf(types.found, { text: 'x', calendar: 'reach' })).toMatch(/can't show/)
     expect(fieldDraftOf(types.label, { x: 1 })).toMatch(/can't show/)
+    // A mapping whose only key is $plain comes as { $$plain: … } (#199): a mapping, not a plain value.
+    expect(fieldDraftOf(types.weight, { $$plain: '7' })).toMatch(/can't show/)
+  })
+
+  it('keeps a padded From as written when something else in the entry changes', () => {
+    const before: Json = [{ value: '[[count-dracula]]', from: ' dracula:1 ' }]
+    const d = draft(types.keeper, before)
+    d.entries = [{ ...d.entries[0], until: 'dracula:5' }]
+    expect(fieldChanges(types.keeper, before, d)).toEqual([{ op: 'set', path: [0, 'until'], value: 'dracula:5' }])
+
+    // Changed, it's trimmed.
+    d.entries = [{ ...d.entries[0], from: ' dracula:2 ' }]
+    expect(fieldChanges(types.keeper, before, d)).toEqual([
+      { op: 'set', path: [0, 'from'], value: 'dracula:2' },
+      { op: 'set', path: [0, 'until'], value: 'dracula:5' },
+    ])
+  })
+
+  it('finds the last field’s lines in a CRLF file, so a stale save can go again without asking', () => {
+    const text = (weight: string, body: string) => ['---', 'name: Box', 'fields:', '  state: Dried', `  weight: ${weight}`, '---', '', body, ''].join('\r\n')
+    const at = (t: string): EntitySource => ({ ...source('h1', [{ name: 'state', line: 4, value: 'Dried' }, { name: 'weight', line: 5, value: { $plain: '12' } }]), text: t, lineEndings: 'crlf' })
+    expect(fieldText(at(text('12', 'The box.')), 'weight')).toBe('  weight: 12\r')
+    // Another part of the note changed: the last field's lines are the same.
+    expect(fieldText(at(text('12', 'An agent wrote this.')), 'weight')).toBe(fieldText(at(text('12', 'The box.')), 'weight'))
+    expect(fieldText(at(text('14', 'The box.')), 'weight')).not.toBe(fieldText(at(text('12', 'The box.')), 'weight'))
+
+    // A closing line with spaces or tabs after it, as the server reads one.
+    const padded = (body: string) => text('12', body).replace('\r\n---\r\n', '\r\n--- \t\r\n')
+    expect(fieldText(at(padded('The box.')), 'weight')).toBe('  weight: 12\r')
+    expect(fieldText(at(padded('An agent wrote this.')), 'weight')).toBe('  weight: 12\r')
+  })
+
+  it('shows a mapping whose only key is $plain with the key the file has', () => {
+    expect(valueLines({ $$plain: '7' })).toBe('{ $plain: "7" }')
+    expect(valueLines({ $$$plain: '7' })).toBe('{ $$plain: "7" }')
+    expect(valueLines({ $$plain: '7', other: 'x' })).toBe('{ $$plain: "7", other: "x" }')
+    expect(valueLines({ $plain: '7' })).toBe('7')
   })
 
   it('writes a link by the file name where that reaches only the note, else by its id', () => {
@@ -237,7 +270,7 @@ describe('SC-WEB-61: the changes a field edit sends', () => {
 })
 
 describe('B1: an untouched form sends nothing, whatever the value', () => {
-  const n = (t: string) => ({ $number: t })
+  const n = (t: string) => ({ $plain: t })
   const scalars: Json[] = ['text', 'Dried', n('2.50'), n('12345678901234567890'), true, false, '[[mina-harker]]', 'dracula:5', '1893-08-08', '']
   const lists: Json[] = [[], ['a', 'b'], [n('1'), 'x'], ['[[a]]']]
   const dates: Json[] = [{ text: 'late spring' }, { sort: n('1893') }, { text: 'x', sort: [n('1893'), n('8')] }]
@@ -344,7 +377,7 @@ function source(hash = 'h1', fields: EntitySource['fields'] | null = null): Enti
       { name: 'role', line: 6, value: [{ value: 'A schoolmistress' }, { value: 'A wife', from: 'dracula:3' }] },
       { name: 'occupation', line: 8, value: ['teacher', 'secretary', 'typist'] },
       { name: 'state', line: 9, value: 'Dried' },
-      { name: 'weight', line: 10, value: { $number: '12' } },
+      { name: 'weight', line: 10, value: { $plain: '12' } },
       { name: 'x_odd', line: 11, value: 'kept' },
       { name: 'species', line: 12, value: [['velari']] },
     ],
@@ -438,7 +471,7 @@ describe('SC-WEB-60: editing a field with a control for its type', () => {
     expect(posts).toEqual([
       { path: 'field', body: { entity: 'E-MINA', universe: 'dracula', expectedHash: 'h1', field: 'state', changes: [{ op: 'set', path: [], value: 'lost' }] } },
     ])
-    expect(document.activeElement?.id).toBe('edit-saved')
+    await waitFor(() => expect(document.activeElement?.id).toBe('edit-saved'))
   })
 
   it('checks a number before sending it, and points at what to fix', async () => {
@@ -458,7 +491,7 @@ describe('SC-WEB-60: editing a field with a control for its type', () => {
     fireEvent.change(input, { target: { value: '12.75' } })
     fireEvent.keyDown(input, { key: 'Enter', ctrlKey: true })
     await waitFor(() => expect(posts).toHaveLength(1))
-    expect(posts[0].body.changes).toEqual([{ op: 'set', path: [], value: { $number: '12.75' } }])
+    expect(posts[0].body.changes).toEqual([{ op: 'set', path: [], value: { $plain: '12.75' } }])
   })
 
   it('moves, removes, and adds list items with the keyboard-reachable buttons', async () => {
@@ -598,7 +631,7 @@ describe('SC-WEB-63: adding and clearing fields, and what only the file can chan
     fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(posts).toHaveLength(1))
-    expect(posts[0].body).toMatchObject({ field: 'born', changes: [{ op: 'set', path: [], value: { text: 'the year of the storm', sort: { $number: '1870' } } }] })
+    expect(posts[0].body).toMatchObject({ field: 'born', changes: [{ op: 'set', path: [], value: { text: 'the year of the storm', sort: { $plain: '1870' } } }] })
   })
 
   it('clears a field after asking in the page', async () => {
@@ -636,7 +669,7 @@ describe('SC-WEB-65: field edits are guarded', () => {
     let form = await openField('state')
     fireEvent.keyDown(within(form).getByRole('combobox', { name: 'Value' }), { key: 'Escape' })
     await waitFor(() => expect(screen.queryByRole('form', { name: 'Edit state' })).toBeNull())
-    expect(document.activeElement?.id).toBe('edit-field-state')
+    await waitFor(() => expect(document.activeElement?.id).toBe('edit-field-state'))
 
     form = await openField('state')
     fireEvent.change(within(form).getByRole('combobox', { name: 'Value' }), { target: { value: 'fresh' } })
@@ -688,7 +721,7 @@ describe('SC-WEB-65: field edits are guarded', () => {
     })
     renderApp('/u/dracula/e/E-MINA')
     const form = await openField('weight')
-    file.source = source('h9', source().fields.map((f) => (f.name === 'weight' ? { ...f, value: { $number: '14' } } : f)))
+    file.source = source('h9', source().fields.map((f) => (f.name === 'weight' ? { ...f, value: { $plain: '14' } } : f)))
     fireEvent.click(within(form).getByRole('button', { name: 'Clear field' }))
     fireEvent.click(within(within(form).getByRole('group', { name: /Clear weight\?/ })).getByRole('button', { name: 'Clear field' }))
 

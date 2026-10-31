@@ -19,7 +19,7 @@ import {
   controlId,
   fieldDraftOf,
   fieldProblems,
-  isNumberText,
+  isPlainValue,
   jsonOfField,
   valueLines,
   type ChapterFieldChange,
@@ -42,8 +42,8 @@ import { ErrorState, Loading } from './States'
 
 /** A value as a note's field shows it: a number as its text. */
 function shown(v: Json | null): unknown {
-  if (isNumberText(v)) {
-    return v.$number
+  if (isPlainValue(v)) {
+    return v.$plain
   }
 
   if (Array.isArray(v)) {
@@ -63,8 +63,8 @@ export function valueWords(v: Json | null): string {
     return v.length === 0 ? 'none ([])' : v.map((x) => valueWords(x)).join(', ')
   }
 
-  if (isNumberText(v)) {
-    return v.$number
+  if (isPlainValue(v)) {
+    return v.$plain
   }
 
   if (v !== null && typeof v === 'object') {

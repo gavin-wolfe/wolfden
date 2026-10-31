@@ -131,6 +131,22 @@ export interface HistoryTurnedOn {
   checkpoint: CheckpointSummary | null
 }
 
+/**
+ * Turning history on was refused with `identity_needed`: git needs a name or
+ * email for the den after all, and these say which (#207). Both are true if
+ * the server didn't say.
+ */
+export class IdentityNeededError extends ApiRequestError {
+  readonly needsName: boolean
+  readonly needsEmail: boolean
+
+  constructor(message: string, needsName: boolean, needsEmail: boolean) {
+    super('identity_needed', message)
+    this.needsName = needsName
+    this.needsEmail = needsEmail
+  }
+}
+
 /** Turns history on for a den that has none: a git repository, its .gitignore, and a first checkpoint (#195). */
 export function turnOnHistory(request: TurnOnRequest): Promise<HistoryTurnedOn> {
   return postJson<HistoryTurnedOn>('/api/history/turn-on', request, 'turning history on')
@@ -144,11 +160,14 @@ async function postJson<T>(path: string, request: unknown, what: string): Promis
   })
   const body: unknown = await response.json().catch(() => undefined)
   if (!response.ok) {
-    const error = typeof body === 'object' && body !== null ? (body as Partial<ApiError>) : null
-    throw new ApiRequestError(
-      typeof error?.code === 'string' ? error.code : 'http_error',
-      typeof error?.message === 'string' ? error.message : `The server answered ${response.status}.`,
-    )
+    const error = typeof body === 'object' && body !== null ? (body as Partial<ApiError> & { needsName?: unknown; needsEmail?: unknown }) : null
+    const message = typeof error?.message === 'string' ? error.message : `The server answered ${response.status}.`
+    if (error?.code === 'identity_needed') {
+      const said = typeof error.needsName === 'boolean' && typeof error.needsEmail === 'boolean' && (error.needsName || error.needsEmail)
+      throw new IdentityNeededError(message, said ? (error.needsName as boolean) : true, said ? (error.needsEmail as boolean) : true)
+    }
+
+    throw new ApiRequestError(typeof error?.code === 'string' ? error.code : 'http_error', message)
   }
 
   if (typeof body !== 'object' || body === null) {

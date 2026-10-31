@@ -137,7 +137,11 @@ public static class HistorySetupEndpoints
         var message = result.Status == HistorySetupStatus.Incomplete
             ? $"{string.Join(" ", result.Steps)} {result.Problem}"
             : result.Problem!;
-        return Error(status, result.Code!, message);
+
+        // Git needs a name or email after all: say which, so the page asks only for what's missing.
+        return result.Code == HistorySetupCodes.IdentityNeeded
+            ? Results.Json(new ApiError(result.Code, message, NeedsName: result.NeedsName, NeedsEmail: result.NeedsEmail), statusCode: status)
+            : Error(status, result.Code!, message);
     }
 
     /// <summary>The request from a POST's JSON body, checked.</summary>
@@ -184,7 +188,7 @@ public static class HistorySetupEndpoints
 /// final. False before the den is a repository: git may then have a name
 /// and email for it after all (<c>includeIf "gitdir:…"</c>), so the fields
 /// are optional, and the server asks again (<c>identity_needed</c>) only if
-/// they're still missing.
+/// they're still missing, with <c>needsName</c> and <c>needsEmail</c> saying which.
 /// </param>
 public sealed record TurnOnView(bool Possible, string? Reason, bool NeedsName, bool NeedsEmail, bool IdentityCertain);
 

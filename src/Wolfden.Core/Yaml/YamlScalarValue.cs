@@ -70,23 +70,26 @@ public sealed partial class YamlScalarValue : YamlValue
     /// (<c>True</c>, <c>yes</c>, <c>2291-05-14</c>). It keeps a value's written
     /// form when it's written again, as a whole or as a moved list item.
     /// </summary>
-    /// <exception cref="ArgumentException"><paramref name="text"/> is one line YAML reads as a string, so it would need quotes.</exception>
+    /// <exception cref="ArgumentException"><paramref name="text"/> is text YAML reads as a string, so it would need
+    /// quotes, or it's a null (<c>~</c>, <c>null</c>) or YAML 1.1's <c>&lt;&lt;</c> or <c>=</c>, which aren't values.</exception>
     public static YamlScalarValue Plain(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
-        return IsPlainNonString(text)
-            ? new(Kind.Float, text)
+        return IsPlainNonString(text) ? new(Kind.Float, text)
+            : NotAValue().IsMatch(text) ? throw new ArgumentException($"'{text}' isn't a value to write plain: send null for no value, or text for the characters.", nameof(text))
             : throw new ArgumentException($"'{text}' is text, not a number or other plain value YAML reads as one.", nameof(text));
     }
 
     /// <summary>
-    /// True if <paramref name="text"/>, written plain, isn't a string to YAML 1.2's core schema
-    /// or to YAML 1.1: a number, boolean, null, or YAML 1.1 timestamp.
+    /// True if <paramref name="text"/>, written plain, is a value that isn't a string to YAML 1.2's core
+    /// schema or to YAML 1.1: a number, boolean, or YAML 1.1 timestamp. A null (<c>~</c>, <c>null</c>) is
+    /// <see cref="Null"/> instead, and YAML 1.1's merge and value keys (<c>&lt;&lt;</c>, <c>=</c>) aren't
+    /// values at all, so all of those are false.
     /// </summary>
     public static bool IsPlainNonString(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
-        return !PlainScalarResolver.IsStringInBothSchemas(text);
+        return !PlainScalarResolver.IsStringInBothSchemas(text) && !NotAValue().IsMatch(text);
     }
 
     /// <summary>A boolean, written <c>true</c> or <c>false</c>.</summary>
@@ -267,13 +270,17 @@ public sealed partial class YamlScalarValue : YamlValue
     /// <c>7th-fleet</c> isn't. <see cref="PlainScalarResolver"/> backs this
     /// up when an edit is verified.
     /// </summary>
-    [GeneratedRegex("^[0-9][0-9a-fA-F_:.,+ xXoObBtTzZ-]*$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^[0-9][0-9a-fA-F_:.,+ xXoObBtTzZ-]*\z", RegexOptions.CultureInvariant)]
     private static partial Regex NumberLike();
 
-    [GeneratedRegex("^(?:null|true|false|yes|no|on|off|y|n)$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^(?:null|true|false|yes|no|on|off|y|n)\z", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex ReservedWord();
 
-    [GeneratedRegex("^[A-Za-z_][A-Za-z0-9_-]*$", RegexOptions.CultureInvariant)]
+    /// <summary>Plain text that isn't a value to write with <see cref="Plain"/>: a null, or YAML 1.1's merge or value key.</summary>
+    [GeneratedRegex(@"^(?:~|null|Null|NULL|<<|=)\z", RegexOptions.CultureInvariant)]
+    private static partial Regex NotAValue();
+
+    [GeneratedRegex(@"^[A-Za-z_][A-Za-z0-9_-]*\z", RegexOptions.CultureInvariant)]
     private static partial Regex SafeKey();
 
     /// <summary>A float under YAML 1.2's core schema, as types.md F-FT-6 reads one, without <c>.inf</c> and <c>.nan</c>.</summary>

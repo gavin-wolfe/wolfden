@@ -160,13 +160,39 @@ export function mapLinks(md, fn) {
 }
 
 /**
+ * Rewrites a Markdown code span (`...`) as <code>. Text inside inline HTML
+ * is still Markdown, so every ASCII punctuation character is written as an
+ * entity: no [[, link, emphasis, or tag survives, and the text shows as typed.
+ */
+export function codeSpanToHtml(span) {
+  const ticks = /^`+/.exec(span)[0].length;
+  // A line break is a space; a continuation line's indent isn't part of the text.
+  let content = span.slice(ticks, -ticks).replace(/\n[ \t]*/g, ' ');
+  // CommonMark strips one space from each end when both are there.
+  if (/^ .* $/s.test(content) && content.trim() !== '') content = content.slice(1, -1);
+  return `<code>${content.replace(/[!-/:-@[-`{-~]/g, (c) => `&#${c.charCodeAt(0)};`)}</code>`;
+}
+
+/**
  * The wiki reads [[Name]] as a link to a wiki page, but in these docs it's
- * Wolfden's own link syntax, shown as an example. Outside code, write the
- * brackets as &#91; so they show as typed. (Inside code they can't be
- * escaped, and don't need to be.)
+ * Wolfden's own link syntax, shown as an example. Write the brackets as
+ * &#91; so they show as typed: in prose directly, and in an inline code
+ * span by writing the span as <code>, where an entity still works. Fenced
+ * code blocks are left as they are.
  */
 export function escapeWikiLinks(md) {
-  return mapProse(md, (text) => text.replace(/\[\[([^[\]\n]*)\]\]/g, '&#91;&#91;$1]]'));
+  return splitFences(md)
+    .map((block) =>
+      block.code
+        ? block.text
+        : splitCodeSpans(block.text)
+            .map((span) => {
+              if (span.code) return span.text.includes('[[') ? codeSpanToHtml(span.text) : span.text;
+              return span.text.replace(/\[\[([^[\]\n]*)\]\]/g, '&#91;&#91;$1]]');
+            })
+            .join(''),
+    )
+    .join('');
 }
 
 /** Returns every link target outside code. */
@@ -183,12 +209,24 @@ const wrap = (original, value) =>
 // ---------------------------------------------------------------------------
 // Headings and anchors
 
-/** GitHub's heading anchor for a heading's text (github-slugger rules). */
+const ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
+const decodeEntities = (s) =>
+  s.replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z]+);/gi, (all, e) =>
+    e[0] === '#'
+      ? String.fromCodePoint(e[1].toLowerCase() === 'x' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10))
+      : ENTITIES[e.toLowerCase()] ?? all);
+
+/**
+ * GitHub's heading anchor for a heading's text (github-slugger rules). GitHub
+ * slugs the rendered text, so tags are dropped and entities decoded first:
+ * a heading the build rewrote (&#91;&#91;, <code>) gets the same anchor as
+ * the heading in docs/.
+ */
 export function slug(text) {
-  const plain = text
+  const plain = decodeEntities(text
     .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1') // links and images keep their text
     .replace(/`/g, '')
-    .replace(/<[^>]+>/g, '')
+    .replace(/<[^>]+>/g, ''))
     .replace(/(\*\*|__|\*|~~)/g, '');
   return plain
     .trim()
@@ -197,9 +235,13 @@ export function slug(text) {
     .replace(/ /g, '-');
 }
 
-/** The set of anchors a page's headings produce, with GitHub's -1, -2 suffixes for repeats. */
+/**
+ * The set of anchors a page's headings produce. Repeats get -1, -2 as in
+ * github-slugger, which also skips any suffixed slug already taken:
+ * "A", "A", "A-1" give a, a-1, a-1-1.
+ */
 export function anchors(md) {
-  const seen = new Map();
+  const occurrences = new Map();
   const out = new Set();
   for (const block of splitFences(md)) {
     if (block.code) continue;
@@ -207,9 +249,13 @@ export function anchors(md) {
       const m = /^ {0,3}(#{1,6})[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/.exec(line);
       if (!m) continue;
       const base = slug(m[2]);
-      const n = seen.get(base) ?? 0;
-      seen.set(base, n + 1);
-      out.add(n === 0 ? base : `${base}-${n}`);
+      let result = base;
+      while (occurrences.has(result)) {
+        occurrences.set(base, occurrences.get(base) + 1);
+        result = `${base}-${occurrences.get(base)}`;
+      }
+      occurrences.set(result, 0);
+      out.add(result);
     }
     for (const m of block.text.matchAll(/<a\s[^>]*(?:id|name)="([^"]+)"/g)) out.add(m[1]);
   }
@@ -313,7 +359,13 @@ export function checkAll({ root, outDir, repo, ref = 'main', pages = PAGES }) {
       const fail = (why) => problems.push(`${page}: ${target}: ${why}`);
       const hashAt = target.indexOf('#');
       const base = hashAt < 0 ? target : target.slice(0, hashAt);
-      const frag = hashAt < 0 ? '' : decodeURIComponent(target.slice(hashAt + 1));
+      let frag;
+      try {
+        frag = hashAt < 0 ? '' : decodeURIComponent(target.slice(hashAt + 1));
+      } catch {
+        fail('malformed % escape');
+        continue;
+      }
 
       if (base === '') {
         if (page.startsWith('_')) fail('an in-page anchor on a sidebar or footer points at whichever page is showing');
@@ -322,7 +374,13 @@ export function checkAll({ root, outDir, repo, ref = 'main', pages = PAGES }) {
         const m = /^(blob|tree|raw)\/([^/]+)(?:\/(.*))?$/.exec(base.slice(repoPrefix.length));
         if (!m) continue; // issues, wiki, and other GitHub pages
         if (m[2] !== ref) { fail(`points at ${m[2]}, not ${ref}`); continue; }
-        const repoPath = decodeURIComponent(m[3] ?? '');
+        let repoPath;
+        try {
+          repoPath = decodeURIComponent(m[3] ?? '');
+        } catch {
+          fail('malformed % escape');
+          continue;
+        }
         const full = path.join(root, repoPath);
         if (!existsSync(full)) { fail('no such file in the repository'); continue; }
         const dir = statSync(full).isDirectory();

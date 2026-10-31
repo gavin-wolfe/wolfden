@@ -129,8 +129,20 @@ describe('escapeWikiLinks', () => {
     assert.equal(escapeWikiLinks('Turn on **Use [[Wikilinks]]**.'), 'Turn on **Use &#91;&#91;Wikilinks]]**.');
   });
 
-  test('leaves [[...]] in code alone', () => {
-    const md = 'Type `[[Mina Harker]]`.\n```yaml\npov: "[[mara-voss]]"\n```\n';
+  test('writes an inline code span with [[ as <code>, with its punctuation as entities', () => {
+    assert.equal(escapeWikiLinks('Type `[[Mina Harker]]`.'), 'Type <code>&#91;&#91;Mina Harker&#93;&#93;</code>.');
+    assert.equal(escapeWikiLinks('`pov: "[[a|B]]" <x> & *y*`'),
+      '<code>pov&#58; &#34;&#91;&#91;a&#124;B&#93;&#93;&#34; &#60;x&#62; &#38; &#42;y&#42;</code>');
+  });
+
+  test('a converted span keeps CommonMark\'s spacing, and links in it stay text', () => {
+    assert.equal(escapeWikiLinks('`` `[[a]]` ``'), '<code>&#96;&#91;&#91;a&#93;&#93;&#96;</code>');
+    assert.equal(escapeWikiLinks('`[[a]]\n[b](c.md)`'), '<code>&#91;&#91;a&#93;&#93; &#91;b&#93;&#40;c&#46;md&#41;</code>');
+    assert.deepEqual(findLinks(escapeWikiLinks('`[[a]] [b](c.md)`')), []);
+  });
+
+  test('leaves code spans without [[ and fenced blocks alone', () => {
+    const md = 'Type `[x](y.md)`.\n```yaml\npov: "[[mara-voss]]"\n```\n';
     assert.equal(escapeWikiLinks(md), md);
   });
 });
@@ -148,6 +160,19 @@ describe('slug and anchors', () => {
   test('repeats get -1, -2, and headings in code don\'t count', () => {
     const a = anchors('## Overview\n```md\n# Overview\n```\n## Overview\n### Overview\n');
     assert.deepEqual([...a].sort(), ['overview', 'overview-1', 'overview-2']);
+  });
+
+  test('a repeat skips a suffixed slug that\'s already taken, as github-slugger does', () => {
+    assert.deepEqual([...anchors('## A\n## A\n## A-1\n')], ['a', 'a-1', 'a-1-1']);
+    assert.deepEqual([...anchors('## A-1\n## A\n## A\n')], ['a-1', 'a', 'a-2']);
+  });
+
+  test('a heading the build escaped keeps the anchor it has in docs/', () => {
+    const src = '## Linking with [[names]]\n\n## The `[[name|alias]]` form\n\n## A & B\n';
+    const out = buildPage(src, { source: 'docs/guide.md', repo, pages, note: false });
+    assert.notEqual(out, src);
+    assert.deepEqual([...anchors(out)], [...anchors(src)]);
+    assert.deepEqual([...anchors(src)], ['linking-with-names', 'the-namealias-form', 'a--b']);
   });
 });
 
@@ -200,5 +225,17 @@ describe('checkAll', () => {
     assert.match(problems.join('\n'), /Guide: .*docs\/missing\.md: no such file/);
     assert.match(problems.join('\n'), /Guide: .*tree\/main\/samples: no such file/);
     assert.match(problems.join('\n'), /_Sidebar: #start: an in-page anchor on a sidebar/);
+  });
+
+  test('a malformed % escape is a broken link, not a crash', () => {
+    write('docs/guide.md', '# Guide\n\n## Start\n\n[a](format.md#bad%zz) [b](#bad%E0%A4%A) [c](../bad%zz.md)\n');
+    write('docs/wiki/_Sidebar.md', '[Home](Home.md)\n');
+    const outDir = path.join(root, 'out');
+    buildAll({ root, outDir, repo, pages });
+    const problems = checkAll({ root, outDir, repo, pages });
+    assert.equal(problems.length, 3, problems.join('\n'));
+    assert.match(problems.join('\n'), /Guide: Format-Specification#bad%zz: malformed % escape/);
+    assert.match(problems.join('\n'), /Guide: #bad%E0%A4%A: malformed % escape/);
+    assert.match(problems.join('\n'), /Guide: .*bad%25zz\.md: no such file/);
   });
 });

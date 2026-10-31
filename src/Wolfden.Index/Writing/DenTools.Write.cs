@@ -279,9 +279,10 @@ public sealed partial class DenTools
                     {
                         var r = removedWithComments[moved];
                         removedWithComments.RemoveAt(moved);
+                        // It may be a move, or another item that happens to have the same value: say what was done, not why.
                         notes.Add(
-                            $"Moved an item of {listPath} to item {at}, written afresh, so the comment on it was dropped: {Quoted(r.Comments)}. " +
-                            "Put it back by hand if you want it; a 'move' change moves an item in place, with its comments.");
+                            $"Removed {r.Path} and added the same value as item {at} of {listPath}, written afresh, so the comment on it was dropped: {Quoted(r.Comments)}. " +
+                            "If that was a move, put the comment back by hand; a 'move' change moves an item in place, with its comments.");
                     }
                 }
             }

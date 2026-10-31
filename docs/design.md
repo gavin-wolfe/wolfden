@@ -1841,9 +1841,11 @@ docs/
     never moved (F-TMP-7): the form has no control for it, and the
     server refuses a `move` of one. Removing an item with a comment
     says so in `effects`, and so does a client that takes an item out
-    and adds it again, which writes it afresh ("Moved an item of
-    fields.tags to item 0, written afresh, so the comment on it was
-    dropped: '# from Varna'"). A value the writer didn't touch,
+    and adds its value again, which writes it afresh ("Removed
+    fields.tags.2 and added the same value as item 0 of fields.tags,
+    written afresh, so the comment on it was dropped: '# from
+    Varna'"). It doesn't call that a move, since another item may just
+    have the same value. A value the writer didn't touch,
     and a list whose items are all as they were, is sent back as
     written, so `Dried` isn't rewritten `dried` and an entry's
     `value: ~` stays `~`. A plain value that gains a date or a pin, or a field whose

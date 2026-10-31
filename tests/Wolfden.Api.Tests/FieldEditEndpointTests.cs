@@ -183,7 +183,8 @@ public class FieldEditEndpointTests
         Assert.Contains("  tags:\n    - chapel\n    - box\n    - soil\n    - Carfax\n  seen:", den.Read(BoxPath), StringComparison.Ordinal);
         Assert.Contains(
             Strings(moved, "effects"),
-            e => e.StartsWith("Moved an item of fields.tags to item 1", StringComparison.Ordinal) && e.Contains("'# from Varna'", StringComparison.Ordinal) && e.Contains("'move' change", StringComparison.Ordinal));
+            e => e.StartsWith("Removed fields.tags.0 and added the same value as item 1 of fields.tags", StringComparison.Ordinal) && e.Contains("'# from Varna'", StringComparison.Ordinal)
+                && e.Contains("If that was a move", StringComparison.Ordinal) && !e.StartsWith("Moved", StringComparison.Ordinal));
 
         // A move with no index, or to a place past the end, is refused.
         var unmoved = den.Read(BoxPath);

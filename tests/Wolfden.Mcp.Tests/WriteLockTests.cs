@@ -294,6 +294,52 @@ public sealed class WriteLockTests : IDisposable
     }
 
     [Fact]
+    public void ACancelledCheckpointStopsWaitingForThisSessionsWrite()
+    {
+        var hash = new DenTools(_den.Root).GetEntity("Mr. Swales").Entity!.Hash!;
+        var cancel = TestContext.Current.CancellationToken;
+        using var paused = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var tools = new DenTools(_den.Root)
+        {
+            BeforeWrite = () =>
+            {
+                paused.Set();
+                release.Wait(Bound, cancel);
+            },
+        };
+        var write = new Thread(() => tools.AppendSection("Mr. Swales", "First pass", "From the write.", hash, newSection: true));
+        write.Start();
+        Assert.True(paused.Wait(Bound, cancel));
+
+        // A checkpoint waits for the session's write with no time limit, but a cancelled call stops waiting.
+        using var call = new CancellationTokenSource();
+        Exception? error = null;
+        var checkpoint = new Thread(() =>
+        {
+            try
+            {
+                using (tools.CancelWith(call.Token))
+                {
+                    tools.Checkpoint("Notes pass", "Claude <noreply@anthropic.com>");
+                }
+            }
+            catch (Exception e)
+            {
+                error = e;
+            }
+        });
+        checkpoint.Start();
+        call.CancelAfter(TimeSpan.FromMilliseconds(200));
+        var stopped = checkpoint.Join(Bound);
+        release.Set();
+        Assert.True(write.Join(Bound));
+
+        Assert.True(stopped, "a cancelled checkpoint should stop waiting for the session's turn");
+        Assert.IsAssignableFrom<OperationCanceledException>(error);
+    }
+
+    [Fact]
     public void AnMcpCallCancelledWhileItWaitsIsCancelledNotAnErrorResult()
     {
         var hash = new DenTools(_den.Root).GetEntity("Mr. Swales").Entity!.Hash!;

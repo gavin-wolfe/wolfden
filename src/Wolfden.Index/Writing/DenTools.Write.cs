@@ -76,8 +76,8 @@ public sealed partial class DenTools
     /// Until the result is disposed, the writes and checkpoints this call
     /// makes (on this thread, or the async flow it's part of) stop waiting
     /// when <paramref name="cancellationToken"/> is cancelled (#234): for
-    /// this session's other writes, for the den's write lock, and, for a
-    /// checkpoint, for git up to its commit. They end with
+    /// this session's other writes and checkpoints, for the den's write
+    /// lock, and, for a checkpoint, for git up to its commit. They end with
     /// <see cref="OperationCanceledException"/>, not
     /// <see cref="ToolErrorCodes.DenBusy"/>, and write nothing. A write that
     /// has its turn isn't stopped part way. The MCP server passes each
@@ -635,7 +635,7 @@ public sealed partial class DenTools
         // git (or on a signing passphrase). Holding the den lock only while staging
         // wouldn't keep their writes out of the commit (#234): 'git commit --only'
         // reads the files from the disk as it commits (design.md §8).
-        lock (_writeLock)
+        using (TakeSessionTurn())
         {
             var history = History();
             try
@@ -1325,6 +1325,37 @@ public sealed partial class DenTools
         {
             _writeLock.Exit();
         }
+    }
+
+    /// <summary>
+    /// This session's turn alone, without the den's write lock, for a
+    /// checkpoint: it waits as long as the session's writes take, with no
+    /// <see cref="WriteLockWait"/>, but stops if the call is cancelled
+    /// (<see cref="CancelWith"/>). Dispose the result to end it.
+    /// </summary>
+    /// <exception cref="OperationCanceledException">The call was cancelled before its turn came.</exception>
+    private SessionTurn TakeSessionTurn()
+    {
+        var cancellation = Cancellation;
+        if (!cancellation.CanBeCanceled)
+        {
+            _writeLock.Enter();
+            return new SessionTurn(_writeLock);
+        }
+
+        cancellation.ThrowIfCancellationRequested();
+        while (!_writeLock.TryEnter(TurnTry))
+        {
+            cancellation.ThrowIfCancellationRequested();
+        }
+
+        return new SessionTurn(_writeLock);
+    }
+
+    /// <summary>This session's turn, from <see cref="TakeSessionTurn"/>; disposing it ends the turn.</summary>
+    private readonly struct SessionTurn(Lock turn) : IDisposable
+    {
+        public void Dispose() => turn.Exit();
     }
 
     /// <summary>A write's turn, from <see cref="EnterWrite"/>; disposing it ends the turn.</summary>

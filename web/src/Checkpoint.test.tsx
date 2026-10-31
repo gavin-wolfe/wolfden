@@ -504,30 +504,49 @@ describe('SC-WEB-55: I turn on history from the checkpoint dialog', () => {
     await waitFor(() => expect(sent).toHaveLength(2))
     expect(sent[1]).toEqual({ firstCheckpoint: true, authorName: 'Mara Voss', authorEmail: 'mara@example.invalid' })
 
-    // While it's pending, the fields stay where they are.
+    // While it's pending, the fields stay where they are, and the email stays required.
     expect(within(dialog).getByRole('button', { name: 'Turning on history…' })).toBeTruthy()
     expect(within(dialog).getByLabelText('Name')).toBeTruthy()
-    expect(within(dialog).getByLabelText('Email')).toBeTruthy()
+    expect((within(dialog).getByLabelText('Email') as HTMLInputElement).required).toBe(true)
 
     retry(TURNED_ON)
     await screen.findByRole('dialog', { name: 'History is on' })
   })
 
-  it('after git turns out to need only an email that wasn’t offered, shows only the email', async () => {
+  it('after git turns out to need only an email that wasn’t offered, shows only the email, and keeps it while it tries again', async () => {
+    // The status said git needs nothing, so only the refusal says to ask: the fields mustn't go while the retry is pending.
+    let retry: (answer: Response | HistoryTurnedOn) => void = () => {}
     const { sent } = stubTurnOn(
       () => noHistory(),
-      () =>
-        new Response(JSON.stringify({ code: 'identity_needed', message: 'It has no email for this den.', needsName: false, needsEmail: true }), {
-          status: 400,
-        }),
+      (body) =>
+        body.authorEmail === undefined
+          ? new Response(JSON.stringify({ code: 'identity_needed', message: 'It has no email for this den.', needsName: false, needsEmail: true }), {
+              status: 400,
+            })
+          : new Promise((resolve) => (retry = resolve)),
     )
     const dialog = await openTurnOn()
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Turn on history' }))
 
-    expect(await within(dialog).findByLabelText('Email')).toBeTruthy()
+    const email = (await within(dialog).findByLabelText('Email')) as HTMLInputElement
     expect(within(dialog).queryByLabelText('Name')).toBeNull()
     expect(sent).toHaveLength(1)
+
+    fireEvent.change(email, { target: { value: 'ash@example.invalid' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Turn on history' }))
+    await waitFor(() => expect(sent).toHaveLength(2))
+    expect(sent[1]).toEqual({ firstCheckpoint: true, authorEmail: 'ash@example.invalid' })
+
+    // Pending: the Email field is still there, still required, and still holds what was typed.
+    expect(within(dialog).getByRole('button', { name: 'Turning on history…' })).toBeTruthy()
+    const pending = within(dialog).getByLabelText('Email') as HTMLInputElement
+    expect(pending.required).toBe(true)
+    expect(pending.value).toBe('ash@example.invalid')
+    expect(within(dialog).queryByLabelText('Name')).toBeNull()
+
+    retry(TURNED_ON)
+    await screen.findByRole('dialog', { name: 'History is on' })
   })
 
   it('says why when it can’t be turned on here, and offers no button', async () => {

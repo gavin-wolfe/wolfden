@@ -52,8 +52,9 @@ public sealed class UnlistableFolderTests
     /// Makes the folder at <paramref name="full"/> one the user may not list
     /// until disposed: a deny rule for listing on Windows, or no permissions
     /// elsewhere. Skips the test where that doesn't stop listing, as for
-    /// root. Disposing it restores the permissions, so the temporary den can
-    /// be deleted.
+    /// root, but fails on Windows CI, where a skip would hide lost coverage
+    /// (#248; see the Index tests' <c>NoSkipOnWindowsCi</c>). Disposing it
+    /// restores the permissions, so the temporary den can be deleted.
     /// </summary>
     private static IDisposable Unlistable(string full)
     {
@@ -64,6 +65,10 @@ public sealed class UnlistableFolderTests
         }
 
         cleanup.Dispose();
+        Assert.False(
+            OperatingSystem.IsWindows() && string.Equals(Environment.GetEnvironmentVariable("CI"), "true", StringComparison.OrdinalIgnoreCase),
+            "On Windows CI, a folder with a deny rule for listing could still be listed, so this test would have been skipped. " +
+            "Does the test process have backup privilege, as it does under Git Bash?");
         Assert.Skip("This user can list a folder without permission to list it.");
         return null!;
     }

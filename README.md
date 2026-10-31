@@ -7,11 +7,14 @@ timelines, plot threads, outlines, and every invented thing a world needs
 (star systems, factions, ships, spells). Every fact knows where in the story it
 becomes true, so you can always ask *"what's canon as of the end of Book 2?"*
 
-> **Status: early.** The file format and a command-line tool are working:
-> `wolfden check` lints a den for continuity, and `wolfden query` shows canon
-> as of any point in the story. There's no app yet, and nothing to install.
-> You build it from source (see [Try it](#try-it)). Ideas and feedback are
-> welcome: see [CONTRIBUTING.md](CONTRIBUTING.md).
+> **Status: early.** You can use Wolfden for real now, if you don't mind rough
+> edges. `wolfden serve` opens a web app in your browser for reading and
+> editing your den, with canon as of any point in the story, history,
+> checkpoints, and freezing a finished book. The command line lints a den for
+> continuity (`wolfden check`), and an MCP server lets AI assistants read and
+> write your notes. There's no installer yet: you build it from source (see
+> [Try it](#try-it)). Ideas and feedback are welcome: see
+> [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Why
 
@@ -26,14 +29,14 @@ Novelists and other writers of long fiction who keep serious notes: series
 bibles, timelines, plot threads, worldbuilding. You shouldn't have to be
 technical to use it.
 
-- **Where it's headed:** no git or command line needed. Wolfden will offer
-  history, checkpoints, and "freeze this book" as ordinary buttons, with git
-  doing the work underneath. Backing up to a private remote, such as GitHub,
-  will be optional, with guided setup.
-- **Where it is today:** early. There's a file format and a command-line
-  tool, but no app yet. For now, it suits writers who are comfortable editing markdown files in a
-  text editor such as [Obsidian](https://obsidian.md) or VS Code. Git is
-  optional. To see what a den looks like, browse the
+- **Where it's headed:** no git or command line needed at all, an
+  installer, and optional backup to a private remote such as GitHub, with
+  guided setup.
+- **Where it is today:** early. A local web app (`wolfden serve`) and a
+  command-line tool both work. History, checkpoints, and freezing a book are
+  already buttons, with git doing the work underneath. You can keep editing
+  the markdown files in [Obsidian](https://obsidian.md) or VS Code side by
+  side with the app. To see what a den looks like, browse the
   [Dracula sample](samples/dracula/).
 
 ## Try it

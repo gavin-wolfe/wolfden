@@ -33,7 +33,8 @@ import { ErrorState, Loading } from './States'
 
 /**
  * The lines the file gives field `name`, from its key to the next field (or
- * the end of the frontmatter), or undefined if it doesn't set it.
+ * the end of the frontmatter), or undefined if it doesn't set it. In a CRLF
+ * file each line keeps its CR, and the closing `---` is found all the same.
  */
 export function fieldText(source: EntitySource, name: string): string | undefined {
   const field = source.fields.find((f) => f.name === name)
@@ -43,7 +44,7 @@ export function fieldText(source: EntitySource, name: string): string | undefine
 
   const lines = source.text.split('\n')
   const next = source.fields.filter((f) => f.line > field.line).map((f) => f.line)
-  let end = next.length > 0 ? Math.min(...next) - 1 : lines.findIndex((l, i) => i >= field.line && l === '---')
+  let end = next.length > 0 ? Math.min(...next) - 1 : lines.findIndex((l, i) => i >= field.line && (l === '---' || l === '---\r'))
   if (end < 0) {
     end = lines.length
   }

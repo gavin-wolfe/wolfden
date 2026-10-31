@@ -1946,7 +1946,8 @@ docs/
     page sends the same changes again on the new hash without asking,
     but only where nothing of the field can be overwritten: no change
     sets the field as a whole, and the field's lines (from its key to
-    the next field), comments and quoting included, are byte for byte
+    the next field, or for the last one to the closing `---`, in a CRLF
+    file too, #199), comments and quoting included, are byte for byte
     as they were. Otherwise it shows the writer's value (or
     "(not set)" for Clear field) and the file's side by side. Keep mine
     sends the same changes on the new hash if the field itself didn't

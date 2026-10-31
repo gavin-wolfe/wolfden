@@ -1,19 +1,15 @@
 // @vitest-environment jsdom
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, screen, waitFor, within, configure } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import type { EntityPageResult, PageField } from './api'
 import type { EntitySource, SourceFieldType, WriteResult } from './editApi'
 import { fieldChanges, fieldDraftOf, fieldProblems, linkFor, newEntry, newItem, type FieldDraft, type Json } from './fieldModel'
 import type { LookupHit, LookupResult } from './lookupApi'
+import { fieldText } from './components/FieldEditing'
 import { entities, page, renderApp, stubApi } from './test/harness'
 
 // Editing a note's fields in place (#28, part b): the changes worked out from
 // the form, the controls for each field type, and saving one field.
-
-// The first test of a file renders the app cold, which can take over a second
-// when the machine is busy (the whole suite runs files in parallel).
-configure({ asyncUtilTimeout: 5000 })
-vi.setConfig({ testTimeout: 15_000 })
 
 beforeAll(() => {
   // jsdom lays nothing out; CodeMirror (Edit file) measures text ranges.
@@ -207,6 +203,31 @@ describe('SC-WEB-61: the changes a field edit sends', () => {
     expect(fieldDraftOf(types.keeper, [{ value: 'a' }, 'b'])).toMatch(/F-TMP-1/)
     expect(fieldDraftOf(types.found, { text: 'x', calendar: 'reach' })).toMatch(/can't show/)
     expect(fieldDraftOf(types.label, { x: 1 })).toMatch(/can't show/)
+    // A mapping whose only key is $plain comes as { $$plain: … } (#199): a mapping, not a plain value.
+    expect(fieldDraftOf(types.weight, { $$plain: '7' })).toMatch(/can't show/)
+  })
+
+  it('keeps a padded From as written when something else in the entry changes', () => {
+    const before: Json = [{ value: '[[count-dracula]]', from: ' dracula:1 ' }]
+    const d = draft(types.keeper, before)
+    d.entries = [{ ...d.entries[0], until: 'dracula:5' }]
+    expect(fieldChanges(types.keeper, before, d)).toEqual([{ op: 'set', path: [0, 'until'], value: 'dracula:5' }])
+
+    // Changed, it's trimmed.
+    d.entries = [{ ...d.entries[0], from: ' dracula:2 ' }]
+    expect(fieldChanges(types.keeper, before, d)).toEqual([
+      { op: 'set', path: [0, 'from'], value: 'dracula:2' },
+      { op: 'set', path: [0, 'until'], value: 'dracula:5' },
+    ])
+  })
+
+  it('finds the last field’s lines in a CRLF file, so a stale save can go again without asking', () => {
+    const text = (weight: string, body: string) => ['---', 'name: Box', 'fields:', '  state: Dried', `  weight: ${weight}`, '---', '', body, ''].join('\r\n')
+    const at = (t: string): EntitySource => ({ ...source('h1', [{ name: 'state', line: 4, value: 'Dried' }, { name: 'weight', line: 5, value: { $plain: '12' } }]), text: t, lineEndings: 'crlf' })
+    expect(fieldText(at(text('12', 'The box.')), 'weight')).toBe('  weight: 12\r')
+    // Another part of the note changed: the last field's lines are the same.
+    expect(fieldText(at(text('12', 'An agent wrote this.')), 'weight')).toBe(fieldText(at(text('12', 'The box.')), 'weight'))
+    expect(fieldText(at(text('14', 'The box.')), 'weight')).not.toBe(fieldText(at(text('12', 'The box.')), 'weight'))
   })
 
   it('writes a link by the file name where that reaches only the note, else by its id', () => {

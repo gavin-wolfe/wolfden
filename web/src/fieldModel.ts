@@ -332,7 +332,10 @@ function jsonOfEntry(type: SourceFieldType, e: EntryDraft): { [key: string]: Jso
   const out: { [key: string]: Json } = { ...(e.raw ?? {}) }
   out.value = jsonOfValue(type, e.value)
   for (const key of ['from', 'until', 'status'] as const) {
-    if (e[key].trim() !== '') {
+    if (e.raw !== undefined && e[key] === textOf(e.raw[key])) {
+      // As written: a padded "from" isn't trimmed by an edit of something else (#199).
+      continue
+    } else if (e[key].trim() !== '') {
       out[key] = e[key].trim()
     } else if (key in out && out[key] !== null) {
       delete out[key]

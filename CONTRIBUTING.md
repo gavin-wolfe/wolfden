@@ -90,8 +90,9 @@ them, and edits made on the wiki itself are overwritten.
   as `design.md` and `scenarios.md` aren't published; links to them point
   at the repo.
 - Link between docs with ordinary relative links (`format.md#62-universemd`).
-  The build turns them into wiki links, and CI fails if a link or its
-  heading anchor doesn't resolve.
+  The build turns them into wiki links. CI builds the pages and checks
+  the links in them, and fails if a link or its heading anchor doesn't
+  resolve. Docs that aren't published aren't checked.
 - To publish a new doc, add it to the `PAGES` list in
   `scripts/wiki/wiki.mjs` and link it from `docs/wiki/_Sidebar.md`.
 - To preview the pages, run

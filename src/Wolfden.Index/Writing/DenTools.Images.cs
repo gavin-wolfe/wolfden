@@ -68,7 +68,6 @@ public sealed partial class DenTools
 
         var (path, _) = Locate(entity, universe);
         var noteFolder = DenPaths.Parent(path);
-        var folder = noteFolder.Length == 0 ? ImageFolder : $"{noteFolder}/{ImageFolder}";
         using (EnterWrite())
         {
             var den = Snapshot();
@@ -77,6 +76,30 @@ public sealed partial class DenTools
                 throw Gone(path);
             }
 
+            // An images folder that's there already, in any case, is used as it's spelled
+            // (Images/ made by hand on Windows); a file or folder link by that name is in the way.
+            var folderName = ImageFolder;
+            static bool IsImages(string name) => string.Equals(name, ImageFolder, StringComparison.OrdinalIgnoreCase);
+            var existing = Store.GetDirectories(noteFolder).FirstOrDefault(IsImages);
+            if (existing is null && Store.GetFolderLinks(noteFolder).FirstOrDefault(IsImages) is { } folderLink)
+            {
+                throw new DenToolException(
+                    ToolErrorCodes.AlreadyExists,
+                    $"{Join(noteFolder, folderLink)} is a folder link, which Wolfden doesn't follow, so it can't save the image there. Make it an ordinary folder, or rename it, then add the image again.");
+            }
+
+            if (existing is not null)
+            {
+                folderName = existing;
+            }
+            else if (Store.GetFiles(noteFolder).FirstOrDefault(IsImages) is { } blocking)
+            {
+                throw new DenToolException(
+                    ToolErrorCodes.AlreadyExists,
+                    $"There's a file named '{blocking}' beside the note ({Join(noteFolder, blocking)}), where Wolfden keeps the note's images in a folder of that name. Rename or move the file, then add the image again.");
+            }
+
+            var folder = Join(noteFolder, folderName);
             var structure = DenStructure.Load(den);
             var frozen = structure.Universes.SelectMany(u => u.Books)
                 .FirstOrDefault(b => b.Status == BookStatus.Final && IsAtOrUnder(folder, b.Path));
@@ -111,14 +134,14 @@ public sealed partial class DenTools
                     continue;
                 }
 
-                var link = $"{ImageFolder}/{name}";
+                var written = $"{folderName}/{name}";
                 var effects = new List<string>();
                 if (n > 1)
                 {
-                    effects.Add($"The note's {ImageFolder} folder already has {slug}{ext}, so the image was saved as {name}.");
+                    effects.Add($"The note's {folderName} folder already has {slug}{ext}, so the image was saved as {name}.");
                 }
 
-                return new AddImageResult(DenReader.ResultVersion, target, link, ImageFiles.AltText(stem), bytes.Length, effects);
+                return new AddImageResult(DenReader.ResultVersion, target, written, ImageFiles.AltText(stem), bytes.Length, effects);
             }
 
             throw new DenToolException(
@@ -126,6 +149,8 @@ public sealed partial class DenTools
                 $"{folder} already has {slug}{ext} and {MostImageNames - 1} numbered copies of it, so nothing was added. Rename the image, then add it again.");
         }
     }
+
+    private static string Join(string folder, string name) => folder.Length == 0 ? name : $"{folder}/{name}";
 
     private static string Megabytes(long bytes) =>
         $"{(bytes / (1024.0 * 1024.0)).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)} MB";

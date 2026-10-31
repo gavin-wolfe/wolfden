@@ -47,6 +47,8 @@ public class ImageFileTests
         { "<svg><unclosed></svg>"u8.ToArray(), null },
         { "just words"u8.ToArray(), null },
         { Bytes(0xC3, 0x28, '<', 's', 'v', 'g', '/', '>'), null },
+        { [0xFF, 0xFE, .. Encoding.Unicode.GetBytes("<?xml version=\"1.0\" encoding=\"UTF-16\"?><svg/>")], "image/svg+xml" },
+        { [0xFE, 0xFF, .. Encoding.BigEndianUnicode.GetBytes("<svg/>")], "image/svg+xml" },
         { Array.Empty<byte>(), null },
     };
 
@@ -61,6 +63,31 @@ public class ImageFileTests
         // A DOCTYPE is skipped, not processed, so an entity can't pull in a file or blow up.
         var svg = "<?xml version=\"1.0\"?><!DOCTYPE svg [<!ENTITY x SYSTEM \"file:///etc/passwd\">]><svg>&x;</svg>"u8.ToArray();
         Assert.Null(ImageFiles.Sniff(svg));
+    }
+
+    [Fact]
+    public void AnSvgThatDeclaresEntitiesIsRefusedWithWhatToDo()
+    {
+        // As Adobe Illustrator's SVG 1.1 Save As writes it.
+        var svg = Encoding.UTF8.GetBytes(
+            "<?xml version=\"1.0\"?>\n<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\" [\n" +
+            "  <!ENTITY ns_svg \"http://www.w3.org/2000/svg\">\n]>\n<svg xmlns=\"&ns_svg;\"><rect/></svg>");
+
+        Assert.Null(ImageFiles.Sniff(svg));
+        var problem = ImageFiles.Problem(".svg", svg);
+        Assert.Contains("declares entities in a DOCTYPE, which Wolfden doesn't accept", problem, StringComparison.Ordinal);
+        Assert.Contains("Export As", problem, StringComparison.Ordinal);
+        Assert.Contains("PNG", problem, StringComparison.Ordinal);
+        Assert.DoesNotContain("damaged", problem, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ALongFileNameGivesAltTextCutAtAWord()
+    {
+        var alt = ImageFiles.AltText(string.Join("-", Enumerable.Repeat("castle", 40)));
+        Assert.True(alt.Length <= ImageFiles.MaxAltLength);
+        Assert.EndsWith("castle", alt, StringComparison.Ordinal);
+        Assert.Equal(new string('x', ImageFiles.MaxAltLength), ImageFiles.AltText(new string('x', 300)));
     }
 
     [Theory]

@@ -377,13 +377,13 @@ function useOpenedPiece(target: TextTarget | { kind: 'rename' | 'remove'; line: 
   return { source, piece, setPiece, missing }
 }
 
-/** Invalidates every cached answer after a save: names, links, lists, searches, and history can all follow from one edit. */
 /** Saves an image beside the note being edited (#187), for the editor's Add image…, drop, and paste. */
 function useAddImage(): (file: File) => Promise<AddedImage> {
   const { universe, entityKey } = useEditing()!
   return useCallback((file: File) => addImage(universe, entityKey, file), [universe, entityKey])
 }
 
+/** Invalidates every cached answer after a save: names, links, lists, searches, and history can all follow from one edit. */
 export function useAfterSave() {
   const client = useQueryClient()
   return useCallback(() => client.invalidateQueries(), [client])

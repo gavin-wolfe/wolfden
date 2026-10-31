@@ -174,6 +174,78 @@ describe('SC-WEB-80: I add a picture to a note while editing it', () => {
     expect(uploads).toHaveLength(1)
   })
 
+  it('pastes the text, not its picture, when the clipboard has both (as Word, Excel, and OneNote put there)', async () => {
+    const { uploads } = stubImages()
+    renderApp('/u/dracula/e/E-MINA')
+    const view = await openLeadEditor()
+    act(() => view.dispatch({ selection: { anchor: view.state.doc.length } }))
+
+    const paste = new Event('paste', { bubbles: true, cancelable: true })
+    const data: Record<string, string> = { 'text/plain': ' Two paragraphs from the manuscript.', 'text/html': '<p>Two paragraphs from the manuscript.</p>' }
+    Object.defineProperty(paste, 'clipboardData', {
+      value: { files: [png('image.png')], getData: (type: string) => data[type] ?? '', types: ['text/plain', 'text/html', 'Files'] },
+    })
+    act(() => {
+      view.contentDOM.dispatchEvent(paste)
+    })
+
+    await waitFor(() => expect(view.state.doc.toString()).toContain('Two paragraphs from the manuscript.'))
+    expect(uploads).toEqual([])
+    expect(view.state.doc.toString()).not.toContain('![')
+  })
+
+  it('refuses more images dropped or pasted while one is being added, as the button does', async () => {
+    let finish: (() => void) | null = null
+    const { uploads } = stubImages()
+    const fetchMock = vi.mocked(fetch)
+    const answer = fetchMock.getMockImplementation()!
+    fetchMock.mockImplementation((async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input), 'http://127.0.0.1')
+      if (url.pathname === '/api/entity/image' && finish === null) {
+        await new Promise<void>((resolve) => (finish = resolve))
+      }
+
+      return answer(input, init)
+    }) as typeof fetch)
+    renderApp('/u/dracula/e/E-MINA')
+    const view = await openLeadEditor()
+
+    pick([png('first.png')])
+    await screen.findByText('Adding first.png…')
+    expect((screen.getByRole('button', { name: 'Add image…' }) as HTMLButtonElement).disabled).toBe(true)
+
+    const paste = new Event('paste', { bubbles: true, cancelable: true })
+    Object.defineProperty(paste, 'clipboardData', { value: { files: [png('second.png')], getData: () => '', types: ['Files'] } })
+    act(() => {
+      view.contentDOM.dispatchEvent(paste)
+    })
+    expect(paste.defaultPrevented).toBe(true)
+    await screen.findByText(/One batch of images at a time/)
+
+    act(() => finish!())
+    await screen.findByText(/Saved images\/first\.png/)
+    expect(uploads.map((u) => u.query.name)).toEqual(['first.png'])
+    expect(view.state.doc.toString()).not.toContain('second')
+  })
+
+  it('says which dropped files it left out because they aren’t images', async () => {
+    const { uploads } = stubImages()
+    renderApp('/u/dracula/e/E-MINA')
+    const view = await openLeadEditor()
+
+    const drop = new Event('drop', { bubbles: true, cancelable: true })
+    Object.defineProperty(drop, 'dataTransfer', {
+      value: { files: [png('map.png'), new File(['x'], 'chapter-notes.txt', { type: 'text/plain' })], types: ['Files'] },
+    })
+    act(() => {
+      view.contentDOM.dispatchEvent(drop)
+    })
+
+    const status = await screen.findByText(/Saved images\/map\.png/)
+    expect(status.textContent).toContain("Not added, since it isn't an image: chapter-notes.txt.")
+    expect(uploads.map((u) => u.query.name)).toEqual(['map.png'])
+  })
+
   it('adds a dropped image', async () => {
     const { uploads } = stubImages()
     renderApp('/u/dracula/e/E-MINA')

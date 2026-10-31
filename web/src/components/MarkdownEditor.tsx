@@ -58,49 +58,69 @@ export function MarkdownEditor({
   const [imageStatus, setImageStatus] = useState<ImageStatus | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
+  // True while images are being added. More dropped or pasted then are refused, as the button is off.
+  const busy = useRef(false)
+
   // Adds the files one at a time, each at the cursor, and says what happened.
-  const addFiles = useRef(async (files: File[]) => {
+  // `skipped` names dropped files that aren't images, which aren't added.
+  const addFiles = useRef(async (files: File[], skipped: string[] = []) => {
     const add = handlers.current.addImage
     const editor = view.current
-    if (!add || !editor || files.length === 0) {
+    if (!add || !editor || (files.length === 0 && skipped.length === 0)) {
       return
     }
 
+    if (busy.current) {
+      setImageStatus((now) => ({
+        ...(now ?? { text: '' }),
+        busy: true,
+        waiting: 'One batch of images at a time: wait until this one is added, then add the others again.',
+      }))
+      return
+    }
+
+    busy.current = true
     const saved: string[] = []
     const failed: string[] = []
     const notes: string[] = []
-    for (const file of files) {
-      const problem = imageProblem(file)
-      if (problem) {
-        failed.push(`${file.name}: ${problem}`)
-        continue
-      }
-
-      setImageStatus({ busy: true, text: `Adding ${file.name}…` })
-      try {
-        const image = await add(file)
-        const current = view.current
-        if (current) {
-          // Each on its own line after the first, so several don't run together.
-          const text = (saved.length > 0 ? '\n' : '') + imageMarkdown(image)
-          current.dispatch(current.state.replaceSelection(text))
+    try {
+      for (const file of files) {
+        const problem = imageProblem(file)
+        if (problem) {
+          failed.push(`${file.name}: ${problem}`)
+          continue
         }
 
-        saved.push(image.link)
-        notes.push(...image.effects)
-      } catch (e) {
-        failed.push(`${file.name}: ${(e as Error).message}`)
+        setImageStatus({ busy: true, text: `Adding ${file.name}…` })
+        try {
+          const image = await add(file)
+          const current = view.current
+          if (current) {
+            // Each on its own line after the first, so several don't run together.
+            const text = (saved.length > 0 ? '\n' : '') + imageMarkdown(image)
+            current.dispatch(current.state.replaceSelection(text))
+          }
+
+          saved.push(image.link)
+          notes.push(...image.effects)
+        } catch (e) {
+          failed.push(`${file.name}: ${(e as Error).message}`)
+        }
       }
+    } finally {
+      busy.current = false
     }
 
-    setImageStatus({
-      busy: false,
-      text: saved.length > 0
-        ? `Saved ${saved.join(', ')} in the den and added ${saved.length === 1 ? 'it' : 'them'} to the text. ${saved.length === 1 ? 'It stays' : 'They stay'} in the den even if you cancel.`
-        : '',
-      notes,
-      failed,
-    })
+    const parts: string[] = []
+    if (saved.length > 0) {
+      parts.push(`Saved ${saved.join(', ')} in the den and added ${saved.length === 1 ? 'it' : 'them'} to the text. ${saved.length === 1 ? 'It stays' : 'They stay'} in the den even if you cancel.`)
+    }
+
+    if (skipped.length > 0) {
+      parts.push(`Not added, since ${skipped.length === 1 ? "it isn't an image" : "they aren't images"}: ${skipped.join(', ')}.`)
+    }
+
+    setImageStatus({ busy: false, text: parts.join(' '), notes, failed })
     view.current?.focus()
   }).current
   // Every note of the universe, to tell whether a slug reaches only the note picked.
@@ -138,7 +158,8 @@ export function MarkdownEditor({
           editorTheme(minLines),
           Prec.highest(EditorView.domEventHandlers({
             drop: (event, editor) => {
-              const files = imagesIn(event.dataTransfer?.files)
+              const dropped = [...(event.dataTransfer?.files ?? [])]
+              const files = dropped.filter(looksLikeImage)
               if (!handlers.current.addImage || files.length === 0) {
                 return false
               }
@@ -156,12 +177,15 @@ export function MarkdownEditor({
                 editor.dispatch({ selection: { anchor: at } })
               }
 
-              void addFiles(files)
+              void addFiles(files, dropped.filter((f) => !looksLikeImage(f)).map((f) => f.name))
               return true
             },
             paste: (event) => {
-              const files = imagesIn(event.clipboardData?.files)
-              if (!handlers.current.addImage || files.length === 0) {
+              const clipboard = event.clipboardData
+              const files = imagesIn(clipboard?.files)
+              // Text copied from Word, Excel, or OneNote comes with a picture of it as
+              // well: when there's text, it's the text that's pasted. A screenshot has none.
+              if (!handlers.current.addImage || files.length === 0 || (clipboard?.getData('text/plain') ?? '').trim() !== '') {
                 return false
               }
 
@@ -222,6 +246,7 @@ export function MarkdownEditor({
       </div>
       {imageStatus && (imageStatus.busy || imageStatus.text) && (
         <p className="editor-image-status" role="status">
+          {imageStatus.waiting ? `${imageStatus.waiting} ` : ''}
           {imageStatus.text}
           {imageStatus.notes && imageStatus.notes.length > 0 ? ` ${imageStatus.notes.join(' ')}` : ''}
         </p>
@@ -244,6 +269,8 @@ export function MarkdownEditor({
 interface ImageStatus {
   busy: boolean
   text: string
+  /** Why more images dropped or pasted meanwhile weren't added. */
+  waiting?: string
   notes?: string[]
   failed?: string[]
 }

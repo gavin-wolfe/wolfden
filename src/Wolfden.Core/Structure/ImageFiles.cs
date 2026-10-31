@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Xml;
 
 namespace Wolfden.Core.Structure;
@@ -87,6 +88,12 @@ public static class ImageFiles
         }
 
         var kind = Name(expected);
+        if (found is null && expected == "image/svg+xml" && DeclaresEntities(bytes))
+        {
+            return "this SVG declares entities in a DOCTYPE, which Wolfden doesn't accept, to keep a file from reading others. " +
+                "Export it again without them (in Illustrator, File > Export > Export As… with SVG, rather than Save As with SVG 1.1), or add it as a PNG";
+        }
+
         if (found is null)
         {
             return $"its name says it's a {kind} image, but it isn't one (or the file is damaged)";
@@ -100,7 +107,9 @@ public static class ImageFiles
     /// The alt text for an image named <paramref name="stem"/> (its file
     /// name without the extension): <c>-</c>, <c>_</c>, and runs of spaces
     /// become one space, and the brackets and backslashes Markdown would
-    /// read are dropped. Empty if nothing's left, for the writer to fill in.
+    /// read are dropped. A long one is cut at a word, to at most
+    /// <see cref="MaxAltLength"/> characters. Empty if nothing's left, for
+    /// the writer to fill in.
     /// </summary>
     public static string AltText(string stem)
     {
@@ -126,8 +135,18 @@ public static class ImageFiles
             }
         }
 
-        return text.ToString().Trim();
+        var alt = text.ToString().Trim();
+        if (alt.Length <= MaxAltLength)
+        {
+            return alt;
+        }
+
+        var cut = alt.LastIndexOf(' ', MaxAltLength);
+        return (cut > MaxAltLength / 2 ? alt[..cut] : alt[..MaxAltLength]).TrimEnd();
     }
+
+    /// <summary>The longest alt text <see cref="AltText"/> makes from a file name.</summary>
+    public const int MaxAltLength = 100;
 
     private static string Name(string contentType) => contentType switch
     {
@@ -163,15 +182,14 @@ public static class ImageFiles
         return false;
     }
 
-    /// <summary>Well-formed XML (a DOCTYPE is skipped, never read) whose first element is <c>svg</c>.</summary>
+    /// <summary>
+    /// Well-formed XML whose first element is <c>svg</c>, in UTF-8, or in
+    /// UTF-16 with a byte order mark. A DOCTYPE is skipped, never read, so an
+    /// entity it declares is undeclared and the file isn't well-formed.
+    /// </summary>
     private static bool IsSvg(ReadOnlySpan<byte> bytes)
     {
-        string text;
-        try
-        {
-            text = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true).GetString(bytes);
-        }
-        catch (DecoderFallbackException)
+        if (SvgText(bytes) is not { } text)
         {
             return false;
         }
@@ -186,7 +204,7 @@ public static class ImageFiles
         };
         try
         {
-            using var reader = XmlReader.Create(new StringReader(text.TrimStart('﻿')), settings);
+            using var reader = XmlReader.Create(new StringReader(text), settings);
             while (reader.Read())
             {
                 if (reader.NodeType == XmlNodeType.Element)
@@ -210,6 +228,34 @@ public static class ImageFiles
         catch (XmlException)
         {
             return false;
+        }
+    }
+
+    /// <summary>True if the text has a DOCTYPE whose internal subset declares an entity.</summary>
+    private static bool DeclaresEntities(ReadOnlySpan<byte> bytes) =>
+        SvgText(bytes) is { } text && Regex.IsMatch(text, @"<!DOCTYPE\s[^>\[]*\[[\s\S]*?<!ENTITY", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+
+    /// <summary>The bytes as text: UTF-16 with a byte order mark, or else UTF-8 (with or without one); null if they aren't valid text.</summary>
+    private static string? SvgText(ReadOnlySpan<byte> bytes)
+    {
+        try
+        {
+            if (bytes.StartsWith((ReadOnlySpan<byte>)[0xFF, 0xFE]))
+            {
+                return new UnicodeEncoding(bigEndian: false, byteOrderMark: false, throwOnInvalidBytes: true).GetString(bytes[2..]);
+            }
+
+            if (bytes.StartsWith((ReadOnlySpan<byte>)[0xFE, 0xFF]))
+            {
+                return new UnicodeEncoding(bigEndian: true, byteOrderMark: false, throwOnInvalidBytes: true).GetString(bytes[2..]);
+            }
+
+            var utf8 = bytes.StartsWith((ReadOnlySpan<byte>)[0xEF, 0xBB, 0xBF]) ? bytes[3..] : bytes;
+            return new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true).GetString(utf8);
+        }
+        catch (DecoderFallbackException)
+        {
+            return null;
         }
     }
 }

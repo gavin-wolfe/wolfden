@@ -94,6 +94,42 @@ public class ImageEndpointTests
         Assert.Equal(Png, File.ReadAllBytes(Full(den, $"{Images}/castle-map-3.png")));
     }
 
+    [Fact]
+    [Trait("Scenario", "SC-WEB-80")]
+    public async Task AnImagesFolderInAnotherCaseIsUsedAsItsSpelled()
+    {
+        using var den = TempDen.Dracula();
+        const string Folder = "universes/dracula/entities/locations/Images";
+        Directory.CreateDirectory(Full(den, Folder));
+        File.WriteAllBytes(Full(den, $"{Folder}/map.png"), [1, 2, 3]);
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+
+        var (status, json) = await UploadAsync(server, Query(Castle, "map.png"), Png);
+
+        Assert.Equal(HttpStatusCode.Created, status);
+        Assert.Equal($"{Folder}/map-2.png", json.GetProperty("path").GetString());
+        Assert.Equal("Images/map-2.png", json.GetProperty("link").GetString());
+        Assert.Equal(["Images"], Directory.GetDirectories(Full(den, "universes/dracula/entities/locations")).Select(d => Path.GetFileName(d)).ToArray());
+        Assert.Equal(Png, File.ReadAllBytes(Full(den, $"{Folder}/map-2.png")));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-81")]
+    public async Task AFileNamedImagesBesideTheNoteIsAConflictThatSaysWhatToRename()
+    {
+        using var den = TempDen.Dracula();
+        File.WriteAllText(Full(den, "universes/dracula/entities/locations/images"), "not a folder");
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+
+        var (status, json) = await UploadAsync(server, Query(Castle, "map.png"), Png);
+
+        Assert.Equal(HttpStatusCode.Conflict, status);
+        Assert.Equal("already_exists", json.GetProperty("code").GetString());
+        Assert.Contains("There's a file named 'images' beside the note", json.GetProperty("message").GetString(), StringComparison.Ordinal);
+        Assert.Contains("Rename or move the file", json.GetProperty("message").GetString(), StringComparison.Ordinal);
+        Assert.Equal("not a folder", den.Read("universes/dracula/entities/locations/images"));
+    }
+
     [Theory]
     [Trait("Scenario", "SC-WEB-81")]
     [InlineData("../../../../../escape.png", "escape.png")]

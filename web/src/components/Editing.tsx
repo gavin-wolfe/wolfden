@@ -2,6 +2,7 @@ import { Suspense, createContext, lazy, useCallback, useContext, useEffect, useI
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useBlocker } from '@tanstack/react-router'
 import { EditError, postEdit, sourceQuery, type EditPath, type EntitySource, type WriteResult } from '../editApi'
+import { addImage, type AddedImage } from '../imageApi'
 import { Markdown } from './Markdown'
 import { ErrorState, Loading } from './States'
 
@@ -376,6 +377,12 @@ function useOpenedPiece(target: TextTarget | { kind: 'rename' | 'remove'; line: 
   return { source, piece, setPiece, missing }
 }
 
+/** Saves an image beside the note being edited (#187), for the editor's Add image…, drop, and paste. */
+function useAddImage(): (file: File) => Promise<AddedImage> {
+  const { universe, entityKey } = useEditing()!
+  return useCallback((file: File) => addImage(universe, entityKey, file), [universe, entityKey])
+}
+
 /** Invalidates every cached answer after a save: names, links, lists, searches, and history can all follow from one edit. */
 export function useAfterSave() {
   const client = useQueryClient()
@@ -390,6 +397,7 @@ export function useAfterSave() {
 export function PieceEditor({ target, what, file }: { target: TextTarget; what: string; file: string }) {
   const editing = useEditing()!
   const afterSave = useAfterSave()
+  const addImageHere = useAddImage()
   const { source, piece, setPiece, missing } = useOpenedPiece(target)
   const [text, setText] = useState<string | null>(null)
   const [preview, setPreview] = useState(false)
@@ -528,6 +536,7 @@ export function PieceEditor({ target, what, file }: { target: TextTarget; what: 
           universe={editing.universe}
           autoFocus
           minLines={target.kind === 'file' ? 20 : 4}
+          addImage={addImageHere}
         />
       </div>
       {preview && (
@@ -858,6 +867,7 @@ export function RemoveSection({ target, subsections }: { target: { kind: 'remove
 export function AddSection({ file }: { file: string }) {
   const editing = useEditing()!
   const afterSave = useAfterSave()
+  const addImageHere = useAddImage()
   const source = useQuery({ ...sourceQuery(editing.universe, editing.entityKey), refetchOnMount: 'always' })
   const fresh = source.isFetchedAfterMount && !source.isFetching
   const [base, setBase] = useState<EntitySource | null>(null)
@@ -968,6 +978,7 @@ export function AddSection({ file }: { file: string }) {
           onCancel={editing.cancel}
           label="Markdown of the new section"
           universe={editing.universe}
+          addImage={addImageHere}
         />
       </div>
       {preview && (

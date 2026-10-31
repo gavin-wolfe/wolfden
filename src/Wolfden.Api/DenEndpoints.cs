@@ -85,6 +85,7 @@ public static class DenEndpoints
                 : WriteEndpoints.PostPaths.Contains(path, StringComparer.OrdinalIgnoreCase)
                     || FreezeEndpoints.PostPaths.Contains(path, StringComparer.OrdinalIgnoreCase)
                     || CreateEndpoints.PostPaths.Contains(path, StringComparer.OrdinalIgnoreCase)
+                    || ImageEndpoints.PostPaths.Contains(path, StringComparer.OrdinalIgnoreCase)
                     || ContainerEndpoints.PostPaths.Contains(path, StringComparer.OrdinalIgnoreCase)
                     || HistorySetupEndpoints.PostPaths.Contains(path, StringComparer.OrdinalIgnoreCase) ? "POST"
                 : null;

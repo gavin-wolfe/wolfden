@@ -285,3 +285,12 @@ public sealed record TypeView(string Key, string Name, string Plural, string? De
 /// <param name="Version">The shape version.</param>
 /// <param name="Types">The types, by display name, then key.</param>
 public sealed record TypeListResult(int Version, IReadOnlyList<TypeView> Types);
+
+/// <summary>An image added to a note's folder (<see cref="DenTools.AddImage"/>, #187).</summary>
+/// <param name="Version">The result's shape version.</param>
+/// <param name="Path">The image's den-relative path, such as <c>universes/dracula/entities/locations/images/castle-map.png</c>.</param>
+/// <param name="Link">The path to write in the note, from the note's folder (format.md F-LAY-9), such as <c>images/castle-map.png</c>.</param>
+/// <param name="Alt">Alt text made from the file's name, such as <c>Castle Map</c>, or empty.</param>
+/// <param name="Bytes">The image's size in bytes.</param>
+/// <param name="Effects">What the writer should know, such as a name that was taken, so it got a number.</param>
+public sealed record AddImageResult(int Version, string Path, string Link, string Alt, long Bytes, IReadOnlyList<string> Effects);

@@ -856,6 +856,24 @@ button.peek {
   display: block;
 }
 
+/* Add image… under the editor (#187), and what it did. */
+.editor-images {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0.4rem 0 0;
+}
+
+.editor-images .muted,
+.editor-image-status {
+  font-size: 0.8rem;
+}
+
+.editor-image-status {
+  margin: 0.3rem 0 0;
+}
+
 .editor-preview {
   border: 1px dashed var(--border);
   border-radius: 4px;

@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react'
-import { EditorState } from '@codemirror/state'
+import { useEffect, useRef, useState } from 'react'
+import { EditorState, Prec } from '@codemirror/state'
 import { EditorView, keymap, placeholder as placeholderText } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
@@ -9,6 +9,7 @@ import { useQuery } from '@tanstack/react-query'
 import { entitiesQuery } from '../api'
 import { linkFor } from '../fieldModel'
 import { lookupable, lookupEntities, matchLabel, noSureLink, type LookupResult } from '../lookupApi'
+import { imageExtensions, imageMarkdown, imageProblem, looksLikeImage, type AddedImage } from '../imageApi'
 
 /**
  * A Markdown source editor (#28): CodeMirror 6, with Markdown highlighting
@@ -21,6 +22,11 @@ import { lookupable, lookupEntities, matchLabel, noSureLink, type LookupResult }
  * `<style>`, which the page's Content-Security-Policy (`style-src 'self'`,
  * #180) refuses, but in a shadow root it's a constructed style sheet, which
  * the policy doesn't govern. The page's colours reach it as CSS variables.
+ *
+ * With `addImage` (#187), an image picked with Add image…, dropped on the
+ * editor, or pasted into it is sent to be saved in the den, and
+ * `![alt](path)` goes in at the cursor (or where it was dropped). Dropped or
+ * pasted files that aren't images are left to CodeMirror.
  */
 export function MarkdownEditor({
   value,
@@ -31,6 +37,7 @@ export function MarkdownEditor({
   universe,
   autoFocus = false,
   minLines = 4,
+  addImage,
 }: {
   value: string
   onChange: (text: string) => void
@@ -40,12 +47,82 @@ export function MarkdownEditor({
   universe: string
   autoFocus?: boolean
   minLines?: number
+  /** Saves an image in the den for this note; without it, the editor doesn't add images. */
+  addImage?: (file: File) => Promise<AddedImage>
 }) {
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<EditorView | null>(null)
   // The latest callbacks, so the editor made once always calls them.
-  const handlers = useRef({ onChange, onSave, onCancel })
-  handlers.current = { onChange, onSave, onCancel }
+  const handlers = useRef({ onChange, onSave, onCancel, addImage })
+  handlers.current = { onChange, onSave, onCancel, addImage }
+  const [imageStatus, setImageStatus] = useState<ImageStatus | null>(null)
+  const fileInput = useRef<HTMLInputElement>(null)
+
+  // True while images are being added. More dropped or pasted then are refused, as the button is off.
+  const busy = useRef(false)
+
+  // Adds the files one at a time, each at the cursor, and says what happened.
+  // `skipped` names dropped files that aren't images, which aren't added.
+  const addFiles = useRef(async (files: File[], skipped: string[] = []) => {
+    const add = handlers.current.addImage
+    const editor = view.current
+    if (!add || !editor || (files.length === 0 && skipped.length === 0)) {
+      return
+    }
+
+    if (busy.current) {
+      setImageStatus((now) => ({
+        ...(now ?? { text: '' }),
+        busy: true,
+        waiting: 'One batch of images at a time: wait until this one is added, then add the others again.',
+      }))
+      return
+    }
+
+    busy.current = true
+    const saved: string[] = []
+    const failed: string[] = []
+    const notes: string[] = []
+    try {
+      for (const file of files) {
+        const problem = imageProblem(file)
+        if (problem) {
+          failed.push(`${file.name}: ${problem}`)
+          continue
+        }
+
+        setImageStatus({ busy: true, text: `Adding ${file.name}…` })
+        try {
+          const image = await add(file)
+          const current = view.current
+          if (current) {
+            // Each on its own line after the first, so several don't run together.
+            const text = (saved.length > 0 ? '\n' : '') + imageMarkdown(image)
+            current.dispatch(current.state.replaceSelection(text))
+          }
+
+          saved.push(image.link)
+          notes.push(...image.effects)
+        } catch (e) {
+          failed.push(`${file.name}: ${(e as Error).message}`)
+        }
+      }
+    } finally {
+      busy.current = false
+    }
+
+    const parts: string[] = []
+    if (saved.length > 0) {
+      parts.push(`Saved ${saved.join(', ')} in the den and added ${saved.length === 1 ? 'it' : 'them'} to the text. ${saved.length === 1 ? 'It stays' : 'They stay'} in the den even if you cancel.`)
+    }
+
+    if (skipped.length > 0) {
+      parts.push(`Not added, since ${skipped.length === 1 ? "it isn't an image" : "they aren't images"}: ${skipped.join(', ')}.`)
+    }
+
+    setImageStatus({ busy: false, text: parts.join(' '), notes, failed })
+    view.current?.focus()
+  }).current
   // Every note of the universe, to tell whether a slug reaches only the note picked.
   const all = useQuery(entitiesQuery(universe, undefined))
   const others = useRef<readonly { path: string; name?: string }[] | null>(null)
@@ -79,6 +156,44 @@ export function MarkdownEditor({
             }
           }),
           editorTheme(minLines),
+          Prec.highest(EditorView.domEventHandlers({
+            drop: (event, editor) => {
+              const dropped = [...(event.dataTransfer?.files ?? [])]
+              const files = dropped.filter(looksLikeImage)
+              if (!handlers.current.addImage || files.length === 0) {
+                return false
+              }
+
+              event.preventDefault()
+              // Where it was dropped, if the editor can tell (it measures the layout); else at the cursor.
+              let at: number | null = null
+              try {
+                at = editor.posAtCoords({ x: event.clientX, y: event.clientY })
+              } catch {
+                at = null
+              }
+
+              if (at !== null) {
+                editor.dispatch({ selection: { anchor: at } })
+              }
+
+              void addFiles(files, dropped.filter((f) => !looksLikeImage(f)).map((f) => f.name))
+              return true
+            },
+            paste: (event) => {
+              const clipboard = event.clipboardData
+              const files = imagesIn(clipboard?.files)
+              // Text copied from Word, Excel, or OneNote comes with a picture of it as
+              // well: when there's text, it's the text that's pasted. A screenshot has none.
+              if (!handlers.current.addImage || files.length === 0 || (clipboard?.getData('text/plain') ?? '').trim() !== '') {
+                return false
+              }
+
+              event.preventDefault()
+              void addFiles(files)
+              return true
+            },
+          })),
         ],
       }),
     })
@@ -102,7 +217,67 @@ export function MarkdownEditor({
     }
   }, [value])
 
-  return <div ref={host} className="markdown-editor" role="group" aria-label={label} data-testid="markdown-editor" />
+  const editorElement = <div ref={host} className="markdown-editor" role="group" aria-label={label} data-testid="markdown-editor" />
+  if (!addImage) {
+    return editorElement
+  }
+
+  return (
+    <>
+      {editorElement}
+      <div className="editor-images">
+        <button type="button" onClick={() => fileInput.current?.click()} disabled={imageStatus?.busy === true}>
+          Add image…
+        </button>
+        <input
+          ref={fileInput}
+          type="file"
+          accept={imageExtensions.join(',')}
+          multiple
+          hidden
+          aria-label="Image to add"
+          onChange={(e) => {
+            const files = [...(e.target.files ?? [])]
+            e.target.value = ''
+            void addFiles(files)
+          }}
+        />
+        <span className="muted">or drop or paste one into the text. It's saved in an images folder beside the note.</span>
+      </div>
+      {imageStatus && (imageStatus.busy || imageStatus.text) && (
+        <p className="editor-image-status" role="status">
+          {imageStatus.waiting ? `${imageStatus.waiting} ` : ''}
+          {imageStatus.text}
+          {imageStatus.notes && imageStatus.notes.length > 0 ? ` ${imageStatus.notes.join(' ')}` : ''}
+        </p>
+      )}
+      {imageStatus && !imageStatus.busy && imageStatus.failed && imageStatus.failed.length > 0 && (
+        <div className="error" role="alert">
+          <p>{imageStatus.failed.length === 1 ? "This image wasn't added:" : "These images weren't added:"}</p>
+          <ul>
+            {imageStatus.failed.map((f) => (
+              <li key={f}>{f}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </>
+  )
+}
+
+/** What adding images is doing, or did. */
+interface ImageStatus {
+  busy: boolean
+  text: string
+  /** Why more images dropped or pasted meanwhile weren't added. */
+  waiting?: string
+  notes?: string[]
+  failed?: string[]
+}
+
+/** The files in a drop or paste that look like images. */
+function imagesIn(files: FileList | null | undefined): File[] {
+  return files ? [...files].filter(looksLikeImage) : []
 }
 
 /** The EditorView in an editor's element, for tests and for moving focus into it. */

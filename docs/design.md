@@ -986,6 +986,10 @@ store, so an edit changes only what it means to (format.md §12):
   A call that's cancelled while it waits (an MCP client's cancel, or a
   browser that goes away from `serve`) stops waiting at once and writes
   nothing (#234); it ends as a cancelled call does, not with `den_busy`.
+  `serve` hears that a browser went away only when it handles the
+  closed connection, which is usually within milliseconds but on a busy
+  machine can be later; if the write's turn comes first, it's saved, as
+  if the browser had gone away just after.
   Only a sharing or lock violation counts as held (on Windows; on Linux
   and macOS, `flock`'s `EWOULDBLOCK`); any other failure to open the
   lock file is `write_failed` at once. `check --fix` takes the lock too.

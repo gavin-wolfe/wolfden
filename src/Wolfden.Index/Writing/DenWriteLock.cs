@@ -98,49 +98,70 @@ public sealed class DenWriteLock : IDisposable
 
         var pause = FirstPause;
         var told = false;
-        while (true)
+        try
         {
-            try
+            while (true)
             {
-                return new DenWriteLock(new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None));
-            }
-            catch (DirectoryNotFoundException)
-            {
-                // The folder was deleted (by hand, or a reset index) between making it and opening the file.
-                Directory.CreateDirectory(folder);
-            }
-            catch (IOException e) when (IsHeld(e))
-            {
-                // Held by another Wolfden, most likely; a virus scanner or indexer
-                // opening it for a moment looks the same, and passes.
-                if (clock.Elapsed >= wait)
+                try
                 {
-                    throw Busy(wait);
+                    return new DenWriteLock(new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None));
                 }
-
-                if (!told)
+                catch (DirectoryNotFoundException)
                 {
-                    told = true;
-                    waiting?.Invoke(wait);
+                    // The folder was deleted (by hand, or a reset index) between making it and opening the file.
+                    Directory.CreateDirectory(folder);
                 }
-
-                // Waits on the token, so a cancelled call (a dropped request, an MCP
-                // cancel) stops waiting at once instead of at the end of the pause.
-                var left = wait - clock.Elapsed;
-                if (cancellationToken.WaitHandle.WaitOne(pause < left ? pause : left > TimeSpan.Zero ? left : TimeSpan.Zero))
+                catch (IOException e) when (IsHeld(e))
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                }
+                    // Held by another Wolfden, most likely; a virus scanner or indexer
+                    // opening it for a moment looks the same, and passes.
+                    if (clock.Elapsed >= wait)
+                    {
+                        throw Busy(wait);
+                    }
 
-                pause = pause * 2 > LongestPause ? LongestPause : pause * 2;
+                    if (!told)
+                    {
+                        told = true;
+                        Waiters.AddOrUpdate(path, 1, (_, n) => n + 1);
+                        waiting?.Invoke(wait);
+                    }
+
+                    // Waits on the token, so a cancelled call (a dropped request, an MCP
+                    // cancel) stops waiting at once instead of at the end of the pause.
+                    var left = wait - clock.Elapsed;
+                    if (cancellationToken.WaitHandle.WaitOne(pause < left ? pause : left > TimeSpan.Zero ? left : TimeSpan.Zero))
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                    }
+
+                    pause = pause * 2 > LongestPause ? LongestPause : pause * 2;
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+                {
+                    // Not another holder: waiting won't help.
+                    throw new DenToolException(ToolErrorCodes.WriteFailed, $"Couldn't open the den's write lock, {path}, so nothing was written: {e.Message}");
+                }
             }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        }
+        finally
+        {
+            if (told)
             {
-                // Not another holder: waiting won't help.
-                throw new DenToolException(ToolErrorCodes.WriteFailed, $"Couldn't open the den's write lock, {path}, so nothing was written: {e.Message}");
+                Waiters.AddOrUpdate(path, 0, (_, n) => n - 1);
             }
         }
     }
+
+    // For tests: how many takes are waiting for each lock file now.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, int> Waiters = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// For tests: how many takes of the lock of the den at <paramref name="root"/>
+    /// are waiting for it right now, in this process. A test polls it to
+    /// know a write is waiting, or has stopped waiting, rather than pausing.
+    /// </summary>
+    internal static int WaitersFor(string root) => Waiters.TryGetValue(PathFor(Path.GetFullPath(root)), out var n) ? n : 0;
 
     /// <summary>The <see cref="ToolErrorCodes.DenBusy"/> error for a write that waited all of <paramref name="wait"/>.</summary>
     internal static DenToolException Busy(TimeSpan wait) => new(

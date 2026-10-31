@@ -72,6 +72,17 @@ public class WriteEndpointTests
         return (response.StatusCode, text.Length == 0 ? default : JsonDocument.Parse(text).RootElement.Clone());
     }
 
+    /// <summary>Waits until <paramref name="condition"/> holds, up to a bound only a hung test meets, polling.</summary>
+    private static async Task UntilAsync(Func<bool> condition, string because)
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        while (!condition())
+        {
+            Assert.True(clock.Elapsed < TimeSpan.FromSeconds(60), because);
+            await Task.Delay(5, Token);
+        }
+    }
+
     private static async Task<JsonElement> SourceAsync(Server server, string entity) =>
         await server.GetJsonAsync($"/api/entity/source?entity={Uri.EscapeDataString(entity)}", HttpStatusCode.OK);
 
@@ -351,8 +362,14 @@ public class WriteEndpointTests
                     JsonSerializer.Serialize(new { entity = LinkerPath, expectedHash = Hash(source), text = "Dropped." }), Encoding.UTF8, "application/json"),
             };
             var sent = server.Client.SendAsync(request, drop.Token);
-            drop.CancelAfter(TimeSpan.FromMilliseconds(300));
+
+            // Cancelled only once the server is waiting for the lock, and the lock let go only once it has
+            // stopped: the server hears of the drop when it handles the closed connection, which on a busy
+            // machine can come after the client has given up.
+            await UntilAsync(() => DenWriteLock.WaitersFor(den.Root) == 1, "the edit should be waiting for the lock");
+            drop.Cancel();
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => sent);
+            await UntilAsync(() => DenWriteLock.WaitersFor(den.Root) == 0, "the server should stop waiting once the request is dropped");
         }
 
         // Had the dropped edit still been waiting, it would hold the server's turn, take the lock as it's let go,

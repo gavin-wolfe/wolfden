@@ -18,6 +18,23 @@ public sealed class WriteLockTests : IDisposable
 
     private string LockPath => Path.Combine(_den.Root, ".wolfden", "write.lock");
 
+    /// <summary>True once <paramref name="condition"/> holds, polling, or false after <see cref="Bound"/>.</summary>
+    private static bool Until(Func<bool> condition)
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        while (!condition())
+        {
+            if (clock.Elapsed >= Bound)
+            {
+                return false;
+            }
+
+            Thread.Sleep(5);
+        }
+
+        return true;
+    }
+
     [Fact]
     public void TwoSessionsTakeTurnsSoTheSecondSeesTheFirstsChange()
     {
@@ -283,7 +300,8 @@ public sealed class WriteLockTests : IDisposable
             }
         });
         second.Start();
-        call.CancelAfter(TimeSpan.FromMilliseconds(200));
+        Assert.True(Until(() => tools.TurnWaiters == 1), "the call should be waiting for the session's turn");
+        call.Cancel();
         var stopped = second.Join(Bound);
         release.Set();
         Assert.True(first.Join(Bound));
@@ -330,7 +348,8 @@ public sealed class WriteLockTests : IDisposable
             }
         });
         checkpoint.Start();
-        call.CancelAfter(TimeSpan.FromMilliseconds(200));
+        Assert.True(Until(() => tools.TurnWaiters == 1), "the call should be waiting for the session's turn");
+        call.Cancel();
         var stopped = checkpoint.Join(Bound);
         release.Set();
         Assert.True(write.Join(Bound));

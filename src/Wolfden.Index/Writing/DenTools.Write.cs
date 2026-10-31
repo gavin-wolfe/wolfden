@@ -1271,7 +1271,9 @@ public sealed partial class DenTools
     private WriteTurn EnterWrite()
     {
         var clock = System.Diagnostics.Stopwatch.StartNew();
-        var cancellation = Cancellation;
+        // A write inside one that has the turn already doesn't wait, so it isn't cancelled:
+        // it may be part of a multi-file write under way.
+        var cancellation = _writeLock.IsHeldByCurrentThread ? CancellationToken.None : Cancellation;
         cancellation.ThrowIfCancellationRequested();
         if (!cancellation.CanBeCanceled)
         {
@@ -1283,12 +1285,23 @@ public sealed partial class DenTools
         else
         {
             // The in-process lock's wait can't be cancelled, so it's taken in short tries.
-            while (!_writeLock.TryEnter(Shorter(WriteLockWait - clock.Elapsed, TurnTry)))
+            if (!_writeLock.TryEnter(TimeSpan.Zero))
             {
-                cancellation.ThrowIfCancellationRequested();
-                if (clock.Elapsed >= WriteLockWait)
+                Interlocked.Increment(ref _turnWaiters);
+                try
                 {
-                    throw DenWriteLock.Busy(WriteLockWait);
+                    while (!_writeLock.TryEnter(Shorter(WriteLockWait - clock.Elapsed, TurnTry)))
+                    {
+                        cancellation.ThrowIfCancellationRequested();
+                        if (clock.Elapsed >= WriteLockWait)
+                        {
+                            throw DenWriteLock.Busy(WriteLockWait);
+                        }
+                    }
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref _turnWaiters);
                 }
             }
         }
@@ -1344,13 +1357,34 @@ public sealed partial class DenTools
         }
 
         cancellation.ThrowIfCancellationRequested();
-        while (!_writeLock.TryEnter(TurnTry))
+        if (!_writeLock.TryEnter(TimeSpan.Zero))
         {
-            cancellation.ThrowIfCancellationRequested();
+            Interlocked.Increment(ref _turnWaiters);
+            try
+            {
+                while (!_writeLock.TryEnter(TurnTry))
+                {
+                    cancellation.ThrowIfCancellationRequested();
+                }
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _turnWaiters);
+            }
         }
 
         return new SessionTurn(_writeLock);
     }
+
+    // How many cancellable calls are waiting for this session's turn (TurnWaiters).
+    private int _turnWaiters;
+
+    /// <summary>
+    /// For tests: how many calls that can be cancelled (<see cref="CancelWith"/>)
+    /// are waiting for this session's turn right now, so a test can cancel
+    /// one it knows is waiting rather than pausing first.
+    /// </summary>
+    internal int TurnWaiters => Volatile.Read(ref _turnWaiters);
 
     /// <summary>This session's turn, from <see cref="TakeSessionTurn"/>; disposing it ends the turn.</summary>
     private readonly struct SessionTurn(Lock turn) : IDisposable

@@ -298,7 +298,7 @@ export function NewMenu({ universe, place }: { universe: string; place?: NewMenu
         {place ? 'New note' : 'New'} <span aria-hidden="true">▾</span>
       </button>
       {open && (
-        <ul id={menuId} role="menu" aria-label={menuLabel}className="new-menu-list" ref={menuRef} tabIndex={-1} onKeyDown={onMenuKey}>
+        <ul id={menuId} role="menu" aria-label={menuLabel} className="new-menu-list" ref={menuRef} tabIndex={-1} onKeyDown={onMenuKey}>
           {types.isPending ? (
             <li role="menuitem" aria-disabled="true" tabIndex={-1}>
               Loading the types…

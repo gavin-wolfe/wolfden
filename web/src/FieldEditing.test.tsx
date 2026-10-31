@@ -3,7 +3,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import type { EntityPageResult, PageField } from './api'
 import type { EntitySource, SourceFieldType, WriteResult } from './editApi'
-import { fieldChanges, fieldDraftOf, fieldProblems, linkFor, newEntry, newItem, type FieldDraft, type Json } from './fieldModel'
+import { fieldChanges, fieldDraftOf, fieldProblems, linkFor, newEntry, newItem, valueLines, type FieldDraft, type Json } from './fieldModel'
 import type { LookupHit, LookupResult } from './lookupApi'
 import { fieldText } from './components/FieldEditing'
 import { entities, page, renderApp, stubApi } from './test/harness'
@@ -228,6 +228,18 @@ describe('SC-WEB-61: the changes a field edit sends', () => {
     // Another part of the note changed: the last field's lines are the same.
     expect(fieldText(at(text('12', 'An agent wrote this.')), 'weight')).toBe(fieldText(at(text('12', 'The box.')), 'weight'))
     expect(fieldText(at(text('14', 'The box.')), 'weight')).not.toBe(fieldText(at(text('12', 'The box.')), 'weight'))
+
+    // A closing line with spaces or tabs after it, as the server reads one.
+    const padded = (body: string) => text('12', body).replace('\r\n---\r\n', '\r\n--- \t\r\n')
+    expect(fieldText(at(padded('The box.')), 'weight')).toBe('  weight: 12\r')
+    expect(fieldText(at(padded('An agent wrote this.')), 'weight')).toBe('  weight: 12\r')
+  })
+
+  it('shows a mapping whose only key is $plain with the key the file has', () => {
+    expect(valueLines({ $$plain: '7' })).toBe('{ $plain: "7" }')
+    expect(valueLines({ $$$plain: '7' })).toBe('{ $$plain: "7" }')
+    expect(valueLines({ $$plain: '7', other: 'x' })).toBe('{ $$plain: "7", other: "x" }')
+    expect(valueLines({ $plain: '7' })).toBe('7')
   })
 
   it('writes a link by the file name where that reaches only the note, else by its id', () => {

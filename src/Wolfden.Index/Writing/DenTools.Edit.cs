@@ -99,10 +99,13 @@ public sealed partial class DenTools
             YamlScalar { Style: YamlScalarStyle.Plain } s when YamlScalarValue.IsPlainNonString(s.Text) => new Dictionary<string, string> { ["$plain"] = s.Text },
             YamlScalar s => s.Text,
             YamlSequence l => l.Items.Select(Plain).ToList(),
-            YamlMapping m => m.Entries.Where(e => e.KeyText is not null).GroupBy(e => e.KeyText!).ToDictionary(
-                g => m.Entries.Count == 1 && IsPlainKey(g.Key) ? "$" + g.Key : g.Key, g => Plain(g.First().Value)),
+            YamlMapping m => Escaped(m.Entries.Where(e => e.KeyText is not null).GroupBy(e => e.KeyText!).ToDictionary(g => g.Key, g => Plain(g.First().Value))),
             _ => null,
         };
+
+        // Counted as sent, once keys that aren't text are left out and repeats are taken once.
+        static Dictionary<string, object?> Escaped(Dictionary<string, object?> map) =>
+            map.Count == 1 && map.Keys.Single() is var key && IsPlainKey(key) ? new() { ["$" + key] = map[key] } : map;
     }
 
     /// <summary>True for <c>$plain</c>, <c>$$plain</c>, and so on: the key of a plain value as written, or one escaped.</summary>

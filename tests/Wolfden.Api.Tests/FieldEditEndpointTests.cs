@@ -485,6 +485,20 @@ public class FieldEditEndpointTests
     }
 
     [Fact]
+    [Trait("Scenario", "SC-WEB-60")]
+    public async Task APlainKeyLeftAloneOnceOthersAreDroppedIsStillEscaped()
+    {
+        // Counted as sent (#249 review): a key that isn't text is left out, so $plain is the only key sent.
+        // (A repeated key makes the file unreadable, so that case never gets this far.)
+        using var den = NewDen();
+        den.Write(BoxPath, Box.Replace("  weight: 12.50\n", "  weight: 12.50\n  x_odd:\n    $plain: \"7\"\n    ? [a]\n    : b\n", StringComparison.Ordinal));
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+
+        var fields = (await SourceAsync(server)).GetProperty("fields").EnumerateArray().ToDictionary(f => f.GetProperty("name").GetString()!, f => f.GetProperty("value"));
+        Assert.Equal("""{"$$plain":"7"}""", fields["x_odd"].GetRawText());
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-WEB-61")]
     public async Task RemovingAnItemWithACommentSaysTheCommentWent()
     {

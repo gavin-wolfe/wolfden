@@ -672,7 +672,10 @@ export function valueLines(value: Json | undefined): string {
     }
 
     if (isObject(v)) {
-      return `{ ${Object.entries(v).map(([k, x]) => `${k}: ${flow(x)}`).join(', ')} }`
+      // A mapping whose only key is $plain comes as { $$plain: … }: show the key the file has.
+      const entries = Object.entries(v)
+      const shown = (k: string) => (entries.length === 1 && /^\$\$+plain$/.test(k) ? k.slice(1) : k)
+      return `{ ${entries.map(([k, x]) => `${shown(k)}: ${flow(x)}`).join(', ')} }`
     }
 
     return v === null ? '~' : typeof v === 'string' ? JSON.stringify(v) : isPlainValue(v) ? v.$plain : String(v)

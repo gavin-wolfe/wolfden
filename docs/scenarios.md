@@ -745,9 +745,12 @@ inherits the default.
 - Past five chapters, it names the first five and counts the rest:
   "after chapters ember:1, ember:2, ember:3, ember:4, ember:5 and 3
   more". Fixing the one default fixes them all.
+- If it runs ahead of just one chapter, the warning names that chapter:
+  "after chapter ember:1, which inherits this default".
 
 Spec: types.md F-CHAP-4, F-LINK-13. Covered by:
 `LinkCheckTests.ADefaultIsOneSpoilerWarningThatNamesItsChapters`,
+`LinkCheckTests.ADefaultAheadOfOneChapterNamesItInTheSingular`,
 `LinkCheckTests.ADefaultAheadOfMoreThanFiveChaptersNamesTheFirstFive`.
 
 ## RT: saving a note keeps what the writer wrote

@@ -19,7 +19,10 @@
 # if it hasn't exited after 60 seconds, a limit built into xUnit. On a busy
 # Windows runner that can be missed. The adapter then reports
 # "Catastrophic failure ... Test process did not respond within 60 seconds"
-# for that assembly, and runs none of its tests. If that's the only thing
+# for that assembly, and runs none of its tests. The same start-up question can
+# also fail with "Test process did not return valid JSON", when xUnit's own
+# "Waiting 10 seconds for foreground threads to exit..." line lands after the
+# answer (#275). If that's the only thing
 # wrong (every other test project ran and passed), those assemblies are run
 # again once, on their own. Anything else fails the run as it is.
 #
@@ -46,8 +49,8 @@ $status = $LASTEXITCODE
 if ($status -eq 0) { exit 0 }
 
 $text = Get-Content $log
-$probe = 'Catastrophic failure: System.InvalidOperationException: Test process did not respond within 60 seconds'
-$missed = @($text | Select-String -Pattern "([A-Za-z0-9_.]+): $([regex]::Escape($probe))" |
+$probe = 'Catastrophic failure: System\.InvalidOperationException: Test process did not (respond within 60 seconds|return valid JSON)'
+$missed = @($text | Select-String -Pattern "([A-Za-z0-9_.]+): $probe" |
     ForEach-Object { $_.Matches[0].Groups[1].Value } | Sort-Object -Unique)
 if ($missed.Count -eq 0) { exit $status }
 
@@ -65,11 +68,11 @@ if ($started -ne $expected -or ($passed + $missed.Count) -ne $expected -or $cata
 foreach ($name in $missed) {
     $project = "tests/$name/$name.csproj"
     if (-not (Test-Path $project)) {
-        Write-Output "::error::$name missed xUnit's 60-second start-up check, and $project isn't there to run again."
+        Write-Output "::error::$name failed xUnit's start-up check, and $project isn't there to run again."
         exit $status
     }
 
-    Write-Output "::warning::$name didn't answer xUnit's 60-second start-up check, so none of its tests ran. Running it again on its own (#248)."
+    Write-Output "::warning::$name failed xUnit's start-up check, so none of its tests ran. Running it again on its own (#248)."
     dotnet test $project @testArgs 2>&1 | ForEach-Object { "$_" } | Tee-Object -FilePath $log -Append
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }

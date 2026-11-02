@@ -59,7 +59,7 @@ public sealed class NewCommandTests : IDisposable
         // Every type's template makes a note that check passes, in its own folder.
         foreach (var (type, folder) in new[]
         {
-            ("star-system", "star-systems"), ("planet", "planets"), ("settlement", "settlements"), ("species", "species"),
+            ("star-system", "star-systems"), ("world", "worlds"), ("settlement", "settlements"), ("species", "species"),
             ("polity", "polities"), ("ship-class", "ship-classes"), ("technology", "technologies"),
         })
         {

@@ -89,7 +89,7 @@ public class KindOfEndpointTests
 
         var setting = book.GetProperty("fieldTypes").EnumerateArray().Single(f => f.GetProperty("name").GetString() == "setting");
         Assert.Equal(["location"], Strings(setting.GetProperty("to")));
-        Assert.Equal(["location", "planet", "settlement", "ship", "star-system"], Strings(setting.GetProperty("accepts")));
+        Assert.Equal(["location", "settlement", "ship", "star-system", "world"], Strings(setting.GetProperty("accepts")));
     }
 
     /// <summary>The name and own type of each note in a place: every kind of location, by every route, and a character beside them.</summary>
@@ -106,8 +106,7 @@ public class KindOfEndpointTests
     };
 
     /// <summary>
-    /// The space opera pack and a den-local one: a moon is a world, so a chain (the
-    /// den's own world, so this holds whichever types the pack names); a sentient ship is a ship and a character, so several parents; an orbital
+    /// The space opera pack and a den-local one: a moon is a world, so a chain; a sentient ship is a ship and a character, so several parents; an orbital
     /// habitat is a ship and a settlement, so a diamond with location at its top.
     /// Each note holds the word "waymark", which nothing in the sample does.
     /// </summary>
@@ -116,7 +115,6 @@ public class KindOfEndpointTests
         var den = TempDen.Dracula();
         den.Write("den.yaml", den.Read("den.yaml") + "packs: [space-opera, starfall]\n");
         den.Write("packs/starfall/pack.yaml", "name: Starfall\n");
-        den.Write("packs/starfall/types/world.yaml", "name: World\nplural: worlds\nkind_of: location\n");
         den.Write("packs/starfall/types/moon.yaml", "name: Moon\nplural: moons\nkind_of: world\n");
         den.Write("packs/starfall/types/sentient-ship.yaml", "name: Sentient Ship\nplural: sentient-ships\nkind_of: [ship, character]\n");
         den.Write("packs/starfall/types/orbital-habitat.yaml", "name: Orbital Habitat\nplural: orbital-habitats\nkind_of: [ship, settlement]\n");

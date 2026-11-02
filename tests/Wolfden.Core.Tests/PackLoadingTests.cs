@@ -183,19 +183,19 @@ public class PackLoadingTests
         var den = DenStructure.Load(Den("starfall",
             ("packs/starfall/pack.yaml", "name: Starfall\n"),
             ("packs/starfall/extensions/location.yaml", "name: Place\nfields:\n  climate: text\n"),
-            ("packs/starfall/extensions/planet.yaml", "fields:\n  gravity: number\n")));
+            ("packs/starfall/extensions/world.yaml", "fields:\n  gravity: number\n")));
 
         // F-TYPE-6: an extension can't rename a type, so the file is excluded.
         // F-TYPE-7: an extension of a type that isn't enabled is ignored.
         Assert.Equal(
             [
                 ("packs/starfall/extensions/location.yaml", "F-TYPE-6", DiagnosticSeverity.Error, (int?)1),
-                ("packs/starfall/extensions/planet.yaml", "F-TYPE-7", DiagnosticSeverity.Warning, null),
+                ("packs/starfall/extensions/world.yaml", "F-TYPE-7", DiagnosticSeverity.Warning, null),
             ],
             Rules(den));
         Assert.Null(den.Types.Find("location")!.FindField("climate"));
         Assert.Equal("Location", den.Types.Find("location")!.Name);
-        Assert.Null(den.Types.Find("planet"));
+        Assert.Null(den.Types.Find("world"));
         Assert.True(den.IsLoaded);
     }
 

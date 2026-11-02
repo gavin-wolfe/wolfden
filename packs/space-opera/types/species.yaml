@@ -9,7 +9,7 @@ fields:
     description: What sort of life it is, such as a hive mind or a machine.
   homeworld:
     type: ref
-    to: [planet, location]
+    to: [world, location]
     description: The world it comes from.
   lifespan:
     type: text

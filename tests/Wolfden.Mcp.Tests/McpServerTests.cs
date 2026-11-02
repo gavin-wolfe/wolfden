@@ -90,8 +90,6 @@ public sealed class McpServerTests : IAsyncLifetime
     {
         _den.Write("den.yaml", _den.Read("den.yaml") + "packs: [space-opera, starfall]\n");
         _den.Write("packs/starfall/pack.yaml", "name: Starfall\n");
-        // The den's own world, so this holds whichever types the pack names.
-        _den.Write("packs/starfall/types/world.yaml", "name: World\nplural: worlds\nkind_of: location\n");
         _den.Write("packs/starfall/types/moon.yaml", "name: Moon\nplural: moons\nkind_of: world\n");
         _den.Write("universes/dracula/entities/worlds/vesta.md", "---\ntype: world\nname: Vesta\nstatus: canon\n---\n# Vesta\n");
         _den.Write("universes/dracula/entities/moons/little-vesta.md", "---\ntype: moon\nname: Little Vesta\nstatus: canon\n---\n# Little Vesta\n");

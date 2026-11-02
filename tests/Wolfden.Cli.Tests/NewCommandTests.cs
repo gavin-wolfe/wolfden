@@ -26,6 +26,54 @@ public sealed class NewCommandTests : IDisposable
         den.All(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '.' or '/' or '\\' or ':' or '-') ? den : $"\"{den.TrimEnd('\\')}\"";
 
     [Fact]
+    [Trait("Scenario", "SC-CHECK-45")]
+    public void WithoutThePackAHandWrittenShipIsAnUnknownType()
+    {
+        _den.Write("universes/dracula/entities/ships/lantern.md", "---\nid: 01M4TF5F0EKGGWD5FNVBAEY9A2\ntype: ship\nname: Lantern\nstatus: draft\n---\n");
+
+        var without = Cli.Run(["check", "--den", _den.Root]);
+        Assert.Contains("unknown type 'ship'", without.Output, StringComparison.Ordinal);
+
+        _den.Write("den.yaml", _den.Read("den.yaml") + "packs: [space-opera]\n");
+        var withPack = Cli.Run(["check", "--den", _den.Root]);
+        Assert.DoesNotContain("unknown type 'ship'", withPack.Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-CHECK-45")]
+    public void AShipNeedsTheSpaceOperaPackAndThenComesFromItsTemplate()
+    {
+        // Without the pack, there's no such type to make one from.
+        Assert.NotEqual(CliApp.ExitOk, New("ship", "Lantern").ExitCode);
+
+        _den.Write("den.yaml", _den.Read("den.yaml") + "packs: [space-opera]\n");
+        var (exitCode, _, error) = New("ship", "Lantern");
+
+        Assert.Equal(CliApp.ExitOk, exitCode);
+        Assert.Empty(error);
+        var text = _den.Read("universes/dracula/entities/ships/lantern.md");
+        Assert.Contains("type: ship\nname: Lantern\nstatus: draft\nfields:\n  class:\n  captain:\n  owner:\n  location:\n  condition:\n", text, StringComparison.Ordinal);
+        Assert.Contains("# Lantern\n\n## Overview\n", text, StringComparison.Ordinal);
+        Assert.Contains("## Service history\n", text, StringComparison.Ordinal);
+
+        // Every type's template makes a note that check passes, in its own folder.
+        foreach (var (type, folder) in new[]
+        {
+            ("star-system", "star-systems"), ("planet", "planets"), ("settlement", "settlements"), ("species", "species"),
+            ("polity", "polities"), ("ship-class", "ship-classes"), ("technology", "technologies"),
+        })
+        {
+            Assert.Equal(CliApp.ExitOk, New(type, "Kessan").ExitCode);
+            Assert.True(_den.Exists($"universes/dracula/entities/{folder}/kessan.md"), type);
+        }
+
+        var check = Cli.Run(["check", "--den", _den.Root]);
+        Assert.Equal(CliApp.ExitOk, check.ExitCode);
+        Assert.DoesNotContain("entities/ships/", check.Output, StringComparison.Ordinal);
+        Assert.DoesNotContain("kessan", check.Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-CLI-15")]
     public void ANewNoteComesFromItsTemplateInTheUniverseWithANewId()
     {

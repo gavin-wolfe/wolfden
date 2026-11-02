@@ -1,0 +1,26 @@
+name: Star System
+plural: star-systems
+description: A star or group of stars, with whatever orbits them.
+fields:
+  part_of:
+    type: ref
+    to: location
+    description: The larger region it's in, such as a sector or a reach.
+  stars:
+    type: text
+    description: What the planets circle, such as a red dwarf or a binary pair.
+  controlled_by:
+    type: ref
+    to: [polity, faction]
+    temporal: true
+    description: The polity or group that holds it.
+sections:
+  - name: Overview
+    description: What the system is and why it matters, in a paragraph.
+  - name: Description
+    description: Its stars, worlds, and hazards.
+  - name: Routes
+    description: How ships get here, and where they can go next.
+  - name: History
+    description: What happened here before and during the story.
+template: star-system.md

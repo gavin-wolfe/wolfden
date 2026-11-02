@@ -239,14 +239,14 @@ link, optionally to given types), and `position`, each optionally a `list`.
 `default` are available. Every type also has the `row` and `placeholder`
 fields.
 
-**Planned packs:**
+**Packs:**
 
 - **core** (always on): character, location, faction, item, event, thread
   (a plot thread with planted and paid-off positions), idea, note
   (free-form).
-- **space-opera**: star-system, planet, settlement, species, polity,
-  ship-class, ship, technology.
-- **epic-fantasy**: realm, magic-system, creature, deity, artifact, order.
+- **space-opera** (built in, enabled in `den.yaml`): star-system, planet,
+  settlement, species, polity, ship-class, ship, technology.
+- **epic-fantasy** (planned): realm, magic-system, creature, deity, artifact, order.
 
 Dens can define their own types in `packs/`, or extend any enabled type
 by adding fields, sections, or a template (`extensions/`). Extensions

@@ -753,6 +753,64 @@ Spec: types.md F-CHAP-4, F-LINK-13. Covered by:
 `LinkCheckTests.ADefaultAheadOfOneChapterNamesItInTheSingular`,
 `LinkCheckTests.ADefaultAheadOfMoreThanFiveChaptersNamesTheFirstFive`.
 
+### SC-CHECK-45. I write space opera and turn on the pack
+
+The writer adds `packs: [space-opera]` to `den.yaml`, then makes the
+*Lantern* with `wolfden new ship "Lantern"`, and notes for its class, its
+captain, and the planets and star systems it visits. A moon's `part_of`
+links to its planet. By mistake, one ship's `class` links to a character.
+
+- Before the line is added, `wolfden new ship` is refused, and a
+  hand-written `type: ship` is an unknown type (F-ENT-2).
+- With it, the pack loads after core with no diagnostics, and each of the
+  eight types has its folder, template, fields, and sections. A new note
+  from any of the templates passes `wolfden check`.
+- Links between the types get no warnings. A `location` or a `faction`
+  is accepted wherever the pack's fields link to a place or a group.
+- The `class` that links to a character gets the F-LINK-11 warning:
+  `class` is a ref to ship-class.
+- A den that doesn't list the pack is unchanged.
+
+Spec: types.md F-PACK-4, F-PACK-7, F-SPACE-1 (#32). Covered by:
+`SpaceOperaPackTests.ListingThePackInDenYamlEnablesItAfterCore`,
+`SpaceOperaPackTests.ADenThatDoesntListThePackDoesntHaveItsTypes`,
+`SpaceOperaPackTests.TheTypesLinkToOneAnotherWithoutWarnings`,
+`SpaceOperaPackTests.ALinkToTheWrongKindOfNoteIsTheUsualWarning`,
+`NewCommandTests.AShipNeedsTheSpaceOperaPackAndThenComesFromItsTemplate`,
+`NewCommandTests.WithoutThePackAHandWrittenShipIsAnUnknownType`.
+
+### SC-CHECK-46. A chapter is set on a planet
+
+With the pack on, the writer sets `setting: "[[vesta]]"` on a chapter,
+where Vesta is a `planet`.
+
+- `setting` is core's ref to location, so it gets the F-LINK-11 warning.
+  The link still resolves.
+- If the den's own pack redefines `setting` to take planets, the link gets
+  no warning, and the den has one F-CHAP-2 clash warning on its own
+  `chapter.yaml`.
+
+Spec: types.md F-SPACE-2, F-TYPE-8, F-PACK-11 (#32). Covered by:
+`SpaceOperaPackTests.ACoreFieldStillAsksForACoreType`,
+`SpaceOperaPackTests.ADensOwnPackCanWidenACoreRefToThePacksTypes`.
+
+### SC-CHECK-47. My den had its own ship before the pack
+
+The writer's den already defines a `ship` type in its own pack, then turns
+on `space-opera`. Another den extends the pack's `ship` and core's
+`character`, and a third has a folder `packs/space-opera/` of its own.
+
+- The den's `ship` is still used, with the F-TYPE-4 warning on the den's
+  file. Its notes mean what they meant.
+- An extension adds its fields after the pack's, with no diagnostics.
+- The folder shadows the built-in pack, with the F-PACK-10 warning, so
+  only its own types exist.
+
+Spec: types.md F-TYPE-4, F-TYPE-8, F-PACK-10, §10 (#32). Covered by:
+`SpaceOperaPackTests.ADensOwnShipWinsOverThePacks`,
+`SpaceOperaPackTests.ADenCanExtendAPackTypeAndCharacters`,
+`SpaceOperaPackTests.ADenLocalPackNamedSpaceOperaShadowsTheBuiltInOne`.
+
 ## RT: saving a note keeps what the writer wrote
 
 Background: the files are the writer's, and Wolfden is only one of the
@@ -4925,3 +4983,14 @@ Spec: design.md §9 ("Adding images", #187). Covered by:
 `ImageEndpointTests.AFileNamedImagesBesideTheNoteIsAConflictThatSaysWhatToRename`,
 `AddImageTests.AFileMadeMeanwhileByAnotherProgramIsKeptAndTheImageTakesTheNextName` (MCP),
 `ImageFileTests` (core), `EditorImages.test.tsx` (web).
+
+### SC-WEB-82. The list of a pack's notes reads right
+
+With the space opera pack on, the contents tree and the universe page list
+the writer's notes by type.
+
+- The lists are headed "Star systems", "Planets", "Settlements", "Species",
+  "Polities", "Ship classes", "Ships", and "Technologies". "Species" is its
+  own plural.
+
+Spec: types.md F-SPACE-1 (#32). Covered by: `web/src/typePlural.test.ts`.

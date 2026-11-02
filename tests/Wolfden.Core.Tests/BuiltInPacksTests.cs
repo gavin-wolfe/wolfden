@@ -24,7 +24,7 @@ public class BuiltInPacksTests
 
         Assert.Equal(onDisk, BuiltInPacks.Instance.Files);
         Assert.All(onDisk, f => Assert.Equal(File.ReadAllBytes(Path.Combine(packs, f)), BuiltInPacks.Instance.ReadFile(f)));
-        Assert.Equal(["core"], BuiltInPacks.Instance.Keys);
+        Assert.Equal(["core", "space-opera"], BuiltInPacks.Instance.Keys);
     }
 
     [Fact]

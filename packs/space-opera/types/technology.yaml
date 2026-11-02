@@ -1,0 +1,35 @@
+name: Technology
+plural: technologies
+description: >-
+  A technology the story depends on: a star drive, a relay network, a
+  weapon. Its rules go here, so that the story keeps to them.
+fields:
+  kind:
+    type: text
+    description: What sort of thing it is, such as a drive or a weapon.
+  created_by:
+    type: ref
+    to: [character, species, polity, faction]
+    description: Who invented it.
+  controlled_by:
+    type: ref
+    to: [polity, faction]
+    temporal: true
+    description: The polity or group that holds it, if it isn't common to all.
+  introduced:
+    type: date
+    description: When it came into use, in-world.
+sections:
+  - name: Overview
+    description: What it is and what it does, in a paragraph.
+  - name: How it works
+    description: How it works, as far as the story needs to say.
+  - name: Limits
+    description: What it can't do, and what it costs to use.
+  - name: Consequences
+    description: What it changed about how people live and fight.
+  - name: History
+    description: Where it came from and how it spread.
+  - name: Open questions
+    description: What isn't decided about it yet.
+template: technology.md

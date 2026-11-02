@@ -1,0 +1,37 @@
+name: Polity
+plural: polities
+description: >-
+  A state that holds territory: an empire, a republic, a league of worlds.
+  The places it holds name it in their `controlled_by` field. A group
+  without territory is a faction.
+fields:
+  government:
+    type: text
+    temporal: true
+    description: How it's ruled, such as a republic or a military junta.
+  leader:
+    type: ref
+    to: character
+    temporal: true
+    description: Who leads it.
+  capital:
+    type: ref
+    to: [planet, settlement, location]
+    temporal: true
+    description: The seat of its government.
+  part_of:
+    type: ref
+    to: [polity, faction]
+    description: The larger state or alliance it belongs to.
+sections:
+  - name: Overview
+    description: What the state is, in a paragraph.
+  - name: Government
+    description: Who holds power, and how they got it.
+  - name: Goals
+    description: What it wants, at home and from its neighbors.
+  - name: Military
+    description: What force it can bring, and where.
+  - name: History
+    description: Where it came from and how it has changed.
+template: polity.md

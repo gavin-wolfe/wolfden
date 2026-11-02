@@ -1,0 +1,41 @@
+name: Ship
+plural: ships
+description: >-
+  One ship. Its `class` field links to its ship class, which holds what's
+  true of every ship of that design.
+fields:
+  class:
+    type: ref
+    to: ship-class
+    description: The design it was built to.
+  captain:
+    type: ref
+    to: character
+    temporal: true
+    description: Who commands it.
+  owner:
+    type: ref
+    to: [character, polity, faction]
+    temporal: true
+    description: Who it belongs to.
+  location:
+    type: ref
+    to: [star-system, planet, settlement, location]
+    temporal: true
+    description: Where it is.
+  condition:
+    type: text
+    temporal: true
+    description: The state it's in, such as "in service", "damaged", or "lost".
+sections:
+  - name: Overview
+    description: What the ship is and why it matters, in a paragraph.
+  - name: Description
+    description: What sets it apart from others of its class.
+  - name: Crew
+    description: >-
+      Who serves aboard. Crew without a page of their own, and the posts
+      people hold.
+  - name: Service history
+    description: Where it has been and what it has done.
+template: ship.md

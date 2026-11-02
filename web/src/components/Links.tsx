@@ -11,10 +11,10 @@ export function EntityLink({ universe, entityKey, className, children }: { unive
   )
 }
 
-/** "character" → "Characters", for a group of entities of one type. */
+/** "character" → "Characters", for a group of entities of one type. "species" is its own plural. */
 export function typePlural(type: string): string {
   const word = type.replace(/[-_]/g, ' ')
-  const plural = /(s|x|z|ch|sh)$/.test(word) ? `${word}es` : /[^aeiou]y$/.test(word) ? `${word.slice(0, -1)}ies` : `${word}s`
+  const plural = /species$/.test(word) ? word : /(s|x|z|ch|sh)$/.test(word) ? `${word}es` : /[^aeiou]y$/.test(word) ? `${word.slice(0, -1)}ies` : `${word}s`
   return plural.charAt(0).toUpperCase() + plural.slice(1)
 }
 

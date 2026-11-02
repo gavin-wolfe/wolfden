@@ -106,8 +106,8 @@ Set things up in this order. Each step builds on the ones before it.
 ## Making a new note
 
 In `wolfden serve`, choose **New ▾** in the top bar and pick a type:
-character, location, event, and so on, plus any types your den's own
-packs add. There are two shortcuts that fill in the place for you:
+character, location, event, and so on, plus any types from
+[packs](#adding-a-genre-pack) your den turns on. There are two shortcuts that fill in the place for you:
 
 - **New note ▾** on a universe's, series', or book's page. It lists every
   type, including ones that place has no notes of yet, so a book you've
@@ -164,6 +164,77 @@ the note in the universe, when your den has one. `--from` is optional,
 and has to be a chapter (or book) your universe has: a typo is refused
 rather than making a note no view shows. Edits are checked the same way
 ([Editing fields](#editing-fields)).
+
+## Adding a genre pack
+
+Every den has the core types: character, location, faction, item, event,
+thread, idea, and note. A **pack** adds types for a genre. Wolfden comes
+with one so far, `space-opera`. Turn it on with a line in `den.yaml`:
+
+```yaml
+packs: [space-opera]
+```
+
+The new types then show up everywhere the core ones do: under **New ▾**, in
+`wolfden new ship "Lantern"`, and to AI assistants. Nothing else in your
+den changes, and notes you've written stay as they are.
+
+| Type | Use it for | Fields | Folder |
+|---|---|---|---|
+| Star System | A star or group of stars | `part_of`, `stars`, `controlled_by` | `star-systems` |
+| Planet | Any world, including a moon | `part_of`, `kind`, `population`, `controlled_by` | `planets` |
+| Settlement | A city, colony, station, or outpost | `part_of`, `kind`, `population`, `controlled_by` | `settlements` |
+| Species | A kind of being | `kind`, `homeworld`, `lifespan`, `population` | `species` |
+| Polity | A state that holds territory | `government`, `leader`, `capital`, `part_of` | `polities` |
+| Ship Class | A design that ships are built to | `role`, `builder`, `crew`, `technologies` | `ship-classes` |
+| Ship | One ship | `class`, `captain`, `owner`, `location`, `condition` | `ships` |
+| Technology | A drive, a weapon, a network: anything with rules the story has to keep | `kind`, `created_by`, `controlled_by`, `introduced` | `technologies` |
+
+**The types link to each other.** A ship's `class` links to its ship
+class, a settlement's `part_of` to its planet, a planet's `part_of` to its
+star system (or, for a moon, to its planet), and a star system's `part_of`
+to a region, which is a core location. What's true of every ship of a
+design goes on the ship class, and what sets one ship apart goes on the
+ship:
+
+```yaml
+---
+type: ship
+name: Lantern
+status: canon
+fields:
+  class: "[[survey-cutter]]"
+  captain: "[[ilse-tarrow]]"
+  location:
+    - { value: "[[kessan-reach]]", from: "ember:1" }
+    - { value: "[[velari-prime]]", from: "ember:20" }
+  condition: in service
+---
+```
+
+Fields that change over a story, such as `captain`, `location`,
+`controlled_by`, or `population`, can have a value for each stretch of it,
+so a view at a chapter shows the one true by then. `kind`, `population`,
+and `condition` are plain words of your own, such as `moon`, `about 40
+million`, or `damaged`, rather than a fixed list.
+
+**A character's species** is the character's own `species` field, which
+can link to the species' note: `species: "[[velari]]"`.
+
+**Polity or faction?** A polity is a state with territory: the places it
+holds name it in their `controlled_by`. A group without territory, such
+as a crew, a guild, or a rebel cell, is a core faction. **Settlement or
+location?** A settlement is a whole place people live. A place within it,
+such as a dock or a bar, is a core location.
+
+**Ranks and postings** aren't in the pack, since not every story has
+them. To add them, or anything else, extend the type from your den's own
+pack ([types.md §4](types.md#4-extensions-and-combining-packs) and
+[§10](types.md#10-appendix-a-den-local-pack)).
+
+The full list is in [types.md §11](types.md#11-the-space-opera-pack). Core
+links that want a location or a faction don't know about these types yet:
+see [the gotcha under Links](#links).
 
 ## Adding series and books
 
@@ -983,6 +1054,16 @@ in it, which Wolfden calls a checkpoint.
 - **Links don't cross universes.** A link reaches only notes in its own
   universe. `wolfden check` says when a broken link matches a note in
   another one.
+- **A chapter's `setting` warns when it's a planet.** With the
+  [space opera pack](#adding-a-genre-pack), core fields that link to a
+  location or a faction still ask for just that: a chapter's `setting`,
+  an event's or item's `location`, a faction's `base`, a location's
+  `part_of`, a character's `factions`, and a few others. Linking one to a
+  planet, a settlement, or a polity gets a warning from `wolfden check`
+  ("setting is a ref to location"). The link still works, so you can
+  ignore it. To stop it, either keep the place as a location note, or
+  redefine the field in your den's own pack, as
+  [types.md F-SPACE-2](types.md#11-the-space-opera-pack) shows.
 
 ### Books and freezing
 

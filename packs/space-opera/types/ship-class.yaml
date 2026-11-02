@@ -1,0 +1,31 @@
+name: Ship Class
+plural: ship-classes
+description: >-
+  A design that ships are built to. What's true of every ship of the class
+  goes here, and each ship's `class` field links here.
+fields:
+  role:
+    type: text
+    description: What it's built for, such as survey work or escort duty.
+  builder:
+    type: ref
+    to: [polity, faction]
+    description: Who designs or builds it.
+  crew:
+    type: text
+    description: How many it takes to run one, such as "140" or "a dozen at most".
+  technologies:
+    type: ref
+    to: technology
+    list: true
+    description: The technology it depends on.
+sections:
+  - name: Overview
+    description: What the class is, in a paragraph.
+  - name: Design
+    description: What these ships look like, and how they're laid out.
+  - name: Capabilities
+    description: What they can and can't do, such as speed, range, and weapons.
+  - name: History
+    description: Where the design came from and how it has served.
+template: ship-class.md

@@ -1,15 +1,19 @@
-name: Planet
-plural: planets
-description: A world of any kind, including a moon.
+name: World
+plural: worlds
+description: >-
+  A planet, moon, asteroid, or gas giant: a body in space that people can
+  live on, visit, or build around.
 kind_of: location
 fields:
   part_of:
     type: ref
-    to: [star-system, planet, location]
-    description: The star system it's in, or the planet a moon circles.
+    to: [star-system, world, location]
+    description: The star system it's in, or the world a moon circles.
   kind:
     type: text
-    description: What sort of world it is, such as an ocean world or a moon.
+    description: >-
+      What sort of world it is, such as an ocean planet, a moon, an asteroid,
+      or a gas giant.
   population:
     type: text
     temporal: true
@@ -30,4 +34,4 @@ sections:
     description: Who lives here and how they get by.
   - name: History
     description: What happened here before and during the story.
-template: planet.md
+template: world.md

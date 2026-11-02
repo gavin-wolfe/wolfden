@@ -21,7 +21,7 @@ fields:
     description: Who it belongs to.
   location:
     type: ref
-    to: [star-system, planet, settlement, location]
+    to: [star-system, world, settlement, location]
     temporal: true
     description: Where it is.
   condition:

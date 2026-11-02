@@ -780,8 +780,9 @@ Spec: types.md F-CHAP-4, F-LINK-13. Covered by:
 
 The writer adds `packs: [space-opera]` to `den.yaml`, then makes the
 *Lantern* with `wolfden new ship "Lantern"`, and notes for its class, its
-captain, and the planets and star systems it visits. A moon's `part_of`
-links to its planet. By mistake, one ship's `class` links to a character.
+captain, and the worlds and star systems it visits. A moon's `part_of`
+links to the world it circles. By mistake, one ship's `class` links to a
+character.
 
 - Before the line is added, `wolfden new ship` is refused, and a
   hand-written `type: ship` is an unknown type (F-ENT-2).
@@ -790,7 +791,9 @@ links to its planet. By mistake, one ship's `class` links to a character.
   from any of the templates passes `wolfden check`.
 - Links between the types get no warnings. A `location` or a `faction`
   is accepted wherever the pack's fields link to a place or a group.
-- A star system, planet, settlement, and ship are kinds of location, and a
+- A moon's `part_of` can link to a world with `kind: gas giant`, and a
+  fuel-mining platform's `part_of` to that same gas giant, with no warnings.
+- A star system, world, settlement, and ship are kinds of location, and a
   polity is a kind of faction. A species, ship class, and technology are
   kinds of nothing.
 - The `class` that links to a character gets the F-LINK-11 warning:
@@ -801,24 +804,25 @@ Spec: types.md F-PACK-4, F-PACK-7, F-SPACE-1 (#32). Covered by:
 `SpaceOperaPackTests.ListingThePackInDenYamlEnablesItAfterCore`,
 `SpaceOperaPackTests.ADenThatDoesntListThePackDoesntHaveItsTypes`,
 `SpaceOperaPackTests.TheTypesLinkToOneAnotherWithoutWarnings`,
+`SpaceOperaPackTests.AGasGiantIsAWorldThatMoonsAndSettlementsCanLinkTo`,
 `SpaceOperaPackTests.ALinkToTheWrongKindOfNoteIsTheUsualWarning`,
 `SpaceOperaPackTests.ThePacksPlacesAreLocationsAndItsPolitiesAreFactions`,
 `NewCommandTests.AShipNeedsTheSpaceOperaPackAndThenComesFromItsTemplate`,
 `NewCommandTests.WithoutThePackAHandWrittenShipIsAnUnknownType`.
 
-### SC-CHECK-46. A chapter is set on a planet
+### SC-CHECK-46. A chapter is set on a world
 
 With the pack on, the writer sets `setting: "[[vesta]]"` on a chapter,
-where Vesta is a `planet`. Other chapters are set on a settlement and a
+where Vesta is a `world`. Other chapters are set on a settlement and a
 ship. A character's `factions` links to a polity, and a location's
 `part_of` links to a settlement. By mistake, one chapter's `setting` links
 to a character, and another's to a species.
 
-- The planet, the settlement, the ship, and the polity get no warning: core
+- The world, the settlement, the ship, and the polity get no warning: core
   fields take the pack's kinds of their types, with nothing to redefine.
 - The two mistakes get the F-LINK-11 warning, which says what's accepted:
-  `setting` is a ref to location or a kind of it (planet, settlement, ship,
-  star-system). In a den without the pack, it says only location.
+  `setting` is a ref to location or a kind of it (settlement, ship,
+  star-system, world). In a den without the pack, it says only location.
 - If the den's own pack still redefines `setting`, its definition is used,
   with one F-CHAP-2 clash warning on its own `chapter.yaml`.
 - A character's `factions` and a faction's `part_of`, redefined in the
@@ -853,13 +857,13 @@ Spec: types.md F-TYPE-4, F-TYPE-8, F-PACK-10, §10 (#32). Covered by:
 
 ### SC-CHECK-48. My own type is a kind of another
 
-The writer's den has a pack of its own. Its `moon` is `kind_of: planet`, and
+The writer's den has a pack of its own. Its `moon` is `kind_of: world`, and
 its `sentient-ship` is `kind_of: [ship, character]`, the POV and the setting
 of the same chapter. Another type reaches one ancestor by two routes, and
 an extension gives the pack's `ship` a second parent.
 
-- A moon is accepted wherever a planet or a location is: it follows the
-  chain. A location isn't accepted where a field names only `planet`, and
+- A moon is accepted wherever a world or a location is: it follows the
+  chain. A location isn't accepted where a field names only `world`, and
   nor is a settlement.
 - The sentient ship is accepted by both `pov` and `setting`, with no
   warning.
@@ -880,7 +884,7 @@ Covered by: `TypeKindOfTests.AChainIsFollowedAllTheWayUp`,
 The writer names a parent that doesn't exist, or one from a pack that isn't
 on. Two of their types are each a kind of the other, and a third is a kind
 of itself. Their extension makes core's `location` a kind of the pack's
-`planet`. One `kind_of` is a mapping.
+`world`. One `kind_of` is a mapping.
 
 - `wolfden check` gives an F-TYPE-13 warning on the line of each, and the
   den loads.
@@ -888,7 +892,7 @@ of itself. Their extension makes core's `location` a kind of the pack's
 - Every parent of the den's in a loop is ignored, whichever came first,
   and parents outside the loop still count.
 - The loop through the pack drops only the den's parent, and is reported
-  only on the den's file. A planet is still a location. The same goes for
+  only on the den's file. A world is still a location. The same goes for
   a later release whose new `kind_of` closes a loop with the den's parent.
 - A value that isn't a type key is ignored, and the others in its list
   still count. An empty `kind_of` means no parents, with no warning.
@@ -916,7 +920,7 @@ its folder.
 - The first den's `ship` isn't a location, so a `setting` that links to one
   gets the F-LINK-11 warning. It means what it meant.
 - The second den's is a location.
-- In the third, the pack's planets are kinds of the den's `location`.
+- In the third, the pack's worlds are kinds of the den's `location`.
 - In the fourth, the pack's types lose that parent. One F-TYPE-13 warning
   on the den's `place` file names them, and none on the pack's files.
 
@@ -5171,7 +5175,7 @@ Spec: design.md §9 ("Adding images", #187). Covered by:
 With the space opera pack on, the contents tree and the universe page list
 the writer's notes by type.
 
-- The lists are headed "Star systems", "Planets", "Settlements", "Species",
+- The lists are headed "Star systems", "Worlds", "Settlements", "Species",
   "Polities", "Ship classes", "Ships", and "Technologies". "Species" is its
   own plural.
 

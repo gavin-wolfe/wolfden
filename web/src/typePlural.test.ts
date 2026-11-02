@@ -5,7 +5,7 @@ describe('SC-WEB-82: a list of notes of one type is headed by the type, in the p
   it.each([
     ['character', 'Characters'],
     ['star-system', 'Star systems'],
-    ['planet', 'Planets'],
+    ['world', 'Worlds'],
     ['settlement', 'Settlements'],
     ['species', 'Species'],
     ['polity', 'Polities'],

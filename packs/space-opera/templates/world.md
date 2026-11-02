@@ -1,5 +1,5 @@
 ---
-type: planet
+type: world
 status: draft
 fields:
   part_of:

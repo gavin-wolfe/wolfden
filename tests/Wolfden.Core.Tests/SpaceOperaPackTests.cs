@@ -56,7 +56,7 @@ public class SpaceOperaPackTests
 
     [Theory]
     [InlineData("star-system", "star-systems", "Star System")]
-    [InlineData("planet", "planets", "Planet")]
+    [InlineData("world", "worlds", "World")]
     [InlineData("settlement", "settlements", "Settlement")]
     [InlineData("species", "species", "Species")]
     [InlineData("polity", "polities", "Polity")]
@@ -77,7 +77,7 @@ public class SpaceOperaPackTests
 
     [Theory]
     [InlineData("star-system", "part_of stars controlled_by")]
-    [InlineData("planet", "part_of kind population controlled_by")]
+    [InlineData("world", "part_of kind population controlled_by")]
     [InlineData("settlement", "part_of kind population controlled_by")]
     [InlineData("species", "kind homeworld lifespan population")]
     [InlineData("polity", "government leader capital part_of")]
@@ -91,7 +91,7 @@ public class SpaceOperaPackTests
 
     [Theory]
     [InlineData("star-system", "controlled_by")]
-    [InlineData("planet", "population controlled_by")]
+    [InlineData("world", "population controlled_by")]
     [InlineData("settlement", "population controlled_by")]
     [InlineData("species", "population")]
     [InlineData("polity", "government leader capital part_of")]
@@ -105,7 +105,7 @@ public class SpaceOperaPackTests
 
     [Theory]
     [InlineData("star-system", "Overview|Description|Routes|History")]
-    [InlineData("planet", "Overview|Environment|Society|History")]
+    [InlineData("world", "Overview|Environment|Society|History")]
     [InlineData("settlement", "Overview|Description|Society|History")]
     [InlineData("species", "Overview|Biology|Culture|History")]
     [InlineData("polity", "Overview|Government|Goals|Military|History")]
@@ -128,20 +128,20 @@ public class SpaceOperaPackTests
     [Theory]
     [InlineData("star-system", "part_of", "location")]
     [InlineData("star-system", "controlled_by", "polity faction")]
-    [InlineData("planet", "part_of", "star-system planet location")]
-    [InlineData("planet", "controlled_by", "polity faction")]
-    [InlineData("settlement", "part_of", "planet star-system location")]
+    [InlineData("world", "part_of", "star-system world location")]
+    [InlineData("world", "controlled_by", "polity faction")]
+    [InlineData("settlement", "part_of", "world star-system location")]
     [InlineData("settlement", "controlled_by", "polity faction")]
-    [InlineData("species", "homeworld", "planet location")]
+    [InlineData("species", "homeworld", "world location")]
     [InlineData("polity", "leader", "character")]
-    [InlineData("polity", "capital", "planet settlement location")]
+    [InlineData("polity", "capital", "world settlement location")]
     [InlineData("polity", "part_of", "polity faction")]
     [InlineData("ship-class", "builder", "polity faction")]
     [InlineData("ship-class", "technologies", "technology")]
     [InlineData("ship", "class", "ship-class")]
     [InlineData("ship", "captain", "character")]
     [InlineData("ship", "owner", "character polity faction")]
-    [InlineData("ship", "location", "star-system planet settlement location")]
+    [InlineData("ship", "location", "star-system world settlement location")]
     [InlineData("technology", "created_by", "character species polity faction")]
     [InlineData("technology", "controlled_by", "polity faction")]
     public void RefsLinkToTheTypesTheyName(string key, string field, string to)
@@ -189,8 +189,8 @@ public class SpaceOperaPackTests
             .Entity(Starfall, "kessan-reach", Note("location", "Kessan Reach"), folder: "locations")
             .Entity(Starfall, "ilse-tarrow", Character("Ilse Tarrow", "fields:\n  species: \"[[velari]]\""))
             .Entity(Starfall, "tessaly", Note("star-system", "Tessaly", "  part_of: \"[[kessan-reach]]\"\n  controlled_by: \"[[reach-compact]]\"\n"), folder: "star-systems")
-            .Entity(Starfall, "vesta", Note("planet", "Vesta", "  part_of: \"[[tessaly]]\"\n"), folder: "planets")
-            .Entity(Starfall, "little-vesta", Note("planet", "Little Vesta", "  part_of: \"[[vesta]]\"\n  kind: moon\n"), folder: "planets")
+            .Entity(Starfall, "vesta", Note("world", "Vesta", "  part_of: \"[[tessaly]]\"\n"), folder: "worlds")
+            .Entity(Starfall, "little-vesta", Note("world", "Little Vesta", "  part_of: \"[[vesta]]\"\n  kind: moon\n"), folder: "worlds")
             .Entity(Starfall, "vesta-yards", Note("settlement", "Vesta Yards", "  part_of: \"[[little-vesta]]\"\n"), folder: "settlements")
             .Entity(Starfall, "velari", Note("species", "Velari", "  homeworld: \"[[vesta]]\"\n"), folder: "species")
             .Entity(Starfall, "reach-compact", Note("polity", "Reach Compact", "  leader: \"[[ilse-tarrow]]\"\n  capital: \"[[vesta-yards]]\"\n"), folder: "polities")
@@ -199,6 +199,20 @@ public class SpaceOperaPackTests
             .Entity(Starfall, "lantern", Note("ship", "Lantern", "  class: \"[[survey]]\"\n  captain: \"[[ilse-tarrow]]\"\n  owner: \"[[reach-compact]]\"\n  location: \"[[tessaly]]\"\n  condition: in service\n"), folder: "ships");
 
         // These hand-written notes have no ids yet (F-ID-2), which is all the catalog says.
+        Assert.All(EntityCatalog.Load(source).Diagnostics, d => Assert.Equal("F-ID-2", d.Diagnostic.RuleId));
+        Assert.Empty(LinkIndex.Load(source).Diagnostics);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-CHECK-45")]
+    public void AGasGiantIsAWorldThatMoonsAndSettlementsCanLinkTo()
+    {
+        var source = Space()
+            .Entity(Starfall, "tessaly", Note("star-system", "Tessaly"), folder: "star-systems")
+            .Entity(Starfall, "orrin", Note("world", "Orrin", "  part_of: \"[[tessaly]]\"\n  kind: gas giant\n"), folder: "worlds")
+            .Entity(Starfall, "little-orrin", Note("world", "Little Orrin", "  part_of: \"[[orrin]]\"\n  kind: moon\n"), folder: "worlds")
+            .Entity(Starfall, "orrin-skimmer", Note("settlement", "Orrin Skimmer", "  part_of: \"[[orrin]]\"\n  kind: fuel-mining platform\n"), folder: "settlements");
+
         Assert.All(EntityCatalog.Load(source).Diagnostics, d => Assert.Equal("F-ID-2", d.Diagnostic.RuleId));
         Assert.Empty(LinkIndex.Load(source).Diagnostics);
     }
@@ -220,7 +234,7 @@ public class SpaceOperaPackTests
 
     [Theory]
     [InlineData("star-system", "location")]
-    [InlineData("planet", "location")]
+    [InlineData("world", "location")]
     [InlineData("settlement", "location")]
     [InlineData("ship", "location")]
     [InlineData("polity", "faction")]
@@ -239,10 +253,10 @@ public class SpaceOperaPackTests
     public void CoreFieldsTakeThePacksKindsOfTheirTypes()
     {
         // A pack can't change a core field (F-TYPE-8), and doesn't need to:
-        // a planet is a location, and a polity is a faction (F-TYPE-13).
+        // a world is a location, and a polity is a faction (F-TYPE-13).
         var source = Space()
             .Entity(Starfall, "tessaly", Note("star-system", "Tessaly"), folder: "star-systems")
-            .Entity(Starfall, "vesta", Note("planet", "Vesta"), folder: "planets")
+            .Entity(Starfall, "vesta", Note("world", "Vesta"), folder: "worlds")
             .Entity(Starfall, "vesta-yards", Note("settlement", "Vesta Yards"), folder: "settlements")
             .Entity(Starfall, "lantern", Note("ship", "Lantern"), folder: "ships")
             .Entity(Starfall, "reach-compact", Note("polity", "Reach Compact"), folder: "polities")
@@ -270,7 +284,7 @@ public class SpaceOperaPackTests
         var warning = Assert.Single(LinkIndex.Load(source).Diagnostics);
 
         Assert.Equal(("F-LINK-11", DiagnosticSeverity.Warning), (warning.Diagnostic.RuleId, warning.Diagnostic.Severity));
-        Assert.Contains("setting is a ref to location or a kind of it (planet, settlement, ship, star-system)", warning.Diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains("setting is a ref to location or a kind of it (settlement, ship, star-system, world)", warning.Diagnostic.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -295,8 +309,8 @@ public class SpaceOperaPackTests
         var source = Space()
             .With("den.yaml", "format: 1\npacks: [space-opera, starfall]\n")
             .With("packs/starfall/pack.yaml", "name: Starfall\n")
-            .With("packs/starfall/chapter.yaml", "fields:\n  setting: { type: ref, to: [location, star-system, planet, settlement, ship], list: true }\n")
-            .Entity(Starfall, "vesta", Note("planet", "Vesta"), folder: "planets")
+            .With("packs/starfall/chapter.yaml", "fields:\n  setting: { type: ref, to: [location, star-system, world, settlement, ship], list: true }\n")
+            .Entity(Starfall, "vesta", Note("world", "Vesta"), folder: "worlds")
             .With($"{Ember}/book.md", "---\nname: Ember\nchapters:\n  - { key: \"1\", fields: { setting: \"[[vesta]]\" } }\n---\n");
 
         var den = DenStructure.Load(source);
@@ -378,7 +392,7 @@ public class SpaceOperaPackTests
         var pack = den.Types.Packs[1];
         Assert.Equal(("My Space Opera", false, true), (pack.Name, pack.IsBuiltIn, pack.Shadows));
         Assert.Equal("Vessel", den.Types.Find("ship")!.Name);
-        Assert.Null(den.Types.Find("planet"));
+        Assert.Null(den.Types.Find("world"));
         var shadow = Assert.Single(den.Diagnostics);
         Assert.Equal(("packs/space-opera/pack.yaml", "F-PACK-10"), (shadow.Path, shadow.Diagnostic.RuleId));
     }

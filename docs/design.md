@@ -244,7 +244,7 @@ fields.
 - **core** (always on): character, location, faction, item, event, thread
   (a plot thread with planted and paid-off positions), idea, note
   (free-form).
-- **space-opera** (built in, enabled in `den.yaml`): star-system, planet,
+- **space-opera** (built in, enabled in `den.yaml`): star-system, world,
   settlement, species, polity, ship-class, ship, technology.
 - **epic-fantasy** (planned): realm, magic-system, creature, deity, artifact, order.
 
@@ -272,7 +272,7 @@ sections, or templates come with it, so several parents can't conflict
 (field inheritance could come later under its own keyword, if dogfooding
 shows a need). It chains, a den's extension can add parents to any pack's
 type, and an unknown parent or a loop is a warning and is ignored. There
-are no abstract types. In the space opera pack, `star-system`, `planet`,
+are no abstract types. In the space opera pack, `star-system`, `world`,
 `settlement`, and `ship` are kinds of `location`, and `polity` of `faction`;
 epic fantasy (#33) would follow the same pattern (types.md F-TYPE-13).
 
@@ -282,9 +282,20 @@ den redefines each field to stop it. That left a den with the pack either a
 warning on every chapter set on a planet, or a clash warning for each field
 it redefined. These really are "is a" relationships, so the types now say
 so, and no field is redefined. The cost is that every field that asks for
-`location` takes all of them, so a star system's `part_of` takes a planet.
+`location` takes all of them, so a star system's `part_of` takes a world.
 "Extensions add" still holds: an extension adds a parent, and `to` stays as
 written.
+
+**Decided (#270): the pack's `planet` type is now `world`.** It's a planet,
+moon, asteroid, or gas giant: a body in space that people can live on, visit,
+or build around, so it covers a gas giant nobody lives on but things orbit or
+float in. They share a structure and fields aren't inherited, so one type
+with a `kind` covers them. A moon or an asteroid filed under `planet` is
+simply wrong, and `world` is the genre's own word. `body` was rejected because a note's "body"
+already means its text in Wolfden. The type's description names "planet" so
+writers looking for that word find it. A den that wants separate types can
+define them, such as `moon` with `kind_of: world`. Nothing had been released,
+so nothing needed migrating.
 
 **Decided (#6): your writing is yours.** Wolfden's licenses place no
 conditions on the notes, manuscripts, or other content writers create with

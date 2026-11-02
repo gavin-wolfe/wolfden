@@ -1,14 +1,17 @@
 name: Settlement
 plural: settlements
 description: >-
-  A place people live or work, on a world or off one: a city, a colony, an
-  orbital station, a mining outpost.
+  A place people live or work, whether on a world, orbiting it, floating in
+  its atmosphere, or out on its own: a city, a colony, an orbital station, a
+  fuel-mining platform.
 kind_of: location
 fields:
   part_of:
     type: ref
-    to: [planet, star-system, location]
-    description: The planet it's on or orbits, or the star system if neither.
+    to: [world, star-system, location]
+    description: >-
+      The world it's on, orbits, or floats in, or the star system if none of
+      those.
   kind:
     type: text
     description: What sort of place it is, such as a colony or a relay station.

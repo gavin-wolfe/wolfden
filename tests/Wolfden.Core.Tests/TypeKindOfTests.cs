@@ -39,15 +39,15 @@ public class TypeKindOfTests
     {
         var den = Chapter(
             Own()
-            .With("packs/starfall/types/moon.yaml", "name: Moon\nplural: moons\nkind_of: planet\n")
+            .With("packs/starfall/types/moon.yaml", "name: Moon\nplural: moons\nkind_of: world\n")
             .Entity(Starfall, "little-vesta", Note("moon", "Little Vesta"), folder: "moons"),
             "setting: \"[[little-vesta]]\"");
 
         var types = Types(den);
 
         Assert.Empty(DenStructure.Load(den).Diagnostics);
-        Assert.Equal(["planet"], types.Find("moon")!.KindOf);
-        Assert.Equal(["planet", "location"], types.Find("moon")!.Ancestors);
+        Assert.Equal(["world"], types.Find("moon")!.KindOf);
+        Assert.Equal(["world", "location"], types.Find("moon")!.Ancestors);
         Assert.True(types.FindChapterField("setting")!.Accepts("moon"));
         Assert.Empty(LinkIndex.Load(den).Diagnostics);
     }
@@ -56,9 +56,9 @@ public class TypeKindOfTests
     [Trait("Scenario", "SC-CHECK-48")]
     public void OnlyAKindIsAcceptedNotItsParentOrASibling()
     {
-        // "Is a" goes one way: a planet is a location, but a location isn't a planet.
+        // "Is a" goes one way: a world is a location, but a location isn't a world.
         var den = Own()
-            .With("packs/starfall/extensions/character.yaml", "fields:\n  homeworld: { type: ref, to: planet }\n")
+            .With("packs/starfall/extensions/character.yaml", "fields:\n  homeworld: { type: ref, to: world }\n")
             .Entity(Starfall, "kessan-reach", Note("location", "Kessan Reach"), folder: "locations")
             .Entity(Starfall, "vesta-yards", Note("settlement", "Vesta Yards"), folder: "settlements")
             .Entity(Starfall, "ilse", Character("Ilse", "fields:\n  homeworld: \"[[kessan-reach]]\""))
@@ -168,13 +168,13 @@ public class TypeKindOfTests
     public void ALoopADenClosesThroughAPackDropsOnlyTheDensParent()
     {
         // A den can't remove a pack's parent (F-TYPE-8), even by mistake.
-        var den = Own().With("packs/starfall/extensions/location.yaml", "kind_of: planet\n");
+        var den = Own().With("packs/starfall/extensions/location.yaml", "kind_of: world\n");
 
         var types = Types(den);
 
         Assert.Equal([("packs/starfall/extensions/location.yaml", "F-TYPE-13", (int?)1)], Diagnostics(den));
         Assert.Empty(types.Find("location")!.Ancestors);
-        Assert.Equal(["location"], types.Find("planet")!.Ancestors);
+        Assert.Equal(["location"], types.Find("world")!.Ancestors);
         Assert.Equal(["location"], types.Find("ship")!.Ancestors);
     }
 
@@ -183,7 +183,7 @@ public class TypeKindOfTests
     public void ALoopThroughADensOwnTypeDropsOnlyTheDensParentToo()
     {
         // The same with a den's location that replaces core's by key.
-        var den = Own().With("packs/starfall/types/location.yaml", "name: Place\nplural: locations\nkind_of: planet\n");
+        var den = Own().With("packs/starfall/types/location.yaml", "name: Place\nplural: locations\nkind_of: world\n");
 
         var types = Types(den);
 
@@ -191,7 +191,7 @@ public class TypeKindOfTests
             [("packs/starfall/types/location.yaml", "F-TYPE-13", (int?)3), ("packs/starfall/types/location.yaml", "F-TYPE-4", null)],
             Diagnostics(den).OrderBy(d => d.Rule, StringComparer.Ordinal));
         Assert.Empty(types.Find("location")!.Ancestors);
-        Assert.Equal(["location"], types.Find("planet")!.Ancestors);
+        Assert.Equal(["location"], types.Find("world")!.Ancestors);
     }
 
     [Fact]
@@ -375,10 +375,10 @@ public class TypeKindOfTests
         var den = Chapter(
             Own()
             .With("packs/starfall/types/location.yaml", "name: Place\nplural: locations\n")
-            .Entity(Starfall, "vesta", Note("planet", "Vesta"), folder: "planets"),
+            .Entity(Starfall, "vesta", Note("world", "Vesta"), folder: "worlds"),
             "setting: \"[[vesta]]\"");
 
-        Assert.Equal(["location"], Types(den).Find("planet")!.Ancestors);
+        Assert.Equal(["location"], Types(den).Find("world")!.Ancestors);
         Assert.Empty(LinkIndex.Load(den).Diagnostics);
     }
 
@@ -394,8 +394,8 @@ public class TypeKindOfTests
 
         var warning = Assert.Single(diagnostics);
         Assert.Equal("packs/starfall/types/place.yaml", warning.Path);
-        Assert.Contains("planet, settlement, ship, star-system", warning.Diagnostic.Message, StringComparison.Ordinal);
-        Assert.Empty(Types(den).Find("planet")!.Ancestors);
+        Assert.Contains("settlement, ship, star-system, world", warning.Diagnostic.Message, StringComparison.Ordinal);
+        Assert.Empty(Types(den).Find("world")!.Ancestors);
     }
 
     [Fact]
@@ -403,7 +403,7 @@ public class TypeKindOfTests
     public void AnExampleLinkCanBeAKindOfTheFieldsType()
     {
         var den = Own()
-            .Entity(Starfall, "vesta", Note("planet", "Vesta"), folder: "planets")
+            .Entity(Starfall, "vesta", Note("world", "Vesta"), folder: "worlds")
             .Entity(Starfall, "ilse", Character("Ilse"));
         var catalog = EntityCatalog.Load(den);
 

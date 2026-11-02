@@ -22,12 +22,18 @@
 # for that assembly, and runs none of its tests. If that's the only thing
 # wrong (every other test project ran and passed), those assemblies are run
 # again once, on their own. Anything else fails the run as it is.
+#
+# VSTest gives a test host or blame's data collector 90 seconds to connect by
+# default, and a busy Windows runner can miss that, aborting a test run before
+# its tests start (#248). VSTEST_CONNECTION_TIMEOUT, in seconds, gives it longer.
+# It doesn't limit how long a test runs.
 # Exits with dotnet test's status.
 
 param([string]$Results = 'TestResults')
 
 # Not 'Stop': dotnet's standard error, merged into the log, mustn't end the script.
 $ErrorActionPreference = 'Continue'
+$env:VSTEST_CONNECTION_TIMEOUT = '300'
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 Set-Location $root
 New-Item -ItemType Directory -Force $Results | Out-Null

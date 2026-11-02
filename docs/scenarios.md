@@ -942,18 +942,57 @@ With the pack on, a character's `factions` links to the Reach Compact, a
   `setting` works the same way.
 - A warning's example link for a ref field can be a kind of its type.
 - The den's list of types says what each is a kind of.
-- A lookup or a filter by type `faction`, in `list_entities`, `search`, or
-  `canon_as_of`, is that type only, so it doesn't list the polity.
+- A lookup by type `faction` finds the polity too, and a filter by type does
+  (SC-CHECK-52).
 
 Spec: types.md F-TYPE-13, §9 "Faction", design.md §9 (#265). Covered by:
 `KindOfEndpointTests.APolitysPageListsItsMembersAsAFactionsDoes`,
 `KindOfEndpointTests.ARefsFieldTypeSaysWhichTypesItsPickerOffers`,
 `KindOfEndpointTests.TheTypeListSaysWhatEachTypeIsAKindOf`,
 `KindOfEndpointTests.AChapterFieldSaysWhichTypesItsPickerOffers`,
-`KindOfEndpointTests.FilteringByTypeMatchesANotesOwnTypeOnly` (API),
 `TypeKindOfTests.AnExampleLinkCanBeAKindOfTheFieldsType`,
 `FieldEditing.test.tsx` "looks up what a field accepts, so a kind of its
 type is offered too" (web).
+
+### SC-CHECK-52. Asking for locations finds my worlds
+
+The writer's den has the pack on and a pack of its own: a `moon` is a kind of
+`world`, a `sentient-ship` is a kind of `ship` and of `character`,
+and an `orbital-habitat` is a kind of `ship` and of `settlement`, so it
+reaches `location` by two routes. They or their assistant filter by type, in
+`list_entities`, `search`, `canon_as_of`, the API, `wolfden query --type`, or
+the search page.
+
+- `location` finds every one of these: locations, worlds, moons,
+  settlements, ships, sentient ships, and orbital habitats, each once.
+- `world` finds worlds and moons, and no other location.
+- `character` finds characters and sentient ships.
+- Each result shows its own type, so a moon says `moon`. A canon
+  view's order is as it was (F-VIEW-3).
+- At a position, a kind the reader hasn't met stays out, of every list, of
+  a search, and of a lookup.
+- A search finds kinds in field values as well as in sections.
+- `wolfden query --type location --entity Saltby` prints both a location and
+  a ship named Saltby. An id or a file name still picks out one.
+- A type with no kinds finds what it did, a type only a note uses finds that
+  note, and a type nothing knows is still refused (`unknown_type`).
+- The search page's Type filter also offers what the types of the notes the
+  reader has met are kinds of, so a den with worlds and no location notes
+  can still ask for `location`. Sidebar groups and folders don't change.
+
+Spec: types.md F-TYPE-13 (#269). Covered by:
+`KindOfEndpointTests.FilteringByTypeIncludesItsKinds`,
+`KindOfEndpointTests.AMixedCanonListKeepsItsOrder`,
+`KindOfEndpointTests.AKindTheReaderHasntMetStaysOutOfAFilterAtAPosition`,
+`KindOfEndpointTests.ASearchFindsKindsInFieldValues`,
+`KindOfEndpointTests.ATypeWithNoKindsAndAnUnknownTypeBehaveAsBefore` (API),
+`TypeKindOfTests.AFilterMatchesATypeAndItsKinds` (core),
+`TypeFilterToolTests.ListEntitiesIncludesKindsOfTheTypeAndShowsEachOwnType`,
+`TypeFilterToolTests.AToolsDescriptionOfTypeSaysItIncludesKinds` (MCP),
+`QueryCommandTests.ATypeFilterIncludesKindsOfTheType`,
+`QueryCommandTests.AKindCanTieWithTheTypeAskedForUntilAnIdOrFileNamePicksOne` (CLI),
+`Search.test.tsx` "offers what a met type is a kind of in the Type filter, as
+filtering by it includes its kinds" (web).
 
 ## RT: saving a note keeps what the writer wrote
 
@@ -3818,7 +3857,8 @@ The writer searches "Renfield" at Dracula chapter 3, then follows
   chapter 3". With no hits it says "No matches as of Dracula chapter
   3." There's no peek at hits met later. "Search everything" drops the
   position and searches again. The Type filter lists only the types
-  of notes the reader has met, and keeps one already chosen. Results
+  of notes the reader has met and what those are kinds of, and keeps one
+  already chosen. Results
   from an earlier search at another position never show while the new
   ones load.
 - A blank `at=` (or one of spaces) is sent as it is and fails closed:
@@ -3947,7 +3987,7 @@ his id; the reader meets Pike in *Ash*.
 - Only the values in the canon view count: Ilse's posting to Kessan
   Reach, from `ash:4`, isn't found at `ash:1`.
 - The Field filter lists only the fields of values the reader has met
-  (`/api/fields` with `asOf`), as the Type filter lists only met types,
+  (`/api/fields` with `asOf`), as the Type filter goes by met types,
   and keeps one already chosen. Searching a field only notes the reader
   hasn't met have, such as Pike's `debts` before *Ash*, is refused just
   as a made-up field is ("No note the reader has met by ember:3 gives a

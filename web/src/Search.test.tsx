@@ -419,6 +419,47 @@ describe('SC-WEB-20: searching as of a story position', () => {
     expect(type.value).toBe('event')
   })
 
+  it('offers what a met type is a kind of in the Type filter, as filtering by it includes its kinds', async () => {
+    stubSearch()
+    stubApi({
+      override: (path, params) => {
+        if (path === '/api/types') {
+          return {
+            version: 1,
+            types: [
+              { key: 'world', name: 'World', plural: 'worlds', description: null, pack: 'space-opera', builtIn: true, kindOf: ['location'] },
+              { key: 'location', name: 'Location', plural: 'locations', description: null, pack: 'core', builtIn: true, kindOf: [] },
+              { key: 'character', name: 'Character', plural: 'characters', description: null, pack: 'core', builtIn: true, kindOf: [] },
+            ],
+          }
+        }
+
+        if (path === '/api/hierarchy' && params.get('asOf') === 'dracula:3') {
+          const u = hierarchy.universe
+          return {
+            ...hierarchy,
+            position: 'dracula:3',
+            universe: {
+              ...u,
+              entities: { total: 1, byType: { world: 1 } },
+              books: u.books.map((b) => ({ ...b, entities: { total: 0, byType: {} } })),
+            },
+          } satisfies HierarchyResult
+        }
+
+        if (path === '/api/search') {
+          return { version: 1, query: 'blood', count: 0, truncated: false, hits: [] } satisfies SearchResult
+        }
+
+        return undefined
+      },
+    })
+    renderApp('/u/dracula/search?q=blood&at=dracula:3')
+    const type = (await screen.findByRole('combobox', { name: 'Type' })) as HTMLSelectElement
+    // Not character: no met note is one, or a kind of one.
+    await waitFor(() => expect([...type.options].map((o) => o.value)).toEqual(['', 'location', 'world']))
+  })
+
   it('says when nothing matches with no position, and suggests dropping filters', async () => {
     stubSearch((params) => ({ version: 1, query: params.get('query')!, count: 0, truncated: false, hits: [] }))
     renderApp('/u/dracula/search?q=scar&type=location')

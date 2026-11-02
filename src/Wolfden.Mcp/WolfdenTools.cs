@@ -23,6 +23,10 @@ public sealed class WolfdenTools
         "A story position is 'book:chapter' using the keys from the den (such as 'dracula:5'), or a bare book key for the start of that book. " +
         "Positions follow reading order across the whole universe.";
 
+    private const string TypeFilterHelp =
+        "Only entities of this type or a kind of it: 'location' also finds worlds and ships in a den where those are kinds of " +
+        "location, while 'world' leaves out other locations. Each result says its own type.";
+
     private const string UniverseHelp =
         "The universe (its key). A den with one universe uses it; in a den with several, name one, unless a story position " +
         "names a book only one universe has.";
@@ -51,7 +55,7 @@ public sealed class WolfdenTools
     public CallToolResult Search(
         [Description("The words to search for.")] string query,
         [Description(UniverseHelp + " Here '*' searches every universe.")] string? universe = null,
-        [Description("Only entities of this type, such as 'character' or 'location'.")] string? type = null,
+        [Description(TypeFilterHelp)] string? type = null,
         [Description("If true, only canon text: draft or canon material, not ideas, retconned material, or bookkeeping sections.")] bool canon_only = false,
         [Description("The most hits to return, 1 to 200.")] int limit = 20,
         [Description("Search only this field's values (the frontmatter key, such as 'home'), not names, leads, or sections.")] string? field = null) =>
@@ -83,7 +87,7 @@ public sealed class WolfdenTools
         "book, of the scopes inside it, and of the scopes that hold it (as canon_as_of's filter does). Use get_entity to read one.")]
     public CallToolResult ListEntities(
         [Description(UniverseHelp + " Here '*' lists every universe (not with series or book).")] string? universe = null,
-        [Description("Only this type, such as 'character'.")] string? type = null,
+        [Description(TypeFilterHelp)] string? type = null,
         [Description("Only this status: idea, undecided, candidate, draft, canon, or retconned.")] string? status = null,
         [Description("Only this series (its key) and what it holds.")] string? series = null,
         [Description("Only this book (its key) and the scopes that hold it.")] string? book = null,
@@ -103,7 +107,7 @@ public sealed class WolfdenTools
         [Description(UniverseHelp + " With position, the position's book settles it.")] string? universe = null,
         [Description("Only entities filed in this series, its books, or the universe.")] string? series = null,
         [Description("Only entities filed in this book, its series, or the universe.")] string? book = null,
-        [Description("Only entities of this type, such as 'character'.")] string? type = null,
+        [Description(TypeFilterHelp)] string? type = null,
         [Description("If true, list the entities without their fields and sections (pinned canon is still given in full).")] bool brief = false) =>
         Respond(() => _tools.CanonAsOf(universe, position, series, book, type, brief));
 

@@ -249,6 +249,8 @@ public sealed class DenReader
                 CheckTypes(db, universeId, [type], listUsed: asOf is null);
             }
 
+            var types = TypesMatching(type);
+
             // The entities (by path) a filter or position keeps, and for a
             // position the lines of the sections in effect there, and the
             // whole universe's view (whatever the filter), for what's met.
@@ -293,7 +295,7 @@ public sealed class DenReader
                     .Where(h => entities.ContainsKey(h.EntityPath))
                     .Select(h => (Hit: h, Entity: entities[h.EntityPath]))
                     .Where(x => universeId is null || x.Entity.UniverseId == universeId)
-                    .Where(x => type is null || x.Entity.Type == type)
+                    .Where(x => types is null || types.Contains(x.Entity.Type))
                     .Where(x => !canonOnly || x.Hit.IsInCanon)
                     .Where(x => status is null || x.Entity.Status == status)
                     .Where(x => kept is null || kept.Contains(x.Entity.Path))
@@ -316,8 +318,8 @@ public sealed class DenReader
                 var met = metView?.Entities.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
                 var search = new FieldSearch(index, SearchWords.Parse(query), universeId, fieldName, met);
                 var candidates = view is null
-                    ? search.AllValues(e => (type is null || e.Type == type) && (status is null || e.Status == status) && (kept is null || kept.Contains(e.Path)))
-                    : search.ValuesIn(view, e => (type is null || e.Type == type) && (status is null || e.Status == status));
+                    ? search.AllValues(e => (types is null || types.Contains(e.Type)) && (status is null || e.Status == status) && (kept is null || kept.Contains(e.Path)))
+                    : search.ValuesIn(view, e => (types is null || types.Contains(e.Type)) && (status is null || e.Status == status));
                 views.AddRange(candidates
                     .Where(c => !canonOnly || c.Status is "draft" or "canon")
                     .Select(search.Match)
@@ -521,6 +523,8 @@ public sealed class DenReader
                 CheckTypes(db, one?.Id, [type], listUsed: asOf is null);
             }
 
+            var types = TypesMatching(type);
+
             var all = new List<EntitySummary>();
             foreach (var u in chosen)
             {
@@ -528,7 +532,7 @@ public sealed class DenReader
                 var inView = asOf is null ? null : CanonView(index, u.Key, asOf, filter).Entities.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
                 all.AddRange(index.Entities(u.Key, filter)
                     .Where(e => inView is null || inView.Contains(e.Path))
-                    .Where(e => type is null || e.Type == type)
+                    .Where(e => types is null || types.Contains(e.Type))
                     .Where(e => status is null || e.Status == status)
                     .Select(e => Summary(e, universes, scopes)));
             }
@@ -543,7 +547,8 @@ public sealed class DenReader
     /// was typed (#198), for a link picker: each word typed starts a word of
     /// it, ignoring case and accents, ranked as <see cref="EntityLookup.Match"/>
     /// ranks them, then by name and path. <paramref name="types"/> narrows
-    /// them to those types (a ref field's <c>to</c>).
+    /// them to those types and the kinds of them (F-TYPE-13), as every filter
+    /// by type does, so a ref field's <c>to</c> or its <c>accepts</c> finds the same notes.
     /// </summary>
     /// <remarks>
     /// The editors don't give <paramref name="asOf"/>: an editing surface
@@ -565,6 +570,7 @@ public sealed class DenReader
         {
             var db = index.Context;
             var u = ChooseUniverse(db, universe, asOf, allowAll: false)!;
+            HashSet<string>? matching = null;
             if (types is { Count: > 0 })
             {
                 // As a ref field's to: does (types.md F-FT-9), a type no pack defines and no
@@ -575,13 +581,13 @@ public sealed class DenReader
                     CheckTypes(db, u.Id, types, listUsed: asOf is null);
                 }
 
-                types = known;
+                matching = DenStructure.Load(Root).Types.WithKinds(known);
             }
 
             var met = asOf is null ? null : CanonView(index, u.Key, asOf, null).Entities.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
             var all = db.Entities.Where(e => e.UniverseId == u.Id).ToList();
             var entities = all
-                .Where(e => types is not { Count: > 0 } || types.Contains(e.Type))
+                .Where(e => matching is null || matching.Contains(e.Type))
                 .Where(e => met is null || met.Contains(e.Path))
                 .ToList();
             var allIds = all.Select(e => e.Id).ToList();
@@ -648,9 +654,9 @@ public sealed class DenReader
             }
 
             var view = CanonView(index, u.Key, position, filter);
-            if (type is not null)
+            if (TypesMatching(type) is { } types)
             {
-                view = view with { Entities = view.Entities.Where(e => e.Type == type).ToList() };
+                view = view with { Entities = view.Entities.Where(e => types.Contains(e.Type)).ToList() };
             }
 
             var pinned = view.Pinned().Entities
@@ -870,6 +876,10 @@ public sealed class DenReader
 
         return known;
     }
+
+    /// <summary>The types a filter by <paramref name="type"/> matches: it and its kinds (F-TYPE-13), or null with no filter.</summary>
+    private HashSet<string>? TypesMatching(string? type) =>
+        type is null ? null : DenStructure.Load(Root).Types.WithKinds([type]);
 
     /// <summary>Refuses a <c>limit</c> outside 1 to <paramref name="max"/>.</summary>
     public static void CheckLimit(int limit, int max)

@@ -14,6 +14,8 @@ export interface TypeView {
   description: string | null
   pack: string
   builtIn: boolean
+  /** Every type it's a kind of, nearest first (types.md F-TYPE-13). */
+  kindOf?: string[]
 }
 
 export interface TypeListResult {

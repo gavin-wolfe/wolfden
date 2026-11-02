@@ -31,7 +31,7 @@ export function lookupable(words: string): boolean {
 /**
  * The notes of a universe whose name, alias, file name, or id has a word
  * starting with each word typed, best first (/api/entities/lookup). `types`
- * narrows them to a ref field's `to` types. The editors never pass `at`: an
+ * narrows them to a ref field's types and the kinds of them. The editors never pass `at`: an
  * editing surface shows everything (#28); with it, only notes the reader
  * has met by then are looked at (#26).
  */

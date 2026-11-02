@@ -11,10 +11,10 @@ public class SectionEditTests
 {
     private const string Entity = """
         ---
-        name: Mara Voss
+        name: Ilse Tarrow
         ---
 
-        # Mara Voss
+        # Ilse Tarrow
 
         ## Appearance
         Silver-streaked hair.

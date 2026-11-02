@@ -15,7 +15,7 @@ namespace Wolfden.Core.Tests;
 /// </summary>
 public sealed class DenStoreTests : IDisposable
 {
-    private const string Mara = "universes/starfall/series/long-dark/entities/characters/mara-voss.md";
+    private const string Ilse = "universes/starfall/series/long-dark/entities/characters/ilse-tarrow.md";
     private const string Characters = "universes/starfall/series/long-dark/entities/characters";
 
     private readonly string _root;
@@ -73,10 +73,10 @@ public sealed class DenStoreTests : IDisposable
         var bytes = File.ReadAllBytes(Path.Combine(TestFiles.RepoRoot, "tests", "Wolfden.Core.Tests", "Fixtures", fixture));
         var store = Store();
 
-        store.WriteFile(Mara, bytes);
+        store.WriteFile(Ilse, bytes);
 
-        Assert.Equal(bytes, File.ReadAllBytes(Full(Mara)));
-        Assert.Equal(bytes, store.ReadFile(Mara));
+        Assert.Equal(bytes, File.ReadAllBytes(Full(Ilse)));
+        Assert.Equal(bytes, store.ReadFile(Ilse));
     }
 
     [Fact]
@@ -84,9 +84,9 @@ public sealed class DenStoreTests : IDisposable
     {
         var store = Store();
 
-        store.WriteFile(Mara, []);
+        store.WriteFile(Ilse, []);
 
-        Assert.Empty(File.ReadAllBytes(Full(Mara)));
+        Assert.Empty(File.ReadAllBytes(Full(Ilse)));
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public sealed class DenStoreTests : IDisposable
         var store = Store();
         var before = Directory.GetFileSystemEntries(Full(Characters)).Order(StringComparer.Ordinal).ToList();
 
-        store.WriteFile(Mara, Bytes("---\nname: Mara Voss\n---\n"));
+        store.WriteFile(Ilse, Bytes("---\nname: Ilse Tarrow\n---\n"));
         store.WriteFile($"{Characters}/wren-ashby.md", Bytes("---\nname: Wren Ashby\n---\n"), DenWriteMode.Create);
 
         var after = Directory.GetFileSystemEntries(Full(Characters)).Order(StringComparer.Ordinal).ToList();
@@ -107,7 +107,7 @@ public sealed class DenStoreTests : IDisposable
     [Trait("Scenario", "SC-STORE-1")]
     public void AWriteThatFailsPartWayLeavesTheOldFileAndNoTemporaryFile()
     {
-        var old = File.ReadAllBytes(Full(Mara));
+        var old = File.ReadAllBytes(Full(Ilse));
         string? temp = null;
         var store = new FileSystemDenStore(_root)
         {
@@ -118,10 +118,10 @@ public sealed class DenStoreTests : IDisposable
             },
         };
 
-        var e = Assert.Throws<IOException>(() => store.WriteFile(Mara, Bytes("half a note")));
+        var e = Assert.Throws<IOException>(() => store.WriteFile(Ilse, Bytes("half a note")));
 
         Assert.Equal("The power went out.", e.Message);
-        Assert.Equal(old, File.ReadAllBytes(Full(Mara)));
+        Assert.Equal(old, File.ReadAllBytes(Full(Ilse)));
         Assert.NotNull(temp);
         Assert.StartsWith(FileSystemDenStore.TempPrefix, Path.GetFileName(temp), StringComparison.Ordinal);
         Assert.False(File.Exists(temp));
@@ -136,7 +136,7 @@ public sealed class DenStoreTests : IDisposable
         var a = Bytes(new string('a', 300_000));
         var b = Bytes(new string('b', 200_000));
         var store = Store();
-        store.WriteFile(Mara, a);
+        store.WriteFile(Ilse, a);
         var torn = new ConcurrentBag<string>();
         var reads = 0;
         var stop = 0;
@@ -150,7 +150,7 @@ public sealed class DenStoreTests : IDisposable
                 {
                     // Shared for delete too, as an editor's reader would be, so
                     // the reader rarely keeps the store from replacing the file.
-                    using var stream = new FileStream(Full(Mara), FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                    using var stream = new FileStream(Full(Ilse), FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
                     var buffer = new byte[stream.Length];
                     seen = buffer[..stream.ReadAtLeast(buffer, buffer.Length, throwOnEndOfStream: false)];
                 }
@@ -185,7 +185,7 @@ public sealed class DenStoreTests : IDisposable
             while (written < Writes || Volatile.Read(ref reads) - readsBefore < ReadsDuringWrites)
             {
                 Assert.True(watch.Elapsed < TimeSpan.FromSeconds(60), $"The reader read {Volatile.Read(ref reads) - readsBefore} times in {written} writes.");
-                store.WriteFile(Mara, written % 2 == 0 ? b : a, DenWriteMode.Replace);
+                store.WriteFile(Ilse, written % 2 == 0 ? b : a, DenWriteMode.Replace);
                 written++;
             }
         }
@@ -213,12 +213,12 @@ public sealed class DenStoreTests : IDisposable
     [Fact]
     public void CreateRefusesAFileThatsThereAndLeavesItAlone()
     {
-        var old = File.ReadAllBytes(Full(Mara));
+        var old = File.ReadAllBytes(Full(Ilse));
 
-        var e = Assert.Throws<DenStoreException>(() => Store().WriteFile(Mara, Bytes("new"), DenWriteMode.Create));
+        var e = Assert.Throws<DenStoreException>(() => Store().WriteFile(Ilse, Bytes("new"), DenWriteMode.Create));
 
         Assert.Equal(DenStoreError.AlreadyExists, e.Error);
-        Assert.Equal(old, File.ReadAllBytes(Full(Mara)));
+        Assert.Equal(old, File.ReadAllBytes(Full(Ilse)));
     }
 
     [Fact]
@@ -285,14 +285,14 @@ public sealed class DenStoreTests : IDisposable
         File.WriteAllText(Path.Combine(_outside, "keep.md"), "keep");
 
         Assert.Equal(DenStoreError.InvalidPath, Assert.Throws<DenStoreException>(() => store.DeleteFile("../outside/keep.md")).Error);
-        Assert.Equal(DenStoreError.InvalidPath, Assert.Throws<DenStoreException>(() => store.MoveFile(Mara, escape)).Error);
-        Assert.Equal(DenStoreError.InvalidPath, Assert.Throws<DenStoreException>(() => store.MoveFile("../outside/keep.md", Mara)).Error);
+        Assert.Equal(DenStoreError.InvalidPath, Assert.Throws<DenStoreException>(() => store.MoveFile(Ilse, escape)).Error);
+        Assert.Equal(DenStoreError.InvalidPath, Assert.Throws<DenStoreException>(() => store.MoveFile("../outside/keep.md", Ilse)).Error);
         Assert.Equal(DenStoreError.InvalidPath, Assert.Throws<DenStoreException>(() => store.MoveFolder(Characters, "../outside/characters")).Error);
         Assert.Equal(DenStoreError.InvalidPath, Assert.Throws<DenStoreException>(() => store.DeleteFolder("../outside")).Error);
         Assert.Equal(DenStoreError.InvalidPath, Assert.Throws<DenStoreException>(() => store.DeleteFolder("")).Error);
 
         Assert.Equal(["keep.md"], Directory.EnumerateFileSystemEntries(_outside).Select(Path.GetFileName));
-        Assert.True(File.Exists(Full(Mara)));
+        Assert.True(File.Exists(Full(Ilse)));
     }
 
     [Fact]
@@ -320,17 +320,17 @@ public sealed class DenStoreTests : IDisposable
     public void ANameThatDiffersOnlyInCaseIsRefusedOnEveryOs()
     {
         var store = Store();
-        var old = File.ReadAllBytes(Full(Mara));
+        var old = File.ReadAllBytes(Full(Ilse));
 
-        var file = Assert.Throws<DenStoreException>(() => store.WriteFile($"{Characters}/Mara-Voss.md", Bytes("another Mara")));
+        var file = Assert.Throws<DenStoreException>(() => store.WriteFile($"{Characters}/Ilse-Tarrow.md", Bytes("another Ilse")));
         var folder = Assert.Throws<DenStoreException>(() => store.WriteFile("universes/Starfall/entities/notes/x.md", Bytes("x")));
-        var moved = Assert.Throws<DenStoreException>(() => store.MoveFile("universes/starfall/entities/locations/kessan-reach.md", $"{Characters}/MARA-VOSS.md"));
+        var moved = Assert.Throws<DenStoreException>(() => store.MoveFile("universes/starfall/entities/locations/kessan-reach.md", $"{Characters}/ILSE-TARROW.md"));
 
         Assert.All([file, folder, moved], e => Assert.Equal(DenStoreError.CaseConflict, e.Error));
-        Assert.Contains($"'{Mara}' is already there", file.Message, StringComparison.Ordinal);
+        Assert.Contains($"'{Ilse}' is already there", file.Message, StringComparison.Ordinal);
         Assert.Contains("'universes/starfall' is already there", folder.Message, StringComparison.Ordinal);
-        Assert.Equal(old, File.ReadAllBytes(Full(Mara)));
-        Assert.Equal(["mara-voss.md"], store.GetFiles(Characters));
+        Assert.Equal(old, File.ReadAllBytes(Full(Ilse)));
+        Assert.Equal(["ilse-tarrow.md"], store.GetFiles(Characters));
         Assert.Equal(["starfall"], store.GetDirectories("universes").Where(d => d.Equals("starfall", StringComparison.OrdinalIgnoreCase)));
     }
 
@@ -352,7 +352,7 @@ public sealed class DenStoreTests : IDisposable
         }
 
         var e = Assert.Throws<DenStoreException>(() =>
-            Store().WriteFile($"universes/starfall/series/long-dark/entities/{shortName}/mara-voss.md", Bytes("through a short name")));
+            Store().WriteFile($"universes/starfall/series/long-dark/entities/{shortName}/ilse-tarrow.md", Bytes("through a short name")));
 
         Assert.Equal(DenStoreError.CaseConflict, e.Error);
         Assert.Contains("another name", e.Message, StringComparison.Ordinal);
@@ -365,12 +365,12 @@ public sealed class DenStoreTests : IDisposable
     public void AFileIsMovedOrRenamedWithItsBytes()
     {
         var store = Store();
-        var bytes = File.ReadAllBytes(Full(Mara));
-        const string to = "universes/starfall/entities/characters/mara-voss.md";
+        var bytes = File.ReadAllBytes(Full(Ilse));
+        const string to = "universes/starfall/entities/characters/ilse-tarrow.md";
 
-        store.MoveFile(Mara, to);
+        store.MoveFile(Ilse, to);
 
-        Assert.False(store.FileExists(Mara));
+        Assert.False(store.FileExists(Ilse));
         Assert.Equal(bytes, store.ReadFile(to));
     }
 
@@ -379,13 +379,13 @@ public sealed class DenStoreTests : IDisposable
     public void ARenameThatChangesOnlyTheCaseIsAllowed()
     {
         var store = Store();
-        var bytes = File.ReadAllBytes(Full(Mara));
+        var bytes = File.ReadAllBytes(Full(Ilse));
 
-        store.MoveFile(Mara, $"{Characters}/Mara-Voss.md");
+        store.MoveFile(Ilse, $"{Characters}/Ilse-Tarrow.md");
         store.MoveFolder("universes/starfall/series/long-dark/books/ember", "universes/starfall/series/long-dark/books/Ember");
 
-        Assert.Equal(["Mara-Voss.md"], store.GetFiles(Characters));
-        Assert.Equal(bytes, store.ReadFile($"{Characters}/Mara-Voss.md"));
+        Assert.Equal(["Ilse-Tarrow.md"], store.GetFiles(Characters));
+        Assert.Equal(bytes, store.ReadFile($"{Characters}/Ilse-Tarrow.md"));
         Assert.Contains("Ember", store.GetDirectories("universes/starfall/series/long-dark/books"));
         Assert.DoesNotContain("ember", store.GetDirectories("universes/starfall/series/long-dark/books"));
         Assert.True(store.FileExists("universes/starfall/series/long-dark/books/Ember/book.md"));
@@ -414,13 +414,13 @@ public sealed class DenStoreTests : IDisposable
         var store = Store();
         const string kessan = "universes/starfall/entities/locations/kessan-reach.md";
 
-        Assert.Equal(DenStoreError.AlreadyExists, Assert.Throws<DenStoreException>(() => store.MoveFile(kessan, Mara)).Error);
+        Assert.Equal(DenStoreError.AlreadyExists, Assert.Throws<DenStoreException>(() => store.MoveFile(kessan, Ilse)).Error);
         Assert.Equal(DenStoreError.AlreadyExists, Assert.Throws<DenStoreException>(() => store.MoveFolder("universes/drift", "universes/starfall")).Error);
         Assert.Equal(DenStoreError.InvalidPath, Assert.Throws<DenStoreException>(() => store.MoveFolder("universes/starfall", "universes/starfall/inner")).Error);
         Assert.Equal(DenStoreError.NotFound, Assert.Throws<DenStoreException>(() => store.MoveFile($"{Characters}/nobody.md", $"{Characters}/somebody.md")).Error);
-        Assert.Equal(DenStoreError.NotAFile, Assert.Throws<DenStoreException>(() => store.MoveFolder(Mara, $"{Characters}/mara")).Error);
+        Assert.Equal(DenStoreError.NotAFile, Assert.Throws<DenStoreException>(() => store.MoveFolder(Ilse, $"{Characters}/ilse")).Error);
         Assert.True(store.FileExists(kessan));
-        Assert.True(store.FileExists(Mara));
+        Assert.True(store.FileExists(Ilse));
     }
 
     [Fact]
@@ -428,9 +428,9 @@ public sealed class DenStoreTests : IDisposable
     {
         var store = Store();
 
-        store.DeleteFile(Mara);
-        Assert.False(File.Exists(Full(Mara)));
-        Assert.Equal(DenStoreError.NotFound, Assert.Throws<DenStoreException>(() => store.DeleteFile(Mara)).Error);
+        store.DeleteFile(Ilse);
+        Assert.False(File.Exists(Full(Ilse)));
+        Assert.Equal(DenStoreError.NotFound, Assert.Throws<DenStoreException>(() => store.DeleteFile(Ilse)).Error);
 
         const string ships = "universes/starfall/series/long-dark/entities/ships";
         var notEmpty = Assert.Throws<DenStoreException>(() => store.DeleteFolder(ships));
@@ -446,13 +446,13 @@ public sealed class DenStoreTests : IDisposable
     public void AFolderWhoseOnlyEntriesAreHiddenIsntDeletedAndTheMessageNamesOne()
     {
         var store = Store();
-        store.DeleteFile(Mara);
-        File.WriteAllText(Path.Combine(Full(Characters), ".mara-voss.md.swp"), "swap");
+        store.DeleteFile(Ilse);
+        File.WriteAllText(Path.Combine(Full(Characters), ".ilse-tarrow.md.swp"), "swap");
 
         var e = Assert.Throws<DenStoreException>(() => store.DeleteFolder(Characters));
 
         Assert.Equal(DenStoreError.NotEmpty, e.Error);
-        Assert.Contains("'.mara-voss.md.swp', which is hidden", e.Message, StringComparison.Ordinal);
+        Assert.Contains("'.ilse-tarrow.md.swp', which is hidden", e.Message, StringComparison.Ordinal);
         Assert.True(Directory.Exists(Full(Characters)));
     }
 
@@ -555,16 +555,16 @@ public sealed class DenStoreTests : IDisposable
     public void ANewNameDisguisedByAnInvisibleCharacterIsRefused()
     {
         var store = Store();
-        const string disguised = $"{Characters}/mara\u200B-voss.md";
+        const string disguised = $"{Characters}/ilse\u200B-tarrow.md";
 
         var create = Assert.Throws<DenStoreException>(() => store.WriteFile(disguised, Bytes("x")));
-        var move = Assert.Throws<DenStoreException>(() => store.MoveFile(Mara, disguised));
+        var move = Assert.Throws<DenStoreException>(() => store.MoveFile(Ilse, disguised));
         var folder = Assert.Throws<DenStoreException>(() => store.WriteFile("universes/starfall/entities/\u202Eships/x.md", Bytes("x")));
 
         Assert.All([create, move, folder], e => Assert.Equal(DenStoreError.InvalidPath, e.Error));
         Assert.Contains("U+200B", create.Message, StringComparison.Ordinal);
         Assert.False(File.Exists(Full(disguised)));
-        Assert.True(File.Exists(Full(Mara)));
+        Assert.True(File.Exists(Full(Ilse)));
     }
 
     [Fact]
@@ -572,18 +572,18 @@ public sealed class DenStoreTests : IDisposable
     public void AFileAlreadyNamedWithAnInvisibleCharacterCanStillBeSavedMovedAndDeleted()
     {
         // Made outside Wolfden: Wolfden won't make such a name, but doesn't strand one.
-        const string odd = $"{Characters}/mara\u200B-voss-copy.md";
+        const string odd = $"{Characters}/ilse\u200B-tarrow-copy.md";
         File.WriteAllText(Full(odd), "---\nname: Copy\n---\n");
         var store = Store();
 
         store.WriteFile(odd, Bytes("---\nname: Saved\n---\n"), DenWriteMode.Replace);
         Assert.Equal("---\nname: Saved\n---\n", File.ReadAllText(Full(odd)));
-        store.MoveFile(odd, $"{Characters}/mara-voss-copy.md");
+        store.MoveFile(odd, $"{Characters}/ilse-tarrow-copy.md");
         File.WriteAllText(Full(odd), "again");
         store.DeleteFile(odd);
 
         Assert.False(File.Exists(Full(odd)));
-        Assert.True(store.FileExists($"{Characters}/mara-voss-copy.md"));
+        Assert.True(store.FileExists($"{Characters}/ilse-tarrow-copy.md"));
     }
 
     [Fact]
@@ -616,17 +616,17 @@ public sealed class DenStoreTests : IDisposable
     [Trait("Scenario", "SC-STORE-3")]
     public void ACaseOnlyRenameOntoAnotherFileWithThatNameIsRefused()
     {
-        // Only Linux can hold mara-voss.md and Mara-Voss.md side by side.
-        File.WriteAllText(Full($"{Characters}/Mara-Voss.md"), "another Mara");
+        // Only Linux can hold ilse-tarrow.md and Ilse-Tarrow.md side by side.
+        File.WriteAllText(Full($"{Characters}/Ilse-Tarrow.md"), "another Ilse");
         if (Directory.GetFiles(Full(Characters)).Length < 2)
         {
             Assert.Skip("This file system takes names that differ only in case as one name.");
         }
 
-        var e = Assert.Throws<DenStoreException>(() => new FileSystemDenStore(_root).MoveFile(Mara, $"{Characters}/MARA-VOSS.md"));
+        var e = Assert.Throws<DenStoreException>(() => new FileSystemDenStore(_root).MoveFile(Ilse, $"{Characters}/ILSE-TARROW.md"));
 
         Assert.Equal(DenStoreError.CaseConflict, e.Error);
-        Assert.Equal("another Mara", File.ReadAllText(Full($"{Characters}/Mara-Voss.md")));
+        Assert.Equal("another Ilse", File.ReadAllText(Full($"{Characters}/Ilse-Tarrow.md")));
     }
 
     [Fact]
@@ -654,18 +654,18 @@ public sealed class DenStoreTests : IDisposable
         }
 
         var store = Store();
-        File.SetAttributes(Full(Mara), FileAttributes.ReadOnly);
+        File.SetAttributes(Full(Ilse), FileAttributes.ReadOnly);
         try
         {
             // Counted, not timed: the write flushes to disk, which a busy
             // CI machine can make take longer than all the retries would.
             using var retries = new RetryCounter(_root);
             var watch = Stopwatch.StartNew();
-            var e = Assert.Throws<DenStoreException>(() => store.WriteFile(Mara, Bytes("x"), DenWriteMode.Replace));
+            var e = Assert.Throws<DenStoreException>(() => store.WriteFile(Ilse, Bytes("x"), DenWriteMode.Replace));
             watch.Stop();
 
             Assert.Equal(DenStoreError.AccessDenied, e.Error);
-            Assert.Equal($"'{Mara}' can't be written: the file is read-only.", e.Message);
+            Assert.Equal($"'{Ilse}' can't be written: the file is read-only.", e.Message);
             Assert.IsType<UnauthorizedAccessException>(e.InnerException);
             Assert.True(retries.Count == 0, $"It was tried {retries.Count + 1} times: a read-only file isn't worth trying again.");
 
@@ -674,7 +674,7 @@ public sealed class DenStoreTests : IDisposable
         }
         finally
         {
-            File.SetAttributes(Full(Mara), FileAttributes.Normal);
+            File.SetAttributes(Full(Ilse), FileAttributes.Normal);
         }
     }
 
@@ -687,19 +687,19 @@ public sealed class DenStoreTests : IDisposable
         }
 
         var store = Store();
-        using var held = new FileStream(Full(Mara), FileMode.Open, FileAccess.Read, FileShare.None);
+        using var held = new FileStream(Full(Ilse), FileMode.Open, FileAccess.Read, FileShare.None);
         using var retries = new RetryCounter(_root);
 
-        var write = Assert.Throws<DenStoreException>(() => store.WriteFile(Mara, Bytes("x"), DenWriteMode.Replace));
-        var delete = Assert.Throws<DenStoreException>(() => store.DeleteFile(Mara));
-        var move = Assert.Throws<DenStoreException>(() => store.MoveFile(Mara, $"{Characters}/mara.md"));
+        var write = Assert.Throws<DenStoreException>(() => store.WriteFile(Ilse, Bytes("x"), DenWriteMode.Replace));
+        var delete = Assert.Throws<DenStoreException>(() => store.DeleteFile(Ilse));
+        var move = Assert.Throws<DenStoreException>(() => store.MoveFile(Ilse, $"{Characters}/ilse.md"));
 
         // A file in use may be let go in a moment, so each is tried again
         // first. This also shows the counter sees retries, so the read-only
         // test's count of none means something.
         Assert.Equal(3 * (FileSystemDenStore.Attempts - 1), retries.Count);
         Assert.All([write, delete, move], e => Assert.Equal(DenStoreError.InUse, e.Error));
-        Assert.Equal($"'{Mara}' can't be written: another program has it open. Close it there and try again.", write.Message);
+        Assert.Equal($"'{Ilse}' can't be written: another program has it open. Close it there and try again.", write.Message);
         Assert.IsType<UnauthorizedAccessException>(write.InnerException);
     }
 
@@ -724,16 +724,16 @@ public sealed class DenStoreTests : IDisposable
         // A long-lived store, as in the MCP server: something else renames
         // characters/ to Characters/ between two reads.
         var store = Store();
-        Assert.True(store.FileExists(Mara));
-        var renamed = Mara.Replace("/characters/", "/Characters/", StringComparison.Ordinal);
+        Assert.True(store.FileExists(Ilse));
+        var renamed = Ilse.Replace("/characters/", "/Characters/", StringComparison.Ordinal);
 
         Directory.Move(Full(Characters), Full(Characters) + "-moving");
         Directory.Move(Full(Characters) + "-moving", Full(Characters.Replace("characters", "Characters", StringComparison.Ordinal)));
 
-        Assert.False(store.FileExists(Mara));
+        Assert.False(store.FileExists(Ilse));
         Assert.True(store.FileExists(renamed));
-        store.WriteFile(renamed, Bytes("---\nname: Mara Voss\n---\n"), DenWriteMode.Replace);
-        Assert.Equal(DenStoreError.CaseConflict, Assert.Throws<DenStoreException>(() => store.WriteFile(Mara, Bytes("x"), DenWriteMode.Replace)).Error);
+        store.WriteFile(renamed, Bytes("---\nname: Ilse Tarrow\n---\n"), DenWriteMode.Replace);
+        Assert.Equal(DenStoreError.CaseConflict, Assert.Throws<DenStoreException>(() => store.WriteFile(Ilse, Bytes("x"), DenWriteMode.Replace)).Error);
     }
 
     [Fact]
@@ -744,7 +744,7 @@ public sealed class DenStoreTests : IDisposable
         var snapshot = store.Snapshot();
 
         Assert.Equal(store.Root, snapshot.Root);
-        Assert.True(snapshot.FileExists(Mara));
+        Assert.True(snapshot.FileExists(Ilse));
     }
 
     // ----- read-only stores -----
@@ -790,10 +790,10 @@ public sealed class DenStoreTests : IDisposable
 
         Assert.Equal(source.GetDirectories("universes"), store.GetDirectories("universes"));
         Assert.Equal(source.GetFiles(Characters), store.GetFiles(Characters));
-        Assert.Equal(source.ReadFile(Mara), store.ReadFile(Mara));
+        Assert.Equal(source.ReadFile(Ilse), store.ReadFile(Ilse));
         Assert.Equal(source.TryReadFile("nothing.md"), store.TryReadFile("nothing.md"));
         Assert.True(store.FolderExists(Characters));
-        Assert.False(store.FileExists($"{Characters}/Mara-Voss.md"));
+        Assert.False(store.FileExists($"{Characters}/Ilse-Tarrow.md"));
         Assert.Equal(
             Describe(Wolfden.Core.Checks.DenCheck.Run(source)),
             Describe(Wolfden.Core.Checks.DenCheck.Run(store)));
@@ -823,7 +823,7 @@ public sealed class DenStoreTests : IDisposable
         {
         }
 
-        File.AppendAllText(Full(Mara), "\nAfter the watch.\n");
+        File.AppendAllText(Full(Ilse), "\nAfter the watch.\n");
         Assert.False(changes.TryTake(out _, TimeSpan.FromMilliseconds(500)));
     }
 

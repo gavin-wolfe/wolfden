@@ -12,7 +12,7 @@ public sealed class DenPathTests
     [Theory]
     [InlineData("den.yaml")]
     [InlineData("universes/starfall/universe.md")]
-    [InlineData("universes/starfall/entities/characters/mara-voss.md")]
+    [InlineData("universes/starfall/entities/characters/ilse-tarrow.md")]
     [InlineData("universes/starfall/entities/characters/caf\u00E9-owner.md")]
     [InlineData("universes/starfall/entities/characters/con-artist.md")]
     [InlineData("universes/starfall/entities/characters/console.md")]
@@ -45,7 +45,7 @@ public sealed class DenPathTests
     [InlineData(".git/config", "hidden")]
     [InlineData(".wolfden/index.db", "hidden")]
     [InlineData("universes/starfall/.obsidian/workspace.json", "hidden")]
-    [InlineData("universes/starfall/entities/.mara.md.swp", "hidden")]
+    [InlineData("universes/starfall/entities/.ilse.md.swp", "hidden")]
     public void APathThatCouldLeaveTheDenOrIsHiddenIsRefused(string path, string why)
     {
         var problem = DenPaths.Problem(path);
@@ -59,8 +59,8 @@ public sealed class DenPathTests
 
     [Theory]
     [Trait("Scenario", "SC-STORE-2")]
-    [InlineData("universes/starfall/mara.md:hidden", "Windows doesn't allow")]
-    [InlineData("universes/starfall/mara.md::$DATA", "Windows doesn't allow")]
+    [InlineData("universes/starfall/ilse.md:hidden", "Windows doesn't allow")]
+    [InlineData("universes/starfall/ilse.md::$DATA", "Windows doesn't allow")]
     [InlineData("universes/star<fall/x.md", "Windows doesn't allow")]
     [InlineData("universes/star>fall/x.md", "Windows doesn't allow")]
     [InlineData("universes/star\"fall/x.md", "Windows doesn't allow")]
@@ -69,8 +69,8 @@ public sealed class DenPathTests
     [InlineData("universes/star*fall/x.md", "Windows doesn't allow")]
     [InlineData("universes/star\tfall/x.md", "control character")]
     [InlineData("universes/star\0fall/x.md", "control character")]
-    [InlineData("universes/starfall/mara.md.", "drops")]
-    [InlineData("universes/starfall/mara.md ", "drops")]
+    [InlineData("universes/starfall/ilse.md.", "drops")]
+    [InlineData("universes/starfall/ilse.md ", "drops")]
     [InlineData("universes/starfall./universe.md", "drops")]
     [InlineData("con", "device name")]
     [InlineData("universes/CON/universe.md", "device name")]
@@ -92,20 +92,20 @@ public sealed class DenPathTests
     public static TheoryData<string, string> DisguisedNames() => new()
     {
         // Characters that only disguise a name, anywhere in it.
-        { "mara\u200B-voss.md", "disguises" },
-        { "mara\uFEFF-voss.md", "disguises" },
-        { "mara\u200E-voss.md", "disguises" },
-        { "mara\u200F-voss.md", "disguises" },
-        { "mara\u202E-voss.md", "disguises" },
-        { "mara\u2066-voss.md", "disguises" },
-        { "mara\u061C-voss.md", "disguises" },
+        { "ilse\u200B-tarrow.md", "disguises" },
+        { "ilse\uFEFF-tarrow.md", "disguises" },
+        { "ilse\u200E-tarrow.md", "disguises" },
+        { "ilse\u200F-tarrow.md", "disguises" },
+        { "ilse\u202E-tarrow.md", "disguises" },
+        { "ilse\u2066-tarrow.md", "disguises" },
+        { "ilse\u061C-tarrow.md", "disguises" },
         // Invisible at the start or the end.
-        { "\u00ADmara-voss.md", "starts or ends" },
-        { "mara-voss.md\u2060", "starts or ends" },
-        { "mara-voss.md\u200D", "starts or ends" },
+        { "\u00ADilse-tarrow.md", "starts or ends" },
+        { "ilse-tarrow.md\u2060", "starts or ends" },
+        { "ilse-tarrow.md\u200D", "starts or ends" },
         // Empty or hidden once the invisible characters are left out.
         { "\u200D\u200C", "looks empty" },
-        { "\u200D.mara-voss.md", "looks hidden" },
+        { "\u200D.ilse-tarrow.md", "looks hidden" },
     };
 
     [Theory]
@@ -147,14 +147,14 @@ public sealed class DenPathTests
     public void AnExistingNameIsntCheckedForInvisibleCharacters()
     {
         // Problem checks every name on a path, old ones too; only new names are checked for these.
-        Assert.Null(DenPaths.Problem("universes/starfall/mara\u200B-voss.md"));
+        Assert.Null(DenPaths.Problem("universes/starfall/ilse\u200B-tarrow.md"));
     }
 
     [Fact]
     public void ANewNameThatIsntValidTextIsRefused()
     {
-        Assert.Contains("isn't valid text", DenPaths.NewNameProblem("mara\uD800.md"), StringComparison.Ordinal);
-        Assert.Contains("isn't valid text", DenPaths.NewNameProblem("mara\uDC00.md"), StringComparison.Ordinal);
+        Assert.Contains("isn't valid text", DenPaths.NewNameProblem("ilse\uD800.md"), StringComparison.Ordinal);
+        Assert.Contains("isn't valid text", DenPaths.NewNameProblem("ilse\uDC00.md"), StringComparison.Ordinal);
     }
 
     [Theory]

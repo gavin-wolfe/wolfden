@@ -14,7 +14,7 @@ public sealed class StarvedPool;
 [Collection(nameof(StarvedPool))]
 public sealed class StarvedPoolTests
 {
-    private const string Mara = "universes/vael/entities/characters/mara-voss.md";
+    private const string Ilse = "universes/vael/entities/characters/ilse-tarrow.md";
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
@@ -27,9 +27,9 @@ public sealed class StarvedPoolTests
 
         // Bigger than any pipe's buffer, both ways: the message goes in on
         // git's input, and comes back out in the log and the diff.
-        var message = string.Join("\n", Enumerable.Range(1, 6000).Select(i => $"Line {i} of the session notes, about Mara Voss and the Fen."));
-        var text = "# Mara Voss\n\n" + string.Join("\n", Enumerable.Range(1, 6000).Select(i => $"She crossed the fen on night {i}.")) + "\n";
-        repo.WriteDen(Mara, text);
+        var message = string.Join("\n", Enumerable.Range(1, 6000).Select(i => $"Line {i} of the session notes, about Ilse Tarrow and the Fen."));
+        var text = "# Ilse Tarrow\n\n" + string.Join("\n", Enumerable.Range(1, 6000).Select(i => $"She crossed the fen on night {i}.")) + "\n";
+        repo.WriteDen(Ilse, text);
 
         // Not disposed: blockers still queued when the test ends wait on it
         // later, and a disposed event would throw on a pool thread.

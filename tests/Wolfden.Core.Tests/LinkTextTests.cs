@@ -7,15 +7,15 @@ namespace Wolfden.Core.Tests;
 public class LinkTextTests
 {
     [Theory]
-    [InlineData("Mara Voss", "mara voss")]
-    [InlineData("  MARA \t  voss\n", "mara voss")]
-    [InlineData("mara-voss", "mara-voss")]
+    [InlineData("Ilse Tarrow", "ilse tarrow")]
+    [InlineData("  ILSE \t  tarrow\n", "ilse tarrow")]
+    [InlineData("ilse-tarrow", "ilse-tarrow")]
     [InlineData("Straße", "strasse")]
     [InlineData("STRASSE", "strasse")]
     [InlineData("ΣΊΣΥΦΟΣ", "σίσυφοσ")]
     [InlineData("σίσυφος", "σίσυφοσ")]
     [InlineData("Zoë", "zoë")]
-    [InlineData("Ｍａｒａ", "ｍａｒａ")]
+    [InlineData("Ｉｌｓｅ", "ｉｌｓｅ")]
     [InlineData("a b", "a b")]
     public void TextIsFoldedTrimmedAndCollapsed(string text, string normalized)
     {
@@ -23,8 +23,8 @@ public class LinkTextTests
     }
 
     [Theory]
-    [InlineData("Mara Voss", "mara voss", true)]
-    [InlineData("Mara Voss", "mara-voss", false)]
+    [InlineData("Ilse Tarrow", "ilse tarrow", true)]
+    [InlineData("Ilse Tarrow", "ilse-tarrow", false)]
     [InlineData("Zoë", "ZOË", true)]
     public void MatchingIsCaseInsensitiveButKeepsHyphens(string a, string b, bool match)
     {

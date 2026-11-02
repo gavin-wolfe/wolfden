@@ -403,7 +403,7 @@ public sealed partial class EntityCatalog
 
                 break;
             case var node:
-                Error("F-ENT-4", node.Line, "aliases must be a list of strings, such as 'aliases: [Voss]', even for one alias.");
+                Error("F-ENT-4", node.Line, "aliases must be a list of strings, such as 'aliases: [Tarrow]', even for one alias.");
                 break;
         }
 

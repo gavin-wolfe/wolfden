@@ -123,10 +123,10 @@ public class HardeningTests
     public void TreeCheckAcceptsNewNestedMappings()
     {
         var before = Md("---\na: 1\nfields:\n---\n").Frontmatter;
-        var after = Md("---\na: 1\nfields:\n  pov: Mara\n---\n").Frontmatter;
+        var after = Md("---\na: 1\nfields:\n  pov: Ilse\n---\n").Frontmatter;
 
-        Assert.True(YamlTreeCheck.SameExcept(before, after, ["fields", "pov"], YamlScalarValue.String("Mara")));
-        Assert.True(YamlTreeCheck.SameExcept(null, Md("---\nfields:\n  pov: Mara\n---\n").Frontmatter, ["fields", "pov"], YamlScalarValue.String("Mara")));
+        Assert.True(YamlTreeCheck.SameExcept(before, after, ["fields", "pov"], YamlScalarValue.String("Ilse")));
+        Assert.True(YamlTreeCheck.SameExcept(null, Md("---\nfields:\n  pov: Ilse\n---\n").Frontmatter, ["fields", "pov"], YamlScalarValue.String("Ilse")));
     }
 
     // --- Deep nesting never crashes ---

@@ -32,29 +32,29 @@ public class CollectionEditTests
 
     [Theory]
     [Trait("Scenario", "SC-RT-7")]
-    [InlineData("aliases: [Voss]\n", "aliases: [Voss, Mara]\n")]
-    [InlineData("aliases: [Voss, Halden]  # surnames\n", "aliases: [Voss, Halden, Mara]  # surnames\n")]
-    [InlineData("aliases: [Voss,Halden]\n", "aliases: [Voss,Halden,Mara]\n")]
-    [InlineData("aliases: [ Voss, Halden ]\n", "aliases: [ Voss, Halden, Mara ]\n")]
-    [InlineData("aliases: [Voss, Halden,]\n", "aliases: [Voss, Halden, Mara,]\n")]
-    [InlineData("aliases: []\n", "aliases: [Mara]\n")]
-    [InlineData("aliases: [ ]\n", "aliases: [ Mara ]\n")]
-    [InlineData("aliases: ['Voss']\n", "aliases: ['Voss', 'Mara']\n")]
-    [InlineData("aliases: [\"the Commander\"]\n", "aliases: [\"the Commander\", \"Mara\"]\n")]
+    [InlineData("aliases: [Tarrow]\n", "aliases: [Tarrow, Ilse]\n")]
+    [InlineData("aliases: [Tarrow, Halden]  # surnames\n", "aliases: [Tarrow, Halden, Ilse]  # surnames\n")]
+    [InlineData("aliases: [Tarrow,Halden]\n", "aliases: [Tarrow,Halden,Ilse]\n")]
+    [InlineData("aliases: [ Tarrow, Halden ]\n", "aliases: [ Tarrow, Halden, Ilse ]\n")]
+    [InlineData("aliases: [Tarrow, Halden,]\n", "aliases: [Tarrow, Halden, Ilse,]\n")]
+    [InlineData("aliases: []\n", "aliases: [Ilse]\n")]
+    [InlineData("aliases: [ ]\n", "aliases: [ Ilse ]\n")]
+    [InlineData("aliases: ['Tarrow']\n", "aliases: ['Tarrow', 'Ilse']\n")]
+    [InlineData("aliases: [\"the Commander\"]\n", "aliases: [\"the Commander\", \"Ilse\"]\n")]
     public void AnItemGoesAtTheEndOfAFlowList(string before, string after)
     {
-        var edited = Md(before).WithNewListItem(["aliases"], S("Mara"));
+        var edited = Md(before).WithNewListItem(["aliases"], S("Ilse"));
 
         Assert.Equal(after, Fm(edited));
     }
 
     [Theory]
-    [InlineData(0, "aliases: [Mara, Voss, Halden]\n")]
-    [InlineData(1, "aliases: [Voss, Mara, Halden]\n")]
-    [InlineData(2, "aliases: [Voss, Halden, Mara]\n")]
+    [InlineData(0, "aliases: [Ilse, Tarrow, Halden]\n")]
+    [InlineData(1, "aliases: [Tarrow, Ilse, Halden]\n")]
+    [InlineData(2, "aliases: [Tarrow, Halden, Ilse]\n")]
     public void AnItemCanGoAnywhereInAFlowList(int index, string after)
     {
-        var edited = Md("aliases: [Voss, Halden]\n").WithNewListItem(["aliases"], S("Mara"), index);
+        var edited = Md("aliases: [Tarrow, Halden]\n").WithNewListItem(["aliases"], S("Ilse"), index);
 
         Assert.Equal(after, Fm(edited));
     }
@@ -67,30 +67,30 @@ public class CollectionEditTests
     [InlineData("2291", "\"2291\"")]
     public void FlowItemsAreQuotedWhenFlowSyntaxWouldMisreadThem(string value, string written)
     {
-        var edited = Md("aliases: [Voss]\n").WithNewListItem(["aliases"], S(value));
+        var edited = Md("aliases: [Tarrow]\n").WithNewListItem(["aliases"], S(value));
 
-        Assert.Equal($"aliases: [Voss, {written}]\n", Fm(edited));
+        Assert.Equal($"aliases: [Tarrow, {written}]\n", Fm(edited));
         Assert.Equal(value, ((YamlSequence)edited.GetFrontmatterValue("aliases")!).Items[1].ToString());
     }
 
     private const string MultiLineFlow = """
         aliases: [
-          Voss,  # surname
+          Tarrow,  # surname
           Halden
         ]
-        name: Mara
+        name: Ilse
 
         """;
 
     [Theory]
-    [InlineData(3, "aliases: [\n  Voss,  # surname\n  Halden,\n  Mara\n]\nname: Mara\n")]
-    [InlineData(1, "aliases: [\n  Voss,  # surname\n  Mara,\n  Halden\n]\nname: Mara\n")]
-    [InlineData(0, "aliases: [\n  Mara,\n  Voss,  # surname\n  Halden\n]\nname: Mara\n")]
+    [InlineData(3, "aliases: [\n  Tarrow,  # surname\n  Halden,\n  Ilse\n]\nname: Ilse\n")]
+    [InlineData(1, "aliases: [\n  Tarrow,  # surname\n  Ilse,\n  Halden\n]\nname: Ilse\n")]
+    [InlineData(0, "aliases: [\n  Ilse,\n  Tarrow,  # surname\n  Halden\n]\nname: Ilse\n")]
     public void AFlowListWithOneItemPerLineGetsANewLine(int index, string after)
     {
         var file = Md(MultiLineFlow);
 
-        var edited = file.WithNewListItem(["aliases"], S("Mara"), index == 3 ? null : index);
+        var edited = file.WithNewListItem(["aliases"], S("Ilse"), index == 3 ? null : index);
 
         Assert.Equal(after, Fm(edited));
     }
@@ -98,41 +98,41 @@ public class CollectionEditTests
     [Fact]
     public void AMultiLineFlowListWithATrailingCommaKeepsIt()
     {
-        var edited = Md("aliases: [\n  Voss,\n  Halden,  # last\n]\n").WithNewListItem(["aliases"], S("Mara"));
+        var edited = Md("aliases: [\n  Tarrow,\n  Halden,  # last\n]\n").WithNewListItem(["aliases"], S("Ilse"));
 
-        Assert.Equal("aliases: [\n  Voss,\n  Halden,  # last\n  Mara,\n]\n", Fm(edited));
+        Assert.Equal("aliases: [\n  Tarrow,\n  Halden,  # last\n  Ilse,\n]\n", Fm(edited));
     }
 
     private const string BlockList = """
         aliases:
-          - Voss
+          - Tarrow
           # the rank she earns in Ember
           - the Commander  # since ember:22
         # notes on the name follow
-        name: Mara
+        name: Ilse
 
         """;
 
     [Theory]
     [Trait("Scenario", "SC-RT-7")]
-    [InlineData(null, "aliases:\n  - Voss\n  # the rank she earns in Ember\n  - the Commander  # since ember:22\n  - Mara\n# notes on the name follow\nname: Mara\n")]
-    [InlineData(1, "aliases:\n  - Voss\n  - Mara\n  # the rank she earns in Ember\n  - the Commander  # since ember:22\n# notes on the name follow\nname: Mara\n")]
-    [InlineData(0, "aliases:\n  - Mara\n  - Voss\n  # the rank she earns in Ember\n  - the Commander  # since ember:22\n# notes on the name follow\nname: Mara\n")]
+    [InlineData(null, "aliases:\n  - Tarrow\n  # the rank she earns in Ember\n  - the Commander  # since ember:22\n  - Ilse\n# notes on the name follow\nname: Ilse\n")]
+    [InlineData(1, "aliases:\n  - Tarrow\n  - Ilse\n  # the rank she earns in Ember\n  - the Commander  # since ember:22\n# notes on the name follow\nname: Ilse\n")]
+    [InlineData(0, "aliases:\n  - Ilse\n  - Tarrow\n  # the rank she earns in Ember\n  - the Commander  # since ember:22\n# notes on the name follow\nname: Ilse\n")]
     public void AnItemInABlockListGetsItsOwnLineAfterTheItemBeforeIt(int? index, string after)
     {
-        var edited = Md(BlockList).WithNewListItem(["aliases"], S("Mara"), index);
+        var edited = Md(BlockList).WithNewListItem(["aliases"], S("Ilse"), index);
 
         Assert.Equal(after, Fm(edited));
     }
 
     [Theory]
-    [InlineData("aliases:\n- Voss\nname: x\n", "aliases:\n- Voss\n- Mara\nname: x\n")]
-    [InlineData("aliases:\n    -   Voss\nname: x\n", "aliases:\n    -   Voss\n    -   Mara\nname: x\n")]
-    [InlineData("aliases:\n  - 'Voss'\n", "aliases:\n  - 'Voss'\n  - 'Mara'\n")]
-    [InlineData("aliases:\n  -\n", "aliases:\n  -\n  - Mara\n")]
+    [InlineData("aliases:\n- Tarrow\nname: x\n", "aliases:\n- Tarrow\n- Ilse\nname: x\n")]
+    [InlineData("aliases:\n    -   Tarrow\nname: x\n", "aliases:\n    -   Tarrow\n    -   Ilse\nname: x\n")]
+    [InlineData("aliases:\n  - 'Tarrow'\n", "aliases:\n  - 'Tarrow'\n  - 'Ilse'\n")]
+    [InlineData("aliases:\n  -\n", "aliases:\n  -\n  - Ilse\n")]
     public void ABlockItemCopiesTheListsIndentDashSpacingAndQuoting(string before, string after)
     {
-        Assert.Equal(after, Fm(Md(before).WithNewListItem(["aliases"], S("Mara"))));
+        Assert.Equal(after, Fm(Md(before).WithNewListItem(["aliases"], S("Ilse"))));
     }
 
     private const string Temporal = """
@@ -190,12 +190,12 @@ public class CollectionEditTests
     }
 
     [Theory]
-    [InlineData("aliases:\nname: x\n", "aliases: [Mara]\nname: x\n")]
-    [InlineData("aliases: ~  # none yet\nname: x\n", "aliases: [Mara]  # none yet\nname: x\n")]
-    [InlineData("name: x\n", "name: x\naliases: [Mara]\n")]
+    [InlineData("aliases:\nname: x\n", "aliases: [Ilse]\nname: x\n")]
+    [InlineData("aliases: ~  # none yet\nname: x\n", "aliases: [Ilse]  # none yet\nname: x\n")]
+    [InlineData("name: x\n", "name: x\naliases: [Ilse]\n")]
     public void AMissingOrNullListBecomesAFlowList(string before, string after)
     {
-        Assert.Equal(after, Fm(Md(before).WithNewListItem(["aliases"], S("Mara"))));
+        Assert.Equal(after, Fm(Md(before).WithNewListItem(["aliases"], S("Ilse"))));
     }
 
     [Theory]
@@ -218,15 +218,15 @@ public class CollectionEditTests
     [Fact]
     public void AFileWithNoFrontmatterGetsSomeForItsFirstAlias()
     {
-        var edited = MarkdownFile.Parse(TestFiles.Utf8("# Mara\n")).WithNewListItem(["aliases"], S("Voss"));
+        var edited = MarkdownFile.Parse(TestFiles.Utf8("# Ilse\n")).WithNewListItem(["aliases"], S("Tarrow"));
 
-        Assert.Equal("---\naliases: [Voss]\n---\n# Mara\n", edited.Text);
+        Assert.Equal("---\naliases: [Tarrow]\n---\n# Ilse\n", edited.Text);
     }
 
     [Fact]
     public void AddingToSomethingThatIsNotAListIsRefused()
     {
-        var file = Md("name: Mara\naliases: [Voss]\nfields: { a: 1 }\n");
+        var file = Md("name: Ilse\naliases: [Tarrow]\nfields: { a: 1 }\n");
 
         Assert.Throws<InvalidOperationException>(() => file.WithNewListItem(["name"], S("x")));
         Assert.Throws<InvalidOperationException>(() => file.WithNewListItem(["fields"], S("x")));
@@ -248,13 +248,13 @@ public class CollectionEditTests
 
     [Theory]
     [Trait("Scenario", "SC-RT-8")]
-    [InlineData("[Voss, Halden, Mara]", "0", "[Halden, Mara]")]
-    [InlineData("[Voss, Halden, Mara]", "1", "[Voss, Mara]")]
-    [InlineData("[Voss, Halden, Mara]", "2", "[Voss, Halden]")]
-    [InlineData("[Voss, Halden,]", "1", "[Voss,]")]
-    [InlineData("[Voss]", "0", "[]")]
-    [InlineData("[ Voss ]", "0", "[]")]
-    [InlineData("[Voss,Halden]", "0", "[Halden]")]
+    [InlineData("[Tarrow, Halden, Ilse]", "0", "[Halden, Ilse]")]
+    [InlineData("[Tarrow, Halden, Ilse]", "1", "[Tarrow, Ilse]")]
+    [InlineData("[Tarrow, Halden, Ilse]", "2", "[Tarrow, Halden]")]
+    [InlineData("[Tarrow, Halden,]", "1", "[Tarrow,]")]
+    [InlineData("[Tarrow]", "0", "[]")]
+    [InlineData("[ Tarrow ]", "0", "[]")]
+    [InlineData("[Tarrow,Halden]", "0", "[Halden]")]
     public void RemovingAFlowItemTakesOneSeparatorWithIt(string before, string index, string after)
     {
         var edited = Md($"aliases: {before}  # names\n").WithoutFrontmatterValue(["aliases", index]);
@@ -263,12 +263,12 @@ public class CollectionEditTests
     }
 
     [Theory]
-    [InlineData("0", "aliases: [\n  Halden,\n  Mara\n]\n")]
-    [InlineData("1", "aliases: [\n  Voss,  # surname\n  Mara\n]\n")]
-    [InlineData("2", "aliases: [\n  Voss,  # surname\n  Halden\n]\n")]
+    [InlineData("0", "aliases: [\n  Halden,\n  Ilse\n]\n")]
+    [InlineData("1", "aliases: [\n  Tarrow,  # surname\n  Ilse\n]\n")]
+    [InlineData("2", "aliases: [\n  Tarrow,  # surname\n  Halden\n]\n")]
     public void RemovingAFlowItemOnItsOwnLineRemovesTheLine(string index, string after)
     {
-        var edited = Md("aliases: [\n  Voss,  # surname\n  Halden,\n  Mara\n]\n").WithoutFrontmatterValue(["aliases", index]);
+        var edited = Md("aliases: [\n  Tarrow,  # surname\n  Halden,\n  Ilse\n]\n").WithoutFrontmatterValue(["aliases", index]);
 
         Assert.Equal(after, Fm(edited));
     }
@@ -279,15 +279,15 @@ public class CollectionEditTests
     [InlineData("1")]
     public void RemovingAFlowItemThatWouldTakeACommentWithItIsRefused(string index)
     {
-        var file = Md("aliases: [Voss,  # surname\n  Halden]\n");
+        var file = Md("aliases: [Tarrow,  # surname\n  Halden]\n");
 
         Assert.Throws<NotSupportedException>(() => file.WithoutFrontmatterValue(["aliases", index]));
     }
 
     [Theory]
     [Trait("Scenario", "SC-RT-8")]
-    [InlineData("0", "aliases:\n  # the rank she earns in Ember\n  - the Commander  # since ember:22\n# notes on the name follow\nname: Mara\n")]
-    [InlineData("1", "aliases:\n  - Voss\n  # the rank she earns in Ember\n# notes on the name follow\nname: Mara\n")]
+    [InlineData("0", "aliases:\n  # the rank she earns in Ember\n  - the Commander  # since ember:22\n# notes on the name follow\nname: Ilse\n")]
+    [InlineData("1", "aliases:\n  - Tarrow\n  # the rank she earns in Ember\n# notes on the name follow\nname: Ilse\n")]
     public void RemovingABlockItemRemovesItsLinesAndKeepsTheCommentsAboveIt(string index, string after)
     {
         Assert.Equal(after, Fm(Md(BlockList).WithoutFrontmatterValue(["aliases", index])));
@@ -296,7 +296,7 @@ public class CollectionEditTests
     [Fact]
     public void RemovingTheOnlyBlockItemLeavesTheKeyUnset()
     {
-        var edited = Md("aliases:\n  - Voss\nname: x\n").WithoutFrontmatterValue(["aliases", "0"]);
+        var edited = Md("aliases:\n  - Tarrow\nname: x\n").WithoutFrontmatterValue(["aliases", "0"]);
 
         Assert.Equal("aliases:\nname: x\n", Fm(edited));
         Assert.True(edited.GetFrontmatterValue("aliases") is YamlScalar { IsNull: true });
@@ -323,7 +323,7 @@ public class CollectionEditTests
     [Fact]
     public void RemovingAnItemPastTheEndChangesNothingButAPathThatDoesNotFitIsRefused()
     {
-        var file = Md("name: Mara\naliases: [Voss]\n");
+        var file = Md("name: Ilse\naliases: [Tarrow]\n");
 
         // Nothing there: like a missing key, nothing to remove.
         Assert.Same(file, file.WithoutFrontmatterValue(["aliases", "1"]));
@@ -338,7 +338,7 @@ public class CollectionEditTests
     // ---- A chapter list field emptied is `[]`, "none here" (F-CHAP-5, F-RT-6) ----
 
     private const string Chapters = """
-        chapter_defaults: { pov: "[[mara-voss]]" }
+        chapter_defaults: { pov: "[[ilse-tarrow]]" }
         chapters:
           - key: prologue
             fields:
@@ -396,7 +396,7 @@ public class CollectionEditTests
     [Fact]
     public void OtherFieldsStillEndAsNullAndEmptyListCanBeAskedFor()
     {
-        var text = "aliases:\n  - Voss\nname: x\n";
+        var text = "aliases:\n  - Tarrow\nname: x\n";
 
         Assert.Equal("aliases:\nname: x\n", Fm(Md(text).WithoutFrontmatterValue(["aliases", "0"])));
         Assert.Equal("aliases: []\nname: x\n", Fm(Md(text).WithoutFrontmatterValue(["aliases", "0"], EmptiedList.EmptyList)));
@@ -446,16 +446,16 @@ public class CollectionEditTests
 
     // ---- chapter_defaults lists emptied are `[]` too (F-CHAP-5, F-RT-6) ----
 
-    private const string BookDefaults = "name: Ember\nchapter_defaults:\n  pov:  # the usual narrator\n    - \"[[mara-voss]]\"\n  narration: first\nchapters:\n  - key: \"1\"\n";
+    private const string BookDefaults = "name: Ember\nchapter_defaults:\n  pov:  # the usual narrator\n    - \"[[ilse-tarrow]]\"\n  narration: first\nchapters:\n  - key: \"1\"\n";
 
-    private const string SeriesDefaults = "name: The Long Dark\nbooks: [ember, ash]\nchapter_defaults: { pov: [\"[[mara-voss]]\"], narration: first }\n";
+    private const string SeriesDefaults = "name: The Long Dark\nbooks: [ember, ash]\nchapter_defaults: { pov: [\"[[ilse-tarrow]]\"], narration: first }\n";
 
     [Theory]
     [Trait("Scenario", "SC-RT-15")]
-    [InlineData(BookDefaults, "  pov:  # the usual narrator\n    - \"[[mara-voss]]\"\n", "  pov: []  # the usual narrator\n")]
-    [InlineData(SeriesDefaults, "{ pov: [\"[[mara-voss]]\"], narration", "{ pov: [], narration")]
-    [InlineData("name: The Long Dark\nbooks: [ember]\nchapter_defaults:\n  pov:\n    - \"[[mara-voss]]\"\n", "  pov:\n    - \"[[mara-voss]]\"\n", "  pov: []\n")]
-    [InlineData("name: Ember\nchapter_defaults: { pov: [\"[[mara-voss]]\"] }\nchapters: []\n", "[\"[[mara-voss]]\"]", "[]")]
+    [InlineData(BookDefaults, "  pov:  # the usual narrator\n    - \"[[ilse-tarrow]]\"\n", "  pov: []  # the usual narrator\n")]
+    [InlineData(SeriesDefaults, "{ pov: [\"[[ilse-tarrow]]\"], narration", "{ pov: [], narration")]
+    [InlineData("name: The Long Dark\nbooks: [ember]\nchapter_defaults:\n  pov:\n    - \"[[ilse-tarrow]]\"\n", "  pov:\n    - \"[[ilse-tarrow]]\"\n", "  pov: []\n")]
+    [InlineData("name: Ember\nchapter_defaults: { pov: [\"[[ilse-tarrow]]\"] }\nchapters: []\n", "[\"[[ilse-tarrow]]\"]", "[]")]
     public void RemovingTheLastChapterDefaultLeavesAnEmptyList(string frontmatter, string oldText, string newText)
     {
         // Block and flow lists, in book.md (with chapters) and series.md (with books).
@@ -469,7 +469,7 @@ public class CollectionEditTests
     [Trait("Scenario", "SC-RT-15")]
     public void AnEmptiedChapterDefaultKeepsCrlf()
     {
-        var text = "---\r\nname: Ember\r\nchapter_defaults:\r\n  pov:\r\n    - \"[[mara-voss]]\"\r\n    - \"[[wren-calder]]\"\r\n---\r\n";
+        var text = "---\r\nname: Ember\r\nchapter_defaults:\r\n  pov:\r\n    - \"[[ilse-tarrow]]\"\r\n    - \"[[wren-calder]]\"\r\n---\r\n";
         var file = MarkdownFile.Parse(TestFiles.Utf8(text));
 
         var edited = file.WithoutChapterDefaultItem("pov", 1).WithoutChapterDefaultItem("pov", 0);
@@ -493,14 +493,14 @@ public class CollectionEditTests
     [Fact]
     public void AnItemAtIndexZeroGoesAboveTheCommentsOverTheFirstItem()
     {
-        var text = "aliases:\n  # her surname\n  - Voss\n";
+        var text = "aliases:\n  # her surname\n  - Tarrow\n";
 
-        Assert.Equal("aliases:\n  - Mara\n  # her surname\n  - Voss\n", Fm(Md(text).WithNewListItem(["aliases"], S("Mara"), 0)));
+        Assert.Equal("aliases:\n  - Ilse\n  # her surname\n  - Tarrow\n", Fm(Md(text).WithNewListItem(["aliases"], S("Ilse"), 0)));
     }
 
     private const string Indented = """
         aliases:
-          - Voss
+          - Tarrow
             # her surname, from her father
           # the rank she earns
           - the Commander
@@ -508,11 +508,11 @@ public class CollectionEditTests
         """;
 
     [Theory]
-    [InlineData(1, "aliases:\n  - Voss\n    # her surname, from her father\n  - Mara\n  # the rank she earns\n  - the Commander\n")]
-    [InlineData(null, "aliases:\n  - Voss\n    # her surname, from her father\n  # the rank she earns\n  - the Commander\n  - Mara\n")]
+    [InlineData(1, "aliases:\n  - Tarrow\n    # her surname, from her father\n  - Ilse\n  # the rank she earns\n  - the Commander\n")]
+    [InlineData(null, "aliases:\n  - Tarrow\n    # her surname, from her father\n  # the rank she earns\n  - the Commander\n  - Ilse\n")]
     public void CommentsIndentedUnderAnItemStayWithIt(int? index, string after)
     {
-        Assert.Equal(after, Fm(Md(Indented).WithNewListItem(["aliases"], S("Mara"), index)));
+        Assert.Equal(after, Fm(Md(Indented).WithNewListItem(["aliases"], S("Ilse"), index)));
     }
 
     [Fact]
@@ -578,7 +578,7 @@ public class CollectionEditTests
     [InlineData("2147483647")]
     public void AVeryLargeItemNumberIsPastTheEnd(string index)
     {
-        var file = Md("aliases: [Voss]\n");
+        var file = Md("aliases: [Tarrow]\n");
 
         Assert.Same(file, file.WithoutFrontmatterValue(["aliases", index]));
         Assert.Null(file.GetFrontmatterValue("aliases", index));
@@ -606,10 +606,10 @@ public class CollectionEditTests
     [InlineData("what?now", "\"what?now\"")]
     public void AQuestionMarkIsQuotedInFlowContext(string value, string written)
     {
-        var list = Md("aliases: [Voss]\n").WithNewListItem(["aliases"], S(value));
+        var list = Md("aliases: [Tarrow]\n").WithNewListItem(["aliases"], S(value));
         var mapping = Md("died: { value: x, from: \"a1:1\" }\n").WithFrontmatterValue(["died", "value"], S(value));
 
-        Assert.Equal($"aliases: [Voss, {written}]\n", Fm(list));
+        Assert.Equal($"aliases: [Tarrow, {written}]\n", Fm(list));
         Assert.Equal($"died: {{ value: {written}, from: \"a1:1\" }}\n", Fm(mapping));
         Assert.Equal(value, mapping.GetFrontmatterValue("died", "value")!.ToString());
     }
@@ -740,9 +740,9 @@ public class CollectionEditTests
     }
 
     [Theory]
-    [InlineData("aliases: [Voss, \"the Commander\"]\n", "aliases: [Voss, \"Cmdr\"]\n")]
-    [InlineData("aliases:\n  - Voss\n  - the Commander  # rank\n", "aliases:\n  - Voss\n  - Cmdr  # rank\n")]
-    [InlineData("aliases:\n  - Voss\n  -\n", "aliases:\n  - Voss\n  - Cmdr\n")]
+    [InlineData("aliases: [Tarrow, \"the Commander\"]\n", "aliases: [Tarrow, \"Cmdr\"]\n")]
+    [InlineData("aliases:\n  - Tarrow\n  - the Commander  # rank\n", "aliases:\n  - Tarrow\n  - Cmdr  # rank\n")]
+    [InlineData("aliases:\n  - Tarrow\n  -\n", "aliases:\n  - Tarrow\n  - Cmdr\n")]
     public void ReplacingOneListItemKeepsItsQuotingAndComment(string before, string after)
     {
         Assert.Equal(after, Fm(Md(before).WithFrontmatterValue(["aliases", "1"], S("Cmdr"))));
@@ -768,8 +768,8 @@ public class CollectionEditTests
     // ---- #97: removing a key ----
 
     private const string Keys = """
-        # Mara's notes
-        name: Mara Voss   # display name
+        # Ilse's notes
+        name: Ilse Tarrow   # display name
         # Ranks change over time.
         rank:
           - { value: Lieutenant, from: "ember:1" }
@@ -788,7 +788,7 @@ public class CollectionEditTests
     {
         var edited = Md(Keys).WithoutFrontmatterValue(["name"]);
 
-        Assert.Equal(Keys.Replace("name: Mara Voss   # display name\n", "", StringComparison.Ordinal), Fm(edited));
+        Assert.Equal(Keys.Replace("name: Ilse Tarrow   # display name\n", "", StringComparison.Ordinal), Fm(edited));
     }
 
     [Fact]
@@ -905,13 +905,13 @@ public class CollectionEditTests
         var nl = "\r\n";
 
         var edited = file
-            .WithNewListItem(["aliases"], S("Mara"))
+            .WithNewListItem(["aliases"], S("Ilse"))
             .WithNewListItem(["fields", "rank"], Entry("Captain", "ash:30"))
             .WithoutFrontmatterValue(["fields", "born"])
             .WithoutFrontmatterValue(["aliases", "0"]);
 
         var expected = file.Text
-            .Replace("aliases: [Voss, \"the Commander\"]", "aliases: [\"the Commander\", \"Mara\"]", StringComparison.Ordinal)
+            .Replace("aliases: [Tarrow, \"the Commander\"]", "aliases: [\"the Commander\", \"Ilse\"]", StringComparison.Ordinal)
             .Replace("from: \"ember:22\" }" + nl, "from: \"ember:22\" }" + nl + "    - { value: Captain, from: \"ash:30\" }" + nl, StringComparison.Ordinal)
             .Replace("  born: \"2291\"" + nl, "", StringComparison.Ordinal);
         Assert.Equal(expected, edited.Text);
@@ -989,7 +989,7 @@ public class CollectionEditTests
     [Trait("Scenario", "SC-RT-16")]
     public void EmptyingAChapterDefaultListTakesTheCommentsInsideIt()
     {
-        var text = "chapter_defaults:\n  pov:  # the usual narrator\n    # until the Reach\n    - \"[[mara-voss]]\"\n";
+        var text = "chapter_defaults:\n  pov:  # the usual narrator\n    # until the Reach\n    - \"[[ilse-tarrow]]\"\n";
 
         Assert.Equal("chapter_defaults:\n  pov: []  # the usual narrator\n", Fm(Md(text).WithoutChapterDefaultItem("pov", 0)));
     }
@@ -1013,7 +1013,7 @@ public class CollectionEditTests
     [InlineData("chapter_defaults:\n  pov: x\n\n    # about the chapters\nchapters: []\n", "chapter_defaults.pov", "chapter_defaults:\nchapters: []\n", 1)]
     [InlineData("chapter_defaults:\n  pov: x\n  # a note\n\n  # another\n\nchapters: []\n", "chapter_defaults.pov", "chapter_defaults:\n\nchapters: []\n", 2)]
     [InlineData("chapter_defaults:\n  pov: x\n  # inside\n# about the chapters\n  # after an outer comment\nchapters: []\n", "chapter_defaults.pov", "chapter_defaults:\n# about the chapters\n  # after an outer comment\nchapters: []\n", 1)]
-    [InlineData("aliases:\n  - Voss\n  # the Commander, once she earns it\nname: x\n", "aliases.0", "aliases:\nname: x\n", 1)]
+    [InlineData("aliases:\n  - Tarrow\n  # the Commander, once she earns it\nname: x\n", "aliases.0", "aliases:\nname: x\n", 1)]
     [InlineData("chapter_defaults:\n  # a\n  pov: x\n    # under pov\n  # b\nchapters: []\n", "chapter_defaults.pov", "chapter_defaults:\nchapters: []\n", 2)]
     public void EmptyingACollectionTakesTheCommentsAfterItThatAreStillInsideIt(string text, string path, string after, int comments)
     {
@@ -1046,7 +1046,7 @@ public class CollectionEditTests
     [InlineData("0", "0")]
     public void EmptyingAListItemByItemInAnyOrderEndsTheSame(string first, string second)
     {
-        var text = "aliases:\n  - Voss\n  # her rank\n  - the Commander\nname: x\n";
+        var text = "aliases:\n  - Tarrow\n  # her rank\n  - the Commander\nname: x\n";
 
         var edited = Md(text).WithoutFrontmatterValue(["aliases", first]).WithoutFrontmatterValue(["aliases", second]);
 

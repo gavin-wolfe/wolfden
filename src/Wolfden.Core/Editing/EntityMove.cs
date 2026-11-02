@@ -39,7 +39,7 @@ public sealed record EntityMovePlan(
 /// <summary>
 /// Moves an entity's file to another scope of its universe: the universe,
 /// a series, or a book (format.md F-LAY-5). The file keeps its place under
-/// <c>entities/</c> (<c>characters/crew/mara-voss.md</c>), so its slug stays
+/// <c>entities/</c> (<c>characters/crew/ilse-tarrow.md</c>), so its slug stays
 /// the same. Links don't depend on scope except to break ties (F-LINK-7), so
 /// a link to the entity that would stop reaching it after the move is
 /// rewritten, in the same change, to the entity's id (F-RT-5), showing the

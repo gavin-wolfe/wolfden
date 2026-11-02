@@ -18,7 +18,7 @@ namespace Wolfden.Index.Tests;
 /// </summary>
 public sealed class UnlistableFolderTests
 {
-    private const string Mara = "universes/starfall/series/long-dark/entities/characters/mara-voss.md";
+    private const string Ilse = "universes/starfall/series/long-dark/entities/characters/ilse-tarrow.md";
     private const string Characters = "universes/starfall/series/long-dark/entities/characters";
     private const string Ember = "universes/starfall/series/long-dark/books/ember";
 
@@ -124,16 +124,16 @@ public sealed class UnlistableFolderTests
         using var den = TempDen.Starfall();
         var tree = DenFileTree.Scan(den.Root);
         var fingerprint = tree.Fingerprint();
-        var bytes = File.ReadAllBytes(Full(den.Root, Mara));
-        File.Delete(Full(den.Root, Mara));
+        var bytes = File.ReadAllBytes(Full(den.Root, Ilse));
+        File.Delete(Full(den.Root, Ilse));
 
         var state = IndexWriter.Load(den.Root, tree, fingerprint);
 
-        Assert.Null(state.Tree.Hash(Mara));
+        Assert.Null(state.Tree.Hash(Ilse));
         Assert.True(state.Tree.HasFolder(Characters));
         Assert.Equal(DenFileTree.Scan(den.Root).Fingerprint(), state.Rows.Meta[IndexSchema.FilesFingerprintKey]);
 
-        File.WriteAllBytes(Full(den.Root, Mara), bytes);
+        File.WriteAllBytes(Full(den.Root, Ilse), bytes);
         Assert.Equal(fingerprint, DenFileTree.Scan(den.Root).Fingerprint());
     }
 
@@ -147,7 +147,7 @@ public sealed class UnlistableFolderTests
 
         using (Unlistable(Full(den.Root, Characters)))
         {
-            var update = updater.Apply(Batch(den, (WatcherChangeTypes.Changed, Characters, null), (WatcherChangeTypes.Changed, Mara, null)), out var retry);
+            var update = updater.Apply(Batch(den, (WatcherChangeTypes.Changed, Characters, null), (WatcherChangeTypes.Changed, Ilse, null)), out var retry);
 
             Assert.Empty(retry);
             Assert.Equal(IndexUpdateKind.Updated, update!.Kind);
@@ -161,9 +161,9 @@ public sealed class UnlistableFolderTests
         }
 
         // The folder's next event brings it back.
-        var back = updater.Apply(Batch(den, (WatcherChangeTypes.Changed, Characters, null), (WatcherChangeTypes.Changed, Mara, null)), out _);
+        var back = updater.Apply(Batch(den, (WatcherChangeTypes.Changed, Characters, null), (WatcherChangeTypes.Changed, Ilse, null)), out _);
         Assert.Equal(IndexUpdateKind.Updated, back!.Kind);
-        Assert.Contains(updater.State!.Catalog.Entities, e => e.Path == Mara);
+        Assert.Contains(updater.State!.Catalog.Entities, e => e.Path == Ilse);
         AssertSameAsFullRebuild(den, "once the folder can be listed");
     }
 
@@ -221,16 +221,16 @@ public sealed class UnlistableFolderTests
         using var den = TempDen.Starfall();
         const string ilya = $"{Characters}/ilya-brand.md";
         const string added = $"{Characters}/zed-amar.md";
-        den.Write(ilya, "---\ntype: character\nname: Ilya Brand\n---\n\nSails with [[Mara Voss]].\n");
+        den.Write(ilya, "---\ntype: character\nname: Ilya Brand\n---\n\nSails with [[Ilse Tarrow]].\n");
         var updater = new IndexUpdater(den.Root);
         updater.Rebuild("start");
         Assert.Contains(updater.State!.Catalog.Entities, e => e.Path == ilya);
 
-        File.AppendAllText(Full(den.Root, Mara), "\nA line added in place.\n");
+        File.AppendAllText(Full(den.Root, Ilse), "\nA line added in place.\n");
         den.Write(added, "---\ntype: character\nname: Zed Amar\n---\n");
         using (Unlistable(Full(den.Root, Characters)))
         {
-            var update = updater.Apply(Batch(den, (WatcherChangeTypes.Changed, Mara, null)), out var retry);
+            var update = updater.Apply(Batch(den, (WatcherChangeTypes.Changed, Ilse, null)), out var retry);
 
             Assert.Empty(retry);
             Assert.Equal(IndexUpdateKind.Updated, update!.Kind);
@@ -246,7 +246,7 @@ public sealed class UnlistableFolderTests
         var back = updater.Apply(Batch(den, (WatcherChangeTypes.Changed, added, null)), out _);
         Assert.Equal(IndexUpdateKind.Updated, back!.Kind);
         Assert.Contains(updater.State!.Catalog.Entities, e => e.Path == ilya);
-        Assert.Contains(updater.State.Catalog.Entities, e => e.Path == Mara);
+        Assert.Contains(updater.State.Catalog.Entities, e => e.Path == Ilse);
         AssertSameAsFullRebuild(den, "once the folder can be listed");
     }
 

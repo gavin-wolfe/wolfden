@@ -15,7 +15,7 @@ public sealed class MoveEntityToolTests : IDisposable
     private const string Ember = Series + "/books/ember";
     private const string Ash = Series + "/books/ash";
     private const string Moon = Root + "/books/a-quiet-moon";
-    private const string Mara = Series + "/entities/characters/mara-voss.md";
+    private const string Ilse = Series + "/entities/characters/ilse-tarrow.md";
     private const string Tessaly = Series + "/entities/ships/tessaly.md";
     private const string Pike = Ash + "/entities/characters/halden-pike.md";
     private const string LanternItem = Ash + "/entities/items/lantern.md";
@@ -82,52 +82,52 @@ public sealed class MoveEntityToolTests : IDisposable
     [Trait("Scenario", "SC-MCP-29")]
     public void ANarrowingMoveOutsideTheEntryPointIsRefusedNamingBothWaysForward()
     {
-        var before = _den.Read(Mara);
-        var hash = Tools.GetEntity("Mara Voss", Universe).Entity!.Hash!;
+        var before = _den.Read(Ilse);
+        var hash = Tools.GetEntity("Ilse Tarrow", Universe).Entity!.Hash!;
 
-        var refused = Assert.Throws<DenToolException>(() => Tools.MoveEntity("Mara Voss", hash, toBook: "ash", universe: Universe));
+        var refused = Assert.Throws<DenToolException>(() => Tools.MoveEntity("Ilse Tarrow", hash, toBook: "ash", universe: Universe));
 
         Assert.Equal(ToolErrorCodes.EntryOutsideScope, refused.Code);
         Assert.Contains("ember:1", refused.Message, StringComparison.Ordinal);
         Assert.Contains("already met it", refused.Message, StringComparison.Ordinal);
         Assert.Contains("keep_entry", refused.Message, StringComparison.Ordinal);
         Assert.Contains("enter_at_new_scope", refused.Message, StringComparison.Ordinal);
-        Assert.Equal(before, _den.Read(Mara));
+        Assert.Equal(before, _den.Read(Ilse));
         Assert.Equal(
             ToolErrorCodes.BadArgument,
-            Assert.Throws<DenToolException>(() => Tools.MoveEntity("Mara Voss", hash, toBook: "ash", keepEntry: true, enterAtNewScope: true, universe: Universe)).Code);
+            Assert.Throws<DenToolException>(() => Tools.MoveEntity("Ilse Tarrow", hash, toBook: "ash", keepEntry: true, enterAtNewScope: true, universe: Universe)).Code);
     }
 
     [Fact]
     [Trait("Scenario", "SC-MCP-29")]
     public void KeepEntryKeepsTheFromAndItsWarning()
     {
-        var hash = Tools.GetEntity("Mara Voss", Universe).Entity!.Hash!;
+        var hash = Tools.GetEntity("Ilse Tarrow", Universe).Entity!.Hash!;
 
-        var result = Tools.MoveEntity("Mara Voss", hash, toBook: "ash", keepEntry: true, universe: Universe);
+        var result = Tools.MoveEntity("Ilse Tarrow", hash, toBook: "ash", keepEntry: true, universe: Universe);
 
-        var moved = Ash + "/entities/characters/mara-voss.md";
+        var moved = Ash + "/entities/characters/ilse-tarrow.md";
         Assert.Equal(moved, result.Path);
         Assert.Contains("\nfrom: \"ember:1\"\n", _den.Read(moved), StringComparison.Ordinal);
         Assert.Contains(result.Effects, e => e.Contains("keep_entry", StringComparison.Ordinal) && e.Contains("F-ENT-6", StringComparison.Ordinal));
         Assert.Contains(Tools.Check(path: moved, universe: Universe).Diagnostics, d => d.Rule == "F-ENT-6");
         Assert.Empty(result.PinnedCanon);
-        Assert.True(Tools.GetEntity("Mara Voss", Universe, "ember:1").InView);
+        Assert.True(Tools.GetEntity("Ilse Tarrow", Universe, "ember:1").InView);
     }
 
     [Fact]
     [Trait("Scenario", "SC-MCP-29")]
     public void EnterAtNewScopeTakesTheFromOutAndFlagsPinnedCanon()
     {
-        var hash = Tools.GetEntity("Mara Voss", Universe).Entity!.Hash!;
+        var hash = Tools.GetEntity("Ilse Tarrow", Universe).Entity!.Hash!;
 
-        var result = Tools.MoveEntity("Mara Voss", hash, toBook: "ash", enterAtNewScope: true, universe: Universe);
+        var result = Tools.MoveEntity("Ilse Tarrow", hash, toBook: "ash", enterAtNewScope: true, universe: Universe);
 
         Assert.DoesNotContain("\nfrom:", _den.Read(result.Path), StringComparison.Ordinal);
         Assert.Contains(result.Effects, e => e.Contains("now enters canon at the start of book 'ash'", StringComparison.Ordinal));
         Assert.NotEmpty(result.PinnedCanon);
-        Assert.False(Tools.GetEntity("Mara Voss", Universe, "ember:3").InView);
-        Assert.True(Tools.GetEntity("Mara Voss", Universe, "ash:1").InView);
+        Assert.False(Tools.GetEntity("Ilse Tarrow", Universe, "ember:3").InView);
+        Assert.True(Tools.GetEntity("Ilse Tarrow", Universe, "ash:1").InView);
     }
 
     [Fact]
@@ -176,12 +176,12 @@ public sealed class MoveEntityToolTests : IDisposable
 
         var moved = Ash + "/entities/ships/tessaly.md";
         Assert.Equal(moved, result.Path);
-        Assert.Contains($"| 2 | 2 | [[mara-voss\\|Voss]] | The away team leaves the [[{TessalyId}\\|Tessaly]]. |", _den.Read(EmberOutline), StringComparison.Ordinal);
-        Assert.Contains($"- {{ value: \"[[{TessalyId}|tessaly]]\", from: \"ember:1\", until: \"ash:2\" }}", _den.Read(Mara), StringComparison.Ordinal);
+        Assert.Contains($"| 2 | 2 | [[ilse-tarrow\\|Tarrow]] | The away team leaves the [[{TessalyId}\\|Tessaly]]. |", _den.Read(EmberOutline), StringComparison.Ordinal);
+        Assert.Contains($"- {{ value: \"[[{TessalyId}|tessaly]]\", from: \"ember:1\", until: \"ash:2\" }}", _den.Read(Ilse), StringComparison.Ordinal);
 
         // A link from Ash reaches it there as it is, so it's left alone.
         Assert.Contains("[[Tessaly]]", _den.Read(LanternItem), StringComparison.Ordinal);
-        Assert.Equal([moved, EmberOutline, Mara], result.Files!.Select(f => f.Path));
+        Assert.Equal([moved, EmberOutline, Ilse], result.Files!.Select(f => f.Path));
         Assert.Contains(result.Effects, e => e.Contains("2 link(s) to it would have stopped reaching it", StringComparison.Ordinal));
         Assert.DoesNotContain(Tools.Check(universe: Universe).Diagnostics, d => d.Rule == "F-LINK-7" && d.Message.Contains("Tessaly", StringComparison.OrdinalIgnoreCase));
     }
@@ -204,8 +204,8 @@ public sealed class MoveEntityToolTests : IDisposable
         Assert.False(File.Exists(Path.Combine(_den.Root, Ash + "/entities/ships/tessaly.md")));
 
         // Nothing moves into a final book, or out of one.
-        var mara = Tools.GetEntity("Mara Voss", Universe).Entity!.Hash!;
-        Assert.Equal(ToolErrorCodes.Frozen, Assert.Throws<DenToolException>(() => Tools.MoveEntity("Mara Voss", mara, toBook: "ember", universe: Universe)).Code);
+        var ilse = Tools.GetEntity("Ilse Tarrow", Universe).Entity!.Hash!;
+        Assert.Equal(ToolErrorCodes.Frozen, Assert.Throws<DenToolException>(() => Tools.MoveEntity("Ilse Tarrow", ilse, toBook: "ember", universe: Universe)).Code);
         _den.Write(Ember + "/entities/notes/watch-log.md", "---\nid: 01M4TF5F0EKGGWD5FNVBAEY8Z5\ntype: note\nname: Watch log\nstatus: draft\n---\n");
         var log = Tools.GetEntity("Watch log", Universe).Entity!.Hash!;
         Assert.Equal(ToolErrorCodes.Frozen, Assert.Throws<DenToolException>(() => Tools.MoveEntity("Watch log", log, toSeries: "long-dark", universe: Universe)).Code);
@@ -394,15 +394,15 @@ public sealed class MoveEntityToolTests : IDisposable
     [Trait("Scenario", "SC-MCP-29")]
     public void AFileAlreadyThereStopsTheMove()
     {
-        const string Taken = Root + "/entities/characters/mara-voss.md";
-        _den.Write(Taken, "---\nid: 01M4TF5F0EKGGWD5FNVBAEY8Z6\ntype: character\nname: Mara Voss (first draft)\nstatus: retconned\n---\n");
-        var before = _den.Read(Mara);
-        var hash = Tools.GetEntity(Mara, Universe).Entity!.Hash!;
+        const string Taken = Root + "/entities/characters/ilse-tarrow.md";
+        _den.Write(Taken, "---\nid: 01M4TF5F0EKGGWD5FNVBAEY8Z6\ntype: character\nname: Ilse Tarrow (first draft)\nstatus: retconned\n---\n");
+        var before = _den.Read(Ilse);
+        var hash = Tools.GetEntity(Ilse, Universe).Entity!.Hash!;
 
-        var refused = Assert.Throws<DenToolException>(() => Tools.MoveEntity(Mara, hash, universe: Universe));
+        var refused = Assert.Throws<DenToolException>(() => Tools.MoveEntity(Ilse, hash, universe: Universe));
 
         Assert.Equal(ToolErrorCodes.AlreadyExists, refused.Code);
-        Assert.Equal(before, _den.Read(Mara));
+        Assert.Equal(before, _den.Read(Ilse));
     }
 
     [Fact]
@@ -410,7 +410,7 @@ public sealed class MoveEntityToolTests : IDisposable
     public void AMoveThatFailsPartWayPutsBackWhatItWrote()
     {
         _den.Write(Moon + "/entities/ships/tessaly.md", "---\nid: 01M4TF5F0EKGGWD5FNVBAEY8Z4\ntype: ship\nname: Tessaly\nstatus: canon\nfrom: a-quiet-moon\n---\n");
-        var before = (Tessaly: _den.Read(Tessaly), Outline: _den.Read(EmberOutline), Mara: _den.Read(Mara));
+        var before = (Tessaly: _den.Read(Tessaly), Outline: _den.Read(EmberOutline), Ilse: _den.Read(Ilse));
         var hash = Tools.GetEntity(Tessaly, Universe).Entity!.Hash!;
         var moved = Ash + "/entities/ships/tessaly.md";
 
@@ -422,39 +422,39 @@ public sealed class MoveEntityToolTests : IDisposable
         Assert.Contains("put back", failed.Message, StringComparison.Ordinal);
         Assert.Equal(before.Tessaly, _den.Read(Tessaly));
         Assert.Equal(before.Outline, _den.Read(EmberOutline));
-        Assert.Equal(before.Mara, _den.Read(Mara));
+        Assert.Equal(before.Ilse, _den.Read(Ilse));
         Assert.False(File.Exists(Path.Combine(_den.Root, moved)));
 
         // A link rewrite that fails puts back the file rewritten in place, and the one written before it.
-        tools = new DenTools(_den.Root) { Store = new WriteToolTests.FailingStore(_den.Root, Mara) };
+        tools = new DenTools(_den.Root) { Store = new WriteToolTests.FailingStore(_den.Root, Ilse) };
         Assert.Equal(ToolErrorCodes.WriteFailed, Assert.Throws<DenToolException>(() => tools.MoveEntity(Tessaly, hash, toBook: "ash", keepEntry: true, universe: Universe)).Code);
         Assert.False(File.Exists(Path.Combine(_den.Root, moved)));
         Assert.Equal(before.Outline, _den.Read(EmberOutline));
         Assert.Equal(before.Tessaly, _den.Read(Tessaly));
 
         // The last write, at the new path (enter_at_new_scope takes 'from' out there), fails: the file moves back.
-        var maraHash = Tools.GetEntity(Mara, Universe).Entity!.Hash!;
-        var maraMoved = Ash + "/entities/characters/mara-voss.md";
-        tools = new DenTools(_den.Root) { Store = new StepStore(_den.Root, failWrite: maraMoved) };
-        Assert.Equal(ToolErrorCodes.WriteFailed, Assert.Throws<DenToolException>(() => tools.MoveEntity(Mara, maraHash, toBook: "ash", enterAtNewScope: true, universe: Universe)).Code);
-        Assert.Equal(before.Mara, _den.Read(Mara));
-        Assert.False(File.Exists(Path.Combine(_den.Root, maraMoved)));
+        var ilseHash = Tools.GetEntity(Ilse, Universe).Entity!.Hash!;
+        var ilseMoved = Ash + "/entities/characters/ilse-tarrow.md";
+        tools = new DenTools(_den.Root) { Store = new StepStore(_den.Root, failWrite: ilseMoved) };
+        Assert.Equal(ToolErrorCodes.WriteFailed, Assert.Throws<DenToolException>(() => tools.MoveEntity(Ilse, ilseHash, toBook: "ash", enterAtNewScope: true, universe: Universe)).Code);
+        Assert.Equal(before.Ilse, _den.Read(Ilse));
+        Assert.False(File.Exists(Path.Combine(_den.Root, ilseMoved)));
     }
 
     [Fact]
     [Trait("Scenario", "SC-MCP-29")]
     public void TheDenNeverHoldsTwoCopiesOrNoneWhileItMoves()
     {
-        var hash = Tools.GetEntity(Mara, Universe).Entity!.Hash!;
-        var moved = Ash + "/entities/characters/mara-voss.md";
-        var store = new StepStore(_den.Root, watch: (Mara, moved));
+        var hash = Tools.GetEntity(Ilse, Universe).Entity!.Hash!;
+        var moved = Ash + "/entities/characters/ilse-tarrow.md";
+        var store = new StepStore(_den.Root, watch: (Ilse, moved));
 
         // Rewritten in place, then moved whole, then its 'from' taken out at the new path.
-        var result = new DenTools(_den.Root) { Store = store }.MoveEntity(Mara, hash, toBook: "ash", enterAtNewScope: true, universe: Universe);
+        var result = new DenTools(_den.Root) { Store = store }.MoveEntity(Ilse, hash, toBook: "ash", enterAtNewScope: true, universe: Universe);
 
         Assert.Equal(moved, result.Path);
         Assert.False(store.SawTwoOrNone);
-        Assert.False(File.Exists(Path.Combine(_den.Root, Mara)));
+        Assert.False(File.Exists(Path.Combine(_den.Root, Ilse)));
     }
 
     [Fact]

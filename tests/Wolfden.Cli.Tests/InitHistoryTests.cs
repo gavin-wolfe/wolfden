@@ -111,12 +111,12 @@ public class InitHistoryTests
         var output = new StringWriter();
         var error = new StringWriter();
 
-        var exitCode = InitCommand.Run([den.Root, "--git", "--author-name", "Mara Voss"], output, error, NoIdentity(global));
+        var exitCode = InitCommand.Run([den.Root, "--git", "--author-name", "Ilse Tarrow"], output, error, NoIdentity(global));
 
         Assert.Equal(CliApp.ExitOk, exitCode);
         Assert.Empty(error.ToString());
         Assert.Contains(
-            "Git already has a name for this den (Ash Calloway), so the one given (Mara Voss) wasn't used.\n",
+            "Git already has a name for this den (Ash Calloway), so the one given (Ilse Tarrow) wasn't used.\n",
             output.ToString().ReplaceLineEndings("\n"),
             StringComparison.Ordinal);
         Assert.Equal("Ash Calloway", GitHistory.ForDen(den.Root, NoIdentity(global), Token).Log(new HistoryLogQuery(), Token).Value[0].Author);

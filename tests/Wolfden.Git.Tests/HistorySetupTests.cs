@@ -12,7 +12,7 @@ namespace Wolfden.Git.Tests;
 /// </summary>
 public sealed class HistorySetupTests : IDisposable
 {
-    private const string Mara = "universes/kestrel/entities/characters/mara-voss.md";
+    private const string Ilse = "universes/kestrel/entities/characters/ilse-tarrow.md";
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
@@ -63,7 +63,7 @@ public sealed class HistorySetupTests : IDisposable
         Assert.Equal(result.Checkpoint!.Id, first.Id);
         Assert.Equal("Start of history", first.Message.TrimEnd('\n'));
         Assert.Equal("Test Writer", first.Author);
-        Assert.Equal(["den.yaml", Mara], first.Changes.Select(c => c.Path).Order(StringComparer.Ordinal));
+        Assert.Equal(["den.yaml", Ilse], first.Changes.Select(c => c.Path).Order(StringComparer.Ordinal));
 
         // Nothing was saved in the repository's own config: git had a name and email.
         Assert.DoesNotContain("[user]", File.ReadAllText(Path.Combine(den, ".git", "config")), StringComparison.Ordinal);
@@ -350,12 +350,12 @@ public sealed class HistorySetupTests : IDisposable
         var included = Config("[user]\n\tname = Ash Calloway\n\temail = ash@example.invalid\n");
         var global = Config($"[includeIf \"gitdir/i:**/{Path.GetFileName(den)}/\"]\n\tpath = {included.Replace('\\', '/')}\n");
 
-        var result = new GitHistorySetup(den, Without(global)).TurnOn(new HistorySetupRequest("Mara Voss", "mara@example.invalid"), Token);
+        var result = new GitHistorySetup(den, Without(global)).TurnOn(new HistorySetupRequest("Ilse Tarrow", "ilse@example.invalid"), Token);
 
         Assert.Equal(HistorySetupStatus.Done, result.Status);
         Assert.Empty(result.IdentitySaved);
-        Assert.Contains("Git already has a name for this den (Ash Calloway), so the one given (Mara Voss) wasn't used.", result.Steps);
-        Assert.Contains("Git already has an email for this den (ash@example.invalid), so the one given (mara@example.invalid) wasn't used.", result.Steps);
+        Assert.Contains("Git already has a name for this den (Ash Calloway), so the one given (Ilse Tarrow) wasn't used.", result.Steps);
+        Assert.Contains("Git already has an email for this den (ash@example.invalid), so the one given (ilse@example.invalid) wasn't used.", result.Steps);
     }
 
     [Theory]
@@ -473,9 +473,9 @@ public sealed class HistorySetupTests : IDisposable
     {
         var den = Folder();
         File.WriteAllText(Path.Combine(den, "den.yaml"), "format: 1\n", new UTF8Encoding(false));
-        var note = Path.Combine(den, Mara.Replace('/', Path.DirectorySeparatorChar));
+        var note = Path.Combine(den, Ilse.Replace('/', Path.DirectorySeparatorChar));
         Directory.CreateDirectory(Path.GetDirectoryName(note)!);
-        File.WriteAllText(note, "# Mara Voss\n", new UTF8Encoding(false));
+        File.WriteAllText(note, "# Ilse Tarrow\n", new UTF8Encoding(false));
         Directory.CreateDirectory(Path.Combine(den, ".wolfden"));
         File.WriteAllText(Path.Combine(den, ".wolfden", "index.db"), "not recorded", new UTF8Encoding(false));
         return den;

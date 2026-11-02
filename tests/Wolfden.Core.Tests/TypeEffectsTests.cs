@@ -14,12 +14,12 @@ namespace Wolfden.Core.Tests;
 /// </summary>
 public class TypeEffectsTests
 {
-    private const string Path = LongDark + "/entities/characters/mara-voss.md";
+    private const string Path = LongDark + "/entities/characters/ilse-tarrow.md";
 
     private static EntityFacts Facts(string body, string extra = "", MemoryDenSource? source = null, string type = "character")
     {
         source ??= Den();
-        source.Entity(LongDark, "mara-voss", $"type: {type}\nname: Mara Voss\nstatus: canon\nfrom: \"ember:1\"{extra}", body);
+        source.Entity(LongDark, "ilse-tarrow", $"type: {type}\nname: Ilse Tarrow\nstatus: canon\nfrom: \"ember:1\"{extra}", body);
         var catalog = EntityCatalog.Load(source);
         return EntityFacts.For(catalog.FindByPath(Path)!, new Bookkeeping());
     }
@@ -201,7 +201,7 @@ public class TypeEffectsTests
             .Entity(Starfall, "compact", "type: faction\nname: Compact\nstatus: canon", folder: "factions")
             .Entity(Starfall, "lamp", "type: item\nname: Lamp\nstatus: canon", folder: "items")
             .Entity(Starfall, "stranger", "type: alien\nname: Stranger\nstatus: canon")
-            .Entity(Starfall, "voss", Character("Voss", """
+            .Entity(Starfall, "tarrow", Character("Tarrow", """
                 fields:
                   factions: ["[[compact]]", "[[reach|wrong plain]]"]
                   heritage: "[[reach|not a ref]]"
@@ -215,7 +215,7 @@ public class TypeEffectsTests
 
         Assert.Equal(
             [
-                (Starfall + "/entities/characters/voss.md", "F-LINK-11", (int?)6),
+                (Starfall + "/entities/characters/tarrow.md", "F-LINK-11", (int?)6),
                 (Starfall + "/entities/items/lamp-owner.md", "F-LINK-11", 8),
             ],
             index.Rules());
@@ -228,13 +228,13 @@ public class TypeEffectsTests
     {
         var source = Den()
             .Entity(Starfall, "reach", "type: location\nname: Reach\nstatus: canon")
-            .Entity(Starfall, "voss", Character("Voss"))
+            .Entity(Starfall, "tarrow", Character("Tarrow"))
             .With($"{Ember}/book.md", """
                 ---
                 name: Ember
                 chapter_defaults: { pov: "[[reach|default pov]]" }
                 chapters:
-                  - { key: "1", fields: { pov: ["[[voss]]", "[[reach|own pov]]"] } }
+                  - { key: "1", fields: { pov: ["[[tarrow]]", "[[reach|own pov]]"] } }
                   - { key: "2", fields: { pov: { value: "[[reach|ignored]]" } } }
                 ---
                 """);
@@ -253,7 +253,7 @@ public class TypeEffectsTests
         var source = Den()
             .Entity(Starfall, "kessan-reach", "type: location\nname: Kessan Reach\nstatus: canon", folder: "locations")
             .Entity(Starfall, "the-drift", "type: location\nname: The Drift\nstatus: canon", folder: "locations")
-            .Entity(Starfall, "voss", Character("Voss"))
+            .Entity(Starfall, "tarrow", Character("Tarrow"))
             .With($"{LongDark}/series.md", "---\nname: The Long Dark\nbooks: [ember, ash]\nchapter_defaults: { setting: \"[[kessan-reach]]\", when: \"2291\" }\n---\n")
             .With($"{Ember}/book.md", """
                 ---
@@ -262,7 +262,7 @@ public class TypeEffectsTests
                   - { key: prologue, fields: { when: "2284", setting: ["[[the-drift]]", "[[kessan-reach]]"] } }
                   - { key: "1" }
                   - { key: "2", fields: { setting: [] } }
-                  - { key: "3", fields: { setting: ["[[voss]]"] } }
+                  - { key: "3", fields: { setting: ["[[tarrow]]"] } }
                 ---
                 """);
 
@@ -337,7 +337,7 @@ public class TypeEffectsTests
             .With("packs/starfall/extensions/character.yaml", "fields:\n  posting: { type: ref, to: [ship, location] }\n  ride: { type: ref, to: starship }\n")
             .Entity(Starfall, "reach", "type: location\nname: Reach\nstatus: canon")
             .Entity(Starfall, "compact", "type: faction\nname: Compact\nstatus: canon", folder: "factions")
-            .Entity(Starfall, "voss", Character("Voss", "fields:\n  posting: \"[[compact]]\"\n  ride: \"[[compact|any ride]]\""));
+            .Entity(Starfall, "tarrow", Character("Tarrow", "fields:\n  posting: \"[[compact]]\"\n  ride: \"[[compact|any ride]]\""));
 
         var index = LinkIndex.Load(source);
 
@@ -356,10 +356,10 @@ public class TypeEffectsTests
     public void ChapterDefaultsInheritFieldByField()
     {
         var source = Den()
-            .Entity(Starfall, "voss", Character("Voss"))
+            .Entity(Starfall, "tarrow", Character("Tarrow"))
             .Entity(Starfall, "pike", Character("Pike"))
             .With($"{Starfall}/universe.md", "---\nname: Starfall\norder: [long-dark, a-quiet-moon]\nchapter_defaults: { tense: past, narration: third-omniscient }\n---\n")
-            .With($"{LongDark}/series.md", "---\nname: The Long Dark\nbooks: [ember, ash]\nchapter_defaults: { narration: third-limited, pov: \"[[voss]]\" }\n---\n")
+            .With($"{LongDark}/series.md", "---\nname: The Long Dark\nbooks: [ember, ash]\nchapter_defaults: { narration: third-limited, pov: \"[[tarrow]]\" }\n---\n")
             .With($"{Ember}/book.md", """
                 ---
                 name: Ember
@@ -390,7 +390,7 @@ public class TypeEffectsTests
 
         // A null own value inherits.
         Assert.Equal("[[pike]]", Text(ember.FindChapter("2")!, "pov"));
-        Assert.Equal(("[[voss]]", "third-limited"), (Text(ash.FindChapter("1")!, "pov"), Text(ash.FindChapter("1")!, "narration")));
+        Assert.Equal(("[[tarrow]]", "third-limited"), (Text(ash.FindChapter("1")!, "pov"), Text(ash.FindChapter("1")!, "narration")));
         Assert.Equal(("past", "third-omniscient", null), (Text(moon.FindChapter("1")!, "tense"), Text(moon.FindChapter("1")!, "narration"), Text(moon.FindChapter("1")!, "pov")));
     }
 
@@ -398,8 +398,8 @@ public class TypeEffectsTests
     public void AnEmptyListInChapterDefaultsStopsInheritance()
     {
         var source = Den()
-            .Entity(Starfall, "voss", Character("Voss"))
-            .With($"{LongDark}/series.md", "---\nname: The Long Dark\nbooks: [ember, ash]\nchapter_defaults: { pov: \"[[voss]]\" }\n---\n")
+            .Entity(Starfall, "tarrow", Character("Tarrow"))
+            .With($"{LongDark}/series.md", "---\nname: The Long Dark\nbooks: [ember, ash]\nchapter_defaults: { pov: \"[[tarrow]]\" }\n---\n")
             .With($"{Ember}/book.md", "---\nname: Ember\nchapter_defaults: { pov: [] }\nchapters: [1]\n---\n");
 
         var chapter = DenStructure.Load(source).FindUniverse("starfall")!.FindBook("ember")!.FindChapter("1")!;
@@ -411,15 +411,15 @@ public class TypeEffectsTests
     public void ChapterValuesThatDontMatchAreIgnoredWithAWarning()
     {
         var source = Den()
-            .Entity(Starfall, "voss", Character("Voss"))
-            .With($"{LongDark}/series.md", "---\nname: The Long Dark\nbooks: [ember, ash]\nchapter_defaults: { tense: past, pov: \"[[voss]]\", narration: third_limited }\n---\n")
+            .Entity(Starfall, "tarrow", Character("Tarrow"))
+            .With($"{LongDark}/series.md", "---\nname: The Long Dark\nbooks: [ember, ash]\nchapter_defaults: { tense: past, pov: \"[[tarrow]]\", narration: third_limited }\n---\n")
             .With($"{Ember}/book.md", """
                 ---
                 name: Ember
                 chapters:
                   - { key: "1", fields: { tense: futur } }
                   - { key: "2", fields: { tense: [] } }
-                  - { key: "3", fields: { pov: ["[[voss]]", "Voss"] } }
+                  - { key: "3", fields: { pov: ["[[tarrow]]", "Tarrow"] } }
                   - { key: "4", fields: { pov: ["Pike"] } }
                   - { key: "5", fields: { weather: rain } }
                   - { key: "6", fields: [tense] }
@@ -433,10 +433,10 @@ public class TypeEffectsTests
         string? Text(string chapter, string field) => ember.FindChapter(chapter)!.Fields.TryGetValue(field, out var v) ? string.Join(",", v.Items) : null;
 
         Assert.Equal(("past", "past"), (Text("1", "tense"), Text("2", "tense")));
-        Assert.Equal("[[voss]]", Text("3", "pov"));
+        Assert.Equal("[[tarrow]]", Text("3", "pov"));
         Assert.Same(ember.FindChapter("3")!.Fields["pov"], ember.FindChapter("3")!.OwnFields["pov"]);
         // A list left with no items counts as not set, so chapter 4 inherits.
-        Assert.Equal("[[voss]]", Text("4", "pov"));
+        Assert.Equal("[[tarrow]]", Text("4", "pov"));
         Assert.Equal(ember.Series, ember.FindChapter("4")!.Fields["pov"].DefaultFrom);
         Assert.Equal("rain", Text("5", "weather"));
         Assert.Null(ember.FindChapter("5")!.Fields["weather"].Definition);

@@ -6,7 +6,7 @@ namespace Wolfden.Core.Tests;
 /// Every link in the invented Starfall den (<c>Dens/starfall</c>), across a
 /// series of two books, a standalone book, and universe scope. The den has
 /// two deliberate problems: an ambiguous link and a spoiler. Its den-local
-/// pack (types.md §10) types Mara Voss's posting, a ship or a location.
+/// pack (types.md §10) types Ilse Tarrow's posting, a ship or a location.
 /// </summary>
 public class StarfallLinkTests
 {

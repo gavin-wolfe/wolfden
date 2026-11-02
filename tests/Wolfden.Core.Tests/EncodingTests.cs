@@ -14,7 +14,7 @@ public class EncodingTests
         Assert.True(file.HasByteOrderMark);
         Assert.StartsWith("---", file.Text, StringComparison.Ordinal);
         Assert.True(file.HasFrontmatter);
-        Assert.Equal("Mara Voss", file.GetFrontmatterValue("name")?.ToString());
+        Assert.Equal("Ilse Tarrow", file.GetFrontmatterValue("name")?.ToString());
         Assert.Empty(file.Diagnostics);
     }
 

@@ -111,7 +111,7 @@ my-den/
           series.md             # frontmatter lists book order
           entities/
             characters/
-              mara-voss.md
+              ilse-tarrow.md
           books/
             ember/
               book.md           # frontmatter lists chapters
@@ -134,8 +134,8 @@ links by id, name, or alias still work (format.md F-RT-5).
 ---
 id: 01JA7Q8M4XK3V9R2D5W8HN6TQB   # ULID, assigned on creation, never changes
 type: character
-name: Mara Voss
-aliases: [Voss, "the Commander"]
+name: Ilse Tarrow
+aliases: [Tarrow, "the Commander"]
 status: canon                    # see format.md §9.3 for all six
 fields:
   species: "[[velari]]"
@@ -145,7 +145,7 @@ fields:
   born: "2291"
 ---
 
-# Mara Voss
+# Ilse Tarrow
 
 ## Overview
 Executive officer of the *Tessaly*...
@@ -182,7 +182,7 @@ Key points:
   the earlier one needs no `until`. Custom sections don't hand over, so
   cumulative ones can repeat. **Decided (#68):** a thread's `## Payoff`
   enters canon at the thread's `paid_off` unless it says otherwise.
-- **Links** are wiki-style: `[[mara-voss]]`, `[[Mara Voss]]`, or an alias.
+- **Links** are wiki-style: `[[ilse-tarrow]]`, `[[Ilse Tarrow]]`, or an alias.
   They resolve by slug, name, or alias to an `id` within the same universe
   (§2), and the index stores the id (or the path, for a file that has
   no id yet). Ambiguous links are flagged.
@@ -1087,7 +1087,7 @@ store, so an edit changes only what it means to (format.md §12):
   `chapter_defaults`: removing a list's last item leaves `[]`, and
   `clear` goes back to inheriting from the container above. Its
   `effects` give each book below in runs of chapters, such as "Book
-  'ember': chapters 1–2b now have pov [[mara-voss]]; chapters prologue,
+  'ember': chapters 1–2b now have pov [[ilse-tarrow]]; chapters prologue,
   3 keep their own", and name a nearer default that keeps chapters as
   they were.
 - **Creating** follows types.md F-TPL-6: the path from the type's
@@ -1603,7 +1603,7 @@ docs/
   query's words match anywhere in the text, in any order, except a
   phrase: words in a closed pair of double quotes, such as
   `"silver key"`, match side by side and in order, as the parts of a
-  word joined by punctuation (`mara-voss`) always have. Phrases and
+  word joined by punctuation (`ilse-tarrow`) always have. Phrases and
   words mix (`"silver key" harbour`), and the same rules hold for text,
   field values, and a linked note's name, in the search page,
   `/api/search`, and the MCP `search` tool, with one exception: the
@@ -2447,7 +2447,7 @@ docs/
     emptied in the form says it will save `[]` and what that replaces;
     where something above sets a value that isn't `[]`, it shows the
     outcome inline with the other choice a click away (#138), `pov:
-    ~~Mara~~ → none in this chapter · use book default (Voss) instead`,
+    ~~Ilse~~ → none in this chapter · use book default (Tarrow) instead`,
     which saves a `clear` instead (no change, for a field the chapter
     only inherited). There's no confirmation step.
     The form keeps the hash and value it was opened on, so a refetch
@@ -2524,8 +2524,12 @@ demos, and test fixtures.
   told in dated journals and letters by several narrators, which makes it a
   well-known, checkable test of timelines, POV, and story position vs.
   in-world time. Readers can verify its accuracy for themselves.
-- **Invented series** (full; name TBD): an original two-book series, Book 1
-  frozen and Book 2 in progress. It shows ideas, open threads, a retcon,
+- **Invented series** (full): the universe **Starfall**, with the original
+  two-book series *The Long Dark*: *Ember* frozen and *Ash* in progress. A
+  relay network connects the settled worlds of the Kessan Reach, and one by
+  one its stations are going silent. Lieutenant Ilse Tarrow commands the
+  *Lantern*, an aging survey ship sent to find out why. A standalone, *A Quiet
+  Moon*, sits beside the series. It shows ideas, open threads, a retcon,
   outline rows continuing across books, and packs. It ships with **history**:
   a script replays a series of snapshots into a fresh git repo, so the
   versioning features have something real to show.
@@ -2557,7 +2561,9 @@ demos, and test fixtures.
    opts in to idle-time checkpoints in `wolfden serve` (§6, §9).
 5. **Desktop packaging:** is a localhost web app enough, or wrap it later
    (Tauri, Electron, .NET MAUI)?
-6. **Name for the invented sample universe.**
+6. ~~**Name for the invented sample universe.**~~ **Decided (#35):**
+   Starfall, with the series *The Long Dark* (*Ember*, then *Ash*), the
+   standalone *A Quiet Moon*, and Lieutenant Ilse Tarrow as the lead (§11).
 7. ~~**Undecided and must-check material inside an entity:** how to mark a
    section or field value as an option still being weighed, or as a fact
    that must not be broken?~~ **Decided (#2):** sections and field entries

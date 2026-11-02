@@ -4,7 +4,7 @@ namespace Wolfden.Index;
 
 /// <summary>
 /// A query term: a word, a phrase in quotes, or a word joined by
-/// punctuation (<c>mara-voss</c>). Its words match side by side, in order;
+/// punctuation (<c>ilse-tarrow</c>). Its words match side by side, in order;
 /// with <paramref name="Prefix"/>, the last one matches as a prefix.
 /// </summary>
 /// <param name="Text">The term's text, without its quotes or prefix star.</param>

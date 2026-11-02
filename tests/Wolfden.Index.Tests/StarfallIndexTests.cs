@@ -12,7 +12,7 @@ namespace Wolfden.Index.Tests;
 /// </summary>
 public sealed class StarfallIndexTests : IClassFixture<StarfallIndexTests.Built>
 {
-    private const string Mara = "01JA7Q8M4XK3V9R2D5W8HN6TQB";
+    private const string Ilse = "01JA7Q8M4XK3V9R2D5W8HN6TQB";
     private const string Pike = "01JA7Q8M4XK3V9R2D5W8HN6TQC";
     private const string Manifest = "01JA7Q8M4XK3V9R2D5W8HN6TQD";
     private const string Reach = "01JADJ8FSSZ5AWSH8VHTPRE95B";
@@ -53,8 +53,8 @@ public sealed class StarfallIndexTests : IClassFixture<StarfallIndexTests.Built>
     [Fact]
     public void TemporalEntriesHandOver()
     {
-        var mara = Index.FindEntity(Mara)!;
-        var values = Index.Context.FieldValues.Where(v => v.EntityId == mara.Id).OrderBy(v => v.FieldOrder).ThenBy(v => v.EntryIndex).ToList();
+        var ilse = Index.FindEntity(Ilse)!;
+        var values = Index.Context.FieldValues.Where(v => v.EntityId == ilse.Id).OrderBy(v => v.FieldOrder).ThenBy(v => v.EntryIndex).ToList();
 
         var rank = values.Where(v => v.Field == "rank").ToList();
         Assert.Equal(["\"Lieutenant\"", "\"Commander\"", "\"Captain\""], rank.Select(v => v.ValueJson));
@@ -79,12 +79,12 @@ public sealed class StarfallIndexTests : IClassFixture<StarfallIndexTests.Built>
     public void CanonAsOfIsARangeComparison()
     {
         // What #15 builds on: the rank in effect at a point is one indexed comparison.
-        var mara = Index.FindEntity(Mara)!;
+        var ilse = Index.FindEntity(Ilse)!;
         string? RankAt(string position)
         {
             var p = P(position);
             return Index.Context.FieldValues
-                .Where(v => v.EntityId == mara.Id && v.Field == "rank" && v.IsLive && v.FromOrdinal <= p && p < v.UntilOrdinal)
+                .Where(v => v.EntityId == ilse.Id && v.Field == "rank" && v.IsLive && v.FromOrdinal <= p && p < v.UntilOrdinal)
                 .Select(v => v.ValueJson)
                 .SingleOrDefault();
         }
@@ -101,9 +101,9 @@ public sealed class StarfallIndexTests : IClassFixture<StarfallIndexTests.Built>
         // F-VIEW-1: an omitted position means the end of the story, "all
         // canon so far". Open-ended facts store until = EndOfStory, so a
         // plain p < until would find nothing there.
-        var mara = Index.FindEntity(Mara)!;
-        var values = Index.Context.FieldValues.Where(v => v.EntityId == mara.Id && v.IsLive);
-        var sections = Index.Context.Sections.Where(s => s.EntityId == mara.Id);
+        var ilse = Index.FindEntity(Ilse)!;
+        var values = Index.Context.FieldValues.Where(v => v.EntityId == ilse.Id && v.IsLive);
+        var sections = Index.Context.Sections.Where(s => s.EntityId == ilse.Id);
 
         Assert.Equal(["\"Commander\"", "\"[[kessan-reach]]\"", "\"human\""],
             values.InEffectAt(IndexQueries.EndOfStory).OrderBy(v => v.FieldOrder).Select(v => v.ValueJson).ToList());
@@ -116,15 +116,15 @@ public sealed class StarfallIndexTests : IClassFixture<StarfallIndexTests.Built>
         Assert.Equal(["Overview", "In command", "Shoulder injury", "Recovery"],
             sections.InEffectAt(P("ash:2")).OrderBy(s => s.Index).Select(s => s.Name).ToList());
 
-        Assert.Contains(Index.Context.Entities.EnteredBy(IndexQueries.EndOfStory), e => e.Id == mara.Id);
-        Assert.DoesNotContain(Index.Context.Entities.EnteredBy(P("ember:prologue")), e => e.Id == mara.Id);
+        Assert.Contains(Index.Context.Entities.EnteredBy(IndexQueries.EndOfStory), e => e.Id == ilse.Id);
+        Assert.DoesNotContain(Index.Context.Entities.EnteredBy(P("ember:prologue")), e => e.Id == ilse.Id);
     }
 
     [Fact]
     public void SectionsHaveEffectiveRanges()
     {
-        var mara = Index.FindEntity(Mara)!;
-        var sections = Index.Context.Sections.Where(s => s.EntityId == mara.Id).OrderBy(s => s.Index).ToDictionary(s => s.Name);
+        var ilse = Index.FindEntity(Ilse)!;
+        var sections = Index.Context.Sections.Where(s => s.EntityId == ilse.Id).OrderBy(s => s.Index).ToDictionary(s => s.Name);
 
         Assert.Equal((P("ember:1"), long.MaxValue), (sections["Overview"].FromOrdinal, sections["Overview"].UntilOrdinal));
         Assert.Equal((P("ember:3"), long.MaxValue), (sections["In command"].FromOrdinal, sections["In command"].UntilOrdinal));
@@ -160,13 +160,13 @@ public sealed class StarfallIndexTests : IClassFixture<StarfallIndexTests.Built>
         Assert.Equal(2, JsonSerializer.Deserialize<string[]>(ambiguous.MatchesJson!)!.Length);
         Assert.NotNull(ambiguous.Problem);
 
-        var outlineLink = links.Single(l => l.Text == @"[[mara-voss\|Voss]]");
+        var outlineLink = links.Single(l => l.Text == @"[[ilse-tarrow\|Tarrow]]");
         Assert.Equal("outline_row", outlineLink.Site);
         Assert.Equal("2", outlineLink.OutlineRow);
-        Assert.Equal(Mara, outlineLink.TargetKey);
+        Assert.Equal(Ilse, outlineLink.TargetKey);
         Assert.Equal(P("ember:2"), outlineLink.PositionOrdinal);
 
-        var sectionLink = links.First(l => l.Path.EndsWith("mara-voss.md", StringComparison.Ordinal) && l.SourceSectionId is not null);
+        var sectionLink = links.First(l => l.Path.EndsWith("ilse-tarrow.md", StringComparison.Ordinal) && l.SourceSectionId is not null);
         Assert.Equal(Reach, sectionLink.TargetKey);
         Assert.Equal("slug", sectionLink.MatchedBy);
     }
@@ -210,7 +210,7 @@ public sealed class StarfallIndexTests : IClassFixture<StarfallIndexTests.Built>
         var rows = Index.Context.OutlineRows.OrderBy(r => r.Order).ToList();
 
         Assert.Equal(["1", "2", "3"], rows.Select(r => r.RowId));
-        Assert.Equal("[[mara-voss|Voss]]", rows[1].Pov);
+        Assert.Equal("[[ilse-tarrow|Tarrow]]", rows[1].Pov);
         Assert.Equal(P("ember:2b"), rows[2].ChapterOrdinal);
         Assert.Null(rows[2].Pov);
         Assert.Equal("draft", rows[0].Status);
@@ -231,9 +231,9 @@ public sealed class StarfallIndexTests : IClassFixture<StarfallIndexTests.Built>
     public void SearchFindsAliasesAndSections()
     {
         Assert.Equal("Kessan Reach", Index.Search("reach").First().EntityName);
-        Assert.Contains(Index.Search("flechette"), h => h.EntityName == "Mara Voss" && h.SectionName == "Shoulder injury");
+        Assert.Contains(Index.Search("flechette"), h => h.EntityName == "Ilse Tarrow" && h.SectionName == "Shoulder injury");
         Assert.Contains(Index.Search("phys* therapy"), h => h.SectionName == "Recovery");
-        Assert.Contains(Index.Search("commander"), h => h.EntityName == "Mara Voss" && h.SectionName is null);
+        Assert.Contains(Index.Search("commander"), h => h.EntityName == "Ilse Tarrow" && h.SectionName is null);
     }
 
     private long P(string position) =>

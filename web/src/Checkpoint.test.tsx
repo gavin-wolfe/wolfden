@@ -430,7 +430,7 @@ describe('SC-WEB-55: I turn on history from the checkpoint dialog', () => {
   it('before the den is a repository, offers the fields without requiring them, and shows what git used instead', async () => {
     const usedOwn: HistoryTurnedOn = {
       ...TURNED_ON,
-      steps: [...TURNED_ON.steps, 'Git already has a name for this den (Ash Calloway), so the one given (Mara Voss) wasn’t used.'],
+      steps: [...TURNED_ON.steps, 'Git already has a name for this den (Ash Calloway), so the one given (Ilse Tarrow) wasn’t used.'],
     }
     const { sent } = stubTurnOn(() => noHistory({ needsName: true, needsEmail: true, identityCertain: false }), () => usedOwn)
     const dialog = await openTurnOn()
@@ -438,12 +438,12 @@ describe('SC-WEB-55: I turn on history from the checkpoint dialog', () => {
     expect(dialog.textContent).toMatch(/doesn't seem to have them/)
     const name = within(dialog).getByLabelText('Name') as HTMLInputElement
     expect(name.required).toBe(false)
-    fireEvent.change(name, { target: { value: 'Mara Voss' } })
+    fireEvent.change(name, { target: { value: 'Ilse Tarrow' } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Turn on history' }))
 
     const done = await screen.findByRole('dialog', { name: 'History is on' })
-    expect(sent).toEqual([{ firstCheckpoint: true, authorName: 'Mara Voss' }])
-    expect(within(done).getByText(/so the one given \(Mara Voss\) wasn’t used/)).toBeTruthy()
+    expect(sent).toEqual([{ firstCheckpoint: true, authorName: 'Ilse Tarrow' }])
+    expect(within(done).getByText(/so the one given \(Ilse Tarrow\) wasn’t used/)).toBeTruthy()
   })
 
   it('asks only for what’s missing', async () => {
@@ -486,23 +486,23 @@ describe('SC-WEB-55: I turn on history from the checkpoint dialog', () => {
           : new Promise((resolve) => (retry = resolve)),
     )
     const dialog = await openTurnOn()
-    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Mara Voss' } })
+    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Ilse Tarrow' } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Turn on history' }))
 
     expect((await within(dialog).findByRole('alert')).textContent).toMatch(/has no email for this den/)
     const email = within(dialog).getByLabelText('Email') as HTMLInputElement
     expect(email.required).toBe(true)
-    expect((within(dialog).getByLabelText('Name') as HTMLInputElement).value).toBe('Mara Voss')
+    expect((within(dialog).getByLabelText('Name') as HTMLInputElement).value).toBe('Ilse Tarrow')
 
     // The email is required now.
     fireEvent.click(within(dialog).getByRole('button', { name: 'Turn on history' }))
     expect(await within(dialog).findByText(/Give an email/)).toBeTruthy()
     expect(sent).toHaveLength(1)
 
-    fireEvent.change(email, { target: { value: 'mara@example.invalid' } })
+    fireEvent.change(email, { target: { value: 'ilse@example.invalid' } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Turn on history' }))
     await waitFor(() => expect(sent).toHaveLength(2))
-    expect(sent[1]).toEqual({ firstCheckpoint: true, authorName: 'Mara Voss', authorEmail: 'mara@example.invalid' })
+    expect(sent[1]).toEqual({ firstCheckpoint: true, authorName: 'Ilse Tarrow', authorEmail: 'ilse@example.invalid' })
 
     // While it's pending, the fields stay where they are, and the email stays required.
     expect(within(dialog).getByRole('button', { name: 'Turning on history…' })).toBeTruthy()
@@ -579,7 +579,7 @@ describe('grouping changes for review', () => {
   it('puts den-level files first, then each universe’s scopes in path order', () => {
     const groups = groupChanges([
       change('universes/starfall/series/long-dark/books/ember/outline.md'),
-      change('universes/starfall/series/long-dark/entities/characters/mara-voss.md'),
+      change('universes/starfall/series/long-dark/entities/characters/ilse-tarrow.md'),
       change('den.yaml'),
       change('universes/starfall/books/a-quiet-moon/book.md'),
       change('universes/starfall/universe.md'),
@@ -588,7 +588,7 @@ describe('grouping changes for review', () => {
       ['Den settings and packs', ['den.yaml']],
       ['Universe starfall', ['universe.md']],
       ['Universe starfall · Book a-quiet-moon', ['book.md']],
-      ['Universe starfall · Series long-dark', ['entities/characters/mara-voss.md']],
+      ['Universe starfall · Series long-dark', ['entities/characters/ilse-tarrow.md']],
       ['Universe starfall · Series long-dark · Book ember', ['outline.md']],
     ])
   })

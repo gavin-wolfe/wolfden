@@ -126,7 +126,7 @@ public static partial class LinkSyntax
     }
 
     /// <summary>
-    /// <paramref name="linkText"/>, a whole link such as <c>[[mara-voss#Old|Voss]]</c>,
+    /// <paramref name="linkText"/>, a whole link such as <c>[[ilse-tarrow#Old|Tarrow]]</c>,
     /// with its heading replaced by <paramref name="heading"/>. The spacing
     /// around the old heading, the target, and the label stay as written.
     /// Null if it isn't one link with a heading.
@@ -168,11 +168,11 @@ public static partial class LinkSyntax
     }
 
     /// <summary>
-    /// <paramref name="linkText"/>, a whole link such as <c>[[Voss#Arc]]</c>,
+    /// <paramref name="linkText"/>, a whole link such as <c>[[Tarrow#Arc]]</c>,
     /// with its target replaced by <paramref name="id"/>, so it reaches its
     /// entity by id (F-LINK-6), and showing what it showed before: a link
     /// without a label gets its target and heading as written as its label
-    /// (<c>[[01JA...#Arc|Voss#Arc]]</c>). In a table row the label goes
+    /// (<c>[[01JA...#Arc|Tarrow#Arc]]</c>). In a table row the label goes
     /// after <c>\|</c>, so the cell isn't split (F-OUT-12). Null if it isn't
     /// one link with a target.
     /// </summary>
@@ -200,7 +200,7 @@ public static partial class LinkSyntax
     /// <c>link = "[[" target [ "#" heading ] [ "|" label ] "]]"</c>. The
     /// target may be empty here, for the F-LINK-3 warning. A <c>\|</c> also
     /// separates the label, so a link escaped for a table cell
-    /// (<c>[[mara-voss\|Voss]]</c>) reads the same everywhere (F-OUT-12).
+    /// (<c>[[ilse-tarrow\|Tarrow]]</c>) reads the same everywhere (F-OUT-12).
     /// </summary>
     [GeneratedRegex(
         """\[\[(?<t>(?:[^\[\]|#\r\n\\]|\\(?!\|))*)(?:\#(?<h>(?:[^\[\]|#\r\n\\]|\\(?!\|))+))?(?:\\?\|(?<l>[^\[\]\r\n]+))?\]\]""",

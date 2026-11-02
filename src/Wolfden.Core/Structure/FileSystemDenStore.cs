@@ -44,6 +44,9 @@ public sealed class FileSystemDenStore : IDenStore, IDenChangeFeed
     /// <summary>How many times a write is tried while another program holds the file (see <see cref="Run"/>).</summary>
     internal const int Attempts = 6;
 
+    /// <summary>How many more times a file is tried when it's denied and nothing holds it any more (see <see cref="Run"/>).</summary>
+    internal const int LetGoAttempts = 2;
+
     private static readonly bool CaseInsensitiveSystem = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS();
 
     /// <summary>The den whose root folder is <paramref name="root"/>.</summary>
@@ -66,10 +69,13 @@ public sealed class FileSystemDenStore : IDenStore, IDenChangeFeed
     /// A test seam: raised with the full path of the file or folder about
     /// to be tried again (see <see cref="Run"/>), so tests can count
     /// retries instead of timing them. Handlers run on the writing thread
-    /// and should only record the call; a test filters by its own path,
-    /// since tests run in parallel.
+    /// and should be quick; a test filters by its own path, since tests run
+    /// in parallel.
     /// </summary>
     internal static event Action<string>? Retrying;
+
+    /// <summary>Puts a written file in place: <see cref="File.Move(string, string, bool)"/>. Tests replace it to be denied at chosen moments.</summary>
+    internal Action<string, string, bool> FileMove { get; init; } = File.Move;
 
     /// <summary>Moves a folder: <see cref="Directory.Move"/>. Tests replace it to fail a step of a rename.</summary>
     internal Action<string, string> DirectoryMove { get; init; } = Directory.Move;
@@ -144,7 +150,7 @@ public sealed class FileSystemDenStore : IDenStore, IDenChangeFeed
             BeforeReplace?.Invoke(temp);
             try
             {
-                Run(path, full, "written", () => File.Move(temp, full, overwrite: mode != DenWriteMode.Create));
+                Run(path, full, "written", () => FileMove(temp, full, mode != DenWriteMode.Create));
             }
             catch (IOException e) when (e is not DenStoreException && mode == DenWriteMode.Create && (File.Exists(full) || Directory.Exists(full)))
             {
@@ -584,6 +590,10 @@ public sealed class FileSystemDenStore : IDenStore, IDenChangeFeed
     /// can't be replaced or deleted: the system says it's in use, or denies
     /// access. So those are tried again, up to <see cref="Attempts"/> times,
     /// for about 300 ms in all. A read-only file isn't: it won't change.
+    /// When the tries run out, the file itself says which it is. A denial
+    /// from a holder that has let go since looks like no permission at all,
+    /// so a file that's denied with nothing holding it now gets
+    /// <see cref="LetGoAttempts"/> more tries before it's reported as denied.
     /// </remarks>
     private static void Run(string path, string full, string what, Action action)
     {
@@ -602,12 +612,20 @@ public sealed class FileSystemDenStore : IDenStore, IDenChangeFeed
             catch (UnauthorizedAccessException e)
             {
                 // Windows denies replacing a file another program has open: ask the file which it is.
-                if (!IsReadOnlyFile(full) && IsHeldOpen(full))
+                var readOnly = IsReadOnlyFile(full);
+                if (!readOnly && IsHeldOpen(full))
                 {
                     throw InUse(path, what, e);
                 }
 
-                var why = IsReadOnlyFile(full) ? "the file is read-only" : "access is denied";
+                if (!readOnly && attempt < Attempts + LetGoAttempts && OperatingSystem.IsWindows() && File.Exists(full))
+                {
+                    Retrying?.Invoke(full);
+                    Thread.Sleep(20);
+                    continue;
+                }
+
+                var why = readOnly ? "the file is read-only" : "access is denied";
                 throw new DenStoreException(DenStoreError.AccessDenied, path, $"'{path}' can't be {what}: {why}.", e);
             }
             catch (IOException e) when (e is not DenStoreException && IsSharingViolation(e))

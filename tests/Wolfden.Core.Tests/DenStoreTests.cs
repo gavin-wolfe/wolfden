@@ -139,6 +139,8 @@ public sealed class DenStoreTests : IDisposable
         store.WriteFile(Ilse, a);
         var torn = new ConcurrentBag<string>();
         var reads = 0;
+        var readerErrors = 0;
+        string? lastReaderError = null;
         var stop = 0;
 
         var reader = new Thread(() =>
@@ -148,8 +150,8 @@ public sealed class DenStoreTests : IDisposable
                 byte[] seen;
                 try
                 {
-                    // Shared for delete too, as an editor's reader would be, so
-                    // the reader rarely keeps the store from replacing the file.
+                    // Shared for delete too, as an editor's reader would be. Windows
+                    // still won't replace the file while this is open (see below).
                     using var stream = new FileStream(Full(Ilse), FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
                     var buffer = new byte[stream.Length];
                     seen = buffer[..stream.ReadAtLeast(buffer, buffer.Length, throwOnEndOfStream: false)];
@@ -157,6 +159,8 @@ public sealed class DenStoreTests : IDisposable
                 catch (Exception e) when (e is IOException or UnauthorizedAccessException)
                 {
                     // Windows: caught mid-replace. Not a torn read.
+                    Interlocked.Increment(ref readerErrors);
+                    Volatile.Write(ref lastReaderError, $"{e.GetType().Name} (0x{e.HResult:X8})");
                     Thread.Sleep(1);
                     continue;
                 }
@@ -164,7 +168,7 @@ public sealed class DenStoreTests : IDisposable
                 Interlocked.Increment(ref reads);
                 if (!seen.AsSpan().SequenceEqual(a) && !seen.AsSpan().SequenceEqual(b))
                 {
-                    torn.Add($"{seen.Length} bytes");
+                    torn.Add(DescribeRead(seen, a, b));
                 }
 
                 Thread.Sleep(1);
@@ -180,13 +184,60 @@ public sealed class DenStoreTests : IDisposable
         var watch = Stopwatch.StartNew();
         var readsBefore = Volatile.Read(ref reads);
         var written = 0;
+        var refused = 0;
+        DenStoreException? lastRefusal = null;
+        var current = a;
+        string Progress() =>
+            $"{written} writes, {refused} refused (last: {lastRefusal?.Message ?? "none"}); "
+            + $"{Volatile.Read(ref reads) - readsBefore} reads, {Volatile.Read(ref readerErrors)} failed (last: {Volatile.Read(ref lastReaderError) ?? "none"}), {torn.Count} torn; "
+            + $"{watch.Elapsed.TotalSeconds:F1} s.";
+        byte[] ReadNote()
+        {
+            // Whatever refused the save may still hold the note, even with no
+            // sharing, so wait for it: that isn't what's being checked.
+            var waited = Stopwatch.StartNew();
+            while (true)
+            {
+                try
+                {
+                    using var stream = new FileStream(Full(Ilse), FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                    var buffer = new byte[stream.Length];
+                    stream.ReadExactly(buffer);
+                    return buffer;
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException && waited.Elapsed < TimeSpan.FromSeconds(30))
+                {
+                    Thread.Sleep(20);
+                }
+            }
+        }
+
         try
         {
-            while (written < Writes || Volatile.Read(ref reads) - readsBefore < ReadsDuringWrites)
+            // Ends on b, not the a it started with, so saves that change
+            // nothing can't pass for the last one saved.
+            while (written < Writes || Volatile.Read(ref reads) - readsBefore < ReadsDuringWrites || ReferenceEquals(current, a))
             {
-                Assert.True(watch.Elapsed < TimeSpan.FromSeconds(60), $"The reader read {Volatile.Read(ref reads) - readsBefore} times in {written} writes.");
-                store.WriteFile(Ilse, written % 2 == 0 ? b : a, DenWriteMode.Replace);
-                written++;
+                Assert.True(watch.Elapsed < TimeSpan.FromSeconds(60), $"Too few writes and reads in time: {Progress()}");
+                var next = written % 2 == 0 ? b : a;
+                try
+                {
+                    store.WriteFile(Ilse, next, DenWriteMode.Replace);
+                    current = next;
+                    written++;
+                }
+                catch (DenStoreException e) when (e.Error == DenStoreError.InUse)
+                {
+                    // Windows can't replace a file that's open. The store tries
+                    // again for a moment, then says so: a save can be refused
+                    // when the reader's handle outlasts that (#173). That's a
+                    // failed save, not a torn read, and it doesn't count as a
+                    // write. It must leave the note as it was: the next save
+                    // would hide any change, so that's checked now.
+                    refused++;
+                    lastRefusal = e;
+                    Assert.True(ReadNote().AsSpan().SequenceEqual(current), $"A refused save changed the note. {Progress()}");
+                }
             }
         }
         finally
@@ -195,7 +246,20 @@ public sealed class DenStoreTests : IDisposable
             reader.Join();
         }
 
-        Assert.Empty(torn);
+        Assert.True(torn.IsEmpty, $"A reader saw part of a note {torn.Count} times, such as: {string.Join("; ", torn.Distinct().Take(5))}. {Progress()}");
+
+        Assert.True(ReadNote().AsSpan().SequenceEqual(current), $"The note isn't the last one saved. {Progress()}");
+
+        // Refused saves clean up too. A scanner can keep a deleted file listed for a moment.
+        bool NoTemporaryFile() => !Directory.EnumerateFiles(Full(Characters), FileSystemDenStore.TempPrefix + "*").Any();
+        Assert.True(SpinWait.SpinUntil(NoTemporaryFile, TimeSpan.FromSeconds(5)), $"A temporary file was left among the notes. {Progress()}");
+    }
+
+    /// <summary>What a reader got that was neither version: enough to tell a cut-short read from a mix of the two.</summary>
+    private static string DescribeRead(byte[] seen, byte[] a, byte[] b)
+    {
+        var letters = string.Join(", ", seen.GroupBy(x => x).OrderBy(g => g.Key).Select(g => $"{g.Count()} x 0x{g.Key:X2}"));
+        return $"{seen.Length} bytes of {a.Length} or {b.Length} ({(letters.Length == 0 ? "empty" : letters)})";
     }
 
     [Fact]
@@ -703,6 +767,87 @@ public sealed class DenStoreTests : IDisposable
         Assert.IsType<UnauthorizedAccessException>(write.InnerException);
     }
 
+    [Fact]
+    [Trait("Scenario", "SC-STORE-1")]
+    public void ASaveGoesThroughWhenWhatHoldsTheFileLetsGoDuringTheRetries()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Skip("Only Windows keeps an open file from being replaced.");
+        }
+
+        var store = Store();
+        var saved = Bytes("the new note");
+        using var held = new FileStream(Full(Ilse), FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        using var retries = new RetryCounter(_root, count =>
+        {
+            if (count == 2)
+            {
+                held.Dispose();
+            }
+        });
+
+        store.WriteFile(Ilse, saved, DenWriteMode.Replace);
+
+        Assert.True(retries.Count >= 2, $"It was tried {retries.Count + 1} times, so the holder never got in the way.");
+        Assert.Equal(saved, File.ReadAllBytes(Full(Ilse)));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-STORE-1")]
+    public void ASaveDeniedByWhatHasLetGoSinceIsTriedAgain()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Skip("Only Windows denies replacing an open file.");
+        }
+
+        // Denied on every normal try, with nothing holding the file when the
+        // store asks: a reader that closed between the denial and the question.
+        var moves = 0;
+        var store = new FileSystemDenStore(_root)
+        {
+            FileMove = (from, to, overwrite) =>
+            {
+                if (++moves <= FileSystemDenStore.Attempts)
+                {
+                    throw new UnauthorizedAccessException("Access to the path is denied.");
+                }
+
+                File.Move(from, to, overwrite);
+            },
+        };
+        var saved = Bytes("the new note");
+
+        store.WriteFile(Ilse, saved, DenWriteMode.Replace);
+
+        Assert.Equal(FileSystemDenStore.Attempts + 1, moves);
+        Assert.Equal(saved, File.ReadAllBytes(Full(Ilse)));
+    }
+
+    [Fact]
+    public void AFileThatStaysDeniedWithNothingHoldingItIsReportedAsDenied()
+    {
+        var old = File.ReadAllBytes(Full(Ilse));
+        var moves = 0;
+        var store = new FileSystemDenStore(_root)
+        {
+            FileMove = (_, _, _) =>
+            {
+                moves++;
+                throw new UnauthorizedAccessException("Access to the path is denied.");
+            },
+        };
+
+        var e = Assert.Throws<DenStoreException>(() => store.WriteFile(Ilse, Bytes("x"), DenWriteMode.Replace));
+
+        Assert.Equal(DenStoreError.AccessDenied, e.Error);
+        Assert.Equal($"'{Ilse}' can't be written: access is denied.", e.Message);
+        Assert.Equal(OperatingSystem.IsWindows() ? FileSystemDenStore.Attempts + FileSystemDenStore.LetGoAttempts : 1, moves);
+        Assert.Equal(old, File.ReadAllBytes(Full(Ilse)));
+        Assert.Empty(Directory.EnumerateFiles(Full(Characters), FileSystemDenStore.TempPrefix + "*"));
+    }
+
     [Theory]
     [InlineData("/", "/universes/x.md", true)]
     [InlineData("/den", "/den/universes/x.md", true)]
@@ -859,11 +1004,13 @@ public sealed class DenStoreTests : IDisposable
     private sealed class RetryCounter : IDisposable
     {
         private readonly string _root;
+        private readonly Action<int>? _onRetry;
         private int _count;
 
-        public RetryCounter(string root)
+        public RetryCounter(string root, Action<int>? onRetry = null)
         {
             _root = Path.GetFullPath(root) + Path.DirectorySeparatorChar;
+            _onRetry = onRetry;
             FileSystemDenStore.Retrying += OnRetrying;
         }
 
@@ -875,7 +1022,8 @@ public sealed class DenStoreTests : IDisposable
         {
             if (full.StartsWith(_root, StringComparison.OrdinalIgnoreCase))
             {
-                Interlocked.Increment(ref _count);
+                var count = Interlocked.Increment(ref _count);
+                _onRetry?.Invoke(count);
             }
         }
     }

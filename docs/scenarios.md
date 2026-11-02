@@ -2919,12 +2919,21 @@ save.
   unchanged. No temporary file is left among the notes, and the watcher
   never indexes one. The saved bytes are exactly the ones given: line
   endings, a byte order mark, and a missing final newline are kept.
+- On Windows a note that's open can't be replaced, so Wolfden tries the
+  save again for a moment. If whatever holds the note lets go, the save
+  goes through. If it doesn't, the save is refused, saying another program
+  has the note open, and the old note stays. If whatever held the note lets
+  go just as Wolfden gives up, Wolfden tries a little longer, so the save
+  rarely reports that access is denied.
 
 Spec: F-RT-1, F-ENC-2, F-LAY-2, design.md §6. Covered by:
 `DenStoreTests.AWriteKeepsTheBytesExactlyAsGiven`,
 `DenStoreTests.AWriteLeavesNoTemporaryFileBehind`,
 `DenStoreTests.AWriteThatFailsPartWayLeavesTheOldFileAndNoTemporaryFile`,
 `DenStoreTests.AReaderSeesTheOldFileOrTheNewOneNeverPartOfEither`,
+`DenStoreTests.ASaveGoesThroughWhenWhatHoldsTheFileLetsGoDuringTheRetries`,
+`DenStoreTests.ASaveDeniedByWhatHasLetGoSinceIsTriedAgain`,
+`DenStoreTests.AFileAnotherProgramHoldsOpenIsReportedAsInUse`,
 `DenWatcherTests.AWriteThroughTheDenStoreIsFollowedLikeAnyEdit`.
 
 ### SC-STORE-2. My assistant asks to write a file outside the den

@@ -719,7 +719,7 @@ function ValueInput({
       )
       break
     case 'ref':
-      return <RefInput {...{ id, label, draft, universe, to: type.to, note, invalid, onChange }} />
+      return <RefInput {...{ id, label, draft, universe, to: type.accepts ?? type.to, note, invalid, onChange }} />
     case 'position':
       return (
         <>

@@ -265,6 +265,27 @@ relies on a custom field should define it in a den-local pack (types.md
 §2.4). Versioning policy is #56. Clashes between two den-local packs are
 settled by pack order (see types.md F-PACK-11).
 
+**Decided (#265): a type can be a kind of another.** A type declares
+`kind_of: <type>` or a list, and it's then accepted wherever a `ref` field's
+`to` names one of its ancestors. It carries identity only: no fields,
+sections, or templates come with it, so several parents can't conflict
+(field inheritance could come later under its own keyword, if dogfooding
+shows a need). It chains, a den's extension can add parents to any pack's
+type, and an unknown parent or a loop is a warning and is ignored. There
+are no abstract types. In the space opera pack, `star-system`, `planet`,
+`settlement`, and `ship` are kinds of `location`, and `polity` of `faction`;
+epic fantasy (#33) would follow the same pattern (types.md F-TYPE-13).
+
+This changes what #32 recorded in types.md F-SPACE-2: that a core field
+links only to core's own types, so a chapter set on a planet warns, and a
+den redefines each field to stop it. That left a den with the pack either a
+warning on every chapter set on a planet, or a clash warning for each field
+it redefined. These really are "is a" relationships, so the types now say
+so, and no field is redefined. The cost is that every field that asks for
+`location` takes all of them, so a star system's `part_of` takes a planet.
+"Extensions add" still holds: an extension adds a parent, and `to` stays as
+written.
+
 **Decided (#6): your writing is yours.** Wolfden's licenses place no
 conditions on the notes, manuscripts, or other content writers create with
 it. The built-in packs in `packs/` are licensed MIT-0 (no attribution
@@ -1870,8 +1891,9 @@ docs/
     `{"$plain": "2.50"}` with its text as written, and every other
     scalar as its text) and `fieldTypes` (the
     type's fields in field order, each with `type`, `list`,
-    `temporal`, `required`, enum `values`, ref `to`, `description`,
-    and `default`, then the universal `placeholder`; `row` is edited in
+    `temporal`, `required`, enum `values`, ref `to`, `accepts` (`to`
+    and every type that's a kind of one, types.md F-TYPE-13; null for
+    any type), `description`, and `default`, then the universal `placeholder`; `row` is edited in
     the file). `POST /api/edit/field` takes `field` and `changes`, a
     list of `{op, path, value, index}` with `op` one of `set`, `add`,
     `remove`, and `move` (#197), and `path` a list of keys and item numbers under the
@@ -1932,7 +1954,7 @@ docs/
     changes it unasked), `date` its text and an optional sort key (the
     mapping form of F-FT-11 when there's a sort key), `ref` a combobox
     that asks the lookup (`/api/entities/lookup`, below) as letters are
-    typed and offers the notes of the field's `to` types whose name,
+    typed and offers the notes of the types the field `accepts` whose name,
     alias, or file name has a word starting with each word typed (not
     notes that only mention it), showing the alias a note was found by
     ("Mina Harker, as *Madam Mina*"), and `position`,
@@ -1978,7 +2000,9 @@ docs/
     name where that does; otherwise null. As of a position, it's
     resolved among the notes met by then, as `get_entity` matches a name
     there. `type` is a type key,
-    or several separated by commas (a `ref` field's `to`). A type no
+    or several separated by commas (a `ref` field's `accepts`), and
+    matches those types only, so the field type says which kinds to
+    ask for (types.md F-TYPE-13). A type no
     enabled pack defines and no note uses is skipped, as `to` skips it
     (types.md F-FT-9, a warning); only when none of them is known is the
     lookup refused (`unknown_type`), and the picker then says it couldn't
@@ -2172,8 +2196,8 @@ docs/
   filled in; and `wolfden new` in the CLI (§7). The rest is v0 behaviour,
   not a recorded decision.
   - **The API.** `GET /api/types` lists the den's enabled types (key,
-    display name, folder, description, pack, and whether it's built in),
-    by display name. Types are the den's, not a universe's (types.md
+    display name, folder, description, pack, whether it's built in, and
+    `kindOf`, every type it's a kind of, nearest first), by display name. Types are the den's, not a universe's (types.md
     F-PACK-7), and containers and chapters aren't types (F-TYPE-2), so
     every type listed can be created anywhere: none is held back from
     the menu. `POST /api/entity/create` takes `{type, name, universe,

@@ -217,7 +217,15 @@ public sealed record SourceField(string Name, int Line, JsonElement Value);
 /// <param name="Default">The value views show when it has none (F-FT-15), as JSON, or null.</param>
 public sealed record SourceFieldType(
     string Name, string Type, bool List, bool Temporal, bool Required, IReadOnlyList<string> Values, IReadOnlyList<string>? To, string? Description,
-    JsonElement? Default);
+    JsonElement? Default)
+{
+    /// <summary>
+    /// For a <c>ref</c> with a <c>to</c>: the types a link picker offers, which are
+    /// <see cref="To"/> and then every type that's a kind of one of them
+    /// (types.md F-TYPE-13). Null for any type.
+    /// </summary>
+    public IReadOnlyList<string>? Accepts { get; init; }
+}
 
 /// <summary>The lead of an entity's file (format.md F-SEC-2): the text before its first section, title heading included.</summary>
 /// <param name="Line">The line it starts at.</param>
@@ -279,7 +287,11 @@ public sealed record FreezeResult(
 /// <param name="Description">What it's for, or null.</param>
 /// <param name="Pack">The key of the pack that defines it, such as <c>core</c>.</param>
 /// <param name="BuiltIn">True if a built-in pack defines it; false for a den-local pack.</param>
-public sealed record TypeView(string Key, string Name, string Plural, string? Description, string Pack, bool BuiltIn);
+public sealed record TypeView(string Key, string Name, string Plural, string? Description, string Pack, bool BuiltIn)
+{
+    /// <summary>Every type it's a kind of (types.md F-TYPE-13), nearest first.</summary>
+    public IReadOnlyList<string> KindOf { get; init; } = [];
+}
 
 /// <summary>The den's enabled types, built-in and den-local (types.md F-PACK-7): what <see cref="DenTools.CreateEntity"/> can make (#29).</summary>
 /// <param name="Version">The shape version.</param>

@@ -218,31 +218,80 @@ public class SpaceOperaPackTests
         Assert.Contains("class is a ref to ship-class", warning.Diagnostic.Message, StringComparison.Ordinal);
     }
 
-    [Fact]
-    [Trait("Scenario", "SC-CHECK-46")]
-    public void ACoreFieldStillAsksForACoreType()
+    [Theory]
+    [InlineData("star-system", "location")]
+    [InlineData("planet", "location")]
+    [InlineData("settlement", "location")]
+    [InlineData("ship", "location")]
+    [InlineData("polity", "faction")]
+    [InlineData("species", "")]
+    [InlineData("ship-class", "")]
+    [InlineData("technology", "")]
+    [Trait("Scenario", "SC-CHECK-45")]
+    public void ThePacksPlacesAreLocationsAndItsPolitiesAreFactions(string key, string parent)
     {
-        // A core ref names core types, and a pack can't change a field it
-        // doesn't own (F-TYPE-8), so a chapter set on a planet gets the
-        // warning. The link still works. See #32 and types.md §11.
-        var source = Space()
-            .Entity(Starfall, "vesta", Note("planet", "Vesta"), folder: "planets")
-            .With($"{Ember}/book.md", "---\nname: Ember\nchapters:\n  - { key: \"1\", fields: { setting: \"[[vesta]]\" } }\n---\n");
-
-        var index = LinkIndex.Load(source);
-
-        var warning = Assert.Single(index.Diagnostics);
-        Assert.Equal("F-LINK-11", warning.Diagnostic.RuleId);
-        Assert.Contains("setting is a ref to location", warning.Diagnostic.Message, StringComparison.Ordinal);
-        Assert.Equal(DiagnosticSeverity.Warning, warning.Diagnostic.Severity);
+        // Removing one of these would turn links that are fine into warnings: a breaking change (types.md §2.4).
+        Assert.Equal(parent.Split(' ', StringSplitOptions.RemoveEmptyEntries), Type(key).KindOf);
     }
 
     [Fact]
     [Trait("Scenario", "SC-CHECK-46")]
-    public void ADensOwnPackCanWidenACoreRefToThePacksTypes()
+    public void CoreFieldsTakeThePacksKindsOfTheirTypes()
     {
-        // The way out, until core's refs can take a pack's types: the den's
-        // definition wins (F-PACK-11), with one clash warning on its own file.
+        // A pack can't change a core field (F-TYPE-8), and doesn't need to:
+        // a planet is a location, and a polity is a faction (F-TYPE-13).
+        var source = Space()
+            .Entity(Starfall, "tessaly", Note("star-system", "Tessaly"), folder: "star-systems")
+            .Entity(Starfall, "vesta", Note("planet", "Vesta"), folder: "planets")
+            .Entity(Starfall, "vesta-yards", Note("settlement", "Vesta Yards"), folder: "settlements")
+            .Entity(Starfall, "lantern", Note("ship", "Lantern"), folder: "ships")
+            .Entity(Starfall, "reach-compact", Note("polity", "Reach Compact"), folder: "polities")
+            .Entity(Starfall, "the-bar", Note("location", "The Bar", "  part_of: \"[[vesta-yards]]\"\n  controlled_by: \"[[reach-compact]]\"\n"), folder: "locations")
+            .Entity(Starfall, "survey-corps", Note("faction", "Survey Corps", "  part_of: \"[[reach-compact]]\"\n  base: \"[[lantern]]\"\n"), folder: "factions")
+            .Entity(Starfall, "the-lamp", Note("item", "The Lamp", "  owner: \"[[reach-compact]]\"\n  location: \"[[tessaly]]\"\n"), folder: "items")
+            .Entity(Starfall, "the-landing", Note("event", "The Landing", "  location: \"[[vesta]]\"\n  participants: [\"[[reach-compact]]\"]\n"), folder: "events")
+            .Entity(Starfall, "ilse-tarrow", Character("Ilse Tarrow", "fields:\n  factions: [\"[[reach-compact]]\"]"))
+            .With($"{Ember}/book.md", "---\nname: Ember\nchapters:\n  - { key: \"1\", fields: { setting: [\"[[vesta-yards]]\", \"[[lantern]]\"] } }\n---\n");
+
+        Assert.Empty(LinkIndex.Load(source).Diagnostics);
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-CHECK-46")]
+    [InlineData("ilse-tarrow")]
+    [InlineData("velari")]
+    public void ASettingThatIsntAPlaceStillWarnsAndSaysWhatsAccepted(string slug)
+    {
+        var source = Space()
+            .Entity(Starfall, "ilse-tarrow", Character("Ilse Tarrow"))
+            .Entity(Starfall, "velari", Note("species", "Velari"), folder: "species")
+            .With($"{Ember}/book.md", $"---\nname: Ember\nchapters:\n  - {{ key: \"1\", fields: {{ setting: \"[[{slug}]]\" }} }}\n---\n");
+
+        var warning = Assert.Single(LinkIndex.Load(source).Diagnostics);
+
+        Assert.Equal(("F-LINK-11", DiagnosticSeverity.Warning), (warning.Diagnostic.RuleId, warning.Diagnostic.Severity));
+        Assert.Contains("setting is a ref to location or a kind of it (planet, settlement, ship, star-system)", warning.Diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-CHECK-46")]
+    public void WithoutThePackAWarningNamesOnlyTheFieldsType()
+    {
+        var source = Den()
+            .Entity(Starfall, "ilse-tarrow", Character("Ilse Tarrow"))
+            .With($"{Ember}/book.md", "---\nname: Ember\nchapters:\n  - { key: \"1\", fields: { setting: \"[[ilse-tarrow]]\" } }\n---\n");
+
+        var warning = Assert.Single(LinkIndex.Load(source).Diagnostics);
+
+        Assert.EndsWith("setting is a ref to location.", warning.Diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-CHECK-46")]
+    public void ADensOwnPackCanStillRedefineACoreRef()
+    {
+        // No longer needed for the pack's types, but the den's definition
+        // still wins (F-PACK-11), with one clash warning on its own file.
         var source = Space()
             .With("den.yaml", "format: 1\npacks: [space-opera, starfall]\n")
             .With("packs/starfall/pack.yaml", "name: Starfall\n")
@@ -259,7 +308,7 @@ public class SpaceOperaPackTests
 
     [Fact]
     [Trait("Scenario", "SC-CHECK-46")]
-    public void AnExtensionCanWidenACoreFieldWithOneWarningForEachField()
+    public void AnExtensionCanStillRedefineACoreFieldWithOneWarningForEachField()
     {
         // Character and faction fields go in extensions/<type>.yaml. Each
         // redefined field is its own clash warning (F-TYPE-8, F-PACK-11).

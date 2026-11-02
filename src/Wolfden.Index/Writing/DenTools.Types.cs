@@ -34,7 +34,7 @@ public sealed partial class DenTools
         var types = structure.Types.Types
             .OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
             .ThenBy(t => t.Key, StringComparer.Ordinal)
-            .Select(t => new TypeView(t.Key, t.Name, t.Plural, t.Description, t.Pack.Key, t.IsBuiltIn))
+            .Select(t => new TypeView(t.Key, t.Name, t.Plural, t.Description, t.Pack.Key, t.IsBuiltIn) { KindOf = t.Ancestors })
             .ToList();
         return new TypeListResult(DenReader.ResultVersion, types);
     }

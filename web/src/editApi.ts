@@ -66,6 +66,8 @@ export interface SourceFieldType {
   values: string[]
   /** The types a ref links to, or null for any. */
   to: string[] | null
+  /** The types a link picker offers: `to` and every type that's a kind of one (types.md F-TYPE-13). */
+  accepts?: string[] | null
   description: string | null
   default: Json | null
 }

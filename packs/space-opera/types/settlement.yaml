@@ -3,6 +3,7 @@ plural: settlements
 description: >-
   A place people live or work, on a world or off one: a city, a colony, an
   orbital station, a mining outpost.
+kind_of: location
 fields:
   part_of:
     type: ref

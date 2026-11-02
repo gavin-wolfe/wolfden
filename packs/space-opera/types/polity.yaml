@@ -4,6 +4,7 @@ description: >-
   A state that holds territory: an empire, a republic, a league of worlds.
   The places it holds name it in their `controlled_by` field. A group
   without territory is a faction.
+kind_of: faction
 fields:
   government:
     type: text

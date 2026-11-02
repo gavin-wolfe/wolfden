@@ -226,17 +226,64 @@ holds name it in their `controlled_by`. A group without territory, such
 as a crew, a guild, or a rebel cell, is a core faction. **Settlement or
 location?** A settlement is a whole place people live or work, such as a
 colony or a relay station. A place within it, such as a dock or a bar, is
-a core location, though its `part_of` warns when it links to the
-settlement: see [the gotcha under Links](#links).
+a core location, whose `part_of` can link to the settlement.
 
 **Ranks and postings** aren't in the pack, since not every story has
 them. To add them, or anything else, extend the type from your den's own
 pack ([types.md §4](types.md#4-extensions-and-combining-packs) and
 [§10](types.md#10-appendix-a-den-local-pack)).
 
-The full list is in [types.md §11](types.md#11-the-space-opera-pack). Core
-links that want a location or a faction don't know about these types yet:
-see [the gotcha under Links](#links).
+**Places and groups count everywhere.** A star system, a planet, a
+settlement, and a ship are kinds of location, and a polity is a kind of
+faction. So a chapter's `setting` can link to a planet or a ship, a
+character's `factions` can link to a polity, and the polity's page lists
+those characters as a faction's page does. A link that's neither, such as a
+`setting` that links to a character, still gets a warning from
+`wolfden check`. A kind of location is still its own type, though: it has
+its own fields and folder, and asking for notes of type `location` doesn't
+list your planets.
+
+The full list is in [types.md §11](types.md#11-the-space-opera-pack).
+
+### Your own types and `kind_of`
+
+If your den has its own pack
+([types.md §10](types.md#10-appendix-a-den-local-pack)), a type can say
+what it's a kind of, with `kind_of` in its file. Then any field that links
+to that other type takes it too:
+
+```yaml
+# packs/starfall/types/moon.yaml
+name: Moon
+plural: moons
+kind_of: planet
+```
+
+A moon is now accepted wherever a planet is, and, since a planet is a kind
+of location, wherever a location is, such as a chapter's `setting`. A type
+can have several parents, so a ship that's also a person can be both a
+chapter's `setting` and its `pov`:
+
+```yaml
+# packs/starfall/types/sentient-ship.yaml
+name: Sentient Ship
+plural: sentient-ships
+kind_of: [ship, character]
+```
+
+- **It's only about what links accept.** The type gets none of its parents'
+  fields, sections, or template. Give it the ones it needs, or leave them
+  out.
+- **You can add a parent to a type you don't own**, in your pack's
+  `extensions/` folder. To let a species be a chapter's `pov`, say,
+  `extensions/species.yaml` holds `kind_of: character`.
+- **You don't need a note of the parent.** A `vehicle` type that no note
+  uses is fine, if you only want a field that takes anything that's a
+  vehicle (`to: vehicle`).
+- **Mistakes get a warning.** `wolfden check` warns about a parent that
+  isn't a type in your den, or one that makes a loop, and ignores it.
+
+The rules are in [types.md F-TYPE-13](types.md#3-type-definitions).
 
 ## Adding series and books
 
@@ -1056,17 +1103,6 @@ in it, which Wolfden calls a checkpoint.
 - **Links don't cross universes.** A link reaches only notes in its own
   universe. `wolfden check` says when a broken link matches a note in
   another one.
-- **A chapter's `setting` warns when it's a planet.** With the
-  [space opera pack](#adding-a-genre-pack), core fields that link to a
-  location or a faction still ask for just that: a chapter's `setting`,
-  an event's or item's `location`, a faction's `base`, a location's
-  `part_of`, a character's `factions`, and a few others. Linking one to a
-  planet, a settlement, or a polity gets a warning from `wolfden check`
-  ("setting is a ref to location"). The link still works, so you can
-  ignore it. To stop it, either keep the place as a location note, or
-  redefine the field in your den's own pack, as
-  [types.md F-SPACE-2](types.md#11-the-space-opera-pack) shows. Each
-  field you redefine then has one warning of its own, on your pack's file.
 
 ### Books and freezing
 

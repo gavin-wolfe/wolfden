@@ -1,6 +1,7 @@
 name: Star System
 plural: star-systems
 description: A star or group of stars, with whatever orbits them.
+kind_of: location
 fields:
   part_of:
     type: ref

@@ -767,6 +767,9 @@ links to its planet. By mistake, one ship's `class` links to a character.
   from any of the templates passes `wolfden check`.
 - Links between the types get no warnings. A `location` or a `faction`
   is accepted wherever the pack's fields link to a place or a group.
+- A star system, planet, settlement, and ship are kinds of location, and a
+  polity is a kind of faction. A species, ship class, and technology are
+  kinds of nothing.
 - The `class` that links to a character gets the F-LINK-11 warning:
   `class` is a ref to ship-class.
 - A den that doesn't list the pack is unchanged.
@@ -776,27 +779,36 @@ Spec: types.md F-PACK-4, F-PACK-7, F-SPACE-1 (#32). Covered by:
 `SpaceOperaPackTests.ADenThatDoesntListThePackDoesntHaveItsTypes`,
 `SpaceOperaPackTests.TheTypesLinkToOneAnotherWithoutWarnings`,
 `SpaceOperaPackTests.ALinkToTheWrongKindOfNoteIsTheUsualWarning`,
+`SpaceOperaPackTests.ThePacksPlacesAreLocationsAndItsPolitiesAreFactions`,
 `NewCommandTests.AShipNeedsTheSpaceOperaPackAndThenComesFromItsTemplate`,
 `NewCommandTests.WithoutThePackAHandWrittenShipIsAnUnknownType`.
 
 ### SC-CHECK-46. A chapter is set on a planet
 
 With the pack on, the writer sets `setting: "[[vesta]]"` on a chapter,
-where Vesta is a `planet`.
+where Vesta is a `planet`. Other chapters are set on a settlement and a
+ship. A character's `factions` links to a polity, and a location's
+`part_of` links to a settlement. By mistake, one chapter's `setting` links
+to a character, and another's to a species.
 
-- `setting` is core's ref to location, so it gets the F-LINK-11 warning.
-  The link still resolves.
-- If the den's own pack redefines `setting` to take planets, the link gets
-  no warning, and the den has one F-CHAP-2 clash warning on its own
-  `chapter.yaml`.
+- The planet, the settlement, the ship, and the polity get no warning: core
+  fields take the pack's kinds of their types, with nothing to redefine.
+- The two mistakes get the F-LINK-11 warning, which says what's accepted:
+  `setting` is a ref to location or a kind of it (planet, settlement, ship,
+  star-system). In a den without the pack, it says only location.
+- If the den's own pack still redefines `setting`, its definition is used,
+  with one F-CHAP-2 clash warning on its own `chapter.yaml`.
 - A character's `factions` and a faction's `part_of`, redefined in the
-  pack's `extensions/` to take a polity, get no link warning either. Each
-  redefined field is its own F-TYPE-8 clash warning, on the den's file.
+  pack's `extensions/`, get no link warning either. Each redefined field is
+  its own F-TYPE-8 clash warning, on the den's file.
 
-Spec: types.md F-SPACE-2, F-TYPE-8, F-PACK-11 (#32). Covered by:
-`SpaceOperaPackTests.ACoreFieldStillAsksForACoreType`,
-`SpaceOperaPackTests.ADensOwnPackCanWidenACoreRefToThePacksTypes`,
-`SpaceOperaPackTests.AnExtensionCanWidenACoreFieldWithOneWarningForEachField`.
+Spec: types.md F-SPACE-2, F-TYPE-13, F-TYPE-8, F-PACK-11 (#32, #265).
+Covered by:
+`SpaceOperaPackTests.CoreFieldsTakeThePacksKindsOfTheirTypes`,
+`SpaceOperaPackTests.ASettingThatIsntAPlaceStillWarnsAndSaysWhatsAccepted`,
+`SpaceOperaPackTests.WithoutThePackAWarningNamesOnlyTheFieldsType`,
+`SpaceOperaPackTests.ADensOwnPackCanStillRedefineACoreRef`,
+`SpaceOperaPackTests.AnExtensionCanStillRedefineACoreFieldWithOneWarningForEachField`.
 
 ### SC-CHECK-47. My den had its own ship before the pack
 
@@ -805,7 +817,8 @@ on `space-opera`. Another den extends the pack's `ship` and core's
 `character`, and a third has a folder `packs/space-opera/` of its own.
 
 - The den's `ship` is still used, with the F-TYPE-4 warning on the den's
-  file. Its notes mean what they meant.
+  file. Its notes mean what they meant, so it isn't a location
+  (SC-CHECK-50).
 - An extension adds its fields after the pack's, with no diagnostics.
 - The folder shadows the built-in pack, with the F-PACK-10 warning, so
   only its own types exist.
@@ -814,6 +827,106 @@ Spec: types.md F-TYPE-4, F-TYPE-8, F-PACK-10, §10 (#32). Covered by:
 `SpaceOperaPackTests.ADensOwnShipWinsOverThePacks`,
 `SpaceOperaPackTests.ADenCanExtendAPackTypeAndCharacters`,
 `SpaceOperaPackTests.ADenLocalPackNamedSpaceOperaShadowsTheBuiltInOne`.
+
+### SC-CHECK-48. My own type is a kind of another
+
+The writer's den has a pack of its own. Its `moon` is `kind_of: planet`, and
+its `sentient-ship` is `kind_of: [ship, character]`, the POV and the setting
+of the same chapter. Another type reaches one ancestor by two routes, and
+an extension gives the pack's `ship` a second parent.
+
+- A moon is accepted wherever a planet or a location is: it follows the
+  chain. A location isn't accepted where a field names only `planet`, and
+  nor is a settlement.
+- The sentient ship is accepted by both `pov` and `setting`, with no
+  warning.
+- It gets no fields, sections, or template from its parents.
+- Two routes to one ancestor give no warning, and name it once.
+- The extension's parent adds to the pack's, with no diagnostics.
+
+Spec: types.md F-TYPE-13, F-TYPE-8, F-FT-9, format.md F-LINK-11 (#265).
+Covered by: `TypeKindOfTests.AChainIsFollowedAllTheWayUp`,
+`TypeKindOfTests.OnlyAKindIsAcceptedNotItsParentOrASibling`,
+`TypeKindOfTests.ASentientShipIsAcceptedAsACharacterAndAsAPlace`,
+`TypeKindOfTests.KindOfCarriesIdentityOnly`,
+`TypeKindOfTests.ADiamondGivesNoDuplicatesAndNoWarnings`,
+`TypeKindOfTests.ADensExtensionAddsAParentToAnyPacksType`.
+
+### SC-CHECK-49. I get `kind_of` wrong
+
+The writer names a parent that doesn't exist, or one from a pack that isn't
+on. Two of their types are each a kind of the other, and a third is a kind
+of itself. Their extension makes core's `location` a kind of the pack's
+`planet`. One `kind_of` is a mapping.
+
+- `wolfden check` gives an F-TYPE-13 warning on the line of each, and the
+  den loads.
+- An unknown parent is ignored, and the type's other parents still count.
+- Every parent of the den's in a loop is ignored, whichever came first,
+  and parents outside the loop still count.
+- The loop through the pack drops only the den's parent, and is reported
+  only on the den's file. A planet is still a location. The same goes for
+  a later release whose new `kind_of` closes a loop with the den's parent.
+- A value that isn't a type key is ignored, and the others in its list
+  still count. An empty `kind_of` means no parents, with no warning.
+
+Spec: types.md F-TYPE-13 (#265). Covered by:
+`TypeKindOfTests.AnUnknownParentIsAWarningAndTheOthersStillCount`,
+`TypeKindOfTests.AParentFromAPackThatIsntEnabledIsUnknown`,
+`TypeKindOfTests.ALoopIsAWarningOnEachFileInItAndAllOfItIsIgnored`,
+`TypeKindOfTests.ATypeThatIsAKindOfItselfIsALoop`,
+`TypeKindOfTests.ALoopADenClosesThroughAPackDropsOnlyTheDensParent`,
+`TypeKindOfTests.ALoopThroughADensOwnTypeDropsOnlyTheDensParentToo`,
+`TypeKindOfTests.DroppingADensParentKeepsEveryBuiltInParentInALongerLoop`,
+`TypeKindOfTests.ALaterBuiltInParentThatClosesALoopDropsTheDensParent`,
+`TypeKindOfTests.ALoopOfBuiltInParentsAloneIsDroppedWholeAndAParentADenRepeatsStaysBuiltIn`,
+`TypeKindOfTests.AValueThatIsntATypeKeyIsAWarningAndOnlyItIsIgnored`,
+`TypeKindOfTests.AnEmptyKindOfMeansNoParents`.
+
+### SC-CHECK-50. My den's own definition wins over a pack's `kind_of`
+
+The writer's den defines its own `ship`, with no `kind_of`, and later turns
+on the pack. Another den's `ship` says `kind_of: location`. A third replaces
+`location` under the same key, and a fourth with a `place` type that takes
+its folder.
+
+- The first den's `ship` isn't a location, so a `setting` that links to one
+  gets the F-LINK-11 warning. It means what it meant.
+- The second den's is a location.
+- In the third, the pack's planets are kinds of the den's `location`.
+- In the fourth, the pack's types lose that parent. One F-TYPE-13 warning
+  on the den's `place` file names them, and none on the pack's files.
+
+Spec: types.md F-TYPE-13, F-TYPE-4, F-TYPE-5, §10 (#265). Covered by:
+`TypeKindOfTests.ADensOwnTypeHasOnlyItsOwnParents`,
+`TypeKindOfTests.ADensOwnTypeCanSayItsAKindOfAPacksType`,
+`TypeKindOfTests.ADensOwnParentKeepsThePacksKindsWhenItReplacesTheParentByKey`,
+`TypeKindOfTests.ReplacingAParentByItsFolderIsReportedOnceOnTheDensFile`.
+
+### SC-CHECK-51. A polity works like a faction
+
+With the pack on, a character's `factions` links to the Reach Compact, a
+`polity`, and the writer opens the polity's page and edits the field.
+
+- The polity's page lists the character under "Linked from", as a
+  faction's page does.
+- The field's link picker offers the polity. The field's `to` still says
+  `faction`, and its `accepts` says `faction` and `polity`. A chapter's
+  `setting` works the same way.
+- A warning's example link for a ref field can be a kind of its type.
+- The den's list of types says what each is a kind of.
+- A lookup or a filter by type `faction`, in `list_entities`, `search`, or
+  `canon_as_of`, is that type only, so it doesn't list the polity.
+
+Spec: types.md F-TYPE-13, §9 "Faction", design.md §9 (#265). Covered by:
+`KindOfEndpointTests.APolitysPageListsItsMembersAsAFactionsDoes`,
+`KindOfEndpointTests.ARefsFieldTypeSaysWhichTypesItsPickerOffers`,
+`KindOfEndpointTests.TheTypeListSaysWhatEachTypeIsAKindOf`,
+`KindOfEndpointTests.AChapterFieldSaysWhichTypesItsPickerOffers`,
+`KindOfEndpointTests.FilteringByTypeMatchesANotesOwnTypeOnly` (API),
+`TypeKindOfTests.AnExampleLinkCanBeAKindOfTheFieldsType`,
+`FieldEditing.test.tsx` "looks up what a field accepts, so a kind of its
+type is offered too" (web).
 
 ## RT: saving a note keeps what the writer wrote
 

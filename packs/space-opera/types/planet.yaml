@@ -1,6 +1,7 @@
 name: Planet
 plural: planets
 description: A world of any kind, including a moon.
+kind_of: location
 fields:
   part_of:
     type: ref

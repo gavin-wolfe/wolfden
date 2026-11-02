@@ -3,6 +3,7 @@ plural: ships
 description: >-
   One ship. Its `class` field links to its ship class, which holds what's
   true of every ship of that design.
+kind_of: location
 fields:
   class:
     type: ref

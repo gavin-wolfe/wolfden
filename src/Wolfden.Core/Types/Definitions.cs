@@ -96,6 +96,13 @@ public sealed class FieldDefinition
         internal set => _checkedTo = value;
     }
 
+    /// <summary>
+    /// The other types F-LINK-11 accepts because they're a kind of a type in
+    /// <see cref="CheckedTo"/> (F-TYPE-13), by key in ASCII order. They aren't
+    /// in <see cref="To"/>, which stays as written.
+    /// </summary>
+    public IReadOnlyList<string> AcceptedKinds { get; internal set; } = [];
+
     /// <summary>The description, shown in the app and given to AI agents, or null.</summary>
     public string? Description { get; internal set; }
 
@@ -122,12 +129,12 @@ public sealed class FieldDefinition
 
     /// <summary>
     /// True if a <c>ref</c> may link to an entity of type <paramref name="typeKey"/> (F-LINK-11):
-    /// it has no checked <c>to</c>, or <c>to</c> names that type.
+    /// it has no checked <c>to</c>, or <c>to</c> names that type or a type it's a kind of (F-TYPE-13).
     /// </summary>
     public bool Accepts(string typeKey)
     {
         ArgumentNullException.ThrowIfNull(typeKey);
-        return CheckedTo.Count == 0 || CheckedTo.Contains(typeKey, StringComparer.Ordinal);
+        return CheckedTo.Count == 0 || CheckedTo.Contains(typeKey, StringComparer.Ordinal) || AcceptedKinds.Contains(typeKey, StringComparer.Ordinal);
     }
 
     /// <summary>Describes the field type for messages, such as "a list of ref to character or faction".</summary>
@@ -270,6 +277,19 @@ public sealed class TypeDefinition
 
     /// <summary>The description, or null.</summary>
     public string? Description { get; }
+
+    /// <summary>
+    /// The types its <c>kind_of</c> and its extensions' name that took effect
+    /// (F-TYPE-13), without any unknown parent or any that makes a loop.
+    /// </summary>
+    public IReadOnlyList<string> KindOf { get; internal set; } = [];
+
+    /// <summary>
+    /// Every type it's a kind of, following <see cref="KindOf"/> up each
+    /// chain (F-TYPE-13), nearest first, each once. Identity only: a type
+    /// gets none of their fields, sections, or templates.
+    /// </summary>
+    public IReadOnlyList<string> Ancestors { get; internal set; } = [];
 
     /// <summary>The fields in field order (F-FT-3), without the universal <c>row</c> and <c>placeholder</c>.</summary>
     public IReadOnlyList<FieldDefinition> Fields { get; }

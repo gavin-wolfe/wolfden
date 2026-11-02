@@ -33,19 +33,19 @@ public sealed class MoveEntityToolTests : IDisposable
     [Trait("Scenario", "SC-MCP-29")]
     public void ABookEntityWithNoFromMovedUpGetsTheEntryPointItHadAsItsFrom()
     {
-        const string Old = Ash + "/entities/characters/ilse-brandt.md";
-        const string New = Series + "/entities/characters/ilse-brandt.md";
-        _den.Write(Old, "---\nid: 01M4TF5F0EKGGWD5FNVBAEY8Z1\ntype: character\nname: Ilse Brandt\nstatus: canon\n---\n\n## Overview\nA medic on the [[Tessaly]].\n");
-        Assert.False(Tools.GetEntity("Ilse Brandt", Universe, "ember:3").InView);
-        var hash = Tools.GetEntity("Ilse Brandt", Universe).Entity!.Hash!;
+        const string Old = Ash + "/entities/characters/greta-brandt.md";
+        const string New = Series + "/entities/characters/greta-brandt.md";
+        _den.Write(Old, "---\nid: 01M4TF5F0EKGGWD5FNVBAEY8Z1\ntype: character\nname: Greta Brandt\nstatus: canon\n---\n\n## Overview\nA medic on the [[Tessaly]].\n");
+        Assert.False(Tools.GetEntity("Greta Brandt", Universe, "ember:3").InView);
+        var hash = Tools.GetEntity("Greta Brandt", Universe).Entity!.Hash!;
 
-        var result = Tools.MoveEntity("Ilse Brandt", hash, toSeries: "long-dark", universe: Universe);
+        var result = Tools.MoveEntity("Greta Brandt", hash, toSeries: "long-dark", universe: Universe);
 
         Assert.True(result.Changed);
         Assert.Equal(New, result.Path);
         Assert.False(File.Exists(Path.Combine(_den.Root, Old)));
         Assert.Equal(
-            "---\nid: 01M4TF5F0EKGGWD5FNVBAEY8Z1\ntype: character\nname: Ilse Brandt\nstatus: canon\nfrom: ash\n---\n\n## Overview\nA medic on the [[Tessaly]].\n",
+            "---\nid: 01M4TF5F0EKGGWD5FNVBAEY8Z1\ntype: character\nname: Greta Brandt\nstatus: canon\nfrom: ash\n---\n\n## Overview\nA medic on the [[Tessaly]].\n",
             _den.Read(New));
         var moved = Assert.Single(result.Files!);
         Assert.Equal((New, true, Old), (moved.Path, moved.Created, moved.MovedFrom));
@@ -53,12 +53,12 @@ public sealed class MoveEntityToolTests : IDisposable
         Assert.Contains(result.Effects, e => e.Contains("entered canon at the start of book 'ash'", StringComparison.Ordinal) && e.Contains("from: \"ash\"", StringComparison.Ordinal));
 
         // Every canon view is as it was: not in Ember, in from the start of Ash.
-        Assert.False(Tools.GetEntity("Ilse Brandt", Universe, "ember:3").InView);
-        Assert.True(Tools.GetEntity("Ilse Brandt", Universe, "ash:1").InView);
-        Assert.Equal(result.Hash, Tools.GetEntity("Ilse Brandt", Universe).Entity!.Hash);
+        Assert.False(Tools.GetEntity("Greta Brandt", Universe, "ember:3").InView);
+        Assert.True(Tools.GetEntity("Greta Brandt", Universe, "ash:1").InView);
+        Assert.Equal(result.Hash, Tools.GetEntity("Greta Brandt", Universe).Entity!.Hash);
 
         // The old hash is stale now.
-        Assert.Equal(ToolErrorCodes.StaleFile, Assert.Throws<DenToolException>(() => Tools.MoveEntity("Ilse Brandt", hash, universe: Universe)).Code);
+        Assert.Equal(ToolErrorCodes.StaleFile, Assert.Throws<DenToolException>(() => Tools.MoveEntity("Greta Brandt", hash, universe: Universe)).Code);
     }
 
     [Fact]

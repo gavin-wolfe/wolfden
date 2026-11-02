@@ -375,7 +375,7 @@ and in `book.md`, with a label to keep the heading short:
 ```yaml
 chapters:
   - { key: "1", number: 1, fields: { pov: ["[[tomas-reyne|Reyne]]"] } }
-  - { key: "2", number: 2, fields: { pov: ["[[ilse-varga|Varga]]"] } }
+  - { key: "2", number: 2, fields: { pov: ["[[petra-varga|Varga]]"] } }
 ```
 
 Chapter 1 is headed "Reyne" and chapter 2 "Varga". A space opera can

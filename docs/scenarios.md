@@ -2394,7 +2394,7 @@ In the invented Starfall den, The Long Dark is a series of two books,
 Ember then Ash, followed by the standalone A Quiet Moon and The Drift
 War, a series with no books yet. The assistant moves notes between them.
 
-- Ilse Brandt, filed in Ash with no `from`, moves up to the series:
+- Greta Brandt, filed in Ash with no `from`, moves up to the series:
   `move_entity` moves the file to the series' `entities/characters/`
   and writes `from: ash`, the point where she entered canon, so she's
   still out of Ember's views and in from the start of Ash. The result

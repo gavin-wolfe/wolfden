@@ -19,10 +19,11 @@
 # if it hasn't exited after 60 seconds, a limit built into xUnit. On a busy
 # Windows runner that can be missed. The adapter then reports
 # "Catastrophic failure ... Test process did not respond within 60 seconds"
-# for that assembly, and runs none of its tests. The same start-up question can
-# also fail with "Test process did not return valid JSON", when xUnit's own
-# "Waiting 10 seconds for foreground threads to exit..." line lands after the
-# answer (#275). If that's the only thing
+# for that assembly, and runs none of its tests. The same check can also fail
+# with "Test process did not return valid JSON": in xUnit 3.2.2, if the process
+# takes over a second to exit, its "Waiting 10 seconds for foreground threads to
+# exit..." line lands after the answer (xunit/xunit#3576, fixed in 4.0, so this
+# part can go once we upgrade). If that's the only thing
 # wrong (every other test project ran and passed), those assemblies are run
 # again once, on their own. Anything else fails the run as it is.
 #

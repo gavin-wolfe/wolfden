@@ -207,6 +207,16 @@ public class CheckCommandTests
     }
 
     [Fact]
+    public void TheStarfallSampleIsClean()
+    {
+        var (exitCode, output, error) = Check(TempDen.StarfallSampleRoot);
+
+        Assert.Equal(CliApp.ExitOk, exitCode);
+        Assert.Empty(error);
+        Assert.Equal("No errors or warnings. Checked 43 entities; spoiler checks are on.\n", output);
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-CHECK-1")]
     public void WarningsAloneExitZero()
     {

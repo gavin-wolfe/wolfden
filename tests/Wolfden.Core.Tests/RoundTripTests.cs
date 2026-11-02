@@ -54,6 +54,7 @@ public class RoundTripTests
         var files = TestFiles.SampleAndPackFiles().ToList();
 
         Assert.Contains("samples/dracula", dens);
+        Assert.Contains("samples/starfall", dens);
         // Every folder under samples/ must be a den, so a misspelled or
         // missing den.yaml can't drop a sample from the suite silently.
         Assert.All(Directory.EnumerateDirectories(Path.Combine(TestFiles.RepoRoot, "samples")), dir =>

@@ -1,0 +1,39 @@
+---
+id: 01KEN97VD0RGMCSNRWVRQ5REBA
+type: species
+name: Velari
+status: canon
+from: "ember:3"
+fields:
+  kind: Aquatic and communal
+  homeworld: { value: "[[velari-prime]]", from: "ember:27" }
+  lifespan: about 300 years
+  population:
+    - { value: extinct, from: "ember:3" }
+    - { value: "alive, a few thousand in hiding", from: "ember:27", pin: true }
+---
+
+# Velari
+
+## Overview
+The Reach's first people. Their ruins are on half its worlds, and nobody has
+seen a living one in sixty years.
+
+### Alive
+<!-- wolfden: from=ember:27 -->
+They're alive. They didn't silence the stations, and they're terrified of
+the relays.
+
+## Biology
+Long-lived and sensitive to low-frequency signals, which they use to speak
+across great distances.
+
+## History
+<!-- wolfden: until=ash:5 -->
+Wiped out by [[velari-plague|the plague]], as far as anyone knows.
+
+## History
+<!-- wolfden: from=ash:5 -->
+Devastated when the relay network was first lit. Their speech and the relay
+signal share a band, and the signal drowned out, then deafened, then killed.
+The plague is the cover story. See [[velari-plague]].

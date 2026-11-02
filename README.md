@@ -37,7 +37,8 @@ technical to use it.
   already buttons, with git doing the work underneath. You can keep editing
   the markdown files in [Obsidian](https://obsidian.md) or VS Code side by
   side with the app. To see what a den looks like, browse the
-  [Dracula sample](samples/dracula/).
+  [Dracula sample](samples/dracula/), or the invented
+  [Starfall sample](samples/starfall/), which comes with version history.
 
 ## Try it
 

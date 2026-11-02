@@ -1,0 +1,4 @@
+# A den-local pack (types.md §10): what this story needs that the built-in
+# packs don't have.
+name: Starfall
+description: Fields for the Starfall universe.

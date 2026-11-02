@@ -1,0 +1,2 @@
+# Empty on purpose. replay.mjs points git's global settings here, so a
+# machine's signing key, hooks, or line-ending settings can't change the replay.

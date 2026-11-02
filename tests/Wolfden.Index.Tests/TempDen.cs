@@ -28,6 +28,9 @@ public sealed class TempDen : IDisposable
     /// <summary>A copy of the Dracula sample.</summary>
     public static TempDen Dracula() => Copy(Path.Combine(RepoRoot, "samples", "dracula"));
 
+    /// <summary>A copy of the Starfall sample, the invented series (#34).</summary>
+    public static TempDen StarfallSample() => Copy(Path.Combine(RepoRoot, "samples", "starfall"));
+
     /// <summary>A copy of the invented Starfall den from the Core tests.</summary>
     public static TempDen Starfall() => Copy(Path.Combine(RepoRoot, "tests", "Wolfden.Core.Tests", "Dens", "starfall"));
 

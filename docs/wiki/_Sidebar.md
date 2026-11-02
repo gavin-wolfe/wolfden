@@ -4,6 +4,7 @@
 
 - [Set up, in order](../using-wolfden.md#getting-started)
 - [Try the Dracula sample](../../samples/dracula/)
+- [See a series in progress: the Starfall sample](../../samples/starfall/)
 
 **Writing in your editor**
 

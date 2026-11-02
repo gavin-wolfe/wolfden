@@ -177,6 +177,29 @@ Hale". They're different people, each filed in their own book.
 Spec: F-VIEW-1, F-VIEW-3, F-LINK-7. Covered by:
 `CanonViewScenarioTests.TwoCharactersShareANameInSiblingBooks`.
 
+### SC-CANON-10. I read the Starfall sample at different chapters
+
+The writer opens the invented Starfall sample as of `ember:14`, `ember:27`,
+and `ash:5`.
+
+- At `ember:14` the Velari are extinct, and a plague killed them. Nothing
+  says they're alive, and Velari Prime isn't there yet.
+- From `ember:27` they're alive and terrified of the relays, and the plague
+  note hasn't changed.
+- From `ash:5` there was no plague, and it's a cover story.
+- Facts change where the sample tags them: Ilse is a Lieutenant, then a
+  Commander from `ember:22`, the *Tessaly* is presumed lost from `ember:7`, and
+  the *Lantern* passes to Ilse at `ember:8`.
+- What isn't decided, such as who the traitor is, stays out of every view, and
+  it's still in the index as candidate and idea notes.
+- `wolfden check` finds no errors or warnings in the sample. Chapters set
+  aboard a ship or at a settlement, and Ilse's `factions` naming a polity, get
+  no link warning, and *Ash*'s outline rows carry on from *Ember*'s.
+
+Spec: design.md §11, F-VIEW-1, F-OUT-6, types.md F-TYPE-13 (#34). Covered by:
+`StarfallSampleCanonViewTests`, `StarfallSampleTests`,
+`CheckCommandTests.TheStarfallSampleIsClean`.
+
 ## CHECK: what `wolfden check` reports
 
 Background: `wolfden check` (design.md §7) lists every error and warning
@@ -3380,6 +3403,48 @@ repository" (maintainer decision, 2026-10-28, #195). Covered by:
 `InitHistoryTests.ADenWithHistoryAlreadyIsRefused`,
 `InitHistoryTests.WithoutGitInstalledAnExistingDenIsRefused`,
 `HistorySetupEndpointTests.ADenInsideALargerRepositoryIsRefused`.
+
+### SC-HIST-18. I replay the Starfall sample's history
+
+The writer runs `node scripts/starfall-history/replay.mjs <new-folder>`, then
+serves the new folder.
+
+- The folder is a git repository with eight checkpoints, ending in exactly the
+  files of `samples/starfall`, byte for byte. Running it again elsewhere makes
+  the same commits.
+- *Ember* is frozen at the fifth, tagged `book/starfall/ember/final` as a real
+  freeze is, and nothing in its folder changes after that.
+- "Retcon: there was no plague" is a checkpoint of its own. The plague note's
+  history lists it, and shows the old text it replaced.
+- Every checkpoint passes `wolfden check` with no errors or warnings.
+
+Spec: design.md §11, §5, §6 (#34). Covered by:
+`StarfallReplayTests.TheEndStateMatchesTheSampleExactly`,
+`StarfallReplayTests.ItHasAboutEightCheckpointsByTheSamplesInventedAuthor`,
+`StarfallReplayTests.EmberIsFrozenPartWayThroughAndNotChangedAfter`,
+`StarfallReplayTests.TheRetconIsItsOwnCheckpointAndTheOldVersionIsInHistory`,
+`StarfallReplayTests.EveryCheckpointPassesCheckWithNoErrorsOrWarnings`.
+
+### SC-HIST-19. The replay refuses to overwrite anything
+
+The writer points the replay at a file, at a folder that has something in it,
+at a folder inside this clone or another repository, or at nothing at all. Or
+their shell has `GIT_DIR` set to another repository.
+
+- Each folder or file is refused, with a message that says nothing was changed,
+  and it exits 1. With no folder named, it prints how to use it and exits 2.
+- With `GIT_DIR` set, the replay still goes to the folder named, and the other
+  repository gets no commits. The script runs no command that uses the network.
+
+Spec: design.md §11 (#34). Covered by:
+`StarfallReplayTests.ItRefusesAFolderThatIsntEmptyAndChangesNothing`,
+`StarfallReplayTests.ASecondReplayIntoTheSameFolderIsRefused`,
+`StarfallReplayTests.ItRefusesAFileAtThatPathAndChangesNothing`,
+`StarfallReplayTests.ItRefusesAFolderInsideThisRepository`,
+`StarfallReplayTests.ItRefusesAFolderInsideAnotherRepository`,
+`StarfallReplayTests.WithoutAFolderItPrintsHowToUseIt`,
+`StarfallReplayTests.GitSettingsInTheEnvironmentCantPointItAtAnotherRepository`,
+`StarfallReplayTests.TheScriptRunsNoGitCommandThatCouldReachTheNetwork`.
 
 ## WEB: the den in a browser
 

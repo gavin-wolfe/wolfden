@@ -211,6 +211,21 @@ public class LinkCheckTests
 
     [Fact]
     [Trait("Scenario", "SC-CHECK-44")]
+    public void ADefaultAheadOfOneChapterNamesItInTheSingular()
+    {
+        var den = Den()
+            .Entity(LongDark, "late", Character("Late", "from: \"ash:2\""))
+            .With($"{Ember}/book.md", "---\nname: Ember\nchapter_defaults: { pov: \"[[late]]\" }\nchapters: [1]\n---\n");
+
+        var warning = Assert.Single(LinkIndex.Load(den).Diagnostics).Diagnostic;
+
+        Assert.Equal("F-LINK-13", warning.RuleId);
+        Assert.Equal("[[late]]: 'Late' enters canon at ash:2, after chapter ember:1, which inherits this default. It may be a spoiler.",
+            warning.Message);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-CHECK-44")]
     public void ADefaultAheadOfMoreThanFiveChaptersNamesTheFirstFive()
     {
         var den = Den()

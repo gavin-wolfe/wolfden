@@ -309,9 +309,12 @@ public sealed class DenTypes
                 }
             }
 
-            // The type's own template: by name, or templates/<key>.md (F-TPL-2).
-            _kindOf[file.Key] = kindOf.DistinctBy(k => k.Parent, StringComparer.Ordinal).ToList();
+            // F-TYPE-13: a parent named twice counts once, as built in if either is, since a loop treats those apart.
+            _kindOf[file.Key] = kindOf.GroupBy(k => k.Parent, StringComparer.Ordinal)
+                .Select(g => g.FirstOrDefault(k => k.Pack.IsBuiltIn) ?? g.First())
+                .ToList();
 
+            // The type's own template: by name, or templates/<key>.md (F-TPL-2).
             var template = file.Template is { } own ? owner.Templates[own] : owner.Templates.GetValueOrDefault($"{file.Key}.md");
             var templatePack = owner.Pack;
 
@@ -451,9 +454,10 @@ public sealed class DenTypes
         }
 
         /// <summary>
-        /// F-TYPE-13: removes every parent that's part of a loop, whichever
-        /// type comes first, so the answer doesn't depend on any order. A
-        /// loop a den's file closes is reported only on the den's files.
+        /// F-TYPE-13: removes the parents that make a loop, without depending
+        /// on any order. First every den-local parent in a loop goes, which
+        /// leaves built-in parents as they are, since a den can't remove one.
+        /// Any loop that's left is built-in packs' own, and every parent in it goes.
         /// </summary>
         private void DropLoops(SortedDictionary<string, List<KindOfDeclaration>> parents)
         {
@@ -489,27 +493,25 @@ public sealed class DenTypes
                 return null;
             }
 
-            var looped = parents
-                .SelectMany(p => p.Value.Select(d => (Type: p.Key, Declared: d)))
-                .Select(e => (e.Type, e.Declared, Way: Way(e.Declared.Parent, e.Type)))
-                .Where(e => e.Way is not null)
-                .ToList();
-
-            foreach (var (type, declared, way) in looped)
+            void Drop(Func<KindOfDeclaration, bool> which)
             {
-                // Types in one loop reach each other, so this says whether a den's file is part of this one.
-                var denIsInIt = looped.Any(o => !o.Declared.Pack.IsBuiltIn && Way(o.Type, type) is not null && Way(type, o.Type) is not null);
-                if (!declared.Pack.IsBuiltIn || !denIsInIt)
+                // Found before any is removed, since removing one can end another's loop.
+                var looped = parents
+                    .SelectMany(p => p.Value.Where(which).Select(d => (Type: p.Key, Declared: d)))
+                    .Select(e => (e.Type, e.Declared, Way: Way(e.Declared.Parent, e.Type)))
+                    .Where(e => e.Way is not null)
+                    .ToList();
+
+                foreach (var (type, declared, way) in looped)
                 {
                     var loop = string.Join(" -> ", new[] { type }.Concat(way!));
                     Warn(declared.Path, "F-TYPE-13", declared.Line, $"Type '{type}' is kind_of '{declared.Parent}', which makes a loop ({loop}), so this parent is ignored.");
+                    parents[type].Remove(declared);
                 }
             }
 
-            foreach (var (type, declared, _) in looped)
-            {
-                parents[type].Remove(declared);
-            }
+            Drop(d => !d.Pack.IsBuiltIn);
+            Drop(_ => true);
         }
 
         /// <summary>F-FT-9: a <c>to</c> naming a type that isn't enabled is a warning, and the type check skips that name.</summary>

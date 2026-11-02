@@ -862,10 +862,11 @@ of itself. Their extension makes core's `location` a kind of the pack's
 - `wolfden check` gives an F-TYPE-13 warning on the line of each, and the
   den loads.
 - An unknown parent is ignored, and the type's other parents still count.
-- Every parent in a loop is ignored, whichever came first, and parents
-  outside the loop still count.
-- The loop through the pack is reported only on the den's file. The rest
-  of the pack is unaffected.
+- Every parent of the den's in a loop is ignored, whichever came first,
+  and parents outside the loop still count.
+- The loop through the pack drops only the den's parent, and is reported
+  only on the den's file. A planet is still a location. The same goes for
+  a later release whose new `kind_of` closes a loop with the den's parent.
 - A value that isn't a type key is ignored, and the others in its list
   still count. An empty `kind_of` means no parents, with no warning.
 
@@ -874,7 +875,11 @@ Spec: types.md F-TYPE-13 (#265). Covered by:
 `TypeKindOfTests.AParentFromAPackThatIsntEnabledIsUnknown`,
 `TypeKindOfTests.ALoopIsAWarningOnEachFileInItAndAllOfItIsIgnored`,
 `TypeKindOfTests.ATypeThatIsAKindOfItselfIsALoop`,
-`TypeKindOfTests.ALoopADenClosesThroughAPackIsReportedOnlyOnTheDensFile`,
+`TypeKindOfTests.ALoopADenClosesThroughAPackDropsOnlyTheDensParent`,
+`TypeKindOfTests.ALoopThroughADensOwnTypeDropsOnlyTheDensParentToo`,
+`TypeKindOfTests.DroppingADensParentKeepsEveryBuiltInParentInALongerLoop`,
+`TypeKindOfTests.ALaterBuiltInParentThatClosesALoopDropsTheDensParent`,
+`TypeKindOfTests.ALoopOfBuiltInParentsAloneIsDroppedWholeAndAParentADenRepeatsStaysBuiltIn`,
 `TypeKindOfTests.AValueThatIsntATypeKeyIsAWarningAndOnlyItIsIgnored`,
 `TypeKindOfTests.AnEmptyKindOfMeansNoParents`.
 
@@ -906,18 +911,22 @@ With the pack on, a character's `factions` links to the Reach Compact, a
 - The polity's page lists the character under "Linked from", as a
   faction's page does.
 - The field's link picker offers the polity. The field's `to` still says
-  `faction`, and its `accepts` says `faction` and `polity`.
+  `faction`, and its `accepts` says `faction` and `polity`. A chapter's
+  `setting` works the same way.
 - A warning's example link for a ref field can be a kind of its type.
 - The den's list of types says what each is a kind of.
-- A lookup or a filter by type `faction` is that type only, so it doesn't
-  list the polity.
+- A lookup or a filter by type `faction`, in `list_entities`, `search`, or
+  `canon_as_of`, is that type only, so it doesn't list the polity.
 
 Spec: types.md F-TYPE-13, §9 "Faction", design.md §9 (#265). Covered by:
 `KindOfEndpointTests.APolitysPageListsItsMembersAsAFactionsDoes`,
 `KindOfEndpointTests.ARefsFieldTypeSaysWhichTypesItsPickerOffers`,
-`KindOfEndpointTests.TheTypeListSaysWhatEachTypeIsAKindOf` (API),
+`KindOfEndpointTests.TheTypeListSaysWhatEachTypeIsAKindOf`,
+`KindOfEndpointTests.AChapterFieldSaysWhichTypesItsPickerOffers`,
+`KindOfEndpointTests.FilteringByTypeMatchesANotesOwnTypeOnly` (API),
 `TypeKindOfTests.AnExampleLinkCanBeAKindOfTheFieldsType`,
-`FieldEditing.test.tsx` (web).
+`FieldEditing.test.tsx` "looks up what a field accepts, so a kind of its
+type is offered too" (web).
 
 ## RT: saving a note keeps what the writer wrote
 

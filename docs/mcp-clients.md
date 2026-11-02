@@ -294,6 +294,10 @@ fewer words; this list is for you, and for an assistant that reads the
 docs. The writer's own list is in
 [using-wolfden.md](using-wolfden.md#gotchas).
 
+- **A type filter is exact.** `list_entities` with `type: location` lists
+  location notes only, and misses a planet or a ship that's a kind of
+  location ([types.md F-TYPE-13](types.md#3-type-definitions)). The same
+  goes for `search` and `canon_as_of`. Ask for each type you want.
 - **Work through the tools, not the files.** An assistant that can
   also edit files, such as Claude Code, should still change notes with
   Wolfden's tools. They check each edit as the den reads it, keep

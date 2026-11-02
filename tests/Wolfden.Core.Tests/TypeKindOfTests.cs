@@ -165,18 +165,99 @@ public class TypeKindOfTests
 
     [Fact]
     [Trait("Scenario", "SC-CHECK-49")]
-    public void ALoopADenClosesThroughAPackIsReportedOnlyOnTheDensFile()
+    public void ALoopADenClosesThroughAPackDropsOnlyTheDensParent()
     {
+        // A den can't remove a pack's parent (F-TYPE-8), even by mistake.
         var den = Own().With("packs/starfall/extensions/location.yaml", "kind_of: planet\n");
 
         var types = Types(den);
 
         Assert.Equal([("packs/starfall/extensions/location.yaml", "F-TYPE-13", (int?)1)], Diagnostics(den));
         Assert.Empty(types.Find("location")!.Ancestors);
-        Assert.Empty(types.Find("planet")!.Ancestors);
-
-        // The rest of the pack is unaffected.
+        Assert.Equal(["location"], types.Find("planet")!.Ancestors);
         Assert.Equal(["location"], types.Find("ship")!.Ancestors);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-CHECK-49")]
+    public void ALoopThroughADensOwnTypeDropsOnlyTheDensParentToo()
+    {
+        // The same with a den's location that replaces core's by key.
+        var den = Own().With("packs/starfall/types/location.yaml", "name: Place\nplural: locations\nkind_of: planet\n");
+
+        var types = Types(den);
+
+        Assert.Equal(
+            [("packs/starfall/types/location.yaml", "F-TYPE-13", (int?)3), ("packs/starfall/types/location.yaml", "F-TYPE-4", null)],
+            Diagnostics(den).OrderBy(d => d.Rule, StringComparer.Ordinal));
+        Assert.Empty(types.Find("location")!.Ancestors);
+        Assert.Equal(["location"], types.Find("planet")!.Ancestors);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-CHECK-49")]
+    public void DroppingADensParentKeepsEveryBuiltInParentInALongerLoop()
+    {
+        // location -> hull is the den's. hull -> ship -> location are the den's and the pack's.
+        var den = Own()
+            .With("packs/starfall/types/hull.yaml", "name: Hull\nplural: hulls\nkind_of: ship\n")
+            .With("packs/starfall/extensions/location.yaml", "kind_of: hull\n");
+
+        var types = Types(den);
+
+        Assert.Equal(
+            [("packs/starfall/extensions/location.yaml", "F-TYPE-13", (int?)1), ("packs/starfall/types/hull.yaml", "F-TYPE-13", 3)],
+            Diagnostics(den));
+        Assert.Empty(types.Find("location")!.Ancestors);
+        Assert.Empty(types.Find("hull")!.Ancestors);
+        Assert.Equal(["location"], types.Find("ship")!.Ancestors);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-CHECK-49")]
+    public void ALaterBuiltInParentThatClosesALoopDropsTheDensParent()
+    {
+        // A release adds species -> location, where the den already said
+        // location -> species (types.md §2.4). The built-in parent stays.
+        var builtIn = BuiltInPacks.FromFiles(new Dictionary<string, string>
+        {
+            ["core/pack.yaml"] = "name: Core\n",
+            ["core/types/location.yaml"] = "name: Location\nplural: locations\n",
+            ["core/types/species.yaml"] = "name: Species\nplural: species\nkind_of: location\n",
+        });
+        var source = new MemoryDenSource()
+            .With("packs/starfall/pack.yaml", "name: Starfall\n")
+            .With("packs/starfall/extensions/location.yaml", "kind_of: species\n");
+
+        var types = DenTypes.Load(source, ["starfall"], builtIn);
+
+        var warning = Assert.Single(types.Diagnostics);
+        Assert.Equal(("packs/starfall/extensions/location.yaml", "F-TYPE-13"), (warning.Path, warning.Diagnostic.RuleId));
+        Assert.Empty(types.Find("location")!.Ancestors);
+        Assert.Equal(["location"], types.Find("species")!.Ancestors);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-CHECK-49")]
+    public void ALoopOfBuiltInParentsAloneIsDroppedWholeAndAParentADenRepeatsStaysBuiltIn()
+    {
+        var builtIn = BuiltInPacks.FromFiles(new Dictionary<string, string>
+        {
+            ["core/pack.yaml"] = "name: Core\n",
+            ["core/types/location.yaml"] = "name: Location\nplural: locations\nkind_of: species\n",
+            ["core/types/species.yaml"] = "name: Species\nplural: species\nkind_of: location\n",
+        });
+        var source = new MemoryDenSource()
+            .With("packs/starfall/pack.yaml", "name: Starfall\n")
+            .With("packs/starfall/extensions/location.yaml", "kind_of: species\n");
+
+        var types = DenTypes.Load(source, ["starfall"], builtIn);
+
+        Assert.Equal(
+            ["builtin:packs/core/types/location.yaml", "builtin:packs/core/types/species.yaml"],
+            types.Diagnostics.Select(d => d.Path));
+        Assert.Empty(types.Find("location")!.Ancestors);
+        Assert.Empty(types.Find("species")!.Ancestors);
     }
 
     [Fact]

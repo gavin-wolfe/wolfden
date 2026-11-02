@@ -74,5 +74,38 @@ public class KindOfEndpointTests
         Assert.Empty(Strings(types.Single(t => t.GetProperty("key").GetString() == "species").GetProperty("kindOf")));
     }
 
+    [Fact]
+    [Trait("Scenario", "SC-CHECK-51")]
+    public async Task AChapterFieldSaysWhichTypesItsPickerOffers()
+    {
+        using var den = Den();
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+
+        var book = await server.GetJsonAsync("/api/book/chapter-fields?universe=dracula&book=dracula", HttpStatusCode.OK);
+
+        var setting = book.GetProperty("fieldTypes").EnumerateArray().Single(f => f.GetProperty("name").GetString() == "setting");
+        Assert.Equal(["location"], Strings(setting.GetProperty("to")));
+        Assert.Equal(["location", "planet", "settlement", "ship", "star-system"], Strings(setting.GetProperty("accepts")));
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-CHECK-51")]
+    [InlineData("faction", 0)]
+    [InlineData("polity", 1)]
+    public async Task FilteringByTypeMatchesANotesOwnTypeOnly(string type, int polities)
+    {
+        using var den = Den();
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+
+        // list_entities, search, and canon_as_of, through the same code as the MCP tools.
+        var listed = await server.GetJsonAsync($"/api/entities?universe=dracula&type={type}", HttpStatusCode.OK);
+        var found = await server.GetJsonAsync($"/api/search?universe=dracula&query=reach&type={type}", HttpStatusCode.OK);
+        var canon = await server.GetJsonAsync($"/api/canon?universe=dracula&type={type}", HttpStatusCode.OK);
+
+        Assert.Equal(polities, listed.GetProperty("entities").EnumerateArray().Count(e => e.GetProperty("name").GetString() == "Reach Compact"));
+        Assert.Equal(polities > 0, found.GetProperty("hits").EnumerateArray().Any(h => h.GetProperty("entity").GetProperty("name").GetString() == "Reach Compact"));
+        Assert.Equal(polities, canon.GetProperty("entities").EnumerateArray().Count(e => e.GetProperty("name").GetString() == "Reach Compact"));
+    }
+
     private static List<string> Strings(JsonElement list) => list.EnumerateArray().Select(e => e.GetString()!).ToList();
 }

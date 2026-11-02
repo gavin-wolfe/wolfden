@@ -153,7 +153,7 @@ Built-in packs change only by adding: new types, fields, sections, and
 chapter fields. Changing an existing built-in field's type, renaming a
 section, or adding or changing a `default` is a breaking change (#56).
 Adding a parent to a built-in type's `kind_of` (F-TYPE-13) counts as
-adding, since it can only stop a warning. Removing one is a breaking
+adding, since a link it reaches stops warning. Removing one is a breaking
 change, since links that were fine would start to warn. Template prompts
 and headings may change in any release, since they only affect entities
 created afterward.
@@ -163,7 +163,11 @@ new core field checks the values a den already wrote under that name, and
 a new core type picks up entities that named it. A new standard section
 makes repeated custom sections with that name start handing over
 (format.md F-SEC-8), so the earlier ones drop out of later views. A
-den-local extension that adds a section name does the same. A writer who
+den-local extension that adds a section name does the same. A new built-in
+`kind_of` parent can close a loop with a parent the den already gave a type,
+which then drops the den's parent, so links that relied on it start to warn.
+If it names a type the den replaced by taking its folder (F-TYPE-5), it adds
+a warning on the den's file. A writer who
 relies on a custom field should define it in a den-local pack (§10), so
 that its definition is the den's own and wins over any later built-in
 one.
@@ -305,12 +309,12 @@ kind_of: [ship, character]
   folder and so replaced it (F-TYPE-5), and a built-in type names it, the
   [warning] is once, on the den's file, as in F-FT-9, and the den can give
   those types a new parent through an extension.
-- A loop is a [warning] on each file that names a parent in it, and every
-  parent in the loop is ignored, so the result doesn't depend on any order.
-  A type that names itself is a loop. Parents outside the loop still count.
-  A loop that a den's extension closes through a built-in type is reported
-  only on the den's files, but the built-in type's parent in that loop is
-  ignored too.
+- A loop is a [warning] on each file whose parent in it is ignored. A
+  den-local file's parents in a loop are all ignored, and a built-in file's
+  parents stay, so a den's file can close a loop but can't remove a built-in
+  parent (F-TYPE-8). A loop of built-in parents alone is ignored whole.
+  None of this depends on any order. A type that names itself is a loop.
+  Parents outside the loop still count.
 - A value that isn't a type key, or a list item that isn't one, is a
   [warning], and only that value is ignored. A null or empty `kind_of` means
   no parents. A parent named twice counts once, without a warning.

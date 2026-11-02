@@ -190,12 +190,12 @@ the index, and never changes them unless asked to with `--fix`
 
 ### SC-CHECK-1. I renamed a character and old links broke
 
-The writer renamed `mara-voss.md` to `mara-ellery.md` and changed her
-`name` to "Mara Ellery" by hand, without keeping the old name as an alias.
-Other notes still say `[[mara-voss]]` and `[[Mara Voss]]`.
+The writer renamed `ilse-tarrow.md` to `ilse-ellery.md` and changed her
+`name` to "Ilse Ellery" by hand, without keeping the old name as an alias.
+Other notes still say `[[ilse-tarrow]]` and `[[Ilse Tarrow]]`.
 
 - Each old link is a broken-link warning on its own line, and check still
-  exits 0. Adding `aliases: [Mara Voss]` fixes the name link. The slug
+  exits 0. Adding `aliases: [Ilse Tarrow]` fixes the name link. The slug
   link stays broken until it's rewritten.
 
 Spec: F-LINK-6, F-LINK-8, F-RT-5, F-GEN-1. Covered by:
@@ -672,7 +672,7 @@ Spec: design.md §7 (#119). Covered by:
 ### SC-CHECK-41. An empty value typed right up against the bracket
 
 The writer types `died: {value: drowned, from:}`, meaning a death with no
-`from` yet, or ends an alias list with `[Voss, Orrin:]`. YAML readers
+`from` yet, or ends an alias list with `[Tarrow, Orrin:]`. YAML readers
 don't agree on a colon that runs straight into `}` or `]`: most take
 `from` as a key with an empty value, but Wolfden's reader would keep the
 colon and read the key `from:`.
@@ -735,7 +735,7 @@ Spec: format.md F-CTR-6 (#227). Covered by:
 
 ### SC-CHECK-44. An early default runs ahead of every chapter that inherits it
 
-The series sets `chapter_defaults: { pov: "[[mara-voss]]" }`, but Mara
+The series sets `chapter_defaults: { pov: "[[ilse-tarrow]]" }`, but Ilse
 doesn't enter canon until Book 2, chapter 2. Every chapter before that
 inherits the default.
 
@@ -1195,7 +1195,7 @@ Spec: F-LAY-2, F-ID-6, design.md §7. Covered by:
 ### SC-CLI-3. What does the reader know at Book 2, chapter 14?
 
 Before drafting `a2:15`, the writer runs `wolfden query --at a2:14` to
-see canon so far, or adds `--entity "Mara Voss"` to see one character.
+see canon so far, or adds `--entity "Ilse Tarrow"` to see one character.
 
 - Each field shows the value in effect at `a2:14`, marked with its
   `from`. A character the reader meets later isn't listed, and nor are
@@ -1549,8 +1549,8 @@ same files would make it.
 
 ### SC-WATCH-1. I edit notes in my editor while Wolfden watches
 
-The writer runs `wolfden index --watch` in a terminal, then edits Mara
-Voss's note in a text editor and saves it a few times, adds a location,
+The writer runs `wolfden index --watch` in a terminal, then edits Ilse
+Tarrow's note in a text editor and saves it a few times, adds a location,
 and moves the `characters/` folder of series `a` to `crew/`.
 
 - Within moments each burst of saves shows up in the index as one
@@ -1642,8 +1642,8 @@ Spec: design.md §7. Covered by:
 
 ### SC-WATCH-6. I query right after a save while Wolfden watches
 
-With the watcher running on a large den, the writer saves Mara Voss's
-note and runs `wolfden query --entity "Mara Voss"` at once, before the
+With the watcher running on a large den, the writer saves Ilse Tarrow's
+note and runs `wolfden query --entity "Ilse Tarrow"` at once, before the
 watcher has applied the save.
 
 - The query shows the saved note. It waits a moment (up to about a
@@ -1661,7 +1661,7 @@ Spec: design.md §7. Covered by:
 ### SC-WATCH-7. A note can't be read while Wolfden watches
 
 With the watcher running, the writer replaces a note with a link to a
-file that has moved away. Later, another program holds Mara Voss's note
+file that has moved away. Later, another program holds Ilse Tarrow's note
 open just after the writer saves it.
 
 - The broken link is left out at once, as if the note were deleted. The
@@ -1681,7 +1681,7 @@ Spec: design.md §7 (#112). Covered by:
 ### SC-WATCH-8. A folder can't be listed while Wolfden watches
 
 With the watcher running, the writer takes away their own permission to
-list Mara Voss's `characters/` folder, and later that of the book folder
+list Ilse Tarrow's `characters/` folder, and later that of the book folder
 `ember/`.
 
 - Whenever the watcher next gets an event for the folder or for anything
@@ -1919,7 +1919,7 @@ Spec: design.md §7, §8 (maintainer decision, 2026-10-23). Covered by:
 The assistant calls `check` with `universe: "drift"`.
 
 - It gets `drift`'s findings and the den-level ones, and none from
-  `starfall`, whose notes aren't read. Mara Voss copied from `starfall`
+  `starfall`, whose notes aren't read. Ilse Tarrow copied from `starfall`
   into `drift`, id and all, is still a duplicate (F-ID-3) and links to
   her still break, as in the whole den; only the hint on a broken link
   that names a match in another universe is missing. A broken pack or
@@ -2205,16 +2205,16 @@ happens to be one a note in `starfall` uses.
 Spec: F-ID-3 (maintainer decision, 2026-10-23). Covered by:
 `WriteToolTests.APinnedSessionChecksNewIdsAcrossTheWholeDen`.
 
-### SC-MCP-24. My assistant makes Mara the default POV for a book
+### SC-MCP-24. My assistant makes Ilse the default POV for a book
 
 In the Starfall den, `ember`'s prologue says `pov: []` and its chapter 3
 has Tomas Reyes's POV; its other chapters set none. The writer asks the
-assistant to make Mara Voss the book's default POV.
+assistant to make Ilse Tarrow the book's default POV.
 
 - `get_chapter_defaults` for the book gives `book.md`'s hash (the same
   as `get_chapter`'s), its defaults, and the books they reach. After
-  `update_chapter_defaults` adds `[[mara-voss]]` to `pov`, the result
-  says "Book 'ember': chapters 1–2b now have pov [[mara-voss]];
+  `update_chapter_defaults` adds `[[ilse-tarrow]]` to `pov`, the result
+  says "Book 'ember': chapters 1–2b now have pov [[ilse-tarrow]];
   chapters prologue, 3 keep their own". Removing the item leaves
   `pov: []` and says those chapters now have no POV; clearing the field
   goes back to inheriting, here from nothing. Clearing a field that
@@ -2256,8 +2256,8 @@ decisions, 2026-10-23, 2026-10-25). Covered by:
 - A second book named `ash`, in another series, doesn't hide the final
   one: books are matched by folder, and the result names each `ash` by
   its folder.
-- A universe-scope Mara Voss means `[[mara-voss]]` in the universe's
-  defaults isn't the series' Mara Voss, so setting the same text in the
+- A universe-scope Ilse Tarrow means `[[ilse-tarrow]]` in the universe's
+  defaults isn't the series' Ilse Tarrow, so setting the same text in the
   series' defaults changes `ash`'s POV, and is refused. Links are
   compared by their text and by the entity they reach, so a different
   spelling of the same link counts as a change too.
@@ -2452,14 +2452,14 @@ In the invented Starfall den, The Long Dark is a series of two books,
 Ember then Ash, followed by the standalone A Quiet Moon and The Drift
 War, a series with no books yet. The assistant moves notes between them.
 
-- Ilse Brandt, filed in Ash with no `from`, moves up to the series:
+- Greta Brandt, filed in Ash with no `from`, moves up to the series:
   `move_entity` moves the file to the series' `entities/characters/`
   and writes `from: ash`, the point where she entered canon, so she's
   still out of Ember's views and in from the start of Ash. The result
   gives the new path and hash, and marks the file with its old path.
   Moved from the series into Ember, its first book, a character with no
   `from` gets none: the series starts where Ember does.
-- Mara Voss, a series character from `ember:1`, moved into Ash is
+- Ilse Tarrow, a series character from `ember:1`, moved into Ash is
   refused (`entry_outside_scope`): the reader has already met her when
   Ash starts, and the error names both ways forward. With `keep_entry`
   she moves and keeps `from: "ember:1"`, and `check` warns that it's
@@ -2473,7 +2473,7 @@ War, a series with no books yet. The assistant moves notes between them.
   would bring her in earlier than the reader meets her now; with it, she
   is in Ember's views.
 - With a second Tessaly in A Quiet Moon, the Ember outline's
-  `[[Tessaly]]` and Mara's `[[tessaly]]` reach the series' Tessaly only
+  `[[Tessaly]]` and Ilse's `[[tessaly]]` reach the series' Tessaly only
   because it's nearer. Moving it into Ash rewrites both to its id with
   the same text (`[[01JA...\|Tessaly]]` in the table row), in the same
   change; a link from Ash, which still reaches it, is left alone. If
@@ -2541,12 +2541,12 @@ The assistant searches the Starfall den for "Lieutenant", then for
 "saltmarsh" in the `home` field, then for "the reach" in a `berth`
 field that links Kessan Reach by its id.
 
-- `search` finds Mara's rank entry, says it's in field `rank` (with the
+- `search` finds Ilse's rank entry, says it's in field `rank` (with the
   entry's line), and brackets the match in the snippet. A candidate
   entry is found but not as canon, and `canon_only` leaves it out.
 - With `field`, only that field's values are searched, every word
   matching, ignoring case and accents: `home: Saltmarsh Docks` matches
-  "saltmarsh" and "DOCKS saltm*", not "saltmarsh harbour"; "Voss" in
+  "saltmarsh" and "DOCKS saltm*", not "saltmarsh harbour"; "Tarrow" in
   `home` finds nothing, though her name holds it.
 - A link matches its note's name and aliases as well as the text as
   written, and the snippet adds the one that matched after `→`:
@@ -2727,7 +2727,7 @@ examples use the invented Starfall den from the tests.
 
 ### SC-STORE-1. Wolfden saves a note while something else is reading it, or the power goes out
 
-Wolfden saves Mara Voss's note while the index's watcher, or another
+Wolfden saves Ilse Tarrow's note while the index's watcher, or another
 program, reads it, and once the machine loses power part way through a
 save.
 
@@ -2764,12 +2764,12 @@ Spec: F-LAY-2, design.md §6. Covered by:
 
 ### SC-STORE-3. A new note whose name differs from another only in case
 
-Series `long-dark` has `mara-voss.md`. Wolfden is asked to save
-`Mara-Voss.md` beside it, or a note under `universes/Starfall/`.
+Series `long-dark` has `ilse-tarrow.md`. Wolfden is asked to save
+`Ilse-Tarrow.md` beside it, or a note under `universes/Starfall/`.
 
 - The save is refused on every OS, naming the file or folder that's
   already there. On Windows and macOS the two names are one file, so the
-  save would overwrite Mara's note; on Linux the den would no longer
+  save would overwrite Ilse's note; on Linux the den would no longer
   clone onto those systems. A Windows short name such as `CHARAC~1`, and
   a name that differs only in Unicode form (`café` typed two ways), are
   refused the same way. So is a new name that an invisible character
@@ -2806,7 +2806,7 @@ Spec: F-PACK-4, design.md §6. Covered by:
 
 ### SC-STORE-5. I rename a note or a book's folder
 
-The writer renames `mara-voss.md` to `Mara-Voss.md`, which changes only
+The writer renames `ilse-tarrow.md` to `Ilse-Tarrow.md`, which changes only
 the case, and moves book `ember` out of its series.
 
 - The note keeps its bytes under its new name, and the book's folder
@@ -2858,7 +2858,7 @@ provider (design.md §6), which runs the writer's own `git`.
 
 ### SC-HIST-2. I look back through a note's history
 
-The writer has checkpointed Mara Voss's note three times over a month,
+The writer has checkpointed Ilse Tarrow's note three times over a month,
 once on a branch they later merged, and asks for its history.
 
 - The checkpoints that changed her file are listed newest first, each
@@ -2880,12 +2880,12 @@ Spec: design.md §6 (#19). Covered by:
 
 ### SC-HIST-3. I make a checkpoint at the end of a session
 
-The writer edited Mara's note, deleted Fen Harbour's, and added a new
+The writer edited Ilse's note, deleted Fen Harbour's, and added a new
 item, then makes a checkpoint, "End of chapter 14 session".
 
 - One commit records all three changes, and the checkpoint lists them.
   A second checkpoint straight after has nothing to record and makes no
-  commit. A checkpoint of only Mara's note records only it, and the new
+  commit. A checkpoint of only Ilse's note records only it, and the new
   note that wasn't named stays as it was. The first checkpoint of a new
   repository works too. A checkpoint needs a message, without control
   characters other than line breaks and tabs. Unicode line and
@@ -3028,7 +3028,7 @@ Spec: design.md §6 (maintainer decision, 2026-10-22). Covered by:
 
 ### SC-HIST-9. A merged checkpoint's clock was wrong
 
-The writer checkpointed Mara's note at 9:10, then, on a laptop whose
+The writer checkpointed Ilse's note at 9:10, then, on a laptop whose
 clock was behind, made a branch from it with a checkpoint dated 9:01,
 checkpointed again on the main line at 9:20, and merged the branch.
 
@@ -3044,10 +3044,10 @@ Spec: design.md §6 (#181). Covered by:
 
 ### SC-HIST-10. I compare a note across a rename
 
-The writer renamed `mara.md` to `mara-voss.md` and edited it, and
+The writer renamed `ilse.md` to `ilse-tarrow.md` and edited it, and
 compares it with a checkpoint from before the rename.
 
-- The compare shows a rename from `mara.md`, with the edit, not a new
+- The compare shows a rename from `ilse.md`, with the edit, not a new
   note: between two checkpoints, by the new path or the old one, and
   from a checkpoint up to the note as it is now, before and after the
   rename is checkpointed. The note's history lists the checkpoint that
@@ -3384,7 +3384,7 @@ Spec: design.md §9 (#26). Covered by:
 
 ### SC-WEB-6. I open a character's page, now or as of a chapter
 
-The writer opens Mara Voss's page, then the same page as of `ember:1`.
+The writer opens Ilse Tarrow's page, then the same page as of `ember:1`.
 
 - `/api/entity` gives what the MCP `get_entity` gives for the same name
   and position, member for member: the full view without a position,
@@ -3396,7 +3396,7 @@ The writer opens Mara Voss's page, then the same page as of `ember:1`.
   reached, by id and name) or marked broken or ambiguous.
 - Backlinks say which entity, field, section, chapter, or outline row
   links to it. As of a position, only links in what the reader has met
-  count: Mara's injury section links Kessan Reach only from `ember:2b`.
+  count: Ilse's injury section links Kessan Reach only from `ember:2b`.
   A link to an entity the reader hasn't met yet doesn't say what it
   reaches, even by id. Chapter POV fields and outline rows link from
   their chapter, so they count from there on.
@@ -3436,7 +3436,7 @@ Spec: design.md §9 (#24, #26). Covered by:
   also keep only entities of one status, those a series or book filter
   covers (as in a canon view), or, as of a position, hits in the
   entities, sections, and field values the reader has met: "flechette"
-  finds nothing at `ember:2` and Mara's injury at `ember:2b`. Field
+  finds nothing at `ember:2` and Ilse's injury at `ember:2b`. Field
   search is SC-WEB-24 and SC-WEB-25.
 
 Spec: design.md §9 (#25). Covered by:
@@ -3732,8 +3732,8 @@ The writer's notes give characters an `occupation:`, and Lucy a
   control characters out of the search table, so the marks it puts in
   snippets can't be the note's own text.
 - A quoted query is a phrase in text and in field values alike (#185):
-  `"mara voss"` marks "Mara Voss" as one match range, `"voss mara"`
-  finds nothing though `voss mara` does, and `"saltmarsh docks"` in
+  `"ilse tarrow"` marks "Ilse Tarrow" as one match range, `"tarrow ilse"`
+  finds nothing though `tarrow ilse` does, and `"saltmarsh docks"` in
   `home` is one range, `"docks saltmarsh"` none.
 
 Spec: design.md §9 (#179; the semantics are the maintainer's decision
@@ -3746,7 +3746,7 @@ of 2026-10-26; phrases are #185). Covered by:
 
 ### SC-WEB-25. I search a field as of a story position
 
-Mara Voss, met in *Ember*, has a `watch_mate:` that links Halden Pike by
+Ilse Tarrow, met in *Ember*, has a `watch_mate:` that links Halden Pike by
 his id; the reader meets Pike in *Ash*.
 
 - As of `ember:3`, searching "Halden Pike" finds nothing, with or
@@ -3756,7 +3756,7 @@ his id; the reader meets Pike in *Ash*.
   the reader has met, so it still matches. As of `ash:1`, and with no
   position, "pike" finds the watch mate, and the snippet reads
   `[[<id>]] → Halden Pike`.
-- Only the values in the canon view count: Mara's posting to Kessan
+- Only the values in the canon view count: Ilse's posting to Kessan
   Reach, from `ash:4`, isn't found at `ash:1`.
 - The Field filter lists only the fields of values the reader has met
   (`/api/fields` with `asOf`), as the Type filter lists only met types,
@@ -4685,7 +4685,7 @@ Spec: format.md F-BOOK-1, design.md §9 (#215). Covered by:
 ### SC-WEB-73. I see each chapter's fields, and which are inherited
 
 The Long Dark (`series.md`) has `chapter_defaults: { tense: past }`, and
-Ember (`book.md`) has `chapter_defaults: { pov: ["[[mara-voss]]"] }`. Its
+Ember (`book.md`) has `chapter_defaults: { pov: ["[[ilse-tarrow]]"] }`. Its
 prologue writes `fields: { pov: [], when: "2284" }`, and chapter 3
 `fields: { tense: futur }`. The writer opens Ember's page, then chapter 1's.
 
@@ -4696,7 +4696,7 @@ prologue writes `fields: { pov: [], when: "2284" }`, and chapter 3
   (F-CHAP-4).
 - The chapter's page lists every chapter field the den's packs define,
   in pack order (the core pack's `pov`, `narration`, `tense`, `when`, and
-  `setting`, then any the den's own packs add), with what holds: chapter 1 has `pov` Mara Voss
+  `setting`, then any the den's own packs add), with what holds: chapter 1 has `pov` Ilse Tarrow
   "inherited from book 'ember' defaults" and `tense` past "inherited from
   series 'long-dark' defaults"; `narration` is "not set". The prologue's
   `pov` is "none (none in this chapter, [])".
@@ -4723,7 +4723,7 @@ Spec: types.md §8 (F-CHAP-1..5), design.md §9 (#225, #233). Covered by:
 ### SC-WEB-74. I give a flashback its own POV and date, then undo it
 
 On chapter 2's page the writer chooses **Edit** for `pov`, adds Halden
-Pike next to Mara Voss, and saves. Later they remove both, save, then
+Pike next to Ilse Tarrow, and saves. Later they remove both, save, then
 choose **Use the default**.
 
 - The form is a note field's (#196): a link picker for `pov`, a dropdown
@@ -4733,7 +4733,7 @@ choose **Use the default**.
   nothing changed sends nothing.
 - Save sends only what changed (`POST /api/chapter/edit`, the MCP
   `update_chapter_fields`): `{ key: "2", number: 2, fields: { pov:
-  ["[[mara-voss]]", "[[halden-pike]]"] } }` in `book.md`, the rest of the
+  ["[[ilse-tarrow]]", "[[halden-pike]]"] } }` in `book.md`, the rest of the
   file as it was. The notice says what the chapter has now and what it
   replaced.
 - Removing the last item says first that saving writes `pov: []`, "none
@@ -4741,7 +4741,7 @@ choose **Use the default**.
   (#132, F-RT-6), not the default.
 - **Use the default** is shown only for a field the chapter writes. It
   says first what the chapter will have ("This chapter will have
-  [[mara-voss]], from book 'ember' defaults", or "Nothing above sets pov, so this chapter
+  [[ilse-tarrow]], from book 'ember' defaults", or "Nothing above sets pov, so this chapter
   will have none"), then takes the field out.
 - A changed date with a sort key is written whole: `when: { text: Year
   2290, sort: 2290 }`.
@@ -4824,16 +4824,16 @@ Spec: format.md F-BOOK-1, types.md F-CHAP-1, design.md §9 (#225). Covered by:
 The Long Dark (`series.md`) has `chapter_heading: [pov, setting, when]`
 and `chapter_defaults: { setting: "[[kessan-reach]]" }` (#227). In
 Ember, the prologue (titled Before the Dark) has `when: "2284"`, chapter
-1 is Mara Voss's, chapter 2 is Halden Pike's and `[[mara-voss|the
-Commander]]`'s, and chapter 2b, The Long Watch, is Mara Voss's again.
+1 is Ilse Tarrow's, chapter 2 is Halden Pike's and `[[ilse-tarrow|the
+Commander]]`'s, and chapter 2b, The Long Watch, is Ilse Tarrow's again.
 Halden Pike enters at the start of Ash.
 
 - Ember's page lists the chapters as "Before the Dark · Kessan Reach —
-  2284", "Mara Voss — Kessan Reach", "Halden Pike & the Commander —
-  Kessan Reach", and "The Long Watch · Mara Voss — Kessan Reach". A
+  2284", "Ilse Tarrow — Kessan Reach", "Halden Pike & the Commander —
+  Kessan Reach", and "The Long Watch · Ilse Tarrow — Kessan Reach". A
   chapter's page uses its heading as its title, and so do its links to
   the chapters before and after it.
-- Renaming Mara Voss's note changes every heading that links her, with
+- Renaming Ilse Tarrow's note changes every heading that links her, with
   no change to `book.md`.
 - Reading as of `ember:2`, chapter 2 is "halden-pike & the Commander —
   Kessan Reach": the reader hasn't met Pike, so his link shows as

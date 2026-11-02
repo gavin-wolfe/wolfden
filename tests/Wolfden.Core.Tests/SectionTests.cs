@@ -158,7 +158,7 @@ public class SectionTests
     [InlineData("<!--wolfden: until=ash:1 -->", "until", "ash:1")]
     [InlineData("<!-- wolfden: from=ember:19-->", "from", "ember:19")]
     [InlineData("  <!-- wolfden: from=a-quiet-moon:2b -->  ", "from", "a-quiet-moon:2b")]
-    [InlineData("<!-- wolfden:\tpov=\"Mara Voss\"\tfrom=ember:1 -->", "pov", "Mara Voss")]
+    [InlineData("<!-- wolfden:\tpov=\"Ilse Tarrow\"\tfrom=ember:1 -->", "pov", "Ilse Tarrow")]
     [InlineData("<!-- wolfden: pov=Zoë -->", "pov", "Zoë")]
     [InlineData("<!-- wolfden: canon=false -->", "canon", "false")]
     [InlineData("<!-- wolfden: status=undecided pin=true -->", "status", "undecided")]
@@ -180,7 +180,7 @@ public class SectionTests
     [InlineData("<!-- wolfden: status=maybe -->", "F-STAT-1", DiagnosticSeverity.Error)]
     [InlineData("<!-- wolfden: pin=yes -->", "F-PIN-1", DiagnosticSeverity.Error)]
     [InlineData("<!-- wolfden: canon=maybe -->", "F-SEC-7", DiagnosticSeverity.Error)]
-    [InlineData("<!-- wolfden: pov=mara -->", "F-SEC-7", DiagnosticSeverity.Warning)]
+    [InlineData("<!-- wolfden: pov=ilse -->", "F-SEC-7", DiagnosticSeverity.Warning)]
     public void BadValuesInAWellFormedCommentAreReported(string comment, string rule, DiagnosticSeverity severity)
     {
         var file = Md($"## Shoulder injury\n{comment}\nText.\n");

@@ -182,14 +182,14 @@ public static partial class OutlineReader
                 var shifted = cells.Count > header.Count;
                 if (shifted)
                 {
-                    Warn("F-OUT-12", line + 1, $"This row has {cells.Count} cells, but the header has {header.Count}. An unescaped | splits a cell and shifts the columns after it: write \\| for a | inside a cell, as in [[mara-voss\\|Voss]].");
+                    Warn("F-OUT-12", line + 1, $"This row has {cells.Count} cells, but the header has {header.Count}. An unescaped | splits a cell and shifts the columns after it: write \\| for a | inside a cell, as in [[ilse-tarrow\\|Tarrow]].");
                 }
 
                 foreach (var cell in cells)
                 {
                     if (HasUnclosedLink(text, cell.Start, cell.End))
                     {
-                        Warn("F-OUT-12", line + 1, $"The cell '{text[cell.Start..cell.End].Trim()}' has a [[ with no ]] after it. If a link's | split the cell, write it as \\|, as in [[mara-voss\\|Voss]].");
+                        Warn("F-OUT-12", line + 1, $"The cell '{text[cell.Start..cell.End].Trim()}' has a [[ with no ]] after it. If a link's | split the cell, write it as \\|, as in [[ilse-tarrow\\|Tarrow]].");
                     }
                 }
 

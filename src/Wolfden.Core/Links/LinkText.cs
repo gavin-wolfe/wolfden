@@ -11,8 +11,8 @@ public static class LinkText
     /// <summary>
     /// Normalizes <paramref name="text"/> for comparison: Unicode NFC
     /// (F-ENC-5), trimmed, each run of whitespace collapsed to one space, then
-    /// case folded. Hyphens and spaces stay distinct, so <c>mara-voss</c> and
-    /// <c>mara voss</c> don't match.
+    /// case folded. Hyphens and spaces stay distinct, so <c>ilse-tarrow</c> and
+    /// <c>ilse tarrow</c> don't match.
     /// </summary>
     /// <remarks>
     /// .NET has no Unicode default case folding, so this uses the

@@ -7,7 +7,7 @@ namespace Wolfden.Index.Tests;
 /// </summary>
 public sealed class FreshnessTests
 {
-    private const string Mara = "universes/starfall/series/long-dark/entities/characters/mara-voss.md";
+    private const string Ilse = "universes/starfall/series/long-dark/entities/characters/ilse-tarrow.md";
 
     [Fact]
     public void AFreshIndexIsCurrent()
@@ -32,7 +32,7 @@ public sealed class FreshnessTests
         using var den = TempDen.Starfall();
         IndexBuilder.Rebuild(den.Root);
 
-        File.AppendAllText(Path.Combine(den.Root, Mara), "\nOne more line.\n");
+        File.AppendAllText(Path.Combine(den.Root, Ilse), "\nOne more line.\n");
 
         Assert.Equal(IndexStatus.FilesChanged, IndexBuilder.CheckFiles(den.Root));
         // Check alone doesn't look at the files, as before.
@@ -59,7 +59,7 @@ public sealed class FreshnessTests
         using var den = TempDen.Starfall();
         IndexBuilder.Rebuild(den.Root);
 
-        File.Delete(Path.Combine(den.Root, Mara));
+        File.Delete(Path.Combine(den.Root, Ilse));
 
         Assert.Equal(IndexStatus.FilesChanged, IndexBuilder.CheckFiles(den.Root));
     }
@@ -108,13 +108,13 @@ public sealed class FreshnessTests
     {
         using var den = TempDen.Starfall();
         IndexBuilder.Rebuild(den.Root);
-        den.Write(Mara, File.ReadAllText(Path.Combine(den.Root, Mara)).Replace("name: Mara Voss", "name: Mara Ellery", StringComparison.Ordinal));
+        den.Write(Ilse, File.ReadAllText(Path.Combine(den.Root, Ilse)).Replace("name: Ilse Tarrow", "name: Ilse Ellery", StringComparison.Ordinal));
 
         Assert.Equal(IndexStatus.FilesChanged, IndexBuilder.EnsureUpToDate(den.Root));
 
         Assert.Equal(IndexStatus.Current, IndexBuilder.CheckFiles(den.Root));
         using var index = DenIndex.Open(den.Root);
-        Assert.Equal("Mara Ellery", index.FindEntity("01JA7Q8M4XK3V9R2D5W8HN6TQB")!.Name);
+        Assert.Equal("Ilse Ellery", index.FindEntity("01JA7Q8M4XK3V9R2D5W8HN6TQB")!.Name);
     }
 
     [Fact]
@@ -126,7 +126,7 @@ public sealed class FreshnessTests
         var updates = new System.Collections.Concurrent.BlockingCollection<IndexUpdate>();
         watcher.Updated += (_, u) => updates.Add(u);
         watcher.Start();
-        den.Write(Mara, File.ReadAllText(Path.Combine(den.Root, Mara)).Replace("name: Mara Voss", "name: Mara Ellery", StringComparison.Ordinal));
+        den.Write(Ilse, File.ReadAllText(Path.Combine(den.Root, Ilse)).Replace("name: Ilse Tarrow", "name: Ilse Ellery", StringComparison.Ordinal));
 
         // A generous wait, so a slow machine still sees the watcher catch up.
         // (On a very slow one the watcher may even be done before the query looks.)
@@ -137,7 +137,7 @@ public sealed class FreshnessTests
         Assert.True(updates.TryTake(out var update, TimeSpan.FromSeconds(60)));
         Assert.Equal(IndexUpdateKind.Updated, update.Kind);
         using var index = DenIndex.Open(den.Root);
-        Assert.Equal("Mara Ellery", index.FindEntity("01JA7Q8M4XK3V9R2D5W8HN6TQB")!.Name);
+        Assert.Equal("Ilse Ellery", index.FindEntity("01JA7Q8M4XK3V9R2D5W8HN6TQB")!.Name);
     }
 
     [Fact]
@@ -148,7 +148,7 @@ public sealed class FreshnessTests
         IndexBuilder.Rebuild(den.Root);
         // A watcher that holds the lock but has stopped applying changes.
         using var stuck = new FileStream(Path.Combine(den.Root, IndexBuilder.StateFolder, DenWatcher.LockFileName), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
-        File.AppendAllText(Path.Combine(den.Root, Mara), "\nOne more line.\n");
+        File.AppendAllText(Path.Combine(den.Root, Ilse), "\nOne more line.\n");
         var clock = System.Diagnostics.Stopwatch.StartNew();
 
         Assert.Equal(IndexStatus.FilesChanged, IndexBuilder.EnsureUpToDate(den.Root, TimeSpan.FromMilliseconds(300)));

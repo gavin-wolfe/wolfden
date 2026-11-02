@@ -41,7 +41,7 @@ public sealed class WolfdenTools
         "Full-text search over the den's notes: entity names, aliases, leads, section text, and field values. Words match whole, " +
         "in any order, ignoring case and accents; end a word with * to match it as a prefix. Put words in double quotes to match " +
         "them as a phrase, side by side and in order (\"silver key\", or \"silver ke\"* for a prefix); a hyphenated word such as " +
-        "mara-voss matches its parts side by side too. Phrases and words mix: \"silver key\" harbour. A field value's words are the value " +
+        "ilse-tarrow matches its parts side by side too. Phrases and words mix: \"silver key\" harbour. A field value's words are the value " +
         "as written and, for a link, the linked entity's name and aliases. Give field to search only that field's values (field " +
         "'home' with query 'saltmarsh' finds home: Saltmarsh Docks); each hit in a field names it in 'field', and its snippet " +
         "shows the value, then '→' and a linked entity's name if that's what matched. Matches are in [square brackets]. Results " +

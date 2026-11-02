@@ -20,19 +20,19 @@ public class LinkSyntaxTests
         BodyLinks(body).Select(l => LinkSyntax.FindLinks(l.Text).Single().Target).ToArray();
 
     [Theory]
-    [InlineData("[[mara-voss]]", "mara-voss", null, null)]
-    [InlineData("[[mara-voss|Voss]]", "mara-voss", null, "Voss")]
-    [InlineData("[[mara-voss#Shoulder injury]]", "mara-voss", "Shoulder injury", null)]
-    [InlineData("[[mara-voss#Shoulder injury|her wound]]", "mara-voss", "Shoulder injury", "her wound")]
-    [InlineData("[[ Mara  Voss ]]", "Mara  Voss", null, null)]
-    [InlineData("[[mara-voss # Appearance | Voss ]]", "mara-voss", "Appearance", "Voss")]
-    [InlineData("[[mara-voss|a|b]]", "mara-voss", null, "a|b")]
-    [InlineData("[[mara-voss|a # b]]", "mara-voss", null, "a # b")]
-    [InlineData(@"[[mara-voss\|Voss]]", "mara-voss", null, "Voss")]
-    [InlineData(@"[[mara-voss\|a\|b]]", "mara-voss", null, "a|b")]
+    [InlineData("[[ilse-tarrow]]", "ilse-tarrow", null, null)]
+    [InlineData("[[ilse-tarrow|Tarrow]]", "ilse-tarrow", null, "Tarrow")]
+    [InlineData("[[ilse-tarrow#Shoulder injury]]", "ilse-tarrow", "Shoulder injury", null)]
+    [InlineData("[[ilse-tarrow#Shoulder injury|her wound]]", "ilse-tarrow", "Shoulder injury", "her wound")]
+    [InlineData("[[ Ilse  Tarrow ]]", "Ilse  Tarrow", null, null)]
+    [InlineData("[[ilse-tarrow # Appearance | Tarrow ]]", "ilse-tarrow", "Appearance", "Tarrow")]
+    [InlineData("[[ilse-tarrow|a|b]]", "ilse-tarrow", null, "a|b")]
+    [InlineData("[[ilse-tarrow|a # b]]", "ilse-tarrow", null, "a # b")]
+    [InlineData(@"[[ilse-tarrow\|Tarrow]]", "ilse-tarrow", null, "Tarrow")]
+    [InlineData(@"[[ilse-tarrow\|a\|b]]", "ilse-tarrow", null, "a|b")]
     [InlineData("[[01JA7Q8M4XK3V9R2D5W8HN6TQB]]", "01JA7Q8M4XK3V9R2D5W8HN6TQB", null, null)]
     [InlineData("[[Zoë]]", "Zoë", null, null)]
-    [InlineData("[[[mara-voss]]", "mara-voss", null, null)]
+    [InlineData("[[[ilse-tarrow]]", "ilse-tarrow", null, null)]
     [InlineData("[[a#b]]]", "a", "b", null)]
     public void TheGrammarSplitsTargetHeadingAndLabel(string text, string target, string? heading, string? label)
     {
@@ -45,29 +45,29 @@ public class LinkSyntaxTests
 
     [Theory]
     [InlineData("[[]]")]
-    [InlineData("[[ |Voss]]")]
+    [InlineData("[[ |Tarrow]]")]
     [InlineData("[[   ]]")]
     [InlineData("[[#Appearance]]")]
-    [InlineData(@"\[[mara-voss]]")]
-    [InlineData("![[mara-voss]]")]
+    [InlineData(@"\[[ilse-tarrow]]")]
+    [InlineData("![[ilse-tarrow]]")]
     [InlineData("![[map.png]]")]
-    [InlineData("[[mara-voss#]]")]
-    [InlineData("[[mara-voss|]]")]
+    [InlineData("[[ilse-tarrow#]]")]
+    [InlineData("[[ilse-tarrow|]]")]
     [InlineData("[[a#b#c]]")]
-    [InlineData("[[mara\nvoss]]")]
-    [InlineData("[[mara-voss|Vo\nss]]")]
-    [InlineData("[[mara [x] voss]]")]
-    [InlineData("[mara-voss]")]
-    [InlineData("[[mara-voss]")]
+    [InlineData("[[ilse\ntarrow]]")]
+    [InlineData("[[ilse-tarrow|Vo\nss]]")]
+    [InlineData("[[ilse [x] tarrow]]")]
+    [InlineData("[ilse-tarrow]")]
+    [InlineData("[[ilse-tarrow]")]
     public void TheseAreNotLinks(string text)
     {
         Assert.Empty(LinkSyntax.FindLinks(text));
     }
 
     [Theory]
-    [InlineData(@"\\[[mara-voss]]", 1)]
-    [InlineData(@"\\\[[mara-voss]]", 0)]
-    [InlineData(@"\![[mara-voss]]", 1)]
+    [InlineData(@"\\[[ilse-tarrow]]", 1)]
+    [InlineData(@"\\\[[ilse-tarrow]]", 0)]
+    [InlineData(@"\![[ilse-tarrow]]", 1)]
     [InlineData("[[a]] and [[b|c]] and [[d#e]]", 3)]
     [InlineData("[[a]][[b]]", 2)]
     public void BackslashesAndEmbedsAreCountedExactly(string text, int count)
@@ -79,7 +79,7 @@ public class LinkSyntaxTests
     public void EmptyTargetsAreFoundForTheWarning()
     {
         // F-LINK-3: they're reported, so the scanner returns them marked empty.
-        var raw = LinkSyntax.Scan("[[]] [[ |Voss]] [[ok]]", 0, 22, null).ToList();
+        var raw = LinkSyntax.Scan("[[]] [[ |Tarrow]] [[ok]]", 0, 24, null).ToList();
 
         Assert.Equal([true, true, false], raw.Select(r => r.IsEmpty));
     }
@@ -92,16 +92,16 @@ public class LinkSyntaxTests
         Assert.Equal([(2, 5), (3, 3)], links.Select(l => (l.Line, l.Column)));
         Assert.Equal("[[a]]", links[0].Text);
         Assert.Equal("a", links[0].DisplayText);
-        Assert.Equal("Voss", One("[[mara-voss|Voss]]").DisplayText);
-        Assert.Equal("mara-voss#Appearance", One("[[mara-voss#Appearance]]").DisplayText);
+        Assert.Equal("Tarrow", One("[[ilse-tarrow|Tarrow]]").DisplayText);
+        Assert.Equal("ilse-tarrow#Appearance", One("[[ilse-tarrow#Appearance]]").DisplayText);
     }
 
     [Fact]
     public void BodyLinksHaveFileLinesAndColumns()
     {
-        var links = BodyLinks("\nSee [[kessan-reach]].\n\n## Overview\n- [[mara-voss]] and [[Voss]]\n");
+        var links = BodyLinks("\nSee [[kessan-reach]].\n\n## Overview\n- [[ilse-tarrow]] and [[Tarrow]]\n");
 
-        Assert.Equal([("[[kessan-reach]]", 6, 5), ("[[mara-voss]]", 9, 3), ("[[Voss]]", 9, 21)], links);
+        Assert.Equal([("[[kessan-reach]]", 6, 5), ("[[ilse-tarrow]]", 9, 3), ("[[Tarrow]]", 9, 23)], links);
     }
 
     [Theory]
@@ -146,16 +146,16 @@ public class LinkSyntaxTests
     {
         var outline = MarkdownFile.Parse(TestFiles.Utf8(
             "# Outline\n\n[[notes]]\n\n| row | chapter | beat | status |\n|---|---|---|---|\n" +
-            "| 1 | 2 | [[mara-voss\\|Voss]] wakes. | Candidate |\n" +
+            "| 1 | 2 | [[ilse-tarrow\\|Tarrow]] wakes. | Candidate |\n" +
             "| 2 | | [[a|b]] splits the cell. | |\n" +
             "| x | 1 | [[bad-row]] | |\n" +
             "| 3 | 1 | `[[code]]` | |\n\nAfter [[after]].\n"));
         var links = BodyLinkScanner.ScanOutline(outline).Where(l => !l.Link.IsEmpty).ToList();
 
-        Assert.Equal(["notes", "mara-voss", "bad-row", "after"], links.Select(l => l.Link.Target));
+        Assert.Equal(["notes", "ilse-tarrow", "bad-row", "after"], links.Select(l => l.Link.Target));
         Assert.Null(links[0].Row);
         Assert.Equal(new OutlineRowCells("1", "Candidate", "2", 7), links[1].Row);
-        Assert.Equal("Voss", links[1].Link.Label);
+        Assert.Equal("Tarrow", links[1].Link.Label);
         Assert.Null(links[2].Row);
         Assert.Null(links[3].Row);
     }

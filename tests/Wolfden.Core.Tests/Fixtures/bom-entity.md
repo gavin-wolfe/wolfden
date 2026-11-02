@@ -1,8 +1,8 @@
 ﻿---
 id: 01JA7Q8M4XK3V9R2D5W8HN6TQB
 type: character
-name: Mara Voss
-aliases: [Voss, "the Commander"]
+name: Ilse Tarrow
+aliases: [Tarrow, "the Commander"]
 status: canon
 fields:
   rank:
@@ -12,7 +12,7 @@ fields:
 x-color: teal
 ---
 
-# Mara Voss
+# Ilse Tarrow
 
 Executive officer of the *Tessaly*.
 

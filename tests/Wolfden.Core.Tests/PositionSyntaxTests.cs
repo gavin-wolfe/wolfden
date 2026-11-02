@@ -168,7 +168,7 @@ public class PositionSyntaxTests
         var file = Md("""
             ---
             type: character
-            name: Mara Voss
+            name: Ilse Tarrow
             from: "ember:1"
             until: "ash:1"
             fields:

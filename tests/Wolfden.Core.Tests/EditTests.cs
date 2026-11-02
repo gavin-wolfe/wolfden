@@ -11,11 +11,11 @@ public class EditTests
 {
     private const string Entity = """
         ---
-        # Mara's notes
+        # Ilse's notes
         id: 01JA7Q8M4XK3V9R2D5W8HN6TQB
         type: character
-        name: Mara Voss   # display name
-        aliases: [Voss, "the Commander"]
+        name: Ilse Tarrow   # display name
+        aliases: [Tarrow, "the Commander"]
         status: 'draft'
         fields:
           rank:
@@ -26,7 +26,7 @@ public class EditTests
         x-color: teal
         ---
 
-        # Mara Voss
+        # Ilse Tarrow
 
         ## Appearance
         Silver-streaked hair.
@@ -46,9 +46,9 @@ public class EditTests
     [Fact]
     public void ReplaceTopLevelScalarKeepsSpacingAndComment()
     {
-        var result = Edit(Entity, f => f.WithFrontmatterValue("name", YamlScalarValue.String("Mara Halden")));
+        var result = Edit(Entity, f => f.WithFrontmatterValue("name", YamlScalarValue.String("Ilse Halden")));
 
-        Assert.Equal(Entity.Replace("name: Mara Voss   # display name", "name: Mara Halden   # display name", StringComparison.Ordinal), result);
+        Assert.Equal(Entity.Replace("name: Ilse Tarrow   # display name", "name: Ilse Halden   # display name", StringComparison.Ordinal), result);
     }
 
     [Fact]
@@ -127,19 +127,19 @@ public class EditTests
     {
         var text = "---\ntype: note\nname: Ember\n---\nBody.\n";
 
-        var result = Edit(text, f => f.WithField("pov", YamlScalarValue.String("Mara Voss")));
+        var result = Edit(text, f => f.WithField("pov", YamlScalarValue.String("Ilse Tarrow")));
 
-        Assert.Equal("---\ntype: note\nname: Ember\nfields:\n  pov: Mara Voss\n---\nBody.\n", result);
+        Assert.Equal("---\ntype: note\nname: Ember\nfields:\n  pov: Ilse Tarrow\n---\nBody.\n", result);
     }
 
     [Theory]
-    [InlineData("fields:\n", "fields:\n  pov: Mara\n")]
-    [InlineData("fields:   # none yet\n", "fields:   # none yet\n  pov: Mara\n")]
-    [InlineData("fields: ~\n", "fields:\n  pov: Mara\n")]
-    [InlineData("fields: {}  # none yet\n", "fields:  # none yet\n  pov: Mara\n")]
+    [InlineData("fields:\n", "fields:\n  pov: Ilse\n")]
+    [InlineData("fields:   # none yet\n", "fields:   # none yet\n  pov: Ilse\n")]
+    [InlineData("fields: ~\n", "fields:\n  pov: Ilse\n")]
+    [InlineData("fields: {}  # none yet\n", "fields:  # none yet\n  pov: Ilse\n")]
     public void FillEmptyFieldsMapping(string before, string after)
     {
-        var result = Edit($"---\nname: Ember\n{before}x-a: 1\n---\n", f => f.WithField("pov", YamlScalarValue.String("Mara")));
+        var result = Edit($"---\nname: Ember\n{before}x-a: 1\n---\n", f => f.WithField("pov", YamlScalarValue.String("Ilse")));
 
         Assert.Equal($"---\nname: Ember\n{after}x-a: 1\n---\n", result);
     }
@@ -159,9 +159,9 @@ public class EditTests
     {
         var text = "---\nx-a:\n    b: 1\nname: Ember\n---\n";
 
-        var result = Edit(text, f => f.WithField("pov", YamlScalarValue.String("Mara")));
+        var result = Edit(text, f => f.WithField("pov", YamlScalarValue.String("Ilse")));
 
-        Assert.Equal("---\nx-a:\n    b: 1\nname: Ember\nfields:\n    pov: Mara\n---\n", result);
+        Assert.Equal("---\nx-a:\n    b: 1\nname: Ember\nfields:\n    pov: Ilse\n---\n", result);
     }
 
     [Fact]
@@ -228,11 +228,11 @@ public class EditTests
         var bytes = TestFiles.Fixture("bom-crlf-no-final-newline.md");
         var file = MarkdownFile.Parse(bytes);
 
-        var edited = file.WithField("species", YamlScalarValue.String("human")).WithFrontmatterValue("name", YamlScalarValue.String("Mara Halden"));
+        var edited = file.WithField("species", YamlScalarValue.String("human")).WithFrontmatterValue("name", YamlScalarValue.String("Ilse Halden"));
 
         var expected = file.Text
             .Replace("  born: \"2291\"\r\n", "  born: \"2291\"\r\n  species: human\r\n", StringComparison.Ordinal)
-            .Replace("name: Mara Voss\r\n", "name: Mara Halden\r\n", StringComparison.Ordinal);
+            .Replace("name: Ilse Tarrow\r\n", "name: Ilse Halden\r\n", StringComparison.Ordinal);
         Assert.Equal(expected, edited.Text);
         Assert.Equal([0xEF, 0xBB, 0xBF], edited.ToBytes()[..3]);
         Assert.False(edited.EndsWithNewline);

@@ -12,7 +12,7 @@ namespace Wolfden.Index.Tests;
 public sealed class DenWatcherTests
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(60);
-    private const string Mara = "universes/starfall/series/long-dark/entities/characters/mara-voss.md";
+    private const string Ilse = "universes/starfall/series/long-dark/entities/characters/ilse-tarrow.md";
 
     [Fact]
     [Trait("Scenario", "SC-WATCH-1")]
@@ -27,11 +27,11 @@ public sealed class DenWatcherTests
         Assert.Equal(IndexUpdateKind.Rebuilt, first.Kind);
         Assert.True(first.Summary.Entities > 0);
 
-        den.Write(Mara, File.ReadAllText(Path.Combine(den.Root, Mara)).Replace("name: Mara Voss", "name: Mara Ellery", StringComparison.Ordinal));
+        den.Write(Ilse, File.ReadAllText(Path.Combine(den.Root, Ilse)).Replace("name: Ilse Tarrow", "name: Ilse Ellery", StringComparison.Ordinal));
 
-        var update = WaitFor(updates, u => u.Files.Contains(Mara) || u.Kind == IndexUpdateKind.Rebuilt);
+        var update = WaitFor(updates, u => u.Files.Contains(Ilse) || u.Kind == IndexUpdateKind.Rebuilt);
         using var index = DenIndex.Open(den.Root);
-        Assert.Equal("Mara Ellery", index.FindEntity("01JA7Q8M4XK3V9R2D5W8HN6TQB")!.Name);
+        Assert.Equal("Ilse Ellery", index.FindEntity("01JA7Q8M4XK3V9R2D5W8HN6TQB")!.Name);
         Assert.Equal(update.Summary.Entities, index.Context.Entities.Count());
     }
 
@@ -48,12 +48,12 @@ public sealed class DenWatcherTests
 
         den.Write(wren, "---\ntype: character\nname: Wren Ashby\nstatus: canon\n---\n\nA pilot.\n");
         WaitFor(updates, u => u.Summary.Entities == entities + 1);
-        File.Delete(Path.Combine(den.Root, Mara));
+        File.Delete(Path.Combine(den.Root, Ilse));
         WaitFor(updates, u => u.Summary.Entities == entities);
 
         using var index = DenIndex.Open(den.Root);
         Assert.NotNull(index.FindEntity(wren));
-        Assert.Null(index.FindEntity(Mara));
+        Assert.Null(index.FindEntity(Ilse));
         Assert.Equal(IndexStatus.Current, IndexBuilder.CheckFiles(den.Root));
     }
 
@@ -70,13 +70,13 @@ public sealed class DenWatcherTests
         watcher.Start();
         Assert.Same(store, watcher.Store);
 
-        var text = File.ReadAllText(Path.Combine(den.Root, Mara)).Replace("name: Mara Voss", "name: Mara Ellery", StringComparison.Ordinal);
-        store.WriteFile(Mara, System.Text.Encoding.UTF8.GetBytes(text), DenWriteMode.Replace);
+        var text = File.ReadAllText(Path.Combine(den.Root, Ilse)).Replace("name: Ilse Tarrow", "name: Ilse Ellery", StringComparison.Ordinal);
+        store.WriteFile(Ilse, System.Text.Encoding.UTF8.GetBytes(text), DenWriteMode.Replace);
 
-        var update = WaitFor(updates, u => u.Files.Contains(Mara) || u.Kind == IndexUpdateKind.Rebuilt);
+        var update = WaitFor(updates, u => u.Files.Contains(Ilse) || u.Kind == IndexUpdateKind.Rebuilt);
         Assert.DoesNotContain(update.Files, f => f.Contains(FileSystemDenStore.TempPrefix, StringComparison.Ordinal));
         using var index = DenIndex.Open(den.Root);
-        Assert.Equal("Mara Ellery", index.FindEntity("01JA7Q8M4XK3V9R2D5W8HN6TQB")!.Name);
+        Assert.Equal("Ilse Ellery", index.FindEntity("01JA7Q8M4XK3V9R2D5W8HN6TQB")!.Name);
     }
 
     [Fact]
@@ -140,7 +140,7 @@ public sealed class DenWatcherTests
             watcher.Start();
         }
 
-        File.AppendAllText(Path.Combine(den.Root, Mara), "\nA new line.\n");
+        File.AppendAllText(Path.Combine(den.Root, Ilse), "\nA new line.\n");
 
         Assert.False(updates.TryTake(out _, TimeSpan.FromSeconds(1)));
         using var again = new DenWatcher(den.Root);
@@ -229,8 +229,8 @@ public sealed class DenWatcherTests
         WaitFor(updates, u => u.Kind == IndexUpdateKind.Rebuilt);
 
         // The new watcher sees edits.
-        den.Write(Mara, File.ReadAllText(Path.Combine(den.Root, Mara)).Replace("name: Mara Voss", "name: Mara Ellery", StringComparison.Ordinal));
-        WaitFor(updates, u => u.Files.Contains(Mara));
+        den.Write(Ilse, File.ReadAllText(Path.Combine(den.Root, Ilse)).Replace("name: Ilse Tarrow", "name: Ilse Ellery", StringComparison.Ordinal));
+        WaitFor(updates, u => u.Files.Contains(Ilse));
     }
 
     [Fact]
@@ -360,11 +360,11 @@ public sealed class DenWatcherTests
             // Only the edit's batch and the rebuilds after it fail. A new
             // watch can start with a batch of its own (on Windows, events
             // for the freshly copied den's folders, which change nothing).
-            // Had that one failed, the rebuild could read Mara before the
+            // Had that one failed, the rebuild could read Ilse before the
             // edit and report Rebuilt while the edit was still on its way.
             BeforeApply = batch =>
             {
-                if ((batch.Paths.Contains(Mara) || batch.Overflowed) && Interlocked.Decrement(ref fails) >= 0)
+                if ((batch.Paths.Contains(Ilse) || batch.Overflowed) && Interlocked.Decrement(ref fails) >= 0)
                 {
                     throw new IOException("The index is locked.");
                 }
@@ -376,7 +376,7 @@ public sealed class DenWatcherTests
         watcher.Failed += (_, e) => failures.Add(e);
         watcher.Start();
 
-        File.AppendAllText(Path.Combine(den.Root, Mara), "\nA new line.\n");
+        File.AppendAllText(Path.Combine(den.Root, Ilse), "\nA new line.\n");
 
         Assert.Equal("couldn't update the index: The index is locked. Trying again with a rebuild in 20 ms.", WaitFor(failures, _ => true).Message);
         Assert.Equal("couldn't update the index: The index is locked. Trying again with a rebuild in 40 ms.", WaitFor(failures, _ => true).Message);
@@ -413,13 +413,13 @@ public sealed class DenWatcherTests
         watcher.Failed += (_, e) => failures.Add(e);
         watcher.Start();
 
-        File.AppendAllText(Path.Combine(den.Root, Mara), "\nA new line.\n");
-        WaitFor(updates, u => u.Files.Contains(Mara));
+        File.AppendAllText(Path.Combine(den.Root, Ilse), "\nA new line.\n");
+        WaitFor(updates, u => u.Files.Contains(Ilse));
         Assert.Contains("a handler of the watcher's updates failed: The host's console went away.", WaitFor(failures, _ => true).Message, StringComparison.Ordinal);
-        File.AppendAllText(Path.Combine(den.Root, Mara), "\nAnother line.\n");
+        File.AppendAllText(Path.Combine(den.Root, Ilse), "\nAnother line.\n");
 
         // Still incremental: the handler's failure didn't make the watcher rebuild.
-        var next = WaitFor(updates, u => u.Files.Contains(Mara) || u.Kind == IndexUpdateKind.Rebuilt);
+        var next = WaitFor(updates, u => u.Files.Contains(Ilse) || u.Kind == IndexUpdateKind.Rebuilt);
         Assert.Equal(IndexUpdateKind.Updated, next.Kind);
     }
 

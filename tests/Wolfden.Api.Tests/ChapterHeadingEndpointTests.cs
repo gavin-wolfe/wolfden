@@ -13,7 +13,7 @@ public sealed class ChapterHeadingEndpointTests : IDisposable
     private const string LongDark = "universes/starfall/series/long-dark";
     private const string Ember = LongDark + "/books/ember/book.md";
     private const string Series = LongDark + "/series.md";
-    private const string Mara = LongDark + "/entities/characters/mara-voss.md";
+    private const string Ilse = LongDark + "/entities/characters/ilse-tarrow.md";
 
     private readonly TempDen _den = TempDen.Starfall();
 
@@ -36,10 +36,10 @@ public sealed class ChapterHeadingEndpointTests : IDisposable
             name: Ember
             chapters:
               - { key: prologue, title: Before the Dark, fields: { when: "2284" } }
-              - { key: "1", number: 1, fields: { pov: ["[[mara-voss]]"] } }
-              - { key: "2", number: 2, fields: { pov: ["[[halden-pike]]", "[[mara-voss|the Commander]]"] } }
-              - { key: 2b, number: 3, title: The Long Watch, fields: { pov: ["[[mara-voss]]"] } }
-              - { key: "3", number: 4, fields: { pov: ["[[mara-voss]]"] } }
+              - { key: "1", number: 1, fields: { pov: ["[[ilse-tarrow]]"] } }
+              - { key: "2", number: 2, fields: { pov: ["[[halden-pike]]", "[[ilse-tarrow|the Commander]]"] } }
+              - { key: 2b, number: 3, title: The Long Watch, fields: { pov: ["[[ilse-tarrow]]"] } }
+              - { key: "3", number: 4, fields: { pov: ["[[ilse-tarrow]]"] } }
             ---
             """.Replace("\r\n", "\n", StringComparison.Ordinal) + "\n");
     }
@@ -66,10 +66,10 @@ public sealed class ChapterHeadingEndpointTests : IDisposable
         Assert.Equal(
             [
                 ("prologue", "Before the Dark", "Before the Dark · Kessan Reach — 2284"),
-                ("1", null, "Mara Voss — Kessan Reach"),
+                ("1", null, "Ilse Tarrow — Kessan Reach"),
                 ("2", null, "Halden Pike & the Commander — Kessan Reach"),
-                ("2b", "The Long Watch", "The Long Watch · Mara Voss — Kessan Reach"),
-                ("3", null, "Mara Voss — Kessan Reach"),
+                ("2b", "The Long Watch", "The Long Watch · Ilse Tarrow — Kessan Reach"),
+                ("3", null, "Ilse Tarrow — Kessan Reach"),
             ],
             await EmberChapters(server));
 
@@ -80,8 +80,8 @@ public sealed class ChapterHeadingEndpointTests : IDisposable
         Assert.Equal("Kessan Reach", ash.GetProperty("heading").GetString());
 
         // A rename follows: the heading names the note by its name now.
-        _den.Write(Mara, _den.Read(Mara).Replace("name: Mara Voss", "name: Mara Venn", StringComparison.Ordinal));
-        Assert.Equal("Mara Venn — Kessan Reach", (await EmberChapters(server))[1].Heading);
+        _den.Write(Ilse, _den.Read(Ilse).Replace("name: Ilse Tarrow", "name: Ilse Venn", StringComparison.Ordinal));
+        Assert.Equal("Ilse Venn — Kessan Reach", (await EmberChapters(server))[1].Heading);
     }
 
     [Fact]
@@ -95,7 +95,7 @@ public sealed class ChapterHeadingEndpointTests : IDisposable
         Assert.Equal(
             [
                 ("prologue", "Before the Dark", "Before the Dark · Kessan Reach — 2284"),
-                ("1", null, "Mara Voss — Kessan Reach"),
+                ("1", null, "Ilse Tarrow — Kessan Reach"),
                 ("2", null, "halden-pike & the Commander — Kessan Reach"),
                 ("2b", "The Long Watch", "The Long Watch"),
                 ("3", null, null),
@@ -117,7 +117,7 @@ public sealed class ChapterHeadingEndpointTests : IDisposable
         var book = await server.GetJsonAsync("/api/book/chapters?universe=starfall&book=ember", HttpStatusCode.OK);
 
         Assert.Equal(
-            ["Before the Dark · Kessan Reach — 2284", "Mara Voss — Kessan Reach", "Halden Pike & the Commander — Kessan Reach", "The Long Watch · Mara Voss — Kessan Reach", "Mara Voss — Kessan Reach"],
+            ["Before the Dark · Kessan Reach — 2284", "Ilse Tarrow — Kessan Reach", "Halden Pike & the Commander — Kessan Reach", "The Long Watch · Ilse Tarrow — Kessan Reach", "Ilse Tarrow — Kessan Reach"],
             book.GetProperty("chapters").EnumerateArray().Select(c => c.GetProperty("heading").GetString()));
         Assert.Equal(JsonValueKind.Null, book.GetProperty("chapters")[1].GetProperty("title").ValueKind);
     }

@@ -120,7 +120,7 @@ using the core schema. A parse failure is an [error].
 
 Inside a flow collection (`[...]` or `{...}`), a plain scalar that ends
 with `:` right before `}` or `]` is also an F-YAML-1 [error], such as
-`{value: drowned, from:}` or `[Voss, Orrin:]`. YAML 1.2 ends the scalar
+`{value: drowned, from:}` or `[Tarrow, Orrin:]`. YAML 1.2 ends the scalar
 before that colon and reads the colon as a key separator, but not every
 YAML reader does, and Wolfden's reader keeps the colon in the text. Before
 a comma (`{from:, value: drowned}`) every reader already ends the scalar
@@ -195,7 +195,7 @@ valid chapter key. A chapter key MUST NOT be `r` followed by a digit
 **F-KEY-3.** A universe, series, or book's key is its folder name.
 
 **F-KEY-4.** An entity's **slug** is its file name without `.md`. A file
-name that isn't a valid key (`Mara Voss.md`) is a [warning]: the entity is
+name that isn't a valid key (`Ilse Tarrow.md`) is a [warning]: the entity is
 indexed but has no slug, so links reach it only by id, name, or alias.
 
 **F-KEY-5.** Book keys MUST be unique within a universe, across all of its
@@ -330,7 +330,7 @@ folder. A file in another type's folder, or directly in `entities/`, is a
 [warning]. A first-level folder under `entities/` that is no enabled
 type's plural (`entities/crew/`) gets no diagnostic. Folders below the
 type folder are free for the writer to use
-(`entities/characters/crew/mara-voss.md`) and mean nothing to Wolfden.
+(`entities/characters/crew/ilse-tarrow.md`) and mean nothing to Wolfden.
 
 **F-LAY-7.** Other files and folders in a container folder (images, a
 `drafts/` folder) are ignored, with one exception: a `.md` file directly in
@@ -657,8 +657,8 @@ chapter key as a side effect of renumbering or reordering.
 ---
 id: 01JA7Q8M4XK3V9R2D5W8HN6TQB
 type: character
-name: Mara Voss
-aliases: [Voss, "the Commander"]
+name: Ilse Tarrow
+aliases: [Tarrow, "the Commander"]
 status: canon
 fields:
   species: "[[velari]]"
@@ -960,7 +960,7 @@ With `order: [long-dark, a-quiet-moon]` and `books: [ember, ash]`, every
 ### 9.1 Structure
 
 ```markdown
-# Mara Voss
+# Ilse Tarrow
 
 Executive officer of the *Tessaly*.
 
@@ -1043,7 +1043,7 @@ contain the sequence `-->` (single `-` and `>` characters are fine, as in
 after its first `-->`, such as `from=ember:19--> -->`, doesn't match
 `pos-line` (F-SEC-10). Unquoted values can be any characters except
 whitespace and `"`, so `pov=Zoë` works. Values with spaces need quotes:
-`pov="Mara Voss"`.
+`pov="Ilse Tarrow"`.
 
 **F-SEC-6.** A **section comment** is a line matching `pos-line`, placed on
 the line after a heading of level 2 to 6, or after a stray level-1
@@ -1188,7 +1188,7 @@ ambiguous links are still reported.
 | `<!-- wolfden: status=maybe -->` | [error] F-STAT-1 |
 | `<!-- wolfden: pin=yes -->` | [error] F-PIN-1 |
 | `<!-- wolfden: canon=false -->` | valid, bookkeeping (F-SEC-12) |
-| `<!-- wolfden: pov=mara -->` | [warning] F-SEC-7 |
+| `<!-- wolfden: pov=ilse -->` | [warning] F-SEC-7 |
 | a blank line, then `<!-- wolfden: from=ember:19 -->` | valid (F-SEC-6) |
 | two blank lines, then `<!-- wolfden: from=ember:19 -->` | [warning] F-SEC-10 |
 | `   <!-- wolfden: from=ember:19 -->` (three spaces) | valid |
@@ -1337,10 +1337,10 @@ tchar      = <any character except "[", "]", "|", "#", CR, LF>
 lchar      = <any character except "[", "]", CR, LF>
 ```
 
-`[[mara-voss]]` links to an entity. `[[mara-voss|Voss]]` shows "Voss".
-`[[mara-voss#Shoulder injury]]` links to a section. Without a label, the
+`[[ilse-tarrow]]` links to an entity. `[[ilse-tarrow|Tarrow]]` shows "Tarrow".
+`[[ilse-tarrow#Shoulder injury]]` links to a section. Without a label, the
 link shows its text as written. `\|` separates the label too, so a link
-escaped for a table cell (`[[mara-voss\|Voss]]`, F-OUT-12) reads the same
+escaped for a table cell (`[[ilse-tarrow\|Tarrow]]`, F-OUT-12) reads the same
 anywhere.
 
 **F-LINK-1.** In a body (entity, container, or outline), links are
@@ -1355,7 +1355,7 @@ nowhere else (not in `name`, `aliases`, or `x-` keys).
 as text, with no diagnostic.
 
 **F-LINK-3.** The target, heading, and label are trimmed. A link with an
-empty target (`[[]]`, `[[ |Voss]]`) is a [warning] and isn't a link.
+empty target (`[[]]`, `[[ |Tarrow]]`) is a [warning] and isn't a link.
 
 ### 10.2 Resolution
 
@@ -1363,7 +1363,7 @@ empty target (`[[]]`, `[[ |Voss]]`) is a [warning] and isn't a link.
 section names, after this normalization of both sides: NFC (F-ENC-5), trim,
 collapse each run of whitespace to one space, then Unicode default case
 folding. So matching is case-insensitive. Hyphens and spaces stay distinct:
-`[[mara voss]]` matches the name "Mara Voss", not the slug `mara-voss`.
+`[[ilse tarrow]]` matches the name "Ilse Tarrow", not the slug `ilse-tarrow`.
 
 **F-LINK-5.** The candidates are the entities of the linking file's
 universe, at every scope and of every status. Container files aren't link
@@ -1386,7 +1386,7 @@ matches, and the link doesn't resolve.
 **F-LINK-8.** A link with no match is **broken**, a [warning]. Broken links
 are allowed, since they often mark notes not yet written. If the target
 would match an entity in another universe of the den, the warning says so
-("matches only 'Mara Voss' in universe 'drift'; links don't cross
+("matches only 'Ilse Tarrow' in universe 'drift'; links don't cross
 universes", design.md §2). If it matches a book or series key or name, the
 warning says containers aren't link targets yet.
 
@@ -1450,16 +1450,16 @@ details live in an entity that the row links to.
 
 | row | chapter | pov | beat | notes |
 |---|---|---|---|---|
-| 37 | 1 | [[mara-voss]] | Mara wakes aboard the *Tessaly*. | |
-| 38 | 2 | [[mara-voss]] | The team lands at [[kessan-reach]]. | [[landing]] |
+| 37 | 1 | [[ilse-tarrow]] | Ilse wakes aboard the *Tessaly*. | |
+| 38 | 2 | [[ilse-tarrow]] | The team lands at [[kessan-reach]]. | [[landing]] |
 | 39a | 2 | | The ambush. | |
-| 39b | 2b | [[mara-voss\|Voss]] | Mara is hit. | |
+| 39b | 2b | [[ilse-tarrow\|Tarrow]] | Ilse is hit. | |
 
 ## Act two
 
 | row | beat | status | progress |
 |---|---|---|---|
-| 40 | Voss takes command. | candidate | outlined |
+| 40 | Tarrow takes command. | candidate | outlined |
 ```
 
 ```abnf
@@ -1550,8 +1550,8 @@ detail belong in a separate entity, linked from the beat text or from the
 `notes` column. Links work in any cell. A `|` inside a cell, including the
 one in `[[target|label]]`, MUST be escaped as `\|`, as GFM requires. Links
 are recognized in each cell's text after GFM removes that escape, so
-`[[mara-voss\|Voss]]` is the link `[[mara-voss|Voss]]`. An unescaped pipe
-splits the cell and shifts every later column, so a body row with more
+`[[ilse-tarrow\|Tarrow]]` is the link `[[ilse-tarrow|Tarrow]]`. An unescaped
+pipe splits the cell and shifts every later column, so a body row with more
 cells than the header is a [warning], and so is a cell with a `[[` that
 has no matching `]]`.
 
@@ -1727,7 +1727,7 @@ starfall-den/
     entities/locations/kessan-reach.md
     series/long-dark/
       series.md
-      entities/characters/mara-voss.md
+      entities/characters/ilse-tarrow.md
       books/ember/
         book.md
         outline.md
@@ -1788,14 +1788,14 @@ status: canon
 A contested belt of mining stations at the edge of settled space.
 ```
 
-`universes/starfall/series/long-dark/entities/characters/mara-voss.md`:
+`universes/starfall/series/long-dark/entities/characters/ilse-tarrow.md`:
 
 ```markdown
 ---
 id: 01JA7Q8M4XK3V9R2D5W8HN6TQB
 type: character
-name: Mara Voss
-aliases: [Voss]
+name: Ilse Tarrow
+aliases: [Tarrow]
 status: canon
 from: "ember:1"
 fields:
@@ -1804,7 +1804,7 @@ fields:
     - { value: Commander, from: "ember:4" }
 ---
 
-# Mara Voss
+# Ilse Tarrow
 
 ## Overview
 Executive officer of the *Tessaly*.
@@ -1821,11 +1821,11 @@ fully recovers.
 | row | chapter | beat |
 |---|---|---|
 | 1 | 1 | A distress call from the edge of [[the Reach]]. |
-| 2 | 2 | [[Mara Voss]] leads the away team. |
+| 2 | 2 | [[Ilse Tarrow]] leads the away team. |
 | 3 | 3 | The ambush. |
-| 4 | 4 | Voss takes command. |
+| 4 | 4 | Tarrow takes command. |
 ```
 
-As of `ember:2`, Mara Voss is a lieutenant with an Overview and no Shoulder
+As of `ember:2`, Ilse Tarrow is a lieutenant with an Overview and no Shoulder
 injury. As of `ember:4`, she's a commander and the injury section is in
 effect. As of `ember:prologue`, she isn't in canon yet (F-ENT-6).

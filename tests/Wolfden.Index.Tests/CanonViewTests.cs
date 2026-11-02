@@ -9,7 +9,7 @@ namespace Wolfden.Index.Tests;
 /// </summary>
 public sealed class CanonViewTests : IClassFixture<CanonViewTests.Built>
 {
-    private const string Mara = "01JA7Q8M4XK3V9R2D5W8HN6TQB";
+    private const string Ilse = "01JA7Q8M4XK3V9R2D5W8HN6TQB";
     private const string Pike = "01JA7Q8M4XK3V9R2D5W8HN6TQC";
     private const string Tessaly = "01JA7Q8M4XK3V9R2D5W8HN6TQE";
     private const string LanternShip = "01JA7Q8M4XK3V9R2D5W8HN6TQF";
@@ -76,13 +76,13 @@ public sealed class CanonViewTests : IClassFixture<CanonViewTests.Built>
     public void ABookFilterLeavesOutASiblingBooksEntities()
     {
         var quietMoon = Starfall.CanonAsOf("starfall", "a-quiet-moon:1", CanonFilter.ForBook("a-quiet-moon")).Entities;
-        Assert.DoesNotContain(quietMoon, e => e.Id is Pike or Mara or Tessaly);
+        Assert.DoesNotContain(quietMoon, e => e.Id is Pike or Ilse or Tessaly);
         Assert.Contains(quietMoon, e => e.Id == LanternShip);
         Assert.Contains(quietMoon, e => e.Name == "Kessan Reach");
 
         var ash = Starfall.CanonAsOf("starfall", null, CanonFilter.ForBook("ash")).Entities;
         Assert.Contains(ash, e => e.Id is Pike);
-        Assert.Contains(ash, e => e.Id is Mara);
+        Assert.Contains(ash, e => e.Id is Ilse);
         Assert.DoesNotContain(ash, e => e.Id == LanternShip);
     }
 
@@ -92,7 +92,7 @@ public sealed class CanonViewTests : IClassFixture<CanonViewTests.Built>
         var longDark = Starfall.CanonAsOf("starfall", null, CanonFilter.ForSeries("long-dark")).Entities;
 
         Assert.Contains(longDark, e => e.Id == Pike);
-        Assert.Contains(longDark, e => e.Id == Mara);
+        Assert.Contains(longDark, e => e.Id == Ilse);
         Assert.DoesNotContain(longDark, e => e.Id == LanternShip);
         Assert.Equal(["universe", "series", "book"], longDark.Select(e => e.ScopeKind).Distinct());
     }
@@ -144,7 +144,7 @@ public sealed class CanonViewTests : IClassFixture<CanonViewTests.Built>
     public void AGapLeavesAFieldOut()
     {
         // F-TMP-6: posting ends at ash:2 and the next starts at ash:4.
-        string[] Posting(string position) => Starfall.CanonAsOf("starfall", position).Entities.Single(e => e.Id == Mara)
+        string[] Posting(string position) => Starfall.CanonAsOf("starfall", position).Entities.Single(e => e.Id == Ilse)
             .Fields.Where(f => f.Name == "posting").Select(f => f.ValueJson).ToArray();
 
         Assert.Equal(["\"[[tessaly]]\""], Posting("ash:1"));
@@ -156,23 +156,23 @@ public sealed class CanonViewTests : IClassFixture<CanonViewTests.Built>
     [Fact]
     public void FieldsComeInFrontmatterOrderWithTheirSources()
     {
-        var mara = Starfall.CanonAsOf("starfall", "ember:2b").Entities.Single(e => e.Id == Mara);
+        var ilse = Starfall.CanonAsOf("starfall", "ember:2b").Entities.Single(e => e.Id == Ilse);
 
-        Assert.Equal(["rank", "posting", "species"], mara.Fields.Select(f => f.Name));
-        var rank = mara.Fields[0];
+        Assert.Equal(["rank", "posting", "species"], ilse.Fields.Select(f => f.Name));
+        var rank = ilse.Fields[0];
         Assert.Equal(("\"Commander\"", "temporal", 1, "canon", true, "ember:2b"), (rank.ValueJson, rank.Kind, rank.EntryIndex, rank.Status, rank.Pinned, rank.From));
-        Assert.Equal("entry", mara.Fields[2].Kind);
-        Assert.EndsWith("mara-voss.md", rank.Path, StringComparison.Ordinal);
+        Assert.Equal("entry", ilse.Fields[2].Kind);
+        Assert.EndsWith("ilse-tarrow.md", rank.Path, StringComparison.Ordinal);
         Assert.Equal(11, rank.Line);
-        Assert.Equal("Mara Voss", mara.Title);
-        Assert.Equal("ember:1", mara.From);
+        Assert.Equal("Ilse Tarrow", ilse.Title);
+        Assert.Equal("ember:1", ilse.From);
     }
 
     [Fact]
     public void ACandidateEntryNeverWins()
     {
         // Captain is a candidate from ash:3, so Commander runs on (F-TMP-4).
-        var rank = Starfall.CanonAsOf("starfall", "ash:3").Entities.Single(e => e.Id == Mara).Fields.Single(f => f.Name == "rank");
+        var rank = Starfall.CanonAsOf("starfall", "ash:3").Entities.Single(e => e.Id == Ilse).Fields.Single(f => f.Name == "rank");
         Assert.Equal("\"Commander\"", rank.ValueJson);
     }
 
@@ -230,16 +230,16 @@ public sealed class CanonViewTests : IClassFixture<CanonViewTests.Built>
     [Fact]
     public void PinnedCanonKeepsOnlyPinnedEntriesAndSections()
     {
-        // F-VIEW-2: at ember:2b Mara's Commander is pinned; at ember:2 her
+        // F-VIEW-2: at ember:2b Ilse's Commander is pinned; at ember:2 her
         // Lieutenant isn't, and nothing else of hers is pinned.
         var pinned = Starfall.CanonAsOf("starfall", "ember:2b").Pinned();
-        var mara = Assert.Single(pinned.Entities, e => e.Id == Mara);
-        Assert.Equal("", mara.Lead);
-        Assert.Equal(["rank"], mara.Fields.Select(f => f.Name));
-        Assert.Empty(mara.Sections);
+        var ilse = Assert.Single(pinned.Entities, e => e.Id == Ilse);
+        Assert.Equal("", ilse.Lead);
+        Assert.Equal(["rank"], ilse.Fields.Select(f => f.Name));
+        Assert.Empty(ilse.Sections);
         Assert.All(pinned.Entities, e => Assert.All(e.Fields, f => Assert.True(f.Pinned)));
         Assert.All(pinned.Entities, e => Assert.All(e.Sections, s => Assert.True(s.Pinned)));
-        Assert.DoesNotContain(Starfall.CanonAsOf("starfall", "ember:2").Pinned().Entities, e => e.Id == Mara);
+        Assert.DoesNotContain(Starfall.CanonAsOf("starfall", "ember:2").Pinned().Entities, e => e.Id == Ilse);
 
         // Defaults are never pinned, and a pinned section pins its subsections (F-PIN-2).
         var gull = Assert.Single(Kit.CanonAsOf("coast").Pinned().Entities);

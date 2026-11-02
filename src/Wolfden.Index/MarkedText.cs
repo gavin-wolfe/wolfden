@@ -120,7 +120,7 @@ public sealed record MarkedText(string Text, IReadOnlyList<TextMatch> Matches)
 /// text that isn't in it, such as field values: the text is split into words
 /// of letters and digits, compared ignoring case and accents. Each query word
 /// matches whole, or as a prefix if it ends in <c>*</c>, and a query word
-/// that holds several (<c>mara-voss</c>) matches them side by side, as a
+/// that holds several (<c>ilse-tarrow</c>) matches them side by side, as a
 /// phrase, as do the words of a quoted phrase (<c>"silver key"</c>; see
 /// <see cref="SearchQuery"/>).
 /// </summary>

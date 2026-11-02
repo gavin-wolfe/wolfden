@@ -16,7 +16,7 @@ public class EntityCatalogTests
     {
         var source = Den()
             .Entity(Starfall, "kessan-reach", Character("Kessan Reach", "id: 01JADJ8FSSZ5AWSH8VHTPRE95B"), folder: "locations")
-            .Entity(LongDark, "mara-voss", Character("Mara Voss", "id: 01JA7Q8M4XK3V9R2D5W8HN6TQB"))
+            .Entity(LongDark, "ilse-tarrow", Character("Ilse Tarrow", "id: 01JA7Q8M4XK3V9R2D5W8HN6TQB"))
             .Entity(Ash, "halden-pike", Character("Halden Pike", "id: 01JA7Q8M4XK3V9R2D5W8HN6TQC"), folder: "characters/crew")
             .Entity(Moon, "lantern", Character("Lantern", "id: 01JA7Q8M4XK3V9R2D5W8HN6TQE"), folder: "ships")
             .With($"{Starfall}/entities/.hidden/ghost.md", "---\ntype: note\nname: Ghost\n---\n")
@@ -31,7 +31,7 @@ public class EntityCatalogTests
 
         Assert.Equal(
             [$"{Moon}/entities/ships/lantern.md", $"{Starfall}/entities/locations/kessan-reach.md",
-             $"{Ash}/entities/characters/crew/halden-pike.md", $"{LongDark}/entities/characters/mara-voss.md"],
+             $"{Ash}/entities/characters/crew/halden-pike.md", $"{LongDark}/entities/characters/ilse-tarrow.md"],
             catalog.Entities.Select(e => e.Path));
         Assert.Empty(catalog.Diagnostics);
         var pike = catalog.FindByPath($"{Ash}/entities/characters/crew/halden-pike.md")!;
@@ -47,8 +47,8 @@ public class EntityCatalogTests
     [InlineData("type: character\nstatus: canon", "F-ENT-3")]
     [InlineData("type: character\nname: '  '", "F-ENT-3")]
     [InlineData("type: character\nname: [X]", "F-ENT-3")]
-    [InlineData("type: character\nname: X\naliases: Voss", "F-ENT-4")]
-    [InlineData("type: character\nname: X\naliases: [Voss, ~]", "F-ENT-4")]
+    [InlineData("type: character\nname: X\naliases: Tarrow", "F-ENT-4")]
+    [InlineData("type: character\nname: X\naliases: [Tarrow, ~]", "F-ENT-4")]
     [InlineData("type: character\nname: X\naliases: [\"\"]", "F-ENT-4")]
     [InlineData("type: character\nname: X\nstatus: maybe", "F-ENT-5")]
     [InlineData("type: character\nname: X\nid: 01ja7q8m4xk3v9r2d5w8hn6tqb", "F-ID-1")]
@@ -88,14 +88,14 @@ public class EntityCatalogTests
     [Fact]
     public void MissingIdsAndBadSlugsAreWarnings()
     {
-        var catalog = EntityCatalog.Load(Den().With($"{Starfall}/entities/notes/Mara Voss.md", "---\ntype: note\nname: Mara Voss\n---\n"));
+        var catalog = EntityCatalog.Load(Den().With($"{Starfall}/entities/notes/Ilse Tarrow.md", "---\ntype: note\nname: Ilse Tarrow\n---\n"));
 
         var entity = Assert.Single(catalog.Entities);
         Assert.Null(entity.Id);
         Assert.Null(entity.Slug);
         Assert.Equal(entity.Path, entity.Key);
         Assert.Equal(
-            [($"{Starfall}/entities/notes/Mara Voss.md", "F-KEY-4", DiagnosticSeverity.Warning), ($"{Starfall}/entities/notes/Mara Voss.md", "F-ID-2", DiagnosticSeverity.Warning)],
+            [($"{Starfall}/entities/notes/Ilse Tarrow.md", "F-KEY-4", DiagnosticSeverity.Warning), ($"{Starfall}/entities/notes/Ilse Tarrow.md", "F-ID-2", DiagnosticSeverity.Warning)],
             Rules(catalog.Diagnostics));
     }
 
@@ -104,8 +104,8 @@ public class EntityCatalogTests
     {
         const string id = "01JA7Q8M4XK3V9R2D5W8HN6TQB";
         var source = Den()
-            .Entity(Starfall, "mara-voss", Character("Mara Voss", $"id: {id}"))
-            .Entity(Ash, "mara-voss", Character("Mara Voss", $"id: {id}"))
+            .Entity(Starfall, "ilse-tarrow", Character("Ilse Tarrow", $"id: {id}"))
+            .Entity(Ash, "ilse-tarrow", Character("Ilse Tarrow", $"id: {id}"))
             .With($"{Moon}/book.md", $"---\nid: {id}\nname: A Quiet Moon\nchapters: [1]\n---\n");
 
         var catalog = EntityCatalog.Load(source);
@@ -114,8 +114,8 @@ public class EntityCatalogTests
         Assert.All(catalog.Entities, e => Assert.True(catalog.HasDuplicateId(e)));
         Assert.Equal(
             [($"{Moon}/book.md", "F-ID-3", DiagnosticSeverity.Warning),
-             ($"{Starfall}/entities/characters/mara-voss.md", "F-ID-3", DiagnosticSeverity.Warning),
-             ($"{Ash}/entities/characters/mara-voss.md", "F-ID-3", DiagnosticSeverity.Warning)],
+             ($"{Starfall}/entities/characters/ilse-tarrow.md", "F-ID-3", DiagnosticSeverity.Warning),
+             ($"{Ash}/entities/characters/ilse-tarrow.md", "F-ID-3", DiagnosticSeverity.Warning)],
             Rules(catalog.Diagnostics));
     }
 

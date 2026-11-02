@@ -18,7 +18,7 @@ public sealed class UnreadableFileTests
         var data = new TheoryData<string, string>();
         foreach (var path in new[]
         {
-            "universes/starfall/series/long-dark/entities/characters/mara-voss.md",
+            "universes/starfall/series/long-dark/entities/characters/ilse-tarrow.md",
             "universes/starfall/series/long-dark/books/ember/outline.md",
             "universes/starfall/series/long-dark/books/ember/book.md",
             "universes/starfall/universe.md",
@@ -93,16 +93,16 @@ public sealed class UnreadableFileTests
     [Fact]
     public void AnUpdateLeavesOutAChangedFileThatCantBeRead()
     {
-        const string mara = "universes/starfall/series/long-dark/entities/characters/mara-voss.md";
+        const string ilse = "universes/starfall/series/long-dark/entities/characters/ilse-tarrow.md";
         var source = MemoryDenSource.FromDirectory(MemoryDenSource.StarfallRoot);
         var structure = DenStructure.Load(source);
         var catalog = EntityCatalog.Load(structure, source);
-        Assert.Contains(catalog.Entities, e => e.Path == mara);
+        Assert.Contains(catalog.Entities, e => e.Path == ilse);
 
-        var updated = catalog.Update(new UnreadableSource(source, mara, "deleted"), [mara]);
+        var updated = catalog.Update(new UnreadableSource(source, ilse, "deleted"), [ilse]);
 
-        Assert.DoesNotContain(updated.Entities, e => e.Path == mara);
-        Assert.Equal(Entities(MemoryDenSource.FromDirectory(MemoryDenSource.StarfallRoot).Without(mara)), updated.Entities.Select(e => e.Path).ToList());
+        Assert.DoesNotContain(updated.Entities, e => e.Path == ilse);
+        Assert.Equal(Entities(MemoryDenSource.FromDirectory(MemoryDenSource.StarfallRoot).Without(ilse)), updated.Entities.Select(e => e.Path).ToList());
     }
 
     [Fact]

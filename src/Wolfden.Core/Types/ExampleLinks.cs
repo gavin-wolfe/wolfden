@@ -34,7 +34,7 @@ public sealed class ExampleLinks
     /// <summary>
     /// A link to the first note by name of a type <paramref name="field"/>
     /// takes (any type if it has no <c>to</c>), as a writer types it, such
-    /// as <c>[[mara-voss]]</c>; or a placeholder if there's none.
+    /// as <c>[[ilse-tarrow]]</c>; or a placeholder if there's none.
     /// </summary>
     public string For(FieldDefinition field)
     {

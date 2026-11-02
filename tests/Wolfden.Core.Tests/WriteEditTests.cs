@@ -7,7 +7,7 @@ namespace Wolfden.Core.Tests;
 /// <summary>The edits the MCP write tools (#21) add to the document API: whole values, placed sections, and lead text.</summary>
 public sealed class WriteEditTests
 {
-    private const string Note = "---\nid: 01JA7Q8M4XK3V9R2D5W8HN6TQB\ntype: character\nname: Mara Voss\nstatus: canon\nfields:\n  born: \"2291\"\n---\n\n# Mara Voss\n\nLead.\n\n## Overview\nXO.\n\n## Voice\nCurt.\n";
+    private const string Note = "---\nid: 01JA7Q8M4XK3V9R2D5W8HN6TQB\ntype: character\nname: Ilse Tarrow\nstatus: canon\nfields:\n  born: \"2291\"\n---\n\n# Ilse Tarrow\n\nLead.\n\n## Overview\nXO.\n\n## Voice\nCurt.\n";
 
     private static MarkdownFile Parse(string text) => MarkdownFile.Parse(Encoding.UTF8.GetBytes(text), requireFrontmatter: true);
 
@@ -38,17 +38,17 @@ public sealed class WriteEditTests
     {
         var file = Parse(Note);
 
-        var aliases = file.WithNewListItem(["aliases"], YamlScalarValue.String("Voss"), inTemplateOrder: true);
+        var aliases = file.WithNewListItem(["aliases"], YamlScalarValue.String("Tarrow"), inTemplateOrder: true);
         var from = aliases.WithFrontmatterValue(["from"], YamlScalarValue.String("ember:3"), inTemplateOrder: true);
         var extra = from.WithFrontmatterValue(["x-color"], YamlScalarValue.String("teal"), inTemplateOrder: true);
 
         Assert.StartsWith(
-            "---\nid: 01JA7Q8M4XK3V9R2D5W8HN6TQB\ntype: character\nname: Mara Voss\naliases: [Voss]\nstatus: canon\nfrom: \"ember:3\"\nfields:\n  born: \"2291\"\nx-color: teal\n---\n",
+            "---\nid: 01JA7Q8M4XK3V9R2D5W8HN6TQB\ntype: character\nname: Ilse Tarrow\naliases: [Tarrow]\nstatus: canon\nfrom: \"ember:3\"\nfields:\n  born: \"2291\"\nx-color: teal\n---\n",
             extra.Text,
             StringComparison.Ordinal);
 
         // Without it, a new key goes after the existing ones (F-RT-4).
-        Assert.Contains("  born: \"2291\"\naliases: [Voss]\n---", file.WithNewListItem(["aliases"], YamlScalarValue.String("Voss")).Text, StringComparison.Ordinal);
+        Assert.Contains("  born: \"2291\"\naliases: [Tarrow]\n---", file.WithNewListItem(["aliases"], YamlScalarValue.String("Tarrow")).Text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -75,7 +75,7 @@ public sealed class WriteEditTests
     {
         var edited = Parse(Note).WithTextAddedToLead("More lead.");
 
-        Assert.Contains("# Mara Voss\n\nLead.\n\nMore lead.\n\n## Overview\nXO.", edited.Text, StringComparison.Ordinal);
+        Assert.Contains("# Ilse Tarrow\n\nLead.\n\nMore lead.\n\n## Overview\nXO.", edited.Text, StringComparison.Ordinal);
         Assert.Throws<ArgumentException>(() => Parse(Note).WithTextAddedToLead("## Sneaky"));
 
         var noSections = Parse("---\nname: x\n---\n\n# X\n<!-- prompt -->\n").WithTextAddedToLead("Idea.");

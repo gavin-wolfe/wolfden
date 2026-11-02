@@ -17,7 +17,7 @@ namespace Wolfden.Git.Tests;
 /// </summary>
 public sealed class GitTimeoutTests
 {
-    private const string Mara = "universes/vael/entities/characters/mara-voss.md";
+    private const string Ilse = "universes/vael/entities/characters/ilse-tarrow.md";
 
     /// <summary>
     /// How long, by the clock, a waiting script runs if the test never
@@ -70,11 +70,11 @@ public sealed class GitTimeoutTests
         repo.CommitAll("start");
         var head = repo.Git("rev-parse", "HEAD");
         repo.WriteHook("pre-commit", Waiting("hook", exitCode: 1));
-        repo.WriteDen(Mara, "# Mara Voss\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
         var history = GitHistory.ForDen(repo.DenRoot, TestRepo.Options with { WriteTimeout = TimeSpan.FromSeconds(5) }, Token);
         try
         {
-            var stuck = Assert.Throws<HistoryException>(() => history.Checkpoint(new CheckpointRequest("Add Mara"), Token));
+            var stuck = Assert.Throws<HistoryException>(() => history.Checkpoint(new CheckpointRequest("Add Ilse"), Token));
 
             Assert.StartsWith("Git hasn't finished the checkpoint after 5 seconds. Wolfden stopped waiting but left git running", stuck.Message, StringComparison.Ordinal);
             Assert.Contains("signing (a passphrase prompt)", stuck.Message, StringComparison.Ordinal);
@@ -91,7 +91,7 @@ public sealed class GitTimeoutTests
 
         // The hook refuses; once git has exited, the new file is untracked again.
         await WaitFor(
-            () => File.Exists(GitFile(repo, "wolfden-hook-done")) && !File.Exists(GitFile(repo, "index.lock")) && Status(repo) == $"?? {Mara}\n",
+            () => File.Exists(GitFile(repo, "wolfden-hook-done")) && !File.Exists(GitFile(repo, "index.lock")) && Status(repo) == $"?? {Ilse}\n",
             "git to finish and the new file to be untracked again");
         Assert.Equal(head, repo.Git("rev-parse", "HEAD"));
     }
@@ -103,11 +103,11 @@ public sealed class GitTimeoutTests
         using var repo = TestRepo.Create();
         repo.CommitAll("start");
         repo.WriteHook("pre-commit", Waiting("hook", exitCode: 0));
-        repo.WriteDen(Mara, "# Mara Voss\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
         var history = GitHistory.ForDen(repo.DenRoot, TestRepo.Options with { WriteTimeout = TimeSpan.FromSeconds(5) }, Token);
         try
         {
-            Assert.Throws<HistoryException>(() => history.Checkpoint(new CheckpointRequest("Add Mara"), Token));
+            Assert.Throws<HistoryException>(() => history.Checkpoint(new CheckpointRequest("Add Ilse"), Token));
             await WaitFor(() => File.Exists(GitFile(repo, "wolfden-hook-started")), "the hook to start");
         }
         finally
@@ -116,9 +116,9 @@ public sealed class GitTimeoutTests
         }
 
         await WaitFor(
-            () => !File.Exists(GitFile(repo, "index.lock")) && repo.Git("log", "-1", "--format=%s") == "Add Mara\n",
+            () => !File.Exists(GitFile(repo, "index.lock")) && repo.Git("log", "-1", "--format=%s") == "Add Ilse\n",
             "git to record the checkpoint");
-        Assert.Equal($"{Mara}\n", repo.Git("show", "--name-only", "--format=", "HEAD"));
+        Assert.Equal($"{Ilse}\n", repo.Git("show", "--name-only", "--format=", "HEAD"));
         Assert.Equal("", Status(repo));
     }
 
@@ -129,7 +129,7 @@ public sealed class GitTimeoutTests
         using var repo = TestRepo.Create();
         repo.CommitAll("start");
         repo.WriteHook("pre-commit", Waiting("hook", exitCode: 0));
-        repo.WriteDen(Mara, "# Mara Voss\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
 
         // Cancel while the pre-commit hook runs, then let the hook finish.
         // Stopping git there would leave index.lock behind (#145).
@@ -149,12 +149,12 @@ public sealed class GitTimeoutTests
             },
             Token);
 
-        var entry = repo.History.Checkpoint(new CheckpointRequest("Add Mara"), cancel.Token).Value;
+        var entry = repo.History.Checkpoint(new CheckpointRequest("Add Ilse"), cancel.Token).Value;
         await watch;
 
         Assert.True(cancel.IsCancellationRequested);
         Assert.NotNull(entry);
-        Assert.Equal("Add Mara", entry.Message);
+        Assert.Equal("Add Ilse", entry.Message);
         Assert.Equal(repo.Git("rev-parse", "HEAD").Trim(), entry.Id);
         Assert.False(File.Exists(GitFile(repo, "index.lock")));
         Assert.Equal("", Status(repo));
@@ -170,15 +170,15 @@ public sealed class GitTimeoutTests
         // Like a post-commit 'git push &': the child keeps git's stderr open
         // after git has exited, until the test releases it.
         repo.WriteHook("post-commit", $"#!/bin/sh\n{BackgroundChild}\nexit 0\n");
-        repo.WriteDen(Mara, "# Mara Voss\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
         try
         {
             // The default limits. A checkpoint that waited for the child's
             // output to close would return only once the child had ended.
-            var entry = (await WithinBound(() => repo.History.Checkpoint(new CheckpointRequest("Add Mara"), Token), "The checkpoint waited on the hook's child.")).Value;
+            var entry = (await WithinBound(() => repo.History.Checkpoint(new CheckpointRequest("Add Ilse"), Token), "The checkpoint waited on the hook's child.")).Value;
 
             Assert.NotNull(entry);
-            Assert.Equal("Add Mara", entry.Message);
+            Assert.Equal("Add Ilse", entry.Message);
             Assert.False(File.Exists(GitFile(repo, "wolfden-child-done")), "The checkpoint waited on the hook's child.");
         }
         finally
@@ -242,13 +242,13 @@ public sealed class GitTimeoutTests
     {
         using var repo = TestRepo.Create();
         repo.CommitAll("start");
-        repo.WriteDen(Mara, "# Mara Voss\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
         using var cancelled = new CancellationTokenSource();
         cancelled.Cancel();
 
-        Assert.ThrowsAny<OperationCanceledException>(() => repo.History.Checkpoint(new CheckpointRequest("Add Mara"), cancelled.Token));
+        Assert.ThrowsAny<OperationCanceledException>(() => repo.History.Checkpoint(new CheckpointRequest("Add Ilse"), cancelled.Token));
 
-        Assert.Equal($"?? {Mara}\n", Status(repo));
+        Assert.Equal($"?? {Ilse}\n", Status(repo));
         Assert.Equal("start\n", repo.Git("log", "-1", "--format=%s"));
     }
 
@@ -265,7 +265,7 @@ public sealed class GitTimeoutTests
             "filter.wolfden-slow.clean",
             $": > .git/wolfden-filter-started; {WaitForRelease("filter")}; : > .git/wolfden-filter-done; cat");
         repo.WriteRepo(".gitattributes", "*.md filter=wolfden-slow\n");
-        repo.WriteDen(Mara, "# Mara Voss\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
         var history = GitHistory.ForDen(repo.DenRoot, TestRepo.Options with { ReadTimeout = TimeSpan.FromSeconds(10) }, Token);
         try
         {

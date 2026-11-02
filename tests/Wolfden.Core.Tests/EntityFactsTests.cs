@@ -14,12 +14,12 @@ namespace Wolfden.Core.Tests;
 /// </summary>
 public class EntityFactsTests
 {
-    private const string Path = LinkDens.Ember + "/entities/characters/mara.md";
+    private const string Path = LinkDens.Ember + "/entities/characters/ilse.md";
 
     [Fact]
     public void LiveEntriesHandOverAtTheNextLiveFrom()
     {
-        var facts = Facts(LinkDens.Character("Mara",
+        var facts = Facts(LinkDens.Character("Ilse",
             "fields:",
             "  rank:",
             "    - { value: Ensign }",
@@ -43,7 +43,7 @@ public class EntityFactsTests
     [Fact]
     public void AnExplicitUntilWins()
     {
-        var facts = Facts(LinkDens.Character("Mara",
+        var facts = Facts(LinkDens.Character("Ilse",
             "fields:",
             "  posting:",
             "    - { value: Tessaly, from: \"ember:1\", until: \"ember:2\" }",
@@ -57,7 +57,7 @@ public class EntityFactsTests
     [Fact]
     public void EntriesWithTheSameFromShareTheirRange()
     {
-        var facts = Facts(LinkDens.Character("Mara",
+        var facts = Facts(LinkDens.Character("Ilse",
             "fields:",
             "  rank:",
             "    - { value: A, from: \"ember:1\" }",
@@ -73,7 +73,7 @@ public class EntityFactsTests
     [Fact]
     public void AnUnresolvedPositionLeavesNoRangeAndIsntLive()
     {
-        var facts = Facts(LinkDens.Character("Mara",
+        var facts = Facts(LinkDens.Character("Ilse",
             "fields:",
             "  rank:",
             "    - { value: A, from: \"ember:1\" }",
@@ -93,7 +93,7 @@ public class EntityFactsTests
     [Fact]
     public void AnEmptyRangeIsNeverLive()
     {
-        var facts = Facts(LinkDens.Character("Mara",
+        var facts = Facts(LinkDens.Character("Ilse",
             "fields:",
             "  rank:",
             "    - { value: A, from: \"ember:1\" }",
@@ -108,7 +108,7 @@ public class EntityFactsTests
     [Fact]
     public void EntriesTakeTheirEntitysStatus()
     {
-        var facts = Facts(LinkDens.Character("Mara", "status: idea",
+        var facts = Facts(LinkDens.Character("Ilse", "status: idea",
             "fields:",
             "  rank: { value: Captain, status: canon }",
             "  born: \"2291\""));
@@ -125,7 +125,7 @@ public class EntityFactsTests
     [Fact]
     public void SectionsGetEffectiveRanges()
     {
-        var facts = Facts(LinkDens.Character("Mara", "from: \"ember:1\""), """
+        var facts = Facts(LinkDens.Character("Ilse", "from: \"ember:1\""), """
 
             ## Overview
             Text.
@@ -164,7 +164,7 @@ public class EntityFactsTests
     [Fact]
     public void AnUnresolvedUntilKeepsTheFrom()
     {
-        var facts = Facts(LinkDens.Character("Mara"), """
+        var facts = Facts(LinkDens.Character("Ilse"), """
 
             ## Injury
             <!-- wolfden: from=ember:2 until=ember:99 -->
@@ -183,7 +183,7 @@ public class EntityFactsTests
     [Fact]
     public void AnUnresolvedFromLeavesNoRange()
     {
-        var facts = Facts(LinkDens.Character("Mara"), """
+        var facts = Facts(LinkDens.Character("Ilse"), """
 
             ## Injury
             <!-- wolfden: from=ember:99 -->
@@ -274,7 +274,7 @@ public class EntityFactsTests
 
             | Row # | Chapter | POV | Beat | Status | Progress | POV |
             |---|---|---|---|---|---|---|
-            | 69 | 1 | [[mara\|Voss]] | Wakes. | Candidate | done | ignored |
+            | 69 | 1 | [[ilse\|Tarrow]] | Wakes. | Candidate | done | ignored |
             | 69a | | | | | | |
             | 069 | 1 | | Bad id, skipped. | | | |
             | 70 | 2 | | Lands. | maybe | | |
@@ -290,7 +290,7 @@ public class EntityFactsTests
         Assert.Equal(["69", "69a", "70"], rows.Select(r => r.RowId));
         Assert.Equal((69L, ""), (rows[0].Number!.Value, rows[0].Suffix));
         Assert.Equal("a", rows[1].Suffix);
-        Assert.Equal("[[mara|Voss]]", rows[0].Pov);
+        Assert.Equal("[[ilse|Tarrow]]", rows[0].Pov);
         Assert.Equal(FactStatus.Candidate, rows[0].Status);
         Assert.Equal(FactStatus.Draft, rows[2].Status);
         Assert.Equal("done", rows[0].Cells["progress"]);

@@ -16,7 +16,7 @@ namespace Wolfden.Index.Tests;
 /// </summary>
 public sealed class UnreadableFileTests
 {
-    private const string Mara = "universes/starfall/series/long-dark/entities/characters/mara-voss.md";
+    private const string Ilse = "universes/starfall/series/long-dark/entities/characters/ilse-tarrow.md";
     private const string Locations = "universes/starfall/entities/locations";
 
     [Fact]
@@ -52,13 +52,13 @@ public sealed class UnreadableFileTests
     public void ALinkToAFileThatIsThereIsReadAsThatFile()
     {
         using var den = TempDen.Starfall();
-        var moved = Full(den.Root, "elsewhere/mara-voss.md");
+        var moved = Full(den.Root, "elsewhere/ilse-tarrow.md");
         Directory.CreateDirectory(Path.GetDirectoryName(moved)!);
-        File.Move(Full(den.Root, Mara), moved);
-        using var link = LinkFile(Full(den.Root, Mara), moved);
+        File.Move(Full(den.Root, Ilse), moved);
+        using var link = LinkFile(Full(den.Root, Ilse), moved);
 
-        Assert.False(FileSystemDenSource.IsBrokenLink(new FileInfo(Full(den.Root, Mara))));
-        Assert.Contains(Mara, Entities(den));
+        Assert.False(FileSystemDenSource.IsBrokenLink(new FileInfo(Full(den.Root, Ilse))));
+        Assert.Contains(Ilse, Entities(den));
     }
 
     [Fact]
@@ -67,9 +67,9 @@ public sealed class UnreadableFileTests
     {
         using var den = TempDen.Starfall();
         using var deleted = TempDen.Starfall();
-        File.Delete(Full(deleted.Root, Mara));
-        File.Delete(Full(den.Root, Mara));
-        using var link = LinkFile(Full(den.Root, Mara), Full(den.Root, "nowhere/mara-voss.md"));
+        File.Delete(Full(deleted.Root, Ilse));
+        File.Delete(Full(den.Root, Ilse));
+        using var link = LinkFile(Full(den.Root, Ilse), Full(den.Root, "nowhere/ilse-tarrow.md"));
 
         Assert.Equal(Describe(DenCheck.Run(deleted.Root)), Describe(DenCheck.Run(den.Root)));
         Assert.Equal(Entities(deleted), Entities(den));
@@ -84,13 +84,13 @@ public sealed class UnreadableFileTests
         var updater = new IndexUpdater(den.Root);
         updater.Rebuild("start");
 
-        File.Delete(Full(den.Root, Mara));
-        using var link = LinkFile(Full(den.Root, Mara), Full(den.Root, "nowhere/mara-voss.md"));
-        var update = updater.Apply(Batch(den, (WatcherChangeTypes.Deleted, Mara, null), (WatcherChangeTypes.Created, Mara, null)), out var retry);
+        File.Delete(Full(den.Root, Ilse));
+        using var link = LinkFile(Full(den.Root, Ilse), Full(den.Root, "nowhere/ilse-tarrow.md"));
+        var update = updater.Apply(Batch(den, (WatcherChangeTypes.Deleted, Ilse, null), (WatcherChangeTypes.Created, Ilse, null)), out var retry);
 
         Assert.Empty(retry);
         Assert.Equal(IndexUpdateKind.Updated, update!.Kind);
-        Assert.DoesNotContain(updater.State!.Catalog.Entities, e => e.Path == Mara);
+        Assert.DoesNotContain(updater.State!.Catalog.Entities, e => e.Path == Ilse);
         AssertSameAsFullRebuild(den, "after the note became a broken link");
 
         using var gone = LinkFile(Full(den.Root, $"{Locations}/gone.md"), Full(den.Root, "nowhere/gone.md"));
@@ -106,21 +106,21 @@ public sealed class UnreadableFileTests
         using var den = TempDen.Starfall();
         IndexBuilder.Rebuild(den.Root);
 
-        using (Unreadable(Full(den.Root, Mara)))
+        using (Unreadable(Full(den.Root, Ilse)))
         {
-            Assert.DoesNotContain(Mara, Entities(den));
-            Assert.DoesNotContain(DenCheck.Run(den.Root).Catalog.Entities, e => e.Path == Mara);
+            Assert.DoesNotContain(Ilse, Entities(den));
+            Assert.DoesNotContain(DenCheck.Run(den.Root).Catalog.Entities, e => e.Path == Ilse);
             Assert.Equal(IndexStatus.FilesChanged, IndexBuilder.CheckFiles(den.Root));
 
             var state = IndexBuilder.Rebuild(den.Root, beforeSwap: null);
 
-            Assert.DoesNotContain(state.Catalog.Entities, e => e.Path == Mara);
-            Assert.Null(state.Tree.Hash(Mara));
+            Assert.DoesNotContain(state.Catalog.Entities, e => e.Path == Ilse);
+            Assert.Null(state.Tree.Hash(Ilse));
             Assert.Equal(IndexStatus.Current, IndexBuilder.CheckFiles(den.Root));
         }
 
         Assert.Equal(IndexStatus.FilesChanged, IndexBuilder.CheckFiles(den.Root));
-        Assert.Contains(IndexBuilder.Rebuild(den.Root, beforeSwap: null).Catalog.Entities, e => e.Path == Mara);
+        Assert.Contains(IndexBuilder.Rebuild(den.Root, beforeSwap: null).Catalog.Entities, e => e.Path == Ilse);
     }
 
     [Fact]
@@ -129,15 +129,15 @@ public sealed class UnreadableFileTests
         using var den = TempDen.Starfall();
         var tree = DenFileTree.Scan(den.Root);
         var fingerprint = tree.Fingerprint();
-        Assert.NotNull(tree.Hash(Mara));
+        Assert.NotNull(tree.Hash(Ilse));
 
-        using (Unreadable(Full(den.Root, Mara)))
+        using (Unreadable(Full(den.Root, Ilse)))
         {
             var state = IndexWriter.Load(den.Root, tree, fingerprint);
 
-            Assert.DoesNotContain(state.Catalog.Entities, e => e.Path == Mara);
-            Assert.Null(state.Tree.Hash(Mara));
-            Assert.DoesNotContain(Mara, state.FileHashes.Keys);
+            Assert.DoesNotContain(state.Catalog.Entities, e => e.Path == Ilse);
+            Assert.Null(state.Tree.Hash(Ilse));
+            Assert.DoesNotContain(Ilse, state.FileHashes.Keys);
             var recorded = state.Rows.Meta[IndexSchema.FilesFingerprintKey];
             Assert.NotEqual(fingerprint, recorded);
             Assert.Equal(DenFileTree.Scan(den.Root).Fingerprint(), recorded);

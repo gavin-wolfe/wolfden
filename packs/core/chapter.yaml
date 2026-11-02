@@ -1,7 +1,7 @@
 # Chapter fields (docs/types.md §8). They go in a chapter item's `fields`
 # mapping in book.md, or in a container's `chapter_defaults`:
 #
-#   - { key: prologue, fields: { pov: "[[mara-voss]]", when: "2284", setting: "[[kessan-reach]]" } }
+#   - { key: prologue, fields: { pov: "[[ilse-tarrow]]", when: "2284", setting: "[[kessan-reach]]" } }
 fields:
   pov:
     type: ref

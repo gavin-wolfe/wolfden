@@ -8,10 +8,10 @@ from: "ember:1"
 ---
 
 ## Overview
-A frigate of the Reach patrol. [[Mara Voss]] is her executive officer.
+A frigate of the Reach patrol. [[Ilse Tarrow]] is her executive officer.
 
 ## Crew
-- [[mara-voss|Voss]], executive officer.
+- [[ilse-tarrow|Tarrow]], executive officer.
 
 ### Quartermaster
 <!-- wolfden: from=ash -->

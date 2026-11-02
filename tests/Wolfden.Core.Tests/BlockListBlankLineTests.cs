@@ -94,10 +94,10 @@ public class BlockListBlankLineTests
     [Trait("Scenario", "SC-WEB-71")]
     public void AScalarAliasListKeepsItsBlankLines()
     {
-        const string Before = "aliases:\n  - Voss\n\n  - Halden\n\nstatus: draft\n";
+        const string Before = "aliases:\n  - Tarrow\n\n  - Halden\n\nstatus: draft\n";
 
-        var edited = Md(Before).WithNewListItem(["aliases"], YamlScalarValue.String("Mara"));
+        var edited = Md(Before).WithNewListItem(["aliases"], YamlScalarValue.String("Ilse"));
 
-        Assert.Equal("aliases:\n  - Voss\n\n  - Halden\n  - Mara\n\nstatus: draft\n", Fm(edited));
+        Assert.Equal("aliases:\n  - Tarrow\n\n  - Halden\n  - Ilse\n\nstatus: draft\n", Fm(edited));
     }
 }

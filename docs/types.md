@@ -387,7 +387,7 @@ is the **field order** (F-TPL-7).
 | `bool` | `true` or `false`. | `placeholder: true` |
 | `date` | An in-world date: free text, a sortable key, or both. | `born: "2291"` |
 | `enum` | One of a fixed list of keys. | `tense: past` |
-| `ref` | One link to an entity. | `leader: "[[mara-voss]]"` |
+| `ref` | One link to an entity. | `leader: "[[ilse-tarrow]]"` |
 | `position` | A story position (format.md §8). | `paid_off: "ash:20"` |
 
 This section says how a value must look for each type. This is the check
@@ -430,8 +430,8 @@ editing, writes the defined key (`past`). It MUST NOT change a value in a
 field it isn't editing (F-RT-2).
 
 **F-FT-9. `ref`.** A string that holds exactly one link and nothing else,
-after trimming (F-LINK-11), such as `"[[mara-voss]]"` or
-`"[[Mara Voss|Voss]]"`. It has to be quoted, or YAML reads it as a list
+after trimming (F-LINK-11), such as `"[[ilse-tarrow]]"` or
+`"[[Ilse Tarrow|Tarrow]]"`. It has to be quoted, or YAML reads it as a list
 inside a list (F-FLD-6). A string that isn't a single link is a
 [warning]. The link resolves and is checked like any other (format.md
 §10). `to` is optional, and is a type key or a list of type keys. A link
@@ -807,15 +807,15 @@ chapter_defaults: { narration: third-limited, tense: past, when: "2291" }
 
 ```yaml
 # book.md
-chapter_defaults: { pov: "[[mara-voss]]", setting: "[[kessan-reach]]" }
+chapter_defaults: { pov: "[[ilse-tarrow]]", setting: "[[kessan-reach]]" }
 chapters:
   - { key: prologue, title: Before the Dark, fields: { when: "2284", tense: present } }
   - { key: "1", number: 1, title: Kessan Reach }
-  - { key: "2", number: 2, fields: { pov: ["[[mara-voss]]", "[[halden-pike]]"] } }
+  - { key: "2", number: 2, fields: { pov: ["[[ilse-tarrow]]", "[[halden-pike]]"] } }
 ```
 
 Every chapter of this book is told in the third person, limited, in the
-past tense, from Mara Voss's point of view, and takes place in 2291 at
+past tense, from Ilse Tarrow's point of view, and takes place in 2291 at
 Kessan Reach, except that the prologue is in the present tense and set in
 2284, and chapter 2 has two POV characters.
 
@@ -894,7 +894,7 @@ has, say, an omniscient prologue or a chapter that is a found document:
 
 ```yaml
 # book.md
-chapter_defaults: { pov: "[[mara-voss]]", narration: first }
+chapter_defaults: { pov: "[[ilse-tarrow]]", narration: first }
 chapters:
   - { key: prologue, fields: { pov: [], narration: third-omniscient } }
   - { key: "1", number: 1 }
@@ -902,7 +902,7 @@ chapters:
 ```
 
 The prologue and chapter 9 have no POV character, and every other chapter
-is Mara Voss's. The same holds in `chapter_defaults`: an empty list there
+is Ilse Tarrow's. The same holds in `chapter_defaults`: an empty list there
 stops inheritance from containers further up.
 
 Each field is looked up on its own, so a series can set `tense` and one of
@@ -1223,7 +1223,7 @@ fields:
 ## Service history
 ```
 
-With this pack enabled, Mara Voss's `rank` from format.md §13 no longer
+With this pack enabled, Ilse Tarrow's `rank` from format.md §13 no longer
 gets the F-FLD-2 warning, and her `posting` can link to the *Tessaly*,
 filed at `entities/ships/tessaly.md`, or to a location such as Kessan
 Reach. Character fields come in this

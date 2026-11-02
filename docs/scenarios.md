@@ -789,10 +789,14 @@ where Vesta is a `planet`.
 - If the den's own pack redefines `setting` to take planets, the link gets
   no warning, and the den has one F-CHAP-2 clash warning on its own
   `chapter.yaml`.
+- A character's `factions` and a faction's `part_of`, redefined in the
+  pack's `extensions/` to take a polity, get no link warning either. Each
+  redefined field is its own F-TYPE-8 clash warning, on the den's file.
 
 Spec: types.md F-SPACE-2, F-TYPE-8, F-PACK-11 (#32). Covered by:
 `SpaceOperaPackTests.ACoreFieldStillAsksForACoreType`,
-`SpaceOperaPackTests.ADensOwnPackCanWidenACoreRefToThePacksTypes`.
+`SpaceOperaPackTests.ADensOwnPackCanWidenACoreRefToThePacksTypes`,
+`SpaceOperaPackTests.AnExtensionCanWidenACoreFieldWithOneWarningForEachField`.
 
 ### SC-CHECK-47. My den had its own ship before the pack
 

@@ -22,6 +22,7 @@ fields:
   part_of:
     type: ref
     to: [polity, faction]
+    temporal: true
     description: The larger state or alliance it belongs to.
 sections:
   - name: Overview

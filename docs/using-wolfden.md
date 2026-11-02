@@ -224,8 +224,10 @@ can link to the species' note: `species: "[[velari]]"`.
 **Polity or faction?** A polity is a state with territory: the places it
 holds name it in their `controlled_by`. A group without territory, such
 as a crew, a guild, or a rebel cell, is a core faction. **Settlement or
-location?** A settlement is a whole place people live. A place within it,
-such as a dock or a bar, is a core location.
+location?** A settlement is a whole place people live or work, such as a
+colony or a relay station. A place within it, such as a dock or a bar, is
+a core location, though its `part_of` warns when it links to the
+settlement: see [the gotcha under Links](#links).
 
 **Ranks and postings** aren't in the pack, since not every story has
 them. To add them, or anything else, extend the type from your den's own
@@ -1063,7 +1065,8 @@ in it, which Wolfden calls a checkpoint.
   ("setting is a ref to location"). The link still works, so you can
   ignore it. To stop it, either keep the place as a location note, or
   redefine the field in your den's own pack, as
-  [types.md F-SPACE-2](types.md#11-the-space-opera-pack) shows.
+  [types.md F-SPACE-2](types.md#11-the-space-opera-pack) shows. Each
+  field you redefine then has one warning of its own, on your pack's file.
 
 ### Books and freezing
 

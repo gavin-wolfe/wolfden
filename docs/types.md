@@ -1256,7 +1256,7 @@ sections, and no defaults, and each type has a template.
 | `planet` | `planets` | `part_of`, `kind`, `population`\*, `controlled_by`\* | Overview, Environment, Society, History |
 | `settlement` | `settlements` | `part_of`, `kind`, `population`\*, `controlled_by`\* | Overview, Description, Society, History |
 | `species` | `species` | `kind`, `homeworld`, `lifespan`, `population`\* | Overview, Biology, Culture, History |
-| `polity` | `polities` | `government`\*, `leader`\*, `capital`\*, `part_of` | Overview, Government, Goals, Military, History |
+| `polity` | `polities` | `government`\*, `leader`\*, `capital`\*, `part_of`\* | Overview, Government, Goals, Military, History |
 | `ship-class` | `ship-classes` | `role`, `builder`, `crew`, `technologies` | Overview, Design, Capabilities, History |
 | `ship` | `ships` | `class`, `captain`\*, `owner`\*, `location`\*, `condition`\* | Overview, Description, Crew, Service history |
 | `technology` | `technologies` | `kind`, `created_by`, `controlled_by`\*, `introduced` | Overview, How it works, Limits, Consequences, History, Open questions |
@@ -1265,7 +1265,7 @@ sections, and no defaults, and each type has a template.
 
 | Field | Type | On |
 |---|---|---|
-| `part_of` | `ref` | star-system: to `location`; planet: to `star-system`, `planet` (a moon's planet), or `location`; settlement: to `planet`, `star-system`, or `location`; polity: to `polity` or `faction` |
+| `part_of` | `ref` | star-system: to `location`; planet: to `star-system`, `planet` (a moon's planet), or `location`; settlement: to `planet`, `star-system`, or `location`; polity: to `polity` or `faction`, and temporal, since a state can join or leave a league |
 | `controlled_by` | `ref` to `polity` or `faction` | star-system, planet, settlement, technology |
 | `stars` | `text` | star-system |
 | `kind` | `text` | planet, settlement, species, technology: what sort of one it is |
@@ -1297,9 +1297,12 @@ a field it doesn't define (F-TYPE-8). So a core field that links to
 `location` or `faction`, such as the chapter field `setting`, an event's
 `location`, a character's `factions`, or a location's `part_of`, gets the
 F-LINK-11 warning when it links to a planet or a polity. The link still
-resolves and shows. A den that wants to link these freely redefines the
-field in its own pack, whose definition wins (F-PACK-11), with one clash
-warning on the den's file:
+resolves and shows. A den that wants to link these freely redefines each
+field in its own pack, whose definition wins (F-PACK-11). Each redefined
+field is one clash warning on the den's file, which stays for as long as
+the den redefines it, so a den that widens four fields has four warnings.
+A chapter field goes in the pack's `chapter.yaml`, and a field of a core
+type, such as a character's or a faction's, in `extensions/<type>.yaml`:
 
 ```yaml
 # packs/starfall/chapter.yaml
@@ -1308,4 +1311,14 @@ fields:
     type: ref
     to: [location, star-system, planet, settlement, ship]
     list: true
+```
+
+```yaml
+# packs/starfall/extensions/character.yaml
+fields:
+  factions:
+    type: ref
+    to: [faction, polity]
+    list: true
+    temporal: true
 ```

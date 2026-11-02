@@ -94,7 +94,7 @@ public class SpaceOperaPackTests
     [InlineData("planet", "population controlled_by")]
     [InlineData("settlement", "population controlled_by")]
     [InlineData("species", "population")]
-    [InlineData("polity", "government leader capital")]
+    [InlineData("polity", "government leader capital part_of")]
     [InlineData("ship-class", "")]
     [InlineData("ship", "captain owner location condition")]
     [InlineData("technology", "controlled_by")]
@@ -255,6 +255,32 @@ public class SpaceOperaPackTests
         Assert.Empty(LinkIndex.Load(source).Diagnostics);
         var clash = Assert.Single(den.Diagnostics);
         Assert.Equal(("packs/starfall/chapter.yaml", "F-CHAP-2", DiagnosticSeverity.Warning), (clash.Path, clash.Diagnostic.RuleId, clash.Diagnostic.Severity));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-CHECK-46")]
+    public void AnExtensionCanWidenACoreFieldWithOneWarningForEachField()
+    {
+        // Character and faction fields go in extensions/<type>.yaml. Each
+        // redefined field is its own clash warning (F-TYPE-8, F-PACK-11).
+        var source = Space()
+            .With("den.yaml", "format: 1\npacks: [space-opera, starfall]\n")
+            .With("packs/starfall/pack.yaml", "name: Starfall\n")
+            .With("packs/starfall/extensions/character.yaml", "fields:\n  factions: { type: ref, to: [faction, polity], list: true, temporal: true }\n")
+            .With("packs/starfall/extensions/faction.yaml", "fields:\n  part_of: { type: ref, to: [faction, polity] }\n")
+            .Entity(Starfall, "reach-compact", Note("polity", "Reach Compact"), folder: "polities")
+            .Entity(Starfall, "survey-corps", Note("faction", "Survey Corps", "  part_of: \"[[reach-compact]]\"\n"), folder: "factions")
+            .Entity(Starfall, "ilse-tarrow", Character("Ilse Tarrow", "fields:\n  factions: [\"[[reach-compact]]\"]"));
+
+        var den = DenStructure.Load(source);
+
+        Assert.Empty(LinkIndex.Load(source).Diagnostics);
+        Assert.Equal(
+            [
+                ("packs/starfall/extensions/character.yaml", "F-TYPE-8", DiagnosticSeverity.Warning),
+                ("packs/starfall/extensions/faction.yaml", "F-TYPE-8", DiagnosticSeverity.Warning),
+            ],
+            den.Diagnostics.Select(d => (d.Path, d.Diagnostic.RuleId, d.Diagnostic.Severity)).Order());
     }
 
     [Fact]

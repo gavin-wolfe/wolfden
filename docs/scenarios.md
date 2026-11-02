@@ -757,8 +757,9 @@ Spec: types.md F-CHAP-4, F-LINK-13. Covered by:
 
 The writer adds `packs: [space-opera]` to `den.yaml`, then makes the
 *Lantern* with `wolfden new ship "Lantern"`, and notes for its class, its
-captain, and the planets and star systems it visits. A moon's `part_of`
-links to the world it circles. By mistake, one ship's `class` links to a character.
+captain, and the worlds and star systems it visits. A moon's `part_of`
+links to the world it circles. By mistake, one ship's `class` links to a
+character.
 
 - Before the line is added, `wolfden new ship` is refused, and a
   hand-written `type: ship` is an unknown type (F-ENT-2).

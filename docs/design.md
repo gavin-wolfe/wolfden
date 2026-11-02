@@ -291,11 +291,11 @@ moon, asteroid, or gas giant: a body in space that people can live on, visit,
 or build around, so it covers a gas giant nobody lives on but things orbit or
 float in. They share a structure and fields aren't inherited, so one type
 with a `kind` covers them. A moon or an asteroid filed under `planet` is
-simply wrong, and `world` is the genre's own word. `body` was rejected because a note's "body"
-already means its text in Wolfden. The type's description names "planet" so
-writers looking for that word find it. A den that wants separate types can
-define them, such as `moon` with `kind_of: world`. Nothing had been released,
-so nothing needed migrating.
+simply wrong, and `world` is the genre's own word. `body` was rejected
+because a note's "body" already means its text in Wolfden. The type's
+description names "planet" so writers looking for that word find it. A den
+that wants separate types can define them, such as `moon` with
+`kind_of: world`. Nothing had been released, so nothing needed migrating.
 
 **Decided (#6): your writing is yours.** Wolfden's licenses place no
 conditions on the notes, manuscripts, or other content writers create with

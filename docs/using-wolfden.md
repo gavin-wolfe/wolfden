@@ -183,7 +183,7 @@ den changes, and notes you've written stay as they are.
 |---|---|---|---|
 | Star System | A star or group of stars | `part_of`, `stars`, `controlled_by` | `star-systems` |
 | World | A planet, moon, asteroid, or gas giant: a body in space that people can live on, visit, or build around | `part_of`, `kind`, `population`, `controlled_by` | `worlds` |
-| Settlement | A place people live or work, on a world, orbiting it, or floating in its atmosphere: a city, colony, orbital station, or fuel-mining platform | `part_of`, `kind`, `population`, `controlled_by` | `settlements` |
+| Settlement | A place people live or work, on a world, orbiting it, floating in its atmosphere, or out on its own, linked to its star system: a city, colony, orbital station, or fuel-mining platform | `part_of`, `kind`, `population`, `controlled_by` | `settlements` |
 | Species | A kind of being | `kind`, `homeworld`, `lifespan`, `population` | `species` |
 | Polity | A state that holds territory | `government`, `leader`, `capital`, `part_of` | `polities` |
 | Ship Class | A design that ships are built to | `role`, `builder`, `crew`, `technologies` | `ship-classes` |
@@ -191,11 +191,11 @@ den changes, and notes you've written stay as they are.
 | Technology | A drive, a weapon, a network: anything with rules the story has to keep | `kind`, `created_by`, `controlled_by`, `introduced` | `technologies` |
 
 **The types link to each other.** A ship's `class` links to its ship
-class, a settlement's `part_of` to its world, a world's `part_of` to its
-star system (or, for a moon, to the world it circles), and a star system's `part_of`
-to a region, which is a core location. What's true of every ship of a
-design goes on the ship class, and what sets one ship apart goes on the
-ship:
+class, a settlement's `part_of` to its world (or, if it has none, to its
+star system), a world's `part_of` to its star system (or, for a moon, to
+the world it circles), and a star system's `part_of` to a region, which is
+a core location. What's true of every ship of a design goes on the ship
+class, and what sets one ship apart goes on the ship:
 
 ```yaml
 ---

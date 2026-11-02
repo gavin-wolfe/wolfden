@@ -1335,7 +1335,8 @@ and `polity` is `kind_of: faction` (F-TYPE-13). `species`, `ship-class`, and
 A `world` is a planet, moon, asteroid, or gas giant: a body in space that
 people can live on, visit, or build around. Its `kind` says which. A
 `settlement` can be on a world, orbit it, or float in its atmosphere, and its
-`part_of` names the world in each case.
+`part_of` names the world in each case. One with no world, out on its own,
+links to its star system instead.
 
 | Field | Type | On |
 |---|---|---|

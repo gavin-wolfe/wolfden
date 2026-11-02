@@ -20,6 +20,7 @@ import {
 import { EntityLink, sectionAnchor } from '../components/Links'
 import { ErrorState, Loading, StatusBadge } from '../components/States'
 import { useDocumentTitle } from '../hooks'
+import { typesQuery, type TypeView } from '../createApi'
 import { snippetParts, type TextMatch } from '../snippet'
 import { describePosition } from '../story'
 import type { SearchPageSearch } from '../router'
@@ -39,7 +40,7 @@ export function SearchPage() {
   // A blank `at` is '' (it fails closed, as on every page), never everything.
   const at = search.at
   // Scopes are books and series, shown whatever the position; types only as
-  // the reader has met them, so a type met later isn't named.
+  // the reader has met them or a kind of them, so a type met later isn't named.
   const hierarchy = useQuery(hierarchyQuery(universe, undefined))
   const metHierarchy = useQuery({ ...hierarchyQuery(universe, at), enabled: at !== '' })
   // Fields as types are: only those of values the reader has met.
@@ -101,7 +102,8 @@ function Filters({
 }) {
   const u = hierarchy?.universe
   const books = u ? [...u.series.flatMap((s) => s.books), ...u.books] : []
-  const types = typesIn(metHierarchy)
+  const denTypes = useQuery(typesQuery)
+  const types = withParents(typesIn(metHierarchy), denTypes.data?.types)
   // A filter the lists don't have yet (still loading, or typed into the URL) stays chosen.
   const withCurrent = (list: string[], current: string | undefined) => (current && !list.includes(current) ? [...list, current] : list)
   const scope = search.book ? `book:${search.book}` : search.series ? `series:${search.series}` : ''
@@ -176,6 +178,16 @@ function Filters({
       </label>
     </div>
   )
+}
+
+/**
+ * The types to offer: those of the notes, and what they're kinds of, since
+ * filtering by a type includes its kinds (types.md F-TYPE-13). A den of worlds
+ * and ships can ask for every location without a note of type location.
+ */
+function withParents(met: string[], den: TypeView[] | undefined): string[] {
+  const parents = met.flatMap((key) => den?.find((t) => t.key === key)?.kindOf ?? [])
+  return [...new Set([...met, ...parents])].sort()
 }
 
 /** The types of the notes a hierarchy counts: as of a position, only those the reader has met. */

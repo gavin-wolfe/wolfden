@@ -62,6 +62,20 @@ public sealed class DenTypes
         return _types.GetValueOrDefault(key);
     }
 
+    /// <summary>
+    /// What a filter by type matches (F-TYPE-13): the keys in <paramref name="keys"/>
+    /// and every enabled type that's a kind of one of them. A key no pack
+    /// defines, such as an unknown type a note uses (F-ENT-2), matches itself.
+    /// </summary>
+    public HashSet<string> WithKinds(IEnumerable<string> keys)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        var matching = keys.ToHashSet(StringComparer.Ordinal);
+        var kinds = Types.Where(t => t.Ancestors.Any(matching.Contains)).Select(t => t.Key).ToList();
+        matching.UnionWith(kinds);
+        return matching;
+    }
+
     /// <summary>The chapter field named <paramref name="name"/>, or null.</summary>
     public FieldDefinition? FindChapterField(string name)
     {

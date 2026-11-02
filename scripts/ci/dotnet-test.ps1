@@ -19,15 +19,25 @@
 # if it hasn't exited after 60 seconds, a limit built into xUnit. On a busy
 # Windows runner that can be missed. The adapter then reports
 # "Catastrophic failure ... Test process did not respond within 60 seconds"
-# for that assembly, and runs none of its tests. If that's the only thing
+# for that assembly, and runs none of its tests. The same check can also fail
+# with "Test process did not return valid JSON": in xUnit 3.2.2, if the process
+# takes over a second to exit, its "Waiting 10 seconds for foreground threads to
+# exit..." line lands after the answer (xunit/xunit#3576, fixed in 4.0, so this
+# part can go once we upgrade). If that's the only thing
 # wrong (every other test project ran and passed), those assemblies are run
 # again once, on their own. Anything else fails the run as it is.
+#
+# VSTest gives a test host or blame's data collector 90 seconds to connect by
+# default, and a busy Windows runner can miss that, aborting a test run before
+# its tests start (#248). VSTEST_CONNECTION_TIMEOUT, in seconds, gives it longer.
+# It doesn't limit how long a test runs.
 # Exits with dotnet test's status.
 
 param([string]$Results = 'TestResults')
 
 # Not 'Stop': dotnet's standard error, merged into the log, mustn't end the script.
 $ErrorActionPreference = 'Continue'
+$env:VSTEST_CONNECTION_TIMEOUT = '300'
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 Set-Location $root
 New-Item -ItemType Directory -Force $Results | Out-Null
@@ -40,8 +50,8 @@ $status = $LASTEXITCODE
 if ($status -eq 0) { exit 0 }
 
 $text = Get-Content $log
-$probe = 'Catastrophic failure: System.InvalidOperationException: Test process did not respond within 60 seconds'
-$missed = @($text | Select-String -Pattern "([A-Za-z0-9_.]+): $([regex]::Escape($probe))" |
+$probe = 'Catastrophic failure: System\.InvalidOperationException: Test process did not (respond within 60 seconds|return valid JSON)'
+$missed = @($text | Select-String -Pattern "([A-Za-z0-9_.]+): $probe" |
     ForEach-Object { $_.Matches[0].Groups[1].Value } | Sort-Object -Unique)
 if ($missed.Count -eq 0) { exit $status }
 
@@ -59,11 +69,11 @@ if ($started -ne $expected -or ($passed + $missed.Count) -ne $expected -or $cata
 foreach ($name in $missed) {
     $project = "tests/$name/$name.csproj"
     if (-not (Test-Path $project)) {
-        Write-Output "::error::$name missed xUnit's 60-second start-up check, and $project isn't there to run again."
+        Write-Output "::error::$name failed xUnit's start-up check, and $project isn't there to run again."
         exit $status
     }
 
-    Write-Output "::warning::$name didn't answer xUnit's 60-second start-up check, so none of its tests ran. Running it again on its own (#248)."
+    Write-Output "::warning::$name failed xUnit's start-up check, so none of its tests ran. Running it again on its own (#248)."
     dotnet test $project @testArgs 2>&1 | ForEach-Object { "$_" } | Tee-Object -FilePath $log -Append
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }

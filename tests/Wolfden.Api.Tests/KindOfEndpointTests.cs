@@ -85,7 +85,7 @@ public class KindOfEndpointTests
 
         var setting = book.GetProperty("fieldTypes").EnumerateArray().Single(f => f.GetProperty("name").GetString() == "setting");
         Assert.Equal(["location"], Strings(setting.GetProperty("to")));
-        Assert.Equal(["location", "planet", "settlement", "ship", "star-system"], Strings(setting.GetProperty("accepts")));
+        Assert.Equal(["location", "settlement", "ship", "star-system", "world"], Strings(setting.GetProperty("accepts")));
     }
 
     [Theory]

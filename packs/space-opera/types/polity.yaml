@@ -17,7 +17,7 @@ fields:
     description: Who leads it.
   capital:
     type: ref
-    to: [planet, settlement, location]
+    to: [world, settlement, location]
     temporal: true
     description: The seat of its government.
   part_of:

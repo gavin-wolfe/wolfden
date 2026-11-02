@@ -182,8 +182,8 @@ den changes, and notes you've written stay as they are.
 | Type | Use it for | Fields | Folder |
 |---|---|---|---|
 | Star System | A star or group of stars | `part_of`, `stars`, `controlled_by` | `star-systems` |
-| Planet | Any world, including a moon | `part_of`, `kind`, `population`, `controlled_by` | `planets` |
-| Settlement | A city, colony, station, or outpost | `part_of`, `kind`, `population`, `controlled_by` | `settlements` |
+| World | A planet, moon, asteroid, or gas giant: a body in space that people can live on, visit, or build around | `part_of`, `kind`, `population`, `controlled_by` | `worlds` |
+| Settlement | A place people live or work, on a world, orbiting it, floating in its atmosphere, or out on its own, linked to its star system: a city, colony, orbital station, or fuel-mining platform | `part_of`, `kind`, `population`, `controlled_by` | `settlements` |
 | Species | A kind of being | `kind`, `homeworld`, `lifespan`, `population` | `species` |
 | Polity | A state that holds territory | `government`, `leader`, `capital`, `part_of` | `polities` |
 | Ship Class | A design that ships are built to | `role`, `builder`, `crew`, `technologies` | `ship-classes` |
@@ -191,11 +191,11 @@ den changes, and notes you've written stay as they are.
 | Technology | A drive, a weapon, a network: anything with rules the story has to keep | `kind`, `created_by`, `controlled_by`, `introduced` | `technologies` |
 
 **The types link to each other.** A ship's `class` links to its ship
-class, a settlement's `part_of` to its planet, a planet's `part_of` to its
-star system (or, for a moon, to its planet), and a star system's `part_of`
-to a region, which is a core location. What's true of every ship of a
-design goes on the ship class, and what sets one ship apart goes on the
-ship:
+class, a settlement's `part_of` to its world (or, if it has none, to its
+star system), a world's `part_of` to its star system (or, for a moon, to
+the world it circles), and a star system's `part_of` to a region, which is
+a core location. What's true of every ship of a design goes on the ship
+class, and what sets one ship apart goes on the ship:
 
 ```yaml
 ---
@@ -233,15 +233,15 @@ them. To add them, or anything else, extend the type from your den's own
 pack ([types.md §4](types.md#4-extensions-and-combining-packs) and
 [§10](types.md#10-appendix-a-den-local-pack)).
 
-**Places and groups count everywhere.** A star system, a planet, a
+**Places and groups count everywhere.** A star system, a world, a
 settlement, and a ship are kinds of location, and a polity is a kind of
-faction. So a chapter's `setting` can link to a planet or a ship, a
+faction. So a chapter's `setting` can link to a world or a ship, a
 character's `factions` can link to a polity, and the polity's page lists
 those characters as a faction's page does. A link that's neither, such as a
 `setting` that links to a character, still gets a warning from
 `wolfden check`. A kind of location is still its own type, though: it has
 its own fields and folder, and asking for notes of type `location` doesn't
-list your planets.
+list your worlds.
 
 The full list is in [types.md §11](types.md#11-the-space-opera-pack).
 
@@ -256,10 +256,10 @@ to that other type takes it too:
 # packs/starfall/types/moon.yaml
 name: Moon
 plural: moons
-kind_of: planet
+kind_of: world
 ```
 
-A moon is now accepted wherever a planet is, and, since a planet is a kind
+A moon is now accepted wherever a world is, and, since a world is a kind
 of location, wherever a location is, such as a chapter's `setting`. A type
 can have several parents, so a ship that's also a person can be both a
 chapter's `setting` and its `pov`:

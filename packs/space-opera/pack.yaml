@@ -2,5 +2,5 @@
 # `packs: [space-opera]` in den.yaml (docs/types.md §11).
 name: Space Opera
 description: >-
-  Types for stories set among the stars: star-system, planet, settlement,
+  Types for stories set among the stars: star-system, world, settlement,
   species, polity, ship-class, ship, and technology.

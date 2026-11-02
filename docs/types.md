@@ -278,9 +278,9 @@ settled by type key, in ASCII order: the earlier key wins.
 **parent**. It is a type key or a list of type keys:
 
 ```yaml
-# packs/space-opera/types/planet.yaml, shortened
-name: Planet
-plural: planets
+# packs/space-opera/types/world.yaml, shortened
+name: World
+plural: worlds
 kind_of: location
 ```
 
@@ -299,7 +299,7 @@ kind_of: [ship, character]
   from its ancestors, so several parents can't conflict. Anything that
   depends on those, such as a thread's `## Payoff` (F-CORE-4), stays with
   the type that defines it. It goes one way: a location isn't accepted
-  where a `to` names only `planet`.
+  where a `to` names only `world`.
 - Nothing else follows it. A note's `type` is still its own, and filtering
   notes by type (`list_entities`, `search`, `canon_as_of`) matches that
   type only. There are no abstract types: a den can define `vehicle` as an
@@ -1006,7 +1006,7 @@ win, and the difference is a bug in this section. The core pack has no required 
 and no required sections, so a hand-written note never gets a "missing"
 warning from it. Each type has a template in `packs/core/templates/`.
 
-The core pack is genre-neutral. Genre types, such as species, planets,
+The core pack is genre-neutral. Genre types, such as species, worlds,
 ships, and magic systems, come in other packs (design.md §4). A genre
 pack that tracks species adds a `species` *type*, rather than redefining
 the character's `species` field: the field is text, so it can hold a link
@@ -1318,7 +1318,7 @@ sections, and no defaults, and each type has a template.
 | Type | Folder | Fields | Standard sections |
 |---|---|---|---|
 | `star-system` | `star-systems` | `part_of`, `stars`, `controlled_by`\* | Overview, Description, Routes, History |
-| `planet` | `planets` | `part_of`, `kind`, `population`\*, `controlled_by`\* | Overview, Environment, Society, History |
+| `world` | `worlds` | `part_of`, `kind`, `population`\*, `controlled_by`\* | Overview, Environment, Society, History |
 | `settlement` | `settlements` | `part_of`, `kind`, `population`\*, `controlled_by`\* | Overview, Description, Society, History |
 | `species` | `species` | `kind`, `homeworld`, `lifespan`, `population`\* | Overview, Biology, Culture, History |
 | `polity` | `polities` | `government`\*, `leader`\*, `capital`\*, `part_of`\* | Overview, Government, Goals, Military, History |
@@ -1328,29 +1328,35 @@ sections, and no defaults, and each type has a template.
 
 \* temporal. Every type also has `row` and `placeholder` (§5.5).
 
-`star-system`, `planet`, `settlement`, and `ship` are `kind_of: location`,
+`star-system`, `world`, `settlement`, and `ship` are `kind_of: location`,
 and `polity` is `kind_of: faction` (F-TYPE-13). `species`, `ship-class`, and
 `technology` are kinds of nothing.
 
+A `world` is a planet, moon, asteroid, or gas giant: a body in space that
+people can live on, visit, or build around. Its `kind` says which. A
+`settlement` can be on a world, orbit it, or float in its atmosphere, and its
+`part_of` names the world in each case. One with no world, out on its own,
+links to its star system instead.
+
 | Field | Type | On |
 |---|---|---|
-| `part_of` | `ref` | star-system: to `location`; planet: to `star-system`, `planet` (a moon's planet), or `location`; settlement: to `planet`, `star-system`, or `location`; polity: to `polity` or `faction`, and temporal, since a state can join or leave a league |
-| `controlled_by` | `ref` to `polity` or `faction` | star-system, planet, settlement, technology |
+| `part_of` | `ref` | star-system: to `location`; world: to `star-system`, `world` (the world a moon circles), or `location`; settlement: to `world`, `star-system`, or `location`; polity: to `polity` or `faction`, and temporal, since a state can join or leave a league |
+| `controlled_by` | `ref` to `polity` or `faction` | star-system, world, settlement, technology |
 | `stars` | `text` | star-system |
-| `kind` | `text` | planet, settlement, species, technology: what sort of one it is |
-| `population` | `text` | planet, settlement, species: how many, in the story's own terms |
-| `homeworld` | `ref` to `planet` or `location` | species |
+| `kind` | `text` | world, settlement, species, technology: what sort of one it is |
+| `population` | `text` | world, settlement, species: how many, in the story's own terms |
+| `homeworld` | `ref` to `world` or `location` | species |
 | `lifespan` | `text` | species |
 | `government` | `text` | polity |
 | `leader` | `ref` to `character` | polity |
-| `capital` | `ref` to `planet`, `settlement`, or `location` | polity |
+| `capital` | `ref` to `world`, `settlement`, or `location` | polity |
 | `role`, `crew` | `text` | ship-class |
 | `builder` | `ref` to `polity` or `faction` | ship-class |
 | `technologies` | list of `ref` to `technology` | ship-class |
 | `class` | `ref` to `ship-class` | ship |
 | `captain` | `ref` to `character` | ship |
 | `owner` | `ref` to `character`, `polity`, or `faction` | ship |
-| `location` | `ref` to `star-system`, `planet`, `settlement`, or `location` | ship |
+| `location` | `ref` to `star-system`, `world`, `settlement`, or `location` | ship |
 | `condition` | `text` | ship |
 | `created_by` | `ref` to `character`, `species`, `polity`, or `faction` | technology |
 | `introduced` | `date` | technology |
@@ -1368,7 +1374,7 @@ to a `species` note (§9). A rank or a posting is left to a den's extension
 (F-TYPE-13), with nothing to redefine. A core field that links to
 `location` or `faction`, such as the chapter field `setting`, an event's
 `location`, a character's `factions`, or a location's `part_of`, takes a
-planet or a polity with no warning. A link that isn't a place or a group,
+world or a polity with no warning. A link that isn't a place or a group,
 such as a `setting` that links to a character or a species, is still the
 F-LINK-11 warning.
 

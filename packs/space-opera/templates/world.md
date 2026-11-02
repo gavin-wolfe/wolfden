@@ -1,5 +1,5 @@
 ---
-type: planet
+type: world
 status: draft
 fields:
   part_of:
@@ -14,7 +14,7 @@ fields:
 <!-- What is this world, and why does it matter? -->
 
 ## Environment
-<!-- What's it like to stand here? Climate, gravity, air, and what it takes to live there. -->
+<!-- What's it like here? Climate, gravity, air, and what it takes to live there or visit. -->
 
 ## Society
 <!-- Who lives here, and how do they get by? -->

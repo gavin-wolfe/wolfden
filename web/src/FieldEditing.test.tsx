@@ -616,6 +616,28 @@ describe('SC-WEB-60: editing a field with a control for its type', () => {
 })
 
 describe('SC-WEB-63: adding and clearing fields, and what only the file can change', () => {
+  it('looks up what a field accepts, so a kind of its type is offered too', async () => {
+    const { calls, file } = stubFields()
+    file.source = {
+      ...source(),
+      fields: [...source().fields, { name: 'husband', line: 13, value: null }],
+      fieldTypes: source().fieldTypes.map((t) => (t.name === 'husband' ? { ...t, accepts: ['character', 'sentient-ship'] } : t)),
+    }
+    renderApp('/u/dracula/e/E-MINA')
+    fireEvent.click(await screen.findByRole('button', { name: 'Add a field' }))
+    const add = await screen.findByRole('form', { name: 'Add a field' })
+    fireEvent.change(within(add).getByRole('combobox', { name: 'Field' }), { target: { value: 'husband' } })
+    fireEvent.click(within(add).getByRole('button', { name: 'Add field' }))
+
+    const form = await screen.findByRole('form', { name: 'Edit husband' })
+    fireEvent.change(within(form).getByRole('combobox', { name: 'Value' }), { target: { value: 'Jon' } })
+    await within(form).findByRole('listbox')
+
+    const lookups = calls.filter((c) => c.startsWith('/api/entities/lookup'))
+    expect(lookups.length).toBeGreaterThan(0)
+    expect(lookups.every((c) => c.includes('type=character%2Csentient-ship') || c.includes('type=character,sentient-ship'))).toBe(true)
+  })
+
   it('adds a field from the ones the type has and the note doesn’t set', async () => {
     const { posts } = stubFields()
     renderApp('/u/dracula/e/E-MINA')

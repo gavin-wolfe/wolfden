@@ -9,7 +9,7 @@ namespace Wolfden.Core.Types;
 
 /// <summary>A type file that loaded (types.md F-TYPE-1, F-TYPE-3).</summary>
 internal sealed class TypeFile(string key, string path, string name, string plural, string? description,
-    List<FieldDefinition> fields, List<SectionDefinition> sections, string? template)
+    List<FieldDefinition> fields, List<SectionDefinition> sections, string? template, List<KindOfDeclaration> kindOf)
 {
     public string Key => key;
 
@@ -27,10 +27,16 @@ internal sealed class TypeFile(string key, string path, string name, string plur
 
     /// <summary>The <c>template</c> value, if it's valid (F-TPL-1).</summary>
     public string? Template => template;
+
+    /// <summary>The parents its <c>kind_of</c> names (F-TYPE-13).</summary>
+    public List<KindOfDeclaration> KindOf => kindOf;
 }
 
+/// <summary>One parent a type file or extension file names in <c>kind_of</c> (types.md F-TYPE-13), with where it's written.</summary>
+internal sealed record KindOfDeclaration(string Parent, PackDefinition Pack, string Path, int Line);
+
 /// <summary>An extension file that loaded (types.md F-TYPE-6).</summary>
-internal sealed record ExtensionFile(string Key, string Path, List<FieldDefinition> Fields, List<SectionDefinition> Sections, string? Template);
+internal sealed record ExtensionFile(string Key, string Path, List<FieldDefinition> Fields, List<SectionDefinition> Sections, string? Template, List<KindOfDeclaration> KindOf);
 
 /// <summary>A template file in a pack's <c>templates/</c>, checked as F-TPL-3 says.</summary>
 /// <param name="Excluded">True if it has an error, so types that would use it use the generated template.</param>
@@ -330,9 +336,9 @@ internal sealed partial class PackReader
         }
 
         ok &= CheckShapes(name, root, "F-TYPE-3");
-        foreach (var entry in root.Entries.Where(e => e.KeyText is not ("name" or "plural" or "description" or "fields" or "sections" or "template")))
+        foreach (var entry in root.Entries.Where(e => e.KeyText is not ("name" or "plural" or "description" or "kind_of" or "fields" or "sections" or "template")))
         {
-            Warn(name, "F-TYPE-3", entry.Key.Line, $"A type file has name, plural, description, fields, sections, and template, not '{entry.KeyText}'. The key is kept and ignored.");
+            Warn(name, "F-TYPE-3", entry.Key.Line, $"A type file has name, plural, description, kind_of, fields, sections, and template, not '{entry.KeyText}'. The key is kept and ignored.");
         }
 
         if (!ok)
@@ -343,7 +349,8 @@ internal sealed partial class PackReader
         return new TypeFile(key, Path(name), typeName!, plural!, description,
             root["fields"] is YamlMapping fields ? ReadFields(name, fields, chapter: false) : [],
             root["sections"] is YamlSequence sections ? ReadSections(name, sections) : [],
-            CheckTemplate(name, root["template"]));
+            CheckTemplate(name, root["template"]),
+            ReadKindOf(name, root["kind_of"]));
     }
 
     /// <summary>F-TYPE-6. Returns null if the file has an error, which excludes it (F-PACK-2).</summary>
@@ -365,7 +372,7 @@ internal sealed partial class PackReader
         {
             // An empty document (a top level that isn't a mapping is already
             // an F-YAML-2 error): the extension adds nothing.
-            return new ExtensionFile(key, Path(name), [], [], null);
+            return new ExtensionFile(key, Path(name), [], [], null, []);
         }
 
         var ok = CheckShapes(name, root, "F-TYPE-6");
@@ -373,14 +380,14 @@ internal sealed partial class PackReader
         {
             switch (entry.KeyText)
             {
-                case "fields" or "sections" or "template":
+                case "kind_of" or "fields" or "sections" or "template":
                     break;
                 case "name" or "plural" or "description":
                     Error(name, "F-TYPE-6", entry.Key.Line, $"An extension can't set {entry.KeyText}: it can't rename a type or move its folder.");
                     ok = false;
                     break;
                 default:
-                    Warn(name, "F-TYPE-6", entry.Key.Line, $"An extension file has fields, sections, and template, not '{entry.KeyText}'. The key is kept and ignored.");
+                    Warn(name, "F-TYPE-6", entry.Key.Line, $"An extension file has kind_of, fields, sections, and template, not '{entry.KeyText}'. The key is kept and ignored.");
                     break;
             }
         }
@@ -393,7 +400,47 @@ internal sealed partial class PackReader
         return new ExtensionFile(key, Path(name),
             root["fields"] is YamlMapping fields ? ReadFields(name, fields, chapter: false) : [],
             root["sections"] is YamlSequence sections ? ReadSections(name, sections) : [],
-            CheckTemplate(name, root["template"]));
+            CheckTemplate(name, root["template"]),
+            ReadKindOf(name, root["kind_of"]));
+    }
+
+    /// <summary>
+    /// F-TYPE-13: the parents in a <c>kind_of</c>, a type key or a list of
+    /// them. Whether each is an enabled type, and whether they make a loop,
+    /// depends on the other packs, so <see cref="DenTypes"/> checks that.
+    /// </summary>
+    private List<KindOfDeclaration> ReadKindOf(string name, YamlNode? node)
+    {
+        var parents = new List<KindOfDeclaration>();
+        void Add(YamlNode item)
+        {
+            if (item is YamlScalar { IsNull: false } s && Keys.IsKey(s.Text))
+            {
+                parents.Add(new KindOfDeclaration(s.Text, Pack, Path(name), s.Line));
+            }
+            else
+            {
+                Warn(name, "F-TYPE-13", item.Line, "kind_of must be a type key or a list of type keys, such as 'kind_of: location' or 'kind_of: [ship, character]', so this value is ignored.");
+            }
+        }
+
+        switch (node)
+        {
+            case null or YamlScalar { IsNull: true }:
+                break;
+            case YamlSequence list:
+                foreach (var item in list.Items)
+                {
+                    Add(item);
+                }
+
+                break;
+            default:
+                Add(node);
+                break;
+        }
+
+        return parents;
     }
 
     /// <summary>The shapes of <c>fields</c> (a mapping) and <c>sections</c> (a list), errors in a type or extension file.</summary>

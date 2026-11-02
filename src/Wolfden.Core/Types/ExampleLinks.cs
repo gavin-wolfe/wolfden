@@ -33,7 +33,7 @@ public sealed class ExampleLinks
 
     /// <summary>
     /// A link to the first note by name of a type <paramref name="field"/>
-    /// takes (any type if it has no <c>to</c>), as a writer types it, such
+    /// takes, or a kind of one (any type if it has no <c>to</c>), as a writer types it, such
     /// as <c>[[ilse-tarrow]]</c>; or a placeholder if there's none.
     /// </summary>
     public string For(FieldDefinition field)
@@ -42,7 +42,7 @@ public sealed class ExampleLinks
         var to = field.To is { Count: > 0 } types ? types : null;
         foreach (var (type, slug) in _notes)
         {
-            if (to is null || to.Contains(type, StringComparer.Ordinal))
+            if (to is null || to.Contains(type, StringComparer.Ordinal) || field.AcceptedKinds.Contains(type, StringComparer.Ordinal))
             {
                 return $"[[{slug}]]";
             }

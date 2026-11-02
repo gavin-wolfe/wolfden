@@ -228,7 +228,7 @@ public sealed class LinkIndex
         if (!occurrence.IsIgnoredValue && RefField(occurrence) is { } field && !field.Accepts(target.Type))
         {
             Warn(occurrence, "F-LINK-11",
-                $"{link.Text}: {field.Name} links to '{target.Name}', whose type is {target.Type}, but {field.Name} is a ref to {string.Join(" or ", field.CheckedTo)}.");
+                $"{link.Text}: {field.Name} links to '{target.Name}', whose type is {target.Type}, but {field.Name} is a ref to {string.Join(" or ", field.CheckedTo)}{KindsOf(field)}.");
         }
 
         if (!occurrence.IsBookkeeping)
@@ -281,6 +281,10 @@ public sealed class LinkIndex
         };
         return field is { Kind: FieldKind.Ref } ? field : null;
     }
+
+    /// <summary>The types an F-LINK-11 message adds to the field's <c>to</c>, since they're accepted too (types.md F-TYPE-13).</summary>
+    private static string KindsOf(FieldDefinition field) =>
+        field.AcceptedKinds.Count == 0 ? "" : $" or a kind of {(field.CheckedTo.Count == 1 ? "it" : "one")} ({string.Join(", ", field.AcceptedKinds)})";
 
     /// <summary>
     /// Two or more chapters for an F-LINK-13 message: "a and b", "a, b and c",

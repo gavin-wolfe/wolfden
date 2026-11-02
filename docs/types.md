@@ -152,8 +152,11 @@ never overrides a den's own definitions (design.md §4).
 Built-in packs change only by adding: new types, fields, sections, and
 chapter fields. Changing an existing built-in field's type, renaming a
 section, or adding or changing a `default` is a breaking change (#56).
-Template prompts and headings may change in any release, since they only
-affect entities created afterward.
+Adding a parent to a built-in type's `kind_of` (F-TYPE-13) counts as
+adding, since it can only stop a warning. Removing one is a breaking
+change, since links that were fine would start to warn. Template prompts
+and headings may change in any release, since they only affect entities
+created afterward.
 
 An addition can still give meaning to something a den left undefined: a
 new core field checks the values a den already wrote under that name, and
@@ -243,14 +246,16 @@ so a new reservation needs a new format version.
   `Star Systems`.
 - `description`, optional: a string, shown in the app and given to AI
   agents through MCP.
+- `kind_of`, optional: the type or types this one is a kind of (F-TYPE-13).
 - `fields`, optional: a mapping of field definitions (§5).
 - `sections`, optional: a list of standard sections (§6).
 - `template`, optional: the type's template (§7).
 
 A missing or empty `name`, a missing or invalid `plural`, or a `name`,
 `description`, `fields`, or `sections` with the wrong shape is an [error].
-A bad `template` value is a [warning] instead (F-TPL-1). Any other key is
-a [warning] (usually a typo), and is kept.
+A bad `template` value (F-TPL-1) or `kind_of` value (F-TYPE-13) is a
+[warning] instead. Any other key is a [warning] (usually a typo), and is
+kept.
 
 **F-TYPE-4.** If more than one enabled pack defines the same type key in
 `types/`, F-PACK-11 decides which definition is used. The other is
@@ -265,10 +270,60 @@ do, F-PACK-11 decides which type is used, and the other type is ignored,
 with the clash [warning], as in F-TYPE-4. Two types in the same pack are
 settled by type key, in ASCII order: the earlier key wins.
 
+**F-TYPE-13.** `kind_of` says a type **is a kind of** another type, its
+**parent**. It is a type key or a list of type keys:
+
+```yaml
+# packs/space-opera/types/planet.yaml, shortened
+name: Planet
+plural: planets
+kind_of: location
+```
+
+```yaml
+# packs/starfall/types/sentient-ship.yaml
+name: Sentient Ship
+plural: sentient-ships
+kind_of: [ship, character]
+```
+
+- A type is accepted wherever a `ref` field's `to` names one of its
+  **ancestors**: its parents, their parents, and so on (F-FT-9, format.md
+  F-LINK-11). A type with several parents is accepted by the `to` of each,
+  and reaching an ancestor by more than one route means nothing more.
+- It carries identity only. A type gets no fields, sections, or template
+  from its ancestors, so several parents can't conflict. Anything that
+  depends on those, such as a thread's `## Payoff` (F-CORE-4), stays with
+  the type that defines it. It goes one way: a location isn't accepted
+  where a `to` names only `planet`.
+- Nothing else follows it. A note's `type` is still its own, and filtering
+  notes by type (`list_entities`, `search`, `canon_as_of`) matches that
+  type only. There are no abstract types: a den can define `vehicle` as an
+  ordinary type and never make a note of it.
+- A parent that isn't an enabled type is a [warning] on the file that names
+  it, and that parent is ignored. If a den-local type took the parent's
+  folder and so replaced it (F-TYPE-5), and a built-in type names it, the
+  [warning] is once, on the den's file, as in F-FT-9, and the den can give
+  those types a new parent through an extension.
+- A loop is a [warning] on each file that names a parent in it, and every
+  parent in the loop is ignored, so the result doesn't depend on any order.
+  A type that names itself is a loop. Parents outside the loop still count.
+  A loop that a den's extension closes through a built-in type is reported
+  only on the den's files, but the built-in type's parent in that loop is
+  ignored too.
+- A value that isn't a type key, or a list item that isn't one, is a
+  [warning], and only that value is ignored. A null or empty `kind_of` means
+  no parents. A parent named twice counts once, without a warning.
+
+If F-TYPE-4 replaces a type, the replaced definition's `kind_of` goes with
+it: a den-local `ship` with no `kind_of` isn't a location, whatever the
+built-in `ship` says. A type that's a kind of a replaced type's key is a
+kind of the definition that replaced it.
+
 ## 4. Extensions and combining packs
 
 A den, or another pack, can add to a type it doesn't own: an extra field,
-an extra section, or its own template.
+an extra section, its own template, or another parent.
 
 ```yaml
 # packs/starfall/extensions/character.yaml
@@ -285,6 +340,7 @@ it extends (F-KEY-1, [error]). The top level is a mapping with:
 - `fields`, optional: field definitions (§5) to add.
 - `sections`, optional: standard sections (§6) to add.
 - `template`, optional: a template (§7) to use instead of the type's own.
+- `kind_of`, optional: parents (F-TYPE-13) to add.
 
 `name`, `plural`, or `description` in an extension is an [error]: an
 extension can't rename a type or move its folder. A `fields` or
@@ -314,6 +370,9 @@ it is applied, in pack order (F-PACK-7):
   template is ignored. A built-in extension's template never replaces the
   template of a den-local type: that is a clash too, and the den-local
   type's own template is used.
+- Each extension's `kind_of` parents are added to the type's own. Parents
+  can't clash, so a den can add one to any pack's type, and can't remove
+  one.
 
 Apart from a den-local definition replacing a built-in one (F-PACK-11),
 an extension can't change or remove a field or section that is already
@@ -435,9 +494,9 @@ after trimming (F-LINK-11), such as `"[[ilse-tarrow]]"` or
 inside a list (F-FLD-6). A string that isn't a single link is a
 [warning]. The link resolves and is checked like any other (format.md
 §10). `to` is optional, and is a type key or a list of type keys. A link
-that resolves to an entity whose type isn't `to`, or isn't one of the
-types in `to`, is the F-LINK-11 warning. Without `to`, a ref links to any
-type. A `to` naming a type that isn't enabled is a [warning] on the type
+that resolves to an entity whose type isn't one of the types in `to`, or a
+kind of one of them (F-TYPE-13), is the F-LINK-11 warning. Without `to`, a
+ref links to any type. A `to` naming a type that isn't enabled is a [warning] on the type
 file, and the type check skips that name.
 
 **F-FT-10. `position`.** A string matching `position` (F-POS-1), such as
@@ -1006,7 +1065,8 @@ which would take over from the first at its `from` (F-SEC-8) and hide the
 earlier history from later views.
 
 **Faction.** Membership is written once, on each member: the character's
-`factions` field. The faction's page lists its members from those links.
+`factions` field. The faction's page lists its members from those links,
+and so does the page of a kind of faction (F-TYPE-13), such as a polity.
 Its `## Members` section holds what that list can't: members who don't
 have a page yet, and the roles people hold within the group.
 
@@ -1131,8 +1191,8 @@ chapter that differs, such as a flashback whose date and POV are out of
 step with the chapters around it, sets its own. `when` works the same way
 for the story's present: a space opera can set a far-future date once in
 `chapter_defaults` and override it as time moves on, and `setting` can
-link each chapter to the place where it happens (for a place that is a
-type from another pack, see F-SPACE-2). Made-up
+link each chapter to the place where it happens (a location, or a kind of
+one, F-TYPE-13). Made-up
 calendars such as stardates wait for #37. A multi-POV book may set
 `pov` on every chapter. No check ties `pov` to `narration`. These fields
 are independent of an outline's `pov` column (F-OUT-9), which is per row.
@@ -1237,9 +1297,10 @@ extension's `Service record`. A ship with no `condition` shows as
 If the den later enables a built-in pack that also defines `ship`, such as
 `space-opera` (§11), the den-local `ship` is still used, and the built-in one is ignored, with the
 F-TYPE-4 warning on `packs/starfall/types/ship.yaml` (F-PACK-11). The den
-means what it meant before. To adopt the built-in type instead, the den
-drops its own `types/ship.yaml` and moves any fields the built-in type
-lacks into `extensions/ship.yaml`.
+means what it meant before, so its `ship` isn't a location unless its own
+file says `kind_of: location` (F-TYPE-13). To adopt the built-in type
+instead, the den drops its own `types/ship.yaml` and moves any fields the
+built-in type lacks into `extensions/ship.yaml`.
 
 ## 11. The space opera pack
 
@@ -1262,6 +1323,10 @@ sections, and no defaults, and each type has a template.
 | `technology` | `technologies` | `kind`, `created_by`, `controlled_by`\*, `introduced` | Overview, How it works, Limits, Consequences, History, Open questions |
 
 \* temporal. Every type also has `row` and `placeholder` (§5.5).
+
+`star-system`, `planet`, `settlement`, and `ship` are `kind_of: location`,
+and `polity` is `kind_of: faction` (F-TYPE-13). `species`, `ship-class`, and
+`technology` are kinds of nothing.
 
 | Field | Type | On |
 |---|---|---|
@@ -1288,37 +1353,22 @@ sections, and no defaults, and each type has a template.
 
 Where a field here links to a place or a group, it also takes core's
 `location` or `faction`, so a den can keep a region or a guild as a core
-note. A character's `species` is core's text field, which can hold a link
+note. Since the pack's places and polities are kinds of those, such a field
+takes all of them, and not only the ones it names: a `homeworld` can be a
+settlement or a ship. The `to` lists name the likely ones, for the field's
+hint in the app. A character's `species` is core's text field, which can hold a link
 to a `species` note (§9). A rank or a posting is left to a den's extension
 (§10).
 
-**F-SPACE-2.** The pack's types are not core types, and a pack can't change
-a field it doesn't define (F-TYPE-8). So a core field that links to
+**F-SPACE-2.** Core's fields link to the pack's types through `kind_of`
+(F-TYPE-13), with nothing to redefine. A core field that links to
 `location` or `faction`, such as the chapter field `setting`, an event's
-`location`, a character's `factions`, or a location's `part_of`, gets the
-F-LINK-11 warning when it links to a planet or a polity. The link still
-resolves and shows. A den that wants to link these freely redefines each
-field in its own pack, whose definition wins (F-PACK-11). Each redefined
-field is one clash warning on the den's file, which stays for as long as
-the den redefines it, so a den that widens four fields has four warnings.
-A chapter field goes in the pack's `chapter.yaml`, and a field of a core
-type, such as a character's or a faction's, in `extensions/<type>.yaml`:
+`location`, a character's `factions`, or a location's `part_of`, takes a
+planet or a polity with no warning. A link that isn't a place or a group,
+such as a `setting` that links to a character or a species, is still the
+F-LINK-11 warning.
 
-```yaml
-# packs/starfall/chapter.yaml
-fields:
-  setting:
-    type: ref
-    to: [location, star-system, planet, settlement, ship]
-    list: true
-```
-
-```yaml
-# packs/starfall/extensions/character.yaml
-fields:
-  factions:
-    type: ref
-    to: [faction, polity]
-    list: true
-    temporal: true
-```
+A den can still redefine a core field in its own pack, whose definition
+wins (F-PACK-11), to give it another type or a narrower `to`. Each
+redefined field is one clash warning on the den's file, which stays for as
+long as the den redefines it.

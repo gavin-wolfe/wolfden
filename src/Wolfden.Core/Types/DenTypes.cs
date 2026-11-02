@@ -94,6 +94,12 @@ public sealed class DenTypes
         /// <summary>Built-in types that a den-local type replaced by taking their plural (F-TYPE-5), with that type's file.</summary>
         private readonly Dictionary<string, (string Key, string Path)> _replacedByDen = new(StringComparer.Ordinal);
 
+        /// <summary>Each enabled type's <c>kind_of</c> parents as written, its own and then its extensions' (F-TYPE-13).</summary>
+        private readonly Dictionary<string, List<KindOfDeclaration>> _kindOf = new(StringComparer.Ordinal);
+
+        /// <summary>For each enabled type, the types that are a kind of it, at any distance (F-TYPE-13).</summary>
+        private readonly Dictionary<string, SortedSet<string>> _kinds = new(StringComparer.Ordinal);
+
         public DenTypes Build()
         {
             var packs = EnabledPacks();
@@ -105,6 +111,7 @@ public sealed class DenTypes
             var enabled = packs.Where(p => !p.Excluded).ToList();
             var types = CombineTypes(enabled);
             var chapterFields = CombineChapterFields(enabled);
+            ResolveKinds(types);
             CheckRefTargets(types.Values.SelectMany(t => t.Fields).Concat(chapterFields), types);
             foreach (var type in types.Values)
             {
@@ -246,11 +253,15 @@ public sealed class DenTypes
         {
             var fields = new List<FieldDefinition>(file.Fields);
             var sections = new List<SectionDefinition>(file.Sections);
+            var kindOf = new List<KindOfDeclaration>(file.KindOf);
             var extensionTemplates = new List<(PackContent Pack, ExtensionFile File)>();
             foreach (var pack in packs)
             {
                 foreach (var extension in pack.Extensions.Where(e => e.Key == file.Key))
                 {
+                    // F-TYPE-13: extensions add parents, and nothing can clash.
+                    kindOf.AddRange(extension.KindOf);
+
                     foreach (var field in extension.Fields)
                     {
                         var index = fields.FindIndex(f => f.Name == field.Name);
@@ -299,6 +310,8 @@ public sealed class DenTypes
             }
 
             // The type's own template: by name, or templates/<key>.md (F-TPL-2).
+            _kindOf[file.Key] = kindOf.DistinctBy(k => k.Parent, StringComparer.Ordinal).ToList();
+
             var template = file.Template is { } own ? owner.Templates[own] : owner.Templates.GetValueOrDefault($"{file.Key}.md");
             var templatePack = owner.Pack;
 
@@ -364,6 +377,141 @@ public sealed class DenTypes
             return fields;
         }
 
+        /// <summary>
+        /// F-TYPE-13: each type's parents, without those that aren't enabled
+        /// or that make a loop, each with a warning; then what each type is a
+        /// kind of, and the kinds of each type, for F-LINK-11.
+        /// </summary>
+        private void ResolveKinds(Dictionary<string, TypeDefinition> types)
+        {
+            var parents = new SortedDictionary<string, List<KindOfDeclaration>>(StringComparer.Ordinal);
+            var redirected = new SortedDictionary<string, SortedSet<string>>(StringComparer.Ordinal);
+            foreach (var (key, declared) in _kindOf)
+            {
+                parents[key] = [];
+                foreach (var parent in declared)
+                {
+                    if (types.ContainsKey(parent.Parent))
+                    {
+                        parents[key].Add(parent);
+                    }
+                    else if (parent.Pack.IsBuiltIn && _replacedByDen.ContainsKey(parent.Parent))
+                    {
+                        // As in CheckRefTargets: once, on the den's own file, not on one the writer can't edit.
+                        if (!redirected.TryGetValue(parent.Parent, out var names))
+                        {
+                            redirected[parent.Parent] = names = new SortedSet<string>(StringComparer.Ordinal);
+                        }
+
+                        names.Add(key);
+                    }
+                    else
+                    {
+                        Warn(parent.Path, "F-TYPE-13", parent.Line, $"Type '{key}' is kind_of '{parent.Parent}', which isn't an enabled type, so this parent is ignored.");
+                    }
+                }
+            }
+
+            foreach (var (key, names) in redirected)
+            {
+                var (by, path) = _replacedByDen[key];
+                Warn(path, "F-TYPE-13", null,
+                    $"Type '{by}' replaces the built-in type '{key}', so the built-in types that are kind_of '{key}' ({string.Join(", ", names)}) lose that parent. An extension can give them kind_of: {by}.");
+            }
+
+            DropLoops(parents);
+
+            foreach (var (key, type) in types)
+            {
+                type.KindOf = parents[key].Select(p => p.Parent).ToList();
+                _kinds[key] = new SortedSet<string>(StringComparer.Ordinal);
+            }
+
+            foreach (var type in types.Values)
+            {
+                // Breadth first, so the nearest come first, and a diamond's top comes once.
+                var ancestors = new List<string>();
+                var seen = new HashSet<string>(StringComparer.Ordinal);
+                var waiting = new Queue<string>(type.KindOf);
+                while (waiting.TryDequeue(out var ancestor))
+                {
+                    if (seen.Add(ancestor))
+                    {
+                        ancestors.Add(ancestor);
+                        _kinds[ancestor].Add(type.Key);
+                        foreach (var next in types[ancestor].KindOf)
+                        {
+                            waiting.Enqueue(next);
+                        }
+                    }
+                }
+
+                type.Ancestors = ancestors;
+            }
+        }
+
+        /// <summary>
+        /// F-TYPE-13: removes every parent that's part of a loop, whichever
+        /// type comes first, so the answer doesn't depend on any order. A
+        /// loop a den's file closes is reported only on the den's files.
+        /// </summary>
+        private void DropLoops(SortedDictionary<string, List<KindOfDeclaration>> parents)
+        {
+            // The types from one type up to another through parents, in order, or null.
+            List<string>? Way(string from, string to)
+            {
+                var cameFrom = new Dictionary<string, string>(StringComparer.Ordinal);
+                var waiting = new Queue<string>();
+                waiting.Enqueue(from);
+                while (waiting.TryDequeue(out var type))
+                {
+                    if (type == to)
+                    {
+                        var way = new List<string> { to };
+                        while (way[^1] != from)
+                        {
+                            way.Add(cameFrom[way[^1]]);
+                        }
+
+                        way.Reverse();
+                        return way;
+                    }
+
+                    foreach (var parent in parents[type].Select(p => p.Parent))
+                    {
+                        if (parent != from && cameFrom.TryAdd(parent, type))
+                        {
+                            waiting.Enqueue(parent);
+                        }
+                    }
+                }
+
+                return null;
+            }
+
+            var looped = parents
+                .SelectMany(p => p.Value.Select(d => (Type: p.Key, Declared: d)))
+                .Select(e => (e.Type, e.Declared, Way: Way(e.Declared.Parent, e.Type)))
+                .Where(e => e.Way is not null)
+                .ToList();
+
+            foreach (var (type, declared, way) in looped)
+            {
+                // Types in one loop reach each other, so this says whether a den's file is part of this one.
+                var denIsInIt = looped.Any(o => !o.Declared.Pack.IsBuiltIn && Way(o.Type, type) is not null && Way(type, o.Type) is not null);
+                if (!declared.Pack.IsBuiltIn || !denIsInIt)
+                {
+                    var loop = string.Join(" -> ", new[] { type }.Concat(way!));
+                    Warn(declared.Path, "F-TYPE-13", declared.Line, $"Type '{type}' is kind_of '{declared.Parent}', which makes a loop ({loop}), so this parent is ignored.");
+                }
+            }
+
+            foreach (var (type, declared, _) in looped)
+            {
+                parents[type].Remove(declared);
+            }
+        }
+
         /// <summary>F-FT-9: a <c>to</c> naming a type that isn't enabled is a warning, and the type check skips that name.</summary>
         private void CheckRefTargets(IEnumerable<FieldDefinition> fields, Dictionary<string, TypeDefinition> types)
         {
@@ -396,6 +544,7 @@ public sealed class DenTypes
 
                 // With every name skipped, nothing is left to check against.
                 field.CheckedTo = known;
+                field.AcceptedKinds = known.SelectMany(k => _kinds[k]).Except(known, StringComparer.Ordinal).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
             }
 
             foreach (var (key, names) in redirected)

@@ -76,7 +76,10 @@ public sealed partial class DenTools
 
     private static SourceFieldType FieldTypeOf(FieldDefinition f) => new(
         f.Name, f.Kind.ToKey(), f.IsList, f.IsTemporal, f.IsRequired, f.Values, f.Kind == FieldKind.Ref ? f.To : null, f.Description,
-        f.Default is null ? null : AsWritten(f.Default));
+        f.Default is null ? null : AsWritten(f.Default))
+    {
+        Accepts = f.Kind == FieldKind.Ref && f.To is { } to ? [.. to, .. f.AcceptedKinds] : null,
+    };
 
     /// <summary>
     /// A YAML value as JSON, keeping what kind of scalar it is (<see cref="SourceField.Value"/>):

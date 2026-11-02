@@ -1401,7 +1401,7 @@ rewrite slug links (F-RT-5).
 
 **F-LINK-11.** A `ref` field (types.md F-FT-9) holds a single link per
 value, with nothing else in the string. A resolved entity whose type isn't
-the one the field names is a [warning].
+one the field names, or a kind of one (types.md F-TYPE-13), is a [warning].
 
 ### 10.3 Link checks
 

@@ -95,7 +95,8 @@ Obsidian, see [Using Wolfden](docs/using-wolfden.md).
 ## License
 
 Code: [MIT](LICENSE). The built-in packs in `packs/` (types and
-templates): [MIT-0](packs/LICENSE). Sample datasets in `samples/`:
+templates): [MIT-0](packs/LICENSE). Sample datasets in `samples/`,
+and the older versions of a sample in `scripts/starfall-history/versions/`:
 [CC-BY-4.0](samples/LICENSE).
 
 **Your writing is yours.** Wolfden's licenses cover Wolfden itself. They

@@ -25,6 +25,10 @@
 // note in the sample needs no change here. The script checks that the end
 // state matches samples/starfall byte for byte, and fails if it doesn't.
 //
+// License: this script, checkpoints.json, and no-settings.gitconfig are MIT,
+// like the rest of the code. versions/ holds sample text, so it's CC BY 4.0,
+// like samples/ (see samples/LICENSE).
+//
 // No dependencies beyond Node and git. Tests: StarfallReplayTests, in
 // tests/Wolfden.Mcp.Tests.
 

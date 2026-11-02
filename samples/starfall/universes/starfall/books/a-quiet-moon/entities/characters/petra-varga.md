@@ -15,7 +15,7 @@ fields:
 # Petra Varga
 
 ## Overview
-The engineer who sited and built the first relay, on [[oriel]].
+The engineer sent to site the first relay, on [[oriel]].
 
 ## Wound
 <!-- wolfden: from=a-quiet-moon:5 -->

@@ -20,12 +20,20 @@ fields:
 # Tessaly
 
 ## Overview
-A frigate of the Compact navy, sent to find out why relay stations in the
-[[kessan-reach|Reach]] are going silent.
+A frigate of the Compact navy.
+
+### Its orders
+<!-- wolfden: from=ember:2 -->
+Sent to find out why relay stations in the [[kessan-reach|Reach]] are going
+silent.
 
 ## Crew
 - Captain: [[halden-pike]].
-- Executive officer: [[ilse-tarrow]], until she's left behind on a supply run.
+- Executive officer: [[ilse-tarrow]].
+
+### Short an officer
+<!-- wolfden: from=ember:4 -->
+Ilse is left behind on a supply run.
 
 ### The medic
 <!-- wolfden: from=ash:2 -->

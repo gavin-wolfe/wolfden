@@ -5,7 +5,9 @@ name: Sorrel Vance
 status: canon
 from: "ash:10"
 fields:
-  role: The admiral Ilse's new orders come through
+  role:
+    - { value: An admiral at Command, from: "ash:10" }
+    - { value: "The admiral Ilse's new orders come through", from: "ash:11" }
   gender: woman
   pronouns: she/her
   species: human

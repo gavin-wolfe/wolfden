@@ -114,4 +114,4 @@ header says how they're stored.
 ## License
 
 The text in this den (summaries, notes, and outline) is by Gavin Wolfe,
-licensed under [CC BY 4.0](../LICENSE). The story and names are invented.
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The story and names are invented.

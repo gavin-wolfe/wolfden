@@ -18,12 +18,19 @@ fields:
 # Halden Pike
 
 ## Overview
-Captain of the *Tessaly*: careful, well liked, and in debt to more people
-than he lets on.
+Captain of the *Tessaly*: careful and well liked.
+
+### Debts
+<!-- wolfden: from=ember:7 -->
+With his ship gone, it comes out that he owes more people than he let on.
 
 ## Arc
 <!-- wolfden: from=ember:7 -->
 He goes silent with his ship.
 
 ## Relationships
-- [[ilse-tarrow]]: his executive officer, whom he left behind on a supply run.
+- [[ilse-tarrow]]: his executive officer.
+
+### Left behind
+<!-- wolfden: from=ember:4 -->
+He left her behind on a supply run.

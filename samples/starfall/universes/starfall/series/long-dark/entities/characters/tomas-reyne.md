@@ -18,8 +18,11 @@ fields:
 # Tomas Reyne
 
 ## Overview
-The [[lantern]]'s engineer. He served on relay stations before the navy, so
-he's the first to see what's wrong with the station logs.
+The [[lantern]]'s engineer. He served on relay stations before the navy.
+
+### The logs
+<!-- wolfden: from=ember:15 -->
+That's why he's the first to see what's wrong with the station logs.
 
 ## Voice
 Answers questions a beat late, and more honestly than anyone wants.

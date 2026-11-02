@@ -13,4 +13,8 @@ fields:
 
 ## Overview
 A small, quiet moon of [[velari-prime]], with a clear line to half of the
-Reach. The first relay mast stands here.
+Reach.
+
+### The mast
+<!-- wolfden: from=a-quiet-moon:3 -->
+The first relay mast stands here.

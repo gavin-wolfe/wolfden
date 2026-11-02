@@ -29,7 +29,7 @@
 // tests/Wolfden.Mcp.Tests.
 
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -75,7 +75,27 @@ function isInside(folder, parent) {
   return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
-/** Refuses anything but a new or empty folder outside every repository. */
+/**
+ * Where a path really is, following links in the part of it that exists, so a
+ * link or a Windows junction can't lead the checks below somewhere else.
+ */
+function realLocation(folder) {
+  const rest = [];
+  for (let at = folder; ; at = path.dirname(at)) {
+    if (existsSync(at)) {
+      return path.join(realpathSync.native(at), ...rest);
+    }
+    if (path.dirname(at) === at) {
+      return folder;
+    }
+    rest.unshift(path.basename(at));
+  }
+}
+
+/**
+ * Refuses anything but a new or empty folder outside every repository.
+ * Returns the folder's real location, which is where the replay then writes.
+ */
 function checkTarget(target) {
   let stat = null;
   try {
@@ -88,13 +108,15 @@ function checkTarget(target) {
   if (stat && (!stat.isDirectory() || readdirSync(target).length > 0)) {
     throw new Refusal(`${target} already exists and isn't an empty folder. Nothing was changed. Name a new folder.`);
   }
-  const repository = enclosingRepository(target);
+  const real = realLocation(target);
+  const repository = enclosingRepository(real);
   if (repository) {
     throw new Refusal(`${target} is inside the git repository at ${repository}. Nothing was changed. Name a folder outside it.`);
   }
-  if (isInside(target, repoRoot)) {
+  if (isInside(real, realLocation(repoRoot))) {
     throw new Refusal(`${target} is inside this copy of Wolfden. Nothing was changed. Name a folder outside it.`);
   }
+  return real;
 }
 
 /** Git's environment here: no settings from this machine, and no pointers at another repository. */
@@ -160,11 +182,11 @@ function verify(target, sampleFiles) {
   }
 }
 
-function replay(target) {
+function replay(given) {
   const checkpoints = JSON.parse(readFileSync(path.join(here, 'checkpoints.json'), 'utf8'));
   const sampleFiles = filesUnder(sampleRoot);
   const finals = planFinals(checkpoints, sampleFiles);
-  checkTarget(target);
+  const target = checkTarget(given);
   git(os.tmpdir(), null, '--version');
 
   mkdirSync(target, { recursive: true });

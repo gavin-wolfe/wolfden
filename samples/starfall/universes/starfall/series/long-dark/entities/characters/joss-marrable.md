@@ -5,7 +5,9 @@ name: Joss Marrable
 status: canon
 from: "ember:5"
 fields:
-  role: Former captain of the Lantern
+  role:
+    - { value: Captain of the Lantern, from: "ember:5" }
+    - { value: Former captain of the Lantern, from: "ember:8" }
   gender: nonbinary
   pronouns: they/them
   species: human
@@ -17,5 +19,12 @@ fields:
 # Joss Marrable
 
 ## Overview
-Three weeks from retirement when the *Tessaly* goes silent. They hand
-[[ilse-tarrow]] the [[lantern]] and its bad habits with visible relief.
+Three weeks from retirement, and in no hurry to take the [[lantern]] anywhere.
+
+### No retirement yet
+<!-- wolfden: from=ember:7 -->
+The *Tessaly* goes silent, and every ship at the yards is wanted.
+
+### Handing over
+<!-- wolfden: from=ember:8 -->
+They hand [[ilse-tarrow]] the *Lantern* and its bad habits with visible relief.

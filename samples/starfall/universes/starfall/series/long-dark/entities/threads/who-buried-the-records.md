@@ -13,8 +13,11 @@ fields:
 # Who buried the records
 
 ## Overview
-Someone in [[compact-command]] is burying the old records, and Ilse's orders
-start coming from that person.
+Someone in [[compact-command]] is burying the old records.
+
+### Her orders
+<!-- wolfden: from=ash:11 -->
+Ilse's orders start coming from that person.
 
 ## Setup
 Chapter 10 of *Ash*: Ilse sees that the crews found the old records, and that

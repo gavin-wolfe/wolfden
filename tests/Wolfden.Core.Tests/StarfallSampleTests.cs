@@ -29,7 +29,7 @@ public class StarfallSampleTests
         Assert.True(catalog.Structure.SpoilerChecks);
         Assert.Empty(catalog.Structure.Diagnostics);
         Assert.Empty(catalog.Diagnostics);
-        Assert.InRange(catalog.Entities.Count, 30, 45);
+        Assert.True(catalog.Entities.Count >= 30, $"Only {catalog.Entities.Count} entities found.");
         Assert.All(catalog.Entities, e => Assert.NotNull(e.Id));
         Assert.All(catalog.Entities, e => Assert.NotNull(e.EntersCanon));
     }

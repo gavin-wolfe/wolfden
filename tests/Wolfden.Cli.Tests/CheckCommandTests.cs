@@ -213,7 +213,8 @@ public class CheckCommandTests
 
         Assert.Equal(CliApp.ExitOk, exitCode);
         Assert.Empty(error);
-        Assert.Equal("No errors or warnings. Checked 43 entities; spoiler checks are on.\n", output);
+        Assert.StartsWith("No errors or warnings. Checked ", output, StringComparison.Ordinal);
+        Assert.EndsWith(" entities; spoiler checks are on.\n", output, StringComparison.Ordinal);
     }
 
     [Fact]

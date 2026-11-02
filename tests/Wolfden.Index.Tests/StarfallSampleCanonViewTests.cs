@@ -105,6 +105,37 @@ public sealed class StarfallSampleCanonViewTests : IClassFixture<StarfallSampleC
         Assert.Equal("\"[[ilse-tarrow]]\"", Field(Entity("ember:8", "Lantern"), "captain"));
     }
 
+    [Theory]
+    [InlineData("ember:1")]
+    [InlineData("ember:3")]
+    public void NothingSaysIlseIsLeftBehindBeforeItHappens(string position)
+    {
+        var text = Text(View(position));
+
+        Assert.DoesNotContain("left behind", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("goes silent", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void IlseIsLeftBehindAtEmberFour()
+    {
+        Assert.Contains("left her behind", Text(Entity("ember:4", "Halden Pike")), StringComparison.Ordinal);
+        Assert.Contains("left behind", Text(Entity("ember:4", "Tessaly")), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("ember:5", "Captain of the Lantern", false, false)]
+    [InlineData("ember:7", "Captain of the Lantern", true, false)]
+    [InlineData("ember:8", "Former captain of the Lantern", true, true)]
+    public void MarrablesRoleAndOverviewFollowTheStory(string position, string role, bool silent, bool handsOver)
+    {
+        var marrable = Entity(position, "Joss Marrable");
+
+        Assert.Equal($"\"{role}\"", Field(marrable, "role"));
+        Assert.Equal(silent, Text(marrable).Contains("goes silent", StringComparison.Ordinal));
+        Assert.Equal(handsOver, marrable.Sections.Any(s => s.Name == "Handing over"));
+    }
+
     [Fact]
     public void WhatIsntDecidedStaysOutOfCanon()
     {

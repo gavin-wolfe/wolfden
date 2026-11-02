@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
 using Wolfden.Core.Checks;
+using Wolfden.Core.History;
 using Wolfden.Git;
 
 namespace Wolfden.Mcp.Tests;
@@ -75,6 +76,10 @@ public sealed class StarfallReplayTests : IClassFixture<StarfallReplayTests.Repl
         Assert.Contains("status: final\n", Show(tagged, book), StringComparison.Ordinal);
         Assert.Empty(Git(Root, "diff", "--name-only", Tag, "HEAD", "--", EmberFolder));
         Assert.Equal("Freeze book 'ember' of universe 'starfall'", Git(Root, "log", "-1", "--format=%s", Tag).Trim());
+
+        // Wolfden itself sees the tag as this book's freeze.
+        var frozen = Assert.Single(FreezeTag.Existing(GitHistory.ForDen(Root, GitOptions, TestContext.Current.CancellationToken), "starfall", "ember", TestContext.Current.CancellationToken));
+        Assert.Equal(Tag, frozen.Name);
     }
 
     [Fact]
@@ -201,6 +206,52 @@ public sealed class StarfallReplayTests : IClassFixture<StarfallReplayTests.Repl
 
     [Fact]
     [Trait("Scenario", "SC-HIST-19")]
+    public void ALinkedParentCantLeadItIntoThisRepository()
+    {
+        _ = Root;
+        var outside = NewFolder();
+        var escaped = Path.Combine(TempDen.RepoRoot, "samples", $"replay-{Guid.NewGuid():N}");
+        var link = Path.Combine(outside, "link");
+        var goodLink = Path.Combine(outside, "good");
+        try
+        {
+            Directory.CreateDirectory(outside);
+            if (!MakeFolderLink(link, Path.Combine(TempDen.RepoRoot, "samples")))
+            {
+                Assert.Skip("This system doesn't allow folder links to be created.");
+            }
+
+            var result = Replayed.RunNode(Script, [Path.Combine(link, Path.GetFileName(escaped))], null);
+
+            Assert.Equal(1, result.ExitCode);
+            Assert.False(Directory.Exists(escaped), "The replay wrote inside the repository through the link.");
+
+            // A link to a folder elsewhere is fine, and the replay lands where the link leads.
+            var elsewhere = Path.Combine(outside, "elsewhere");
+            Directory.CreateDirectory(elsewhere);
+            Assert.True(MakeFolderLink(goodLink, elsewhere));
+            var through = Replayed.RunNode(Script, [Path.Combine(goodLink, "den")], null);
+            Assert.True(through.ExitCode == 0, through.Error);
+            Assert.True(File.Exists(Path.Combine(elsewhere, "den", "den.yaml")));
+        }
+        finally
+        {
+            // The links first, so that deleting the folder can't reach through them.
+            foreach (var made in new[] { link, goodLink })
+            {
+                if (Directory.Exists(made))
+                {
+                    Directory.Delete(made);
+                }
+            }
+
+            Delete(escaped);
+            Delete(outside);
+        }
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-19")]
     public void ItRefusesAFolderInsideAnotherRepository()
     {
         _ = Root;
@@ -274,6 +325,33 @@ public sealed class StarfallReplayTests : IClassFixture<StarfallReplayTests.Repl
         {
             Assert.DoesNotContain(word, script.Replace("https://nodejs.org", string.Empty, StringComparison.Ordinal), StringComparison.Ordinal);
         }
+    }
+
+    /// <summary>A folder link: a symbolic link, or on Windows without that right, a junction. False if neither can be made.</summary>
+    private static bool MakeFolderLink(string link, string target)
+    {
+        try
+        {
+            Directory.CreateSymbolicLink(link, target);
+            return true;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                return false;
+            }
+        }
+
+        using var mklink = Process.Start(new ProcessStartInfo("cmd.exe", ["/c", "mklink", "/J", link, target])
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        })!;
+        mklink.WaitForExit();
+        return mklink.ExitCode == 0 && Directory.Exists(link);
     }
 
     private static List<string> FilesUnder(string root) =>

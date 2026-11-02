@@ -5,8 +5,6 @@ fields:
     description: Military rank.
   posting:
     type: ref
-    to: [ship, location]
+    to: [location]
     temporal: true
     description: The ship or place they're assigned to.
-sections:
-  - Service record

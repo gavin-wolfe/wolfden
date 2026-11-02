@@ -3432,7 +3432,8 @@ Spec: design.md §11, §5, §6 (#34). Covered by:
 ### SC-HIST-19. The replay refuses to overwrite anything
 
 The writer points the replay at a file, at a folder that has something in it,
-at a folder inside this clone or another repository, or at nothing at all. Or
+at a folder inside this clone or another repository, directly or through a
+linked folder, or at nothing at all. Or
 their shell has `GIT_DIR` set to another repository.
 
 - Each folder or file is refused, with a message that says nothing was changed,
@@ -3446,6 +3447,7 @@ Spec: design.md §11 (#34). Covered by:
 `StarfallReplayTests.ItRefusesAFileAtThatPathAndChangesNothing`,
 `StarfallReplayTests.ItRefusesAFolderInsideThisRepository`,
 `StarfallReplayTests.ItRefusesAFolderInsideAnotherRepository`,
+`StarfallReplayTests.ALinkedParentCantLeadItIntoThisRepository`,
 `StarfallReplayTests.WithoutAFolderItPrintsHowToUseIt`,
 `StarfallReplayTests.GitSettingsInTheEnvironmentCantPointItAtAnotherRepository`,
 `StarfallReplayTests.TheScriptRunsNoGitCommandThatCouldReachTheNetwork`.

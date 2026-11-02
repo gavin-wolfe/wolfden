@@ -1459,7 +1459,7 @@ details live in an entity that the row links to.
 
 | row | beat | status | progress |
 |---|---|---|---|
-| 40 | Tarrow takes command. | candidate | outlined |
+| 40 | Tarrow makes commander. | candidate | outlined |
 ```
 
 ```abnf
@@ -1825,7 +1825,7 @@ fully recovers.
 | 1 | 1 | A distress call from the edge of [[the Reach]]. |
 | 2 | 2 | [[Ilse Tarrow]] leads the away team. |
 | 3 | 3 | The ambush. |
-| 4 | 4 | Tarrow takes command. |
+| 4 | 4 | Tarrow makes commander. |
 ```
 
 As of `ember:2`, Ilse Tarrow is a lieutenant with an Overview and no Shoulder

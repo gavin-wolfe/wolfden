@@ -45,6 +45,7 @@ Silver-streaked hair, a burn scar along her left forearm.
 Takes a flechette round at Kessan Reach; the arm never fully recovers.
 
 ## Want
+<!-- wolfden: from=ember:7 -->
 To get the *Tessaly*'s crew back.
 
 ## Relationships
@@ -60,6 +61,7 @@ To get the *Tessaly*'s crew back.
   wants to believe her.
 
 ## Custom: Things she never says aloud
+<!-- wolfden: from=ember:8 -->
 That she was glad to be left behind, for about an hour.
 
 ## Open questions

@@ -17,8 +17,11 @@ fields:
 # Greta Brandt
 
 ## Overview
-A medic from the [[tessaly]] who turns up alive at [[kessan-station]], with a
-story that doesn't quite add up.
+A medic from the [[tessaly]] who turns up alive at [[kessan-station]].
+
+### Her story
+<!-- wolfden: from=ash:4 -->
+It doesn't quite add up.
 
 ## Open questions
 <!-- wolfden: from=ash:10 status=undecided -->

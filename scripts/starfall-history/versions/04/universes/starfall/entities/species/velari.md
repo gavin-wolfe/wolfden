@@ -25,6 +25,7 @@ They're alive. They didn't silence the stations, and they're terrified of
 the relays.
 
 ## Biology
+<!-- wolfden: from=ember:28 -->
 Long-lived and sensitive to low-frequency signals, which they use to speak
 across great distances.
 

@@ -14,5 +14,8 @@ fields:
 # The first dead station
 
 ## Overview
-The *Lantern* boards [[halcyon-relay]] and finds it abandoned, with no bodies
-and no damage.
+The *Lantern* boards [[halcyon-relay]] and finds it abandoned.
+
+### No damage, no bodies
+<!-- wolfden: from=ember:13 -->
+A full search finds no damage and no bodies.

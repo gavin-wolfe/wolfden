@@ -14,8 +14,12 @@ fields:
 # Halcyon Relay
 
 ## Overview
-The first of the dead stations the *Lantern* reaches: the air is still good,
-the meals are still on the tables, and nobody is aboard.
+The first of the dead stations the *Lantern* reaches: abandoned, with the air
+still good.
+
+### Left as it was
+<!-- wolfden: from=ember:10 -->
+The meals are still on the tables.
 
 ## Description
 Thirty berths, one mess, a relay core the size of a house.

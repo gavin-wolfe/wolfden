@@ -45,6 +45,7 @@ Silver-streaked hair, a burn scar along her left forearm.
 Takes a flechette round at Kessan Reach; the arm never fully recovers.
 
 ## Want
+<!-- wolfden: from=ember:7 -->
 To get the *Tessaly*'s crew back.
 
 ## Relationships
@@ -55,4 +56,5 @@ To get the *Tessaly*'s crew back.
 - [[tomas-reyne]]: her engineer, who tells her what she doesn't want to hear.
 
 ## Custom: Things she never says aloud
+<!-- wolfden: from=ember:8 -->
 That she was glad to be left behind, for about an hour.

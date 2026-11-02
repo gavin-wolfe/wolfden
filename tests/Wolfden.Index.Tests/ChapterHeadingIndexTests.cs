@@ -11,7 +11,7 @@ namespace Wolfden.Index.Tests;
 public sealed class ChapterHeadingIndexTests
 {
     private const string Ember = "universes/starfall/series/long-dark/books/ember/book.md";
-    private const string Mara = "universes/starfall/series/long-dark/entities/characters/mara-voss.md";
+    private const string Ilse = "universes/starfall/series/long-dark/entities/characters/ilse-tarrow.md";
 
     private static string Headings(TempDen den, IReadOnlySet<string>? met = null, long? upTo = null)
     {
@@ -33,7 +33,7 @@ public sealed class ChapterHeadingIndexTests
             id: 01JAQKFBF5KZNWJ47TAN9ZT24M
             name: Ember
             chapter_heading: [pov, when]
-            chapter_defaults: { pov: ["[[mara-voss]]"] }
+            chapter_defaults: { pov: ["[[ilse-tarrow]]"] }
             chapters:
               - { key: prologue, title: Before the Dark, fields: { pov: [], when: "2284" } }
               - { key: "1", number: 1, title: Kessan Reach }
@@ -43,20 +43,20 @@ public sealed class ChapterHeadingIndexTests
         var updater = new IndexUpdater(den.Root);
         updater.Rebuild("start");
 
-        Assert.Equal("Before the Dark · 2284 | Kessan Reach · Mara Voss | Mara Voss — 2291", Headings(den));
+        Assert.Equal("Before the Dark · 2284 | Kessan Reach · Ilse Tarrow | Ilse Tarrow — 2291", Headings(den));
         // As of a position: no fields after it, and a link to a note the reader hasn't met shows as written.
-        Assert.Equal("Before the Dark · 2284 | Kessan Reach · mara-voss | mara-voss — 2291", Headings(den, met: new HashSet<string>()));
+        Assert.Equal("Before the Dark · 2284 | Kessan Reach · ilse-tarrow | ilse-tarrow — 2291", Headings(den, met: new HashSet<string>()));
         using (var index = DenIndex.Open(den.Root))
         {
             var first = index.PointOf("starfall", "ember:1");
-            Assert.Equal("Before the Dark · 2284 | Kessan Reach · Mara Voss | (none)", Headings(den, upTo: first));
+            Assert.Equal("Before the Dark · 2284 | Kessan Reach · Ilse Tarrow | (none)", Headings(den, upTo: first));
         }
 
-        den.Write(Mara, File.ReadAllText(Path.Combine(den.Root, Mara)).Replace("name: Mara Voss", "name: Mara Ellery", StringComparison.Ordinal));
-        var update = updater.Apply(Batch(den, (WatcherChangeTypes.Changed, Mara, null)), out _);
+        den.Write(Ilse, File.ReadAllText(Path.Combine(den.Root, Ilse)).Replace("name: Ilse Tarrow", "name: Ilse Ellery", StringComparison.Ordinal));
+        var update = updater.Apply(Batch(den, (WatcherChangeTypes.Changed, Ilse, null)), out _);
 
         Assert.Equal(IndexUpdateKind.Updated, update!.Kind);
-        Assert.Equal("Before the Dark · 2284 | Kessan Reach · Mara Ellery | Mara Ellery — 2291", Headings(den));
+        Assert.Equal("Before the Dark · 2284 | Kessan Reach · Ilse Ellery | Ilse Ellery — 2291", Headings(den));
         AssertSameAsFullRebuild(den, "after the rename");
     }
 }

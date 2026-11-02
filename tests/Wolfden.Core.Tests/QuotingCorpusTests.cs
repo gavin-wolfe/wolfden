@@ -16,7 +16,7 @@ public partial class QuotingCorpusTests
     private static readonly string[] Corpus =
     [
         // Ids, keys, and ordinary words
-        "01JA7Q8M4XK3V9R2D5W8HN6TQB", "01M4TF5F08GDVZVWZ4JYQDBHZG", "7th-fleet", "Mara Voss", "Kessan Reach", "ember:22",
+        "01JA7Q8M4XK3V9R2D5W8HN6TQB", "01M4TF5F08GDVZVWZ4JYQDBHZG", "7th-fleet", "Ilse Tarrow", "Kessan Reach", "ember:22",
         "a-quiet-moon:2b", "plain words", "Zoë", "it's", "say \"hi\"", "back\\slash", "C#", "100%", "x-color",
         // Integers and radix forms
         "2291", "014", "0", "-0", "+12", "-7", "0o17", "0O17", "0b1010", "0B11", "0x1F", "0xff", "0xDEADBEEF", "0xCafe",
@@ -74,7 +74,7 @@ public partial class QuotingCorpusTests
     {
         // A flow list item and a flow mapping value: a plain scalar there
         // that ends in ':' would run into ',' '}' or ']' (F-YAML-1).
-        var list = MarkdownFile.Parse(TestFiles.Utf8("---\naliases: [Voss]\n---\n"))
+        var list = MarkdownFile.Parse(TestFiles.Utf8("---\naliases: [Tarrow]\n---\n"))
             .WithNewListItem(["aliases"], YamlScalarValue.String(value));
         var map = MarkdownFile.Parse(TestFiles.Utf8("---\ndied: {value: x, from: ~}\n---\n"))
             .WithFrontmatterValue(["died", "value"], YamlScalarValue.String(value));

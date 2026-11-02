@@ -39,13 +39,13 @@ public sealed class ListItemToolTests : IDisposable
             status: draft
             chapter_defaults:
               pov:
-                - "[[mara-voss]]"  # most of the book
+                - "[[ilse-tarrow]]"  # most of the book
                 - "[[tomas-reyes]]"
             chapters:
               - key: "1"
                 number: 1
                 fields:
-                  pov: ["[[mara-voss]]", "[[tomas-reyes]]"]  # both watches
+                  pov: ["[[ilse-tarrow]]", "[[tomas-reyes]]"]  # both watches
               - { key: "2", number: 2 }
             ---
             """.Replace("\r\n", "\n", StringComparison.Ordinal) + "\n");
@@ -88,7 +88,7 @@ public sealed class ListItemToolTests : IDisposable
         var hash = Tools.GetChapter("ember", "1", "starfall").Hash;
 
         var moved = Tools.UpdateChapterFields("ember", "1", hash, Json("""[{"op": "move", "field": "pov", "item": 1, "index": 0}]"""), "starfall");
-        Assert.Contains("pov: [\"[[tomas-reyes]]\", \"[[mara-voss]]\"]  # both watches\n", _den.Read(Ember), StringComparison.Ordinal);
+        Assert.Contains("pov: [\"[[tomas-reyes]]\", \"[[ilse-tarrow]]\"]  # both watches\n", _den.Read(Ember), StringComparison.Ordinal);
 
         var replaced = Tools.UpdateChapterFields("ember", "1", moved.Hash, Json("""[{"op": "replace", "field": "pov", "item": 1, "value": "[[halden-pike]]"}]"""), "starfall");
         Assert.Contains("pov: [\"[[tomas-reyes]]\", \"[[halden-pike]]\"]  # both watches\n", _den.Read(Ember), StringComparison.Ordinal);
@@ -110,7 +110,7 @@ public sealed class ListItemToolTests : IDisposable
         var hash = Tools.GetChapterDefaults("starfall", book: "ember").Hash;
 
         var moved = Tools.UpdateChapterDefaults(hash, Json("""[{"op": "move", "field": "pov", "item": 0, "index": 1}]"""), "starfall", book: "ember");
-        Assert.Contains("  pov:\n    - \"[[tomas-reyes]]\"\n    - \"[[mara-voss]]\"  # most of the book\nchapters:", _den.Read(Ember), StringComparison.Ordinal);
+        Assert.Contains("  pov:\n    - \"[[tomas-reyes]]\"\n    - \"[[ilse-tarrow]]\"  # most of the book\nchapters:", _den.Read(Ember), StringComparison.Ordinal);
 
         var replaced = Tools.UpdateChapterDefaults(moved.Hash, Json("""[{"op": "replace", "field": "pov", "item": 1, "value": "[[halden-pike]]"}]"""), "starfall", book: "ember");
         Assert.Contains("    - \"[[halden-pike]]\"  # most of the book\n", _den.Read(Ember), StringComparison.Ordinal);
@@ -145,13 +145,13 @@ public sealed class ListItemToolTests : IDisposable
     {
         _den.Write(Tomas, _den.Read(Tomas).Replace(
             "status: canon\n",
-            "status: canon\nfields:\n  x_crew:\n    - name: Mara\n      # the captain\n      role: captain\n    - Halden\n",
+            "status: canon\nfields:\n  x_crew:\n    - name: Ilse\n      # the captain\n      role: captain\n    - Halden\n",
             StringComparison.Ordinal));
         var hash = Tools.GetEntity("Tomas Reyes", "starfall").Entity!.Hash!;
 
-        var result = Tools.UpdateFields("Tomas Reyes", hash, Json("""[{"op": "set", "path": "fields.x_crew.0", "value": "Mara"}]"""), "starfall");
+        var result = Tools.UpdateFields("Tomas Reyes", hash, Json("""[{"op": "set", "path": "fields.x_crew.0", "value": "Ilse"}]"""), "starfall");
 
-        Assert.Contains("    - Mara\n    - Halden\n", _den.Read(Tomas), StringComparison.Ordinal);
+        Assert.Contains("    - Ilse\n    - Halden\n", _den.Read(Tomas), StringComparison.Ordinal);
         Assert.Contains("Replaced fields.x_crew.0 whole, so the comment inside the old value went: '# the captain'.", result.Effects);
     }
 
@@ -169,7 +169,7 @@ public sealed class ListItemToolTests : IDisposable
         var book = Tools.GetChapter("ember", "1", "starfall").Hash;
         var ember = _den.Read(Ember);
         Assert.Equal(ToolErrorCodes.BadArgument, Assert.Throws<DenToolException>(() => Tools.UpdateChapterFields("ember", "1", book, Json("""[{"op": "replace", "field": "pov", "item": 0, "value": []}]"""), "starfall")).Code);
-        Assert.Equal(ToolErrorCodes.BadArgument, Assert.Throws<DenToolException>(() => Tools.UpdateChapterDefaults(book, Json("""[{"op": "add", "field": "pov", "value": ["[[mara-voss]]"]}]"""), "starfall", book: "ember")).Code);
+        Assert.Equal(ToolErrorCodes.BadArgument, Assert.Throws<DenToolException>(() => Tools.UpdateChapterDefaults(book, Json("""[{"op": "add", "field": "pov", "value": ["[[ilse-tarrow]]"]}]"""), "starfall", book: "ember")).Code);
         Assert.Equal(ember, _den.Read(Ember));
     }
 

@@ -11,7 +11,7 @@ namespace Wolfden.Core.Tests;
 /// </summary>
 public class IncrementalLoadTests
 {
-    private const string Mara = "universes/starfall/series/long-dark/entities/characters/mara-voss.md";
+    private const string Ilse = "universes/starfall/series/long-dark/entities/characters/ilse-tarrow.md";
     private const string Pike = "universes/starfall/series/long-dark/books/ash/entities/characters/halden-pike.md";
     private const string Outline = "universes/starfall/series/long-dark/books/ember/outline.md";
 
@@ -42,11 +42,11 @@ public class IncrementalLoadTests
                 changed.Add(Pike);
                 break;
             case "delete":
-                source.Without(Mara);
-                changed.Add(Mara);
+                source.Without(Ilse);
+                changed.Add(Ilse);
                 break;
             case "add":
-                source.With("universes/starfall/entities/characters/pike.md", "---\ntype: character\nname: Pike\n---\n\nAnother Pike, with [[Mara Voss]].\n");
+                source.With("universes/starfall/entities/characters/pike.md", "---\ntype: character\nname: Pike\n---\n\nAnother Pike, with [[Ilse Tarrow]].\n");
                 changed.Add("universes/starfall/entities/characters/pike.md");
                 break;
             case "outline":
@@ -76,14 +76,14 @@ public class IncrementalLoadTests
 
         var updated = catalog.Update(source, [Pike]);
 
-        Assert.Same(catalog.FindByPath(Mara), updated.FindByPath(Mara));
+        Assert.Same(catalog.FindByPath(Ilse), updated.FindByPath(Ilse));
         Assert.NotSame(catalog.FindByPath(Pike), updated.FindByPath(Pike));
     }
 
     [Fact]
     public void AnUpdateDoesntChangeThePreviousCatalog()
     {
-        // Pike takes Mara's id: in the update, Mara (the same object in both
+        // Pike takes Ilse's id: in the update, Ilse (the same object in both
         // catalogs) has a duplicate id, but the old catalog and its links
         // must still say what they said (#107).
         var source = MemoryDenSource.FromDirectory(MemoryDenSource.StarfallRoot);
@@ -94,18 +94,18 @@ public class IncrementalLoadTests
         source.With(Pike, text.Replace("id: 01JA7Q8M4XK3V9R2D5W8HN6TQC", "id: 01JA7Q8M4XK3V9R2D5W8HN6TQB", StringComparison.Ordinal));
 
         var updated = catalog.Update(source, [Pike]);
-        var mara = updated.FindByPath(Mara)!;
+        var ilse = updated.FindByPath(Ilse)!;
 
-        Assert.Same(catalog.FindByPath(Mara), mara);
-        Assert.True(updated.HasDuplicateId(mara));
-        Assert.False(catalog.HasDuplicateId(mara));
-        Assert.Equal(LinkOutcome.Resolved, new LinkResolver(catalog).Resolve(mara.Scope, "Mara Voss").Outcome);
-        Assert.Equal(LinkOutcome.Broken, new LinkResolver(updated).Resolve(mara.Scope, "Mara Voss").Outcome);
+        Assert.Same(catalog.FindByPath(Ilse), ilse);
+        Assert.True(updated.HasDuplicateId(ilse));
+        Assert.False(catalog.HasDuplicateId(ilse));
+        Assert.Equal(LinkOutcome.Resolved, new LinkResolver(catalog).Resolve(ilse.Scope, "Ilse Tarrow").Outcome);
+        Assert.Equal(LinkOutcome.Broken, new LinkResolver(updated).Resolve(ilse.Scope, "Ilse Tarrow").Outcome);
         Assert.Equal(before, Describe(catalog, links));
     }
 
     [Theory]
-    [InlineData(Mara, "universes/starfall/series/long-dark")]
+    [InlineData(Ilse, "universes/starfall/series/long-dark")]
     [InlineData("universes/starfall/entities/deep/down/here.md", "universes/starfall")]
     [InlineData("universes/starfall/series/long-dark/books/ash/entities/x.md", "universes/starfall/series/long-dark/books/ash")]
     [InlineData("universes/starfall/entities/.hidden/x.md", null)]

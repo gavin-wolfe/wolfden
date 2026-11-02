@@ -11,20 +11,20 @@ namespace Wolfden.Api.Tests;
 /// </summary>
 public class FieldSearchEndpointTests
 {
-    private const string MaraFile = "universes/starfall/series/long-dark/entities/characters/mara-voss.md";
+    private const string IlseFile = "universes/starfall/series/long-dark/entities/characters/ilse-tarrow.md";
     private const string PikeFile = "universes/starfall/series/long-dark/books/ash/entities/characters/halden-pike.md";
 
     /// <summary>Halden Pike's id. The reader meets him in <c>ash</c>.</summary>
     private const string PikeId = "01JA7Q8M4XK3V9R2D5W8HN6TQC";
 
     /// <summary>
-    /// Starfall, with Mara (met at ember:1) given a home and a watch mate
+    /// Starfall, with Ilse (met at ember:1) given a home and a watch mate
     /// linked by id to Halden Pike, and Pike given a field of his own.
     /// </summary>
     private static TempDen Den()
     {
         var den = TempDen.Starfall();
-        den.Write(MaraFile, den.Read(MaraFile).Replace(
+        den.Write(IlseFile, den.Read(IlseFile).Replace(
             "  species: { value: human, from: \"ember:prologue\" }",
             $"  species: {{ value: human, from: \"ember:prologue\" }}\n  home: Saltmarsh Docks\n  watch_mate: \"[[{PikeId}]]\"",
             StringComparison.Ordinal));
@@ -66,14 +66,14 @@ public class FieldSearchEndpointTests
         using var den = TempDen.Starfall();
         await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
 
-        // Tessaly's overview links [[Mara Voss]]; the snippet brackets "Mara" inside the link's own brackets.
-        var hit = Hits(await server.GetJsonAsync("/api/search?universe=starfall&query=mara", HttpStatusCode.OK))
-            .First(h => h.GetProperty("text").GetString()!.Contains("[[Mara Voss]]", StringComparison.Ordinal));
-        Assert.Contains("[[[Mara] Voss]]", hit.GetProperty("snippet").GetString(), StringComparison.Ordinal);
+        // Tessaly's overview links [[Ilse Tarrow]]; the snippet brackets "Ilse" inside the link's own brackets.
+        var hit = Hits(await server.GetJsonAsync("/api/search?universe=starfall&query=ilse", HttpStatusCode.OK))
+            .First(h => h.GetProperty("text").GetString()!.Contains("[[Ilse Tarrow]]", StringComparison.Ordinal));
+        Assert.Contains("[[[Ilse] Tarrow]]", hit.GetProperty("snippet").GetString(), StringComparison.Ordinal);
         var text = hit.GetProperty("text").GetString()!;
-        Assert.Contains("[[Mara Voss]]", text, StringComparison.Ordinal);
+        Assert.Contains("[[Ilse Tarrow]]", text, StringComparison.Ordinal);
         var match = Assert.Single(hit.GetProperty("matches").EnumerateArray());
-        Assert.Equal("Mara", text.Substring(match.GetProperty("start").GetInt32(), match.GetProperty("length").GetInt32()));
+        Assert.Equal("Ilse", text.Substring(match.GetProperty("start").GetInt32(), match.GetProperty("length").GetInt32()));
     }
 
     [Fact]
@@ -84,17 +84,17 @@ public class FieldSearchEndpointTests
         await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
         var tools = new DenTools(den.Root);
 
-        // In text: "Mara Voss" side by side is one match; the words the other way round aren't a phrase (#185).
-        var json = await server.GetJsonAsync("/api/search?universe=starfall&query=%22mara%20voss%22", HttpStatusCode.OK);
-        SameAsMcp.Assert(tools.Search("\"mara voss\"", "starfall"), json);
-        var hit = Hits(json).First(h => h.GetProperty("text").GetString()!.Contains("[[Mara Voss]]", StringComparison.Ordinal));
-        Assert.Contains("[[[Mara Voss]]]", hit.GetProperty("snippet").GetString(), StringComparison.Ordinal);
+        // In text: "Ilse Tarrow" side by side is one match; the words the other way round aren't a phrase (#185).
+        var json = await server.GetJsonAsync("/api/search?universe=starfall&query=%22ilse%20tarrow%22", HttpStatusCode.OK);
+        SameAsMcp.Assert(tools.Search("\"ilse tarrow\"", "starfall"), json);
+        var hit = Hits(json).First(h => h.GetProperty("text").GetString()!.Contains("[[Ilse Tarrow]]", StringComparison.Ordinal));
+        Assert.Contains("[[[Ilse Tarrow]]]", hit.GetProperty("snippet").GetString(), StringComparison.Ordinal);
         var text = hit.GetProperty("text").GetString()!;
         Assert.Contains(
             hit.GetProperty("matches").EnumerateArray(),
-            m => text.Substring(m.GetProperty("start").GetInt32(), m.GetProperty("length").GetInt32()) == "Mara Voss");
-        Assert.NotEmpty(Hits(await server.GetJsonAsync("/api/search?universe=starfall&query=voss%20mara", HttpStatusCode.OK)));
-        Assert.Empty(Hits(await server.GetJsonAsync("/api/search?universe=starfall&query=%22voss%20mara%22", HttpStatusCode.OK)));
+            m => text.Substring(m.GetProperty("start").GetInt32(), m.GetProperty("length").GetInt32()) == "Ilse Tarrow");
+        Assert.NotEmpty(Hits(await server.GetJsonAsync("/api/search?universe=starfall&query=tarrow%20ilse", HttpStatusCode.OK)));
+        Assert.Empty(Hits(await server.GetJsonAsync("/api/search?universe=starfall&query=%22tarrow%20ilse%22", HttpStatusCode.OK)));
 
         // In one field's values, likewise.
         var field = Assert.Single(Hits(await server.GetJsonAsync("/api/search?universe=starfall&query=%22saltmarsh%20docks%22&field=home", HttpStatusCode.OK)));
@@ -126,7 +126,7 @@ public class FieldSearchEndpointTests
             Assert.Equal($"[[{PikeId}]] → Halden [Pike]", hit.GetProperty("snippet").GetString());
         }
 
-        // An entry counts only where it's in effect: Mara's posting to Kessan Reach starts at ash:4.
+        // An entry counts only where it's in effect: Ilse's posting to Kessan Reach starts at ash:4.
         Assert.Empty(Hits(await server.GetJsonAsync("/api/search?universe=starfall&query=kessan&field=posting&asOf=ash:1", HttpStatusCode.OK)));
         Assert.Single(Hits(await server.GetJsonAsync("/api/search?universe=starfall&query=kessan&field=posting&asOf=ash:4", HttpStatusCode.OK)));
     }

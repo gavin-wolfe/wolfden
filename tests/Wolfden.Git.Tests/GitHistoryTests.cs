@@ -9,7 +9,7 @@ namespace Wolfden.Git.Tests;
 /// </summary>
 public sealed class GitHistoryTests
 {
-    private const string Mara = "universes/vael/entities/characters/mara-voss.md";
+    private const string Ilse = "universes/vael/entities/characters/ilse-tarrow.md";
     private const string Fen = "universes/vael/entities/locations/fen-harbour.md";
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
@@ -19,24 +19,24 @@ public sealed class GitHistoryTests
     public void ANotesHistoryListsTheCheckpointsThatChangedItNewestFirst()
     {
         using var repo = TestRepo.Create();
-        repo.WriteDen(Mara, "# Mara Voss\n");
-        var first = repo.CommitAll("Add Mara");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
+        var first = repo.CommitAll("Add Ilse");
         repo.WriteDen(Fen, "# Fen Harbour\n");
         repo.CommitAll("Add the harbour");
-        repo.WriteDen(Mara, "# Mara Voss\n\nA pilot.\n");
-        var third = repo.CommitAll("Mara is a pilot\n\nShe flies the night run.");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n\nA pilot.\n");
+        var third = repo.CommitAll("Ilse is a pilot\n\nShe flies the night run.");
 
         var history = repo.History;
         Assert.Equal("git", history.Name);
         Assert.Equal(HistoryCapabilities.All, history.Capabilities);
 
-        var log = history.Log(new HistoryLogQuery(Mara), Token).Value;
+        var log = history.Log(new HistoryLogQuery(Ilse), Token).Value;
 
         Assert.Equal([third, first], log.Select(e => e.Id));
-        Assert.Equal("Mara is a pilot\n\nShe flies the night run.", log[0].Message);
+        Assert.Equal("Ilse is a pilot\n\nShe flies the night run.", log[0].Message);
         Assert.Equal("Test Writer", log[0].Author);
-        Assert.Equal([new HistoryFileChange(HistoryChangeKind.Modified, Mara)], log[0].Changes);
-        Assert.Equal([new HistoryFileChange(HistoryChangeKind.Added, Mara)], log[1].Changes);
+        Assert.Equal([new HistoryFileChange(HistoryChangeKind.Modified, Ilse)], log[0].Changes);
+        Assert.Equal([new HistoryFileChange(HistoryChangeKind.Added, Ilse)], log[1].Changes);
         Assert.True(log[0].When >= log[1].When);
 
         // The whole den's history has every checkpoint.
@@ -48,16 +48,16 @@ public sealed class GitHistoryTests
     public void TheLogPagesWithALimitAndABeforeRevisionThroughAMerge()
     {
         using var repo = TestRepo.Create();
-        repo.WriteDen(Mara, "one\n");
+        repo.WriteDen(Ilse, "one\n");
         repo.CommitAll("one");
         repo.Git("checkout", "--quiet", "-b", "side");
         repo.WriteDen(Fen, "side\n");
         var side = repo.CommitAll("side");
         repo.Git("checkout", "--quiet", "main");
-        repo.WriteDen(Mara, "two\n");
+        repo.WriteDen(Ilse, "two\n");
         repo.CommitAll("two");
         repo.Git("merge", "--quiet", "--no-ff", "-m", "merge side", "side");
-        repo.WriteDen(Mara, "three\n");
+        repo.WriteDen(Ilse, "three\n");
         repo.CommitAll("three");
 
         var history = repo.History;
@@ -90,13 +90,13 @@ public sealed class GitHistoryTests
         // A (main), then B (main) and C (side, from A, newer than B), then the
         // merge: the log is merge, C, B, A, and B isn't an ancestor of C.
         using var repo = TestRepo.Create();
-        repo.WriteDen(Mara, "a\n");
+        repo.WriteDen(Ilse, "a\n");
         var a = repo.CommitAt("A", 1);
         repo.Git("checkout", "--quiet", "-b", "side");
         repo.WriteDen(Fen, "c\n");
         var c = repo.CommitAt("C", 3);
         repo.Git("checkout", "--quiet", "main");
-        repo.WriteDen(Mara, "b\n");
+        repo.WriteDen(Ilse, "b\n");
         var b = repo.CommitAt("B", 2);
         repo.Git("merge", "--quiet", "--no-ff", "-m", "merge side", "side");
         var merge = repo.Git("rev-parse", "HEAD").Trim();
@@ -115,7 +115,7 @@ public sealed class GitHistoryTests
         }
 
         // A revision that isn't an entry of this log isn't a cursor for it.
-        Assert.Throws<HistoryRevisionException>(() => history.Log(new HistoryLogQuery(Mara, Limit: 1, Before: c), Token));
+        Assert.Throws<HistoryRevisionException>(() => history.Log(new HistoryLogQuery(Ilse, Limit: 1, Before: c), Token));
     }
 
     [Fact]
@@ -126,13 +126,13 @@ public sealed class GitHistoryTests
         // wrong (9:01), M (main, 9:20), and the merge of S. By date alone, A
         // comes before S, its own child.
         using var repo = TestRepo.Create();
-        repo.WriteDen(Mara, "a\n");
+        repo.WriteDen(Ilse, "a\n");
         var a = repo.CommitAt("A", 10);
         repo.Git("checkout", "--quiet", "-b", "side");
         repo.WriteDen(Fen, "s\n");
         var s = repo.CommitAt("S", 1);
         repo.Git("checkout", "--quiet", "main");
-        repo.WriteDen(Mara, "m\n");
+        repo.WriteDen(Ilse, "m\n");
         var m = repo.CommitAt("M", 20);
         repo.Git("merge", "--quiet", "--no-ff", "-m", "merge side", "side");
         var merge = repo.Git("rev-parse", "HEAD").Trim();
@@ -182,14 +182,14 @@ public sealed class GitHistoryTests
             File.SetUnixFileMode(hook, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         }
 
-        repo.WriteDen(Mara, "# Mara Voss\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
         var status = repo.Git("status", "--porcelain", "--untracked-files=all");
 
-        var refused = Assert.Throws<HistoryException>(() => repo.History.Checkpoint(new CheckpointRequest("Add Mara"), Token));
+        var refused = Assert.Throws<HistoryException>(() => repo.History.Checkpoint(new CheckpointRequest("Add Ilse"), Token));
 
         Assert.StartsWith("Git refused the checkpoint, so nothing was recorded (", refused.Message, StringComparison.Ordinal);
         Assert.Contains("not today", refused.Message, StringComparison.Ordinal);
-        Assert.Equal($"?? {Mara}\n", status);
+        Assert.Equal($"?? {Ilse}\n", status);
         Assert.Equal(status, repo.Git("status", "--porcelain", "--untracked-files=all"));
     }
 
@@ -198,9 +198,9 @@ public sealed class GitHistoryTests
     public void ACheckpointMessageCantHoldControlCharacters()
     {
         using var repo = TestRepo.Create();
-        repo.WriteDen(Mara, "# Mara Voss\n");
-        Assert.Throws<ArgumentException>(() => repo.History.Checkpoint(new CheckpointRequest("Add\u0001 Mara"), Token));
-        Assert.NotNull(repo.History.Checkpoint(new CheckpointRequest("Add Mara\r\n\n\tand more"), Token).Value);
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
+        Assert.Throws<ArgumentException>(() => repo.History.Checkpoint(new CheckpointRequest("Add\u0001 Ilse"), Token));
+        Assert.NotNull(repo.History.Checkpoint(new CheckpointRequest("Add Ilse\r\n\n\tand more"), Token).Value);
     }
 
     [Fact]
@@ -209,14 +209,14 @@ public sealed class GitHistoryTests
     {
         // U+2028 and U+2029 aren't line breaks to git, so they stay (#161).
         // Built from code points so no editor turns them into line breaks here.
-        var message = $"Add Mara{char.ConvertFromUtf32(0x2028)}and{char.ConvertFromUtf32(0x2029)}more";
+        var message = $"Add Ilse{char.ConvertFromUtf32(0x2028)}and{char.ConvertFromUtf32(0x2029)}more";
         using var repo = TestRepo.Create();
-        repo.WriteDen(Mara, "# Mara Voss\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
 
         var entry = repo.History.Checkpoint(new CheckpointRequest(message), Token).Value!;
 
         Assert.Equal(message, entry.Message);
-        Assert.Equal(message, Assert.Single(repo.History.Log(new HistoryLogQuery(Mara), Token).Value).Message);
+        Assert.Equal(message, Assert.Single(repo.History.Log(new HistoryLogQuery(Ilse), Token).Value).Message);
     }
 
     [Fact]
@@ -258,11 +258,11 @@ public sealed class GitHistoryTests
     public void ACheckpointRecordsNewChangedAndDeletedNotes()
     {
         using var repo = TestRepo.Create();
-        repo.WriteDen(Mara, "# Mara Voss\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
         repo.WriteDen(Fen, "# Fen Harbour\n");
         repo.CommitAll("start");
 
-        repo.WriteDen(Mara, "# Mara Voss\n\nA pilot.\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n\nA pilot.\n");
         repo.DeleteDen(Fen);
         repo.WriteDen("universes/vael/entities/items/compass.md", "# The Compass\n");
 
@@ -272,7 +272,7 @@ public sealed class GitHistoryTests
         Assert.Equal("End of chapter 14 session", entry.Message);
         Assert.Equal(
             [
-                new HistoryFileChange(HistoryChangeKind.Modified, Mara),
+                new HistoryFileChange(HistoryChangeKind.Modified, Ilse),
                 new HistoryFileChange(HistoryChangeKind.Added, "universes/vael/entities/items/compass.md"),
                 new HistoryFileChange(HistoryChangeKind.Deleted, Fen),
             ],
@@ -291,12 +291,12 @@ public sealed class GitHistoryTests
     {
         using var repo = TestRepo.Create();
         repo.CommitAll("start");
-        repo.WriteDen(Mara, "# Mara Voss\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
         repo.WriteDen(Fen, "# Fen Harbour\n");
 
-        var entry = repo.History.Checkpoint(new CheckpointRequest("Just Mara", [Mara]), Token).Value!;
+        var entry = repo.History.Checkpoint(new CheckpointRequest("Just Ilse", [Ilse]), Token).Value!;
 
-        Assert.Equal([new HistoryFileChange(HistoryChangeKind.Added, Mara)], entry.Changes);
+        Assert.Equal([new HistoryFileChange(HistoryChangeKind.Added, Ilse)], entry.Changes);
         Assert.Equal($"?? {Fen}\n", repo.Git("status", "--porcelain", "--untracked-files=all"));
     }
 
@@ -305,14 +305,14 @@ public sealed class GitHistoryTests
     public void TheFirstCheckpointOfANewRepositoryWorks()
     {
         using var repo = TestRepo.Create();
-        repo.WriteDen(Mara, "# Mara Voss\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
 
         Assert.Empty(repo.History.Log(new HistoryLogQuery(), Token).Value);
         Assert.False(repo.History.Diff(new HistoryDiffQuery(), Token).IsAvailable);
 
         var entry = repo.History.Checkpoint(new CheckpointRequest("First"), Token).Value!;
 
-        Assert.Equal(["den.yaml", Mara], entry.Changes.Select(c => c.Path).Order(StringComparer.Ordinal));
+        Assert.Equal(["den.yaml", Ilse], entry.Changes.Select(c => c.Path).Order(StringComparer.Ordinal));
         Assert.Single(repo.History.Log(new HistoryLogQuery(), Token).Value);
     }
 
@@ -322,12 +322,12 @@ public sealed class GitHistoryTests
     {
         using var repo = TestRepo.Create();
         repo.CommitAll("start");
-        repo.WriteDen(Mara, "# Mara Voss\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
 
         var entry = repo.History.Checkpoint(
-            new CheckpointRequest("Add Mara from the chapter 3 draft", CoAuthors: ["Claude <noreply@anthropic.com>"]), Token).Value!;
+            new CheckpointRequest("Add Ilse from the chapter 3 draft", CoAuthors: ["Claude <noreply@anthropic.com>"]), Token).Value!;
 
-        Assert.Equal("Add Mara from the chapter 3 draft\n\nCo-Authored-By: Claude <noreply@anthropic.com>", entry.Message);
+        Assert.Equal("Add Ilse from the chapter 3 draft\n\nCo-Authored-By: Claude <noreply@anthropic.com>", entry.Message);
         Assert.Equal("Claude <noreply@anthropic.com>\n", repo.Git("log", "-1", "--format=%(trailers:key=Co-Authored-By,valueonly)").TrimEnd('\n') + "\n");
         Assert.Equal("Test Writer\n", repo.Git("log", "-1", "--format=%an"));
     }
@@ -350,8 +350,8 @@ public sealed class GitHistoryTests
     public void ACoAuthorIsANameAndAnEmailOnOneLine(string coAuthor)
     {
         using var repo = TestRepo.Create();
-        repo.WriteDen(Mara, "# Mara Voss\n");
-        Assert.Throws<ArgumentException>(() => repo.History.Checkpoint(new CheckpointRequest("Add Mara", CoAuthors: [coAuthor]), Token));
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
+        Assert.Throws<ArgumentException>(() => repo.History.Checkpoint(new CheckpointRequest("Add Ilse", CoAuthors: [coAuthor]), Token));
         Assert.Throws<InvalidOperationException>(() => repo.Git("rev-parse", "--verify", "HEAD"));
     }
 
@@ -361,7 +361,7 @@ public sealed class GitHistoryTests
     {
         using var repo = TestRepo.Create("writing/vael-notes");
         repo.WriteRepo("README.md", "# My writing\n");
-        repo.WriteDen(Mara, "# Mara Voss\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
         var start = repo.CommitAll("start");
         repo.WriteRepo("README.md", "# My writing\n\nUpdated.\n");
         repo.CommitAll("Only the readme");
@@ -371,7 +371,7 @@ public sealed class GitHistoryTests
 
         // Only the commit that touched the den, with den-relative paths.
         Assert.Equal([start], log.Select(e => e.Id));
-        Assert.Equal(["den.yaml", Mara], log[0].Changes.Select(c => c.Path).Order(StringComparer.Ordinal));
+        Assert.Equal(["den.yaml", Ilse], log[0].Changes.Select(c => c.Path).Order(StringComparer.Ordinal));
         Assert.Equal(Path.GetFullPath(repo.Root), ((GitHistory)history).RepositoryRoot, ignoreCase: OperatingSystem.IsWindows());
     }
 
@@ -387,12 +387,12 @@ public sealed class GitHistoryTests
         repo.WriteRepo("README.md", "# My writing\n\nStaged by hand.\n");
         repo.Git("add", "README.md");
         repo.WriteRepo("blog/post.md", "not staged\n");
-        repo.WriteDen(Mara, "# Mara Voss\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
 
-        var entry = repo.History.Checkpoint(new CheckpointRequest("Add Mara"), Token).Value!;
+        var entry = repo.History.Checkpoint(new CheckpointRequest("Add Ilse"), Token).Value!;
 
-        Assert.Equal([new HistoryFileChange(HistoryChangeKind.Added, Mara)], entry.Changes);
-        Assert.Equal($"writing/vael-notes/{Mara}\n", repo.Git("show", "--name-only", "--format=", "HEAD"));
+        Assert.Equal([new HistoryFileChange(HistoryChangeKind.Added, Ilse)], entry.Changes);
+        Assert.Equal($"writing/vael-notes/{Ilse}\n", repo.Git("show", "--name-only", "--format=", "HEAD"));
         Assert.Equal("M  README.md\n M blog/post.md\n", repo.Git("status", "--porcelain"));
     }
 
@@ -401,7 +401,7 @@ public sealed class GitHistoryTests
     public void HiddenPathsAreNeverRecordedOrReported()
     {
         using var repo = TestRepo.Create("vael-notes");
-        repo.WriteDen(Mara, "# Mara Voss\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
         repo.CommitAll("start");
 
         // A commit made by hand that only touches hidden files in the den isn't in its history.
@@ -412,15 +412,15 @@ public sealed class GitHistoryTests
 
         repo.WriteDen(".obsidian/workspace.json", "{\"open\": true}\n");
         repo.WriteDen(".wolfden/index.db", "not really\n");
-        repo.WriteDen("universes/vael/.mara-voss.md.swp", "swap\n");
-        repo.WriteDen(Mara, "# Mara Voss\n\nA pilot.\n");
+        repo.WriteDen("universes/vael/.ilse-tarrow.md.swp", "swap\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n\nA pilot.\n");
 
         var diff = repo.History.Diff(new HistoryDiffQuery(), Token).Value;
-        Assert.Equal([Mara], diff.Files.Select(f => f.Change.Path));
+        Assert.Equal([Ilse], diff.Files.Select(f => f.Change.Path));
 
-        var entry = repo.History.Checkpoint(new CheckpointRequest("Mara is a pilot"), Token).Value!;
-        Assert.Equal([new HistoryFileChange(HistoryChangeKind.Modified, Mara)], entry.Changes);
-        Assert.Equal($"vael-notes/{Mara}\n", repo.Git("show", "--name-only", "--format=", "HEAD"));
+        var entry = repo.History.Checkpoint(new CheckpointRequest("Ilse is a pilot"), Token).Value!;
+        Assert.Equal([new HistoryFileChange(HistoryChangeKind.Modified, Ilse)], entry.Changes);
+        Assert.Equal($"vael-notes/{Ilse}\n", repo.Git("show", "--name-only", "--format=", "HEAD"));
         Assert.Contains(" M vael-notes/.obsidian/workspace.json", repo.Git("status", "--porcelain"), StringComparison.Ordinal);
 
         Assert.ThrowsAny<ArgumentException>(() => repo.History.Log(new HistoryLogQuery(".obsidian/workspace.json"), Token));
@@ -432,11 +432,11 @@ public sealed class GitHistoryTests
     public void ADiffSinceTheLatestCheckpointShowsNewChangedAndDeletedNotesAndLeavesTheIndexAlone()
     {
         using var repo = TestRepo.Create();
-        repo.WriteDen(Mara, "# Mara Voss\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
         repo.WriteDen(Fen, "# Fen Harbour\n");
         var start = repo.CommitAll("start");
 
-        repo.WriteDen(Mara, "# Mara Voss\n\nA pilot.\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n\nA pilot.\n");
         repo.DeleteDen(Fen);
         repo.WriteDen("universes/vael/entities/items/compass.md", "# The Compass\n");
         var status = repo.Git("status", "--porcelain", "--untracked-files=all");
@@ -447,21 +447,21 @@ public sealed class GitHistoryTests
         Assert.Null(diff.To);
         Assert.Equal(
             [
-                (HistoryChangeKind.Modified, Mara),
+                (HistoryChangeKind.Modified, Ilse),
                 (HistoryChangeKind.Added, "universes/vael/entities/items/compass.md"),
                 (HistoryChangeKind.Deleted, Fen),
             ],
             diff.Files.Select(f => (f.Change.Kind, f.Change.Path)).OrderBy(c => c.Path, StringComparer.Ordinal));
-        var mara = diff.Files.Single(f => f.Change.Path == Mara).Patch;
-        Assert.StartsWith($"diff --git a/{Mara} b/{Mara}\n", mara, StringComparison.Ordinal);
-        Assert.Contains("\n+A pilot.\n", mara, StringComparison.Ordinal);
+        var ilse = diff.Files.Single(f => f.Change.Path == Ilse).Patch;
+        Assert.StartsWith($"diff --git a/{Ilse} b/{Ilse}\n", ilse, StringComparison.Ordinal);
+        Assert.Contains("\n+A pilot.\n", ilse, StringComparison.Ordinal);
         Assert.Contains("\n+# The Compass\n", diff.Files.Single(f => f.Change.Kind == HistoryChangeKind.Added).Patch, StringComparison.Ordinal);
 
         // A diff only reads: the user's index and files are as they were.
         Assert.Equal(status, repo.Git("status", "--porcelain", "--untracked-files=all"));
 
         // One file only.
-        Assert.Equal([Mara], repo.History.Diff(new HistoryDiffQuery(Path: Mara), Token).Value.Files.Select(f => f.Change.Path));
+        Assert.Equal([Ilse], repo.History.Diff(new HistoryDiffQuery(Path: Ilse), Token).Value.Files.Select(f => f.Change.Path));
     }
 
     [Theory]
@@ -471,28 +471,28 @@ public sealed class GitHistoryTests
     public void ACheckpointsOwnDiffComparesItWithTheOneBeforeOrWithNothingForTheFirst(string? objectFormat)
     {
         using var repo = TestRepo.Create(objectFormat: objectFormat);
-        repo.WriteDen(Mara, "# Mara Voss\n");
-        var first = repo.CommitAll("Add Mara");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
+        var first = repo.CommitAll("Add Ilse");
         repo.WriteDen(Fen, "# Fen Harbour\n");
-        repo.WriteDen(Mara, "# Mara Voss\n\nA pilot.\n");
-        var second = repo.CommitAll("Mara is a pilot");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n\nA pilot.\n");
+        var second = repo.CommitAll("Ilse is a pilot");
 
-        var added = repo.History.DiffCheckpoint(first, Mara, Token).Value;
+        var added = repo.History.DiffCheckpoint(first, Ilse, Token).Value;
         Assert.Equal(("", first), (added.From, added.To));
         var file = Assert.Single(added.Files);
-        Assert.Equal(new HistoryFileChange(HistoryChangeKind.Added, Mara), file.Change);
-        Assert.Contains("+# Mara Voss", file.Patch, StringComparison.Ordinal);
+        Assert.Equal(new HistoryFileChange(HistoryChangeKind.Added, Ilse), file.Change);
+        Assert.Contains("+# Ilse Tarrow", file.Patch, StringComparison.Ordinal);
 
-        var changed = repo.History.DiffCheckpoint(second, Mara, Token).Value;
+        var changed = repo.History.DiffCheckpoint(second, Ilse, Token).Value;
         Assert.Equal((first, second), (changed.From, changed.To));
         file = Assert.Single(changed.Files);
-        Assert.Equal(new HistoryFileChange(HistoryChangeKind.Modified, Mara), file.Change);
+        Assert.Equal(new HistoryFileChange(HistoryChangeKind.Modified, Ilse), file.Change);
         Assert.Contains("+A pilot.", file.Patch, StringComparison.Ordinal);
 
         // Without a path, every den file the checkpoint changed.
-        Assert.Equal([Mara, Fen], repo.History.DiffCheckpoint(second, null, Token).Value.Files.Select(f => f.Change.Path).Order(StringComparer.Ordinal));
-        Assert.Throws<HistoryRevisionException>(() => repo.History.DiffCheckpoint("no-such-checkpoint", Mara, Token));
-        Assert.False(NoHistory.Instance.DiffCheckpoint(first, Mara, Token).IsAvailable);
+        Assert.Equal([Ilse, Fen], repo.History.DiffCheckpoint(second, null, Token).Value.Files.Select(f => f.Change.Path).Order(StringComparer.Ordinal));
+        Assert.Throws<HistoryRevisionException>(() => repo.History.DiffCheckpoint("no-such-checkpoint", Ilse, Token));
+        Assert.False(NoHistory.Instance.DiffCheckpoint(first, Ilse, Token).IsAvailable);
     }
 
     [Fact]
@@ -500,20 +500,20 @@ public sealed class GitHistoryTests
     public void ADiffBetweenTwoCheckpointsShowsARename()
     {
         using var repo = TestRepo.Create();
-        repo.WriteDen("universes/vael/entities/characters/mara.md", "# Mara Voss\n\nA pilot who flies the night run to the outer moons.\n");
+        repo.WriteDen("universes/vael/entities/characters/ilse.md", "# Ilse Tarrow\n\nA pilot who flies the night run to the outer moons.\n");
         var before = repo.CommitAll("start");
-        repo.Git("mv", "universes/vael/entities/characters/mara.md", Mara);
+        repo.Git("mv", "universes/vael/entities/characters/ilse.md", Ilse);
         var after = repo.CommitAll("rename");
 
         var diff = repo.History.Diff(new HistoryDiffQuery(before, after), Token).Value;
 
         Assert.Equal((before, after), (diff.From, diff.To));
         var file = Assert.Single(diff.Files);
-        Assert.Equal(new HistoryFileChange(HistoryChangeKind.Renamed, Mara, "universes/vael/entities/characters/mara.md"), file.Change);
+        Assert.Equal(new HistoryFileChange(HistoryChangeKind.Renamed, Ilse, "universes/vael/entities/characters/ilse.md"), file.Change);
         Assert.Contains("rename to ", file.Patch, StringComparison.Ordinal);
 
         // The checkpoint's own diff, narrowed to the new path, still sees the old one.
-        var own = Assert.Single(repo.History.DiffCheckpoint(after, Mara, Token).Value.Files);
+        var own = Assert.Single(repo.History.DiffCheckpoint(after, Ilse, Token).Value.Files);
         Assert.Equal(file.Change, own.Change);
     }
 
@@ -521,51 +521,51 @@ public sealed class GitHistoryTests
     [Trait("Scenario", "SC-HIST-10")]
     public void ACompareOfOneNoteAcrossARenameShowsTheRename()
     {
-        const string old = "universes/vael/entities/characters/mara.md";
+        const string old = "universes/vael/entities/characters/ilse.md";
         using var repo = TestRepo.Create();
-        repo.WriteDen(old, "# Mara Voss\n\nA pilot who flies the night run to the outer moons.\n");
+        repo.WriteDen(old, "# Ilse Tarrow\n\nA pilot who flies the night run to the outer moons.\n");
         repo.WriteDen(Fen, "# Fen Harbour\n");
         var before = repo.CommitAll("start");
-        repo.WriteDen(old, "# Mara Voss\n\nA pilot who flies the night run to the outer moons.\nShe keeps a compass.\n");
+        repo.WriteDen(old, "# Ilse Tarrow\n\nA pilot who flies the night run to the outer moons.\nShe keeps a compass.\n");
         var edited = repo.CommitAll("edit");
-        repo.Git("mv", old, Mara);
+        repo.Git("mv", old, Ilse);
         var after = repo.CommitAll("rename");
-        var renamed = new HistoryFileChange(HistoryChangeKind.Renamed, Mara, old);
+        var renamed = new HistoryFileChange(HistoryChangeKind.Renamed, Ilse, old);
 
         // Between two checkpoints, by the new path or the old one.
-        var diff = Assert.Single(repo.History.Diff(new HistoryDiffQuery(before, after, Mara), Token).Value.Files);
+        var diff = Assert.Single(repo.History.Diff(new HistoryDiffQuery(before, after, Ilse), Token).Value.Files);
         Assert.Equal(renamed, diff.Change);
         Assert.Contains("rename from ", diff.Patch, StringComparison.Ordinal);
         Assert.Contains("+She keeps a compass.", diff.Patch, StringComparison.Ordinal);
         Assert.Equal(renamed, Assert.Single(repo.History.Diff(new HistoryDiffQuery(before, after, old), Token).Value.Files).Change);
 
         // From a checkpoint to the file as it is now, before and after the rename is checkpointed.
-        Assert.Equal(renamed, Assert.Single(repo.History.Diff(new HistoryDiffQuery(edited, null, Mara), Token).Value.Files).Change);
+        Assert.Equal(renamed, Assert.Single(repo.History.Diff(new HistoryDiffQuery(edited, null, Ilse), Token).Value.Files).Change);
         repo.Git("reset", "--quiet", "--soft", "HEAD~1");
         repo.Git("reset", "--quiet");
-        Assert.Equal(renamed, Assert.Single(repo.History.Diff(new HistoryDiffQuery(edited, null, Mara), Token).Value.Files).Change);
-        Assert.Equal(renamed, Assert.Single(repo.History.Diff(new HistoryDiffQuery(null, null, Mara), Token).Value.Files).Change);
+        Assert.Equal(renamed, Assert.Single(repo.History.Diff(new HistoryDiffQuery(edited, null, Ilse), Token).Value.Files).Change);
+        Assert.Equal(renamed, Assert.Single(repo.History.Diff(new HistoryDiffQuery(null, null, Ilse), Token).Value.Files).Change);
         repo.CommitAll("rename again");
 
         // The note's log lists the renaming checkpoint as a rename. Its older
         // checkpoints, made under the old name, aren't listed (the log follows
         // the current path).
-        var log = repo.History.Log(new HistoryLogQuery(Mara), Token).Value;
+        var log = repo.History.Log(new HistoryLogQuery(Ilse), Token).Value;
         Assert.Equal([renamed], Assert.Single(log).Changes);
 
         // A folder's view: renamed in from another folder, and out to it.
         const string people = "universes/vael/entities/people";
         Directory.CreateDirectory(Path.Combine(repo.DenRoot, "universes", "vael", "entities", "people"));
-        repo.Git("mv", Mara, $"{people}/mara-voss.md");
+        repo.Git("mv", Ilse, $"{people}/ilse-tarrow.md");
         var moved = repo.CommitAll("move to people");
         Assert.Equal(
-            new HistoryFileChange(HistoryChangeKind.Renamed, $"{people}/mara-voss.md", Mara),
+            new HistoryFileChange(HistoryChangeKind.Renamed, $"{people}/ilse-tarrow.md", Ilse),
             Assert.Single(repo.History.DiffCheckpoint(moved, people, Token).Value.Files).Change);
         Assert.Equal(
-            new HistoryFileChange(HistoryChangeKind.Renamed, $"{people}/mara-voss.md", Mara),
+            new HistoryFileChange(HistoryChangeKind.Renamed, $"{people}/ilse-tarrow.md", Ilse),
             Assert.Single(repo.History.DiffCheckpoint(moved, "universes/vael/entities/characters", Token).Value.Files).Change);
         Assert.Equal(
-            [new HistoryFileChange(HistoryChangeKind.Renamed, $"{people}/mara-voss.md", Mara)],
+            [new HistoryFileChange(HistoryChangeKind.Renamed, $"{people}/ilse-tarrow.md", Ilse)],
             repo.History.Log(new HistoryLogQuery(people), Token).Value[0].Changes);
     }
 
@@ -573,32 +573,32 @@ public sealed class GitHistoryTests
     [Trait("Scenario", "SC-HIST-10")]
     public void ANoteMovedIntoAHiddenFolderIsDeletedNotRenamedToALookAlike()
     {
-        // Mara's note goes to .trash/ and a copy of it, under another name,
-        // appears in the den: without the hidden side, git would pair Mara
+        // Ilse's note goes to .trash/ and a copy of it, under another name,
+        // appears in the den: without the hidden side, git would pair Ilse
         // with the copy. Fen's goes to .trash/ and is edited there, and a
         // note kept in .wolfden/ comes out into the den, edited. Each is a
         // plain delete or add, and no patch names a hidden path or shows a
         // hidden file's text (#184 review).
-        const string copy = "universes/vael/entities/characters/mara.md";
+        const string copy = "universes/vael/entities/characters/ilse.md";
         const string secret = "universes/vael/entities/characters/secret.md";
         const string folder = "universes/vael/entities/characters";
-        const string text = "# Mara Voss\n\nA pilot who flies the night run to the outer moons.\n";
+        const string text = "# Ilse Tarrow\n\nA pilot who flies the night run to the outer moons.\n";
         const string fen = "# Fen Harbour\n\nA harbour on the night run.\nIts lamps burn blue.\nIts piers are old.\n";
         const string hidden = "# Secret\n\nA secret line kept out of the den.\nAnother line of it.\nAnd one more.\n";
         using var repo = TestRepo.Create();
-        repo.WriteDen(Mara, text);
+        repo.WriteDen(Ilse, text);
         repo.WriteDen(Fen, fen);
         repo.WriteDen(".wolfden/secret.md", hidden);
         var before = repo.CommitAll("start");
         Directory.CreateDirectory(Path.Combine(repo.DenRoot, ".trash"));
-        File.Move(Path.Combine(repo.DenRoot, Mara), Path.Combine(repo.DenRoot, ".trash", "mara-voss.md"));
+        File.Move(Path.Combine(repo.DenRoot, Ilse), Path.Combine(repo.DenRoot, ".trash", "ilse-tarrow.md"));
         repo.WriteDen(copy, text);
         repo.DeleteDen(Fen);
         repo.WriteDen(".trash/fen-harbour.md", fen + "Edited in trash.\n");
         repo.DeleteDen(".wolfden/secret.md");
         repo.WriteDen(secret, hidden + "Edited in the den.\n");
 
-        var deleted = new HistoryFileChange(HistoryChangeKind.Deleted, Mara);
+        var deleted = new HistoryFileChange(HistoryChangeKind.Deleted, Ilse);
         var added = new HistoryFileChange(HistoryChangeKind.Added, copy);
         var fenDeleted = new HistoryFileChange(HistoryChangeKind.Deleted, Fen);
         var secretAdded = new HistoryFileChange(HistoryChangeKind.Added, secret);
@@ -629,7 +629,7 @@ public sealed class GitHistoryTests
 
         // Up to the files now, before the checkpoint.
         Expect(history.Diff(new HistoryDiffQuery(before), Token), added, deleted, fenDeleted, secretAdded);
-        Expect(history.Diff(new HistoryDiffQuery(before, null, Mara), Token), deleted);
+        Expect(history.Diff(new HistoryDiffQuery(before, null, Ilse), Token), deleted);
         Expect(history.Diff(new HistoryDiffQuery(before, null, copy), Token), added);
         Expect(history.Diff(new HistoryDiffQuery(before, null, Fen), Token), fenDeleted);
         Expect(history.Diff(new HistoryDiffQuery(before, null, secret), Token), secretAdded);
@@ -637,7 +637,7 @@ public sealed class GitHistoryTests
         Assert.Contains("+Edited in the den.", history.Diff(new HistoryDiffQuery(before, null, secret), Token).Value.Files[0].Patch, StringComparison.Ordinal);
 
         // Between checkpoints, and the checkpoint's own diff.
-        var after = repo.CommitAll("trash Mara and Fen, bring the secret out");
+        var after = repo.CommitAll("trash Ilse and Fen, bring the secret out");
         foreach (var diff in new Func<string?, HistoryResult<HistoryDiff>>[]
         {
             path => history.Diff(new HistoryDiffQuery(before, after, path), Token),
@@ -645,7 +645,7 @@ public sealed class GitHistoryTests
         })
         {
             Expect(diff(null), added, deleted, fenDeleted, secretAdded);
-            Expect(diff(Mara), deleted);
+            Expect(diff(Ilse), deleted);
             Expect(diff(copy), added);
             Expect(diff(Fen), fenDeleted);
             Expect(diff(secret), secretAdded);
@@ -692,9 +692,9 @@ public sealed class GitHistoryTests
     public void ACheckpointsOwnDiffOfAPathThatCantBeADenFileIsEmpty()
     {
         using var repo = TestRepo.Create();
-        repo.WriteDen(Mara, "# Mara Voss\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
         repo.WriteRepo(".wolfden/notes.md", "hidden\n");
-        var first = repo.CommitAll("Add Mara");
+        var first = repo.CommitAll("Add Ilse");
 
         foreach (var path in new[] { ".wolfden/notes.md", ".wolfden", "universes/../den.yaml", "C:/den.yaml", "universes//vael" })
         {
@@ -704,7 +704,7 @@ public sealed class GitHistoryTests
         }
 
         // A leading or trailing '/' is only trimmed, and a path the checkpoint didn't change is empty too.
-        Assert.Single(repo.History.DiffCheckpoint(first, "/" + Mara + "/", Token).Value.Files);
+        Assert.Single(repo.History.DiffCheckpoint(first, "/" + Ilse + "/", Token).Value.Files);
         Assert.Empty(repo.History.DiffCheckpoint(first, Fen, Token).Value.Files);
     }
 
@@ -717,17 +717,17 @@ public sealed class GitHistoryTests
         // mustn't matter; here it can't, since Wolfden refreshes its
         // temporary index before comparing.)
         using var repo = TestRepo.Create("writing/vael-notes");
-        const string old = "universes/vael/entities/characters/mara.md";
+        const string old = "universes/vael/entities/characters/ilse.md";
         const string accented = "universes/vael/entities/characters/Ilona Székely.md";
         const string staged = "universes/vael/entities/items/compass.md";
-        repo.WriteDen(old, "# Mara Voss\n\nA pilot who flies the night run to the outer moons.\n");
+        repo.WriteDen(old, "# Ilse Tarrow\n\nA pilot who flies the night run to the outer moons.\n");
         repo.WriteDen(Fen, "# Fen Harbour\n");
         repo.WriteDen("universes/vael/unchanged.md", "# Still the same\n");
         repo.WriteRepo("README.md", "# outside the den\n");
         var start = repo.CommitAll("start");
         repo.Git("config", "diff.autoRefreshIndex", "false");
 
-        File.Move(Path.Combine(repo.DenRoot, old), Path.Combine(repo.DenRoot, Mara));
+        File.Move(Path.Combine(repo.DenRoot, old), Path.Combine(repo.DenRoot, Ilse));
         repo.DeleteDen(Fen);
         repo.WriteDen(accented, "# Ilona\n");
         repo.WriteDen("universes/vael/empty.md", string.Empty);
@@ -747,7 +747,7 @@ public sealed class GitHistoryTests
             [
                 new HistoryFileChange(HistoryChangeKind.Added, "universes/vael/empty.md"),
                 new HistoryFileChange(HistoryChangeKind.Added, accented),
-                new HistoryFileChange(HistoryChangeKind.Renamed, Mara, old),
+                new HistoryFileChange(HistoryChangeKind.Renamed, Ilse, old),
                 new HistoryFileChange(HistoryChangeKind.Added, staged),
                 new HistoryFileChange(HistoryChangeKind.Deleted, Fen),
                 new HistoryFileChange(HistoryChangeKind.Added, "universes/vael/map.png"),
@@ -772,17 +772,17 @@ public sealed class GitHistoryTests
     public void ADiffOnABranchWithNoCommitsYetComparesTheFilesOnDisk()
     {
         using var repo = TestRepo.Create();
-        repo.WriteDen(Mara, "# Mara Voss\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
         repo.WriteDen(Fen, "# Fen Harbour\n");
         var start = repo.CommitAll("start");
         repo.Git("checkout", "--quiet", "--orphan", "fresh");
         repo.Git("rm", "--quiet", "-r", "--cached", ".");
-        repo.WriteDen(Mara, "# Mara Voss\n\nA pilot.\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n\nA pilot.\n");
         var objects = Objects(repo);
 
         var diff = repo.History.Diff(new HistoryDiffQuery(start), Token).Value;
 
-        Assert.Equal([new HistoryFileChange(HistoryChangeKind.Modified, Mara)], diff.Files.Select(f => f.Change));
+        Assert.Equal([new HistoryFileChange(HistoryChangeKind.Modified, Ilse)], diff.Files.Select(f => f.Change));
         Assert.Equal(objects, Objects(repo));
     }
 
@@ -793,17 +793,17 @@ public sealed class GitHistoryTests
         // With core.ignoreStat, git would mark the new files' entries as
         // unchanged and take them as the empty blob, which isn't stored.
         using var repo = TestRepo.Create();
-        repo.WriteDen(Mara, "# Mara Voss\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
         repo.CommitAll("start");
         repo.Git("config", "core.ignoreStat", "true");
         repo.Git("config", "core.splitIndex", "true");
-        repo.WriteDen(Mara, "# Mara Voss\n\nA pilot.\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n\nA pilot.\n");
         repo.WriteDen(Fen, "# Fen Harbour\n");
         var files = Directory.EnumerateFiles(Path.Combine(repo.Root, ".git")).Select(Path.GetFileName).Order(StringComparer.Ordinal).ToList();
 
         var diff = repo.History.Diff(new HistoryDiffQuery(), Token).Value;
 
-        Assert.Equal([(HistoryChangeKind.Modified, Mara), (HistoryChangeKind.Added, Fen)], diff.Files.Select(f => (f.Change.Kind, f.Change.Path)));
+        Assert.Equal([(HistoryChangeKind.Modified, Ilse), (HistoryChangeKind.Added, Fen)], diff.Files.Select(f => (f.Change.Kind, f.Change.Path)));
         Assert.Contains("\n+# Fen Harbour\n", diff.Files.Single(f => f.Change.Path == Fen).Patch, StringComparison.Ordinal);
 
         // And no shared index (core.splitIndex) was left in the user's .git folder.
@@ -821,7 +821,7 @@ public sealed class GitHistoryTests
         // apart would disagree, the way they would if the writer saved in
         // between: no file listed, then one patch. One run can't.
         using var repo = TestRepo.Create();
-        repo.WriteDen(Mara, "# Mara Voss\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
         repo.CommitAll("start");
         repo.Git(
             "config",
@@ -873,7 +873,7 @@ public sealed class GitHistoryTests
         // feed, and a lone \r stay inside their lines, a CRLF line keeps its
         // \r, and a line can't pass for a diff --git header after one.
         using var repo = TestRepo.Create();
-        repo.WriteDen(Mara, "# Mara Voss\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
         repo.WriteDen(Fen, "# Fen Harbour\n");
         var start = repo.CommitAll("start");
         string[] lines =
@@ -887,13 +887,13 @@ public sealed class GitHistoryTests
             $"spoof\u2028diff --git a/{Fen} b/{Fen}",
             $"spoof\rdiff --git a/{Fen} b/{Fen}",
         ];
-        repo.WriteDen(Mara, "# Mara Voss\n" + string.Concat(lines.Select(l => l + "\n")));
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n" + string.Concat(lines.Select(l => l + "\n")));
 
         var file = Assert.Single(repo.History.Diff(new HistoryDiffQuery(start), Token).Value.Files);
 
-        Assert.Equal(new HistoryFileChange(HistoryChangeKind.Modified, Mara), file.Change);
-        Assert.StartsWith($"diff --git a/{Mara} b/{Mara}\n", file.Patch, StringComparison.Ordinal);
-        Assert.EndsWith(" # Mara Voss\n" + string.Concat(lines.Select(l => "+" + l + "\n")), file.Patch, StringComparison.Ordinal);
+        Assert.Equal(new HistoryFileChange(HistoryChangeKind.Modified, Ilse), file.Change);
+        Assert.StartsWith($"diff --git a/{Ilse} b/{Ilse}\n", file.Patch, StringComparison.Ordinal);
+        Assert.EndsWith(" # Ilse Tarrow\n" + string.Concat(lines.Select(l => "+" + l + "\n")), file.Patch, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -907,9 +907,9 @@ public sealed class GitHistoryTests
         // line must stay whole for the patch to pair with its file.
         var odd = $"universes/vael/odd{char.ConvertFromUtf32(codePoint)}name.md";
         using var repo = TestRepo.Create();
-        repo.WriteDen(Mara, "# Mara Voss\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
         var start = repo.CommitAll("start");
-        repo.WriteDen(Mara, "# Mara Voss\n\nA pilot.\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n\nA pilot.\n");
         try
         {
             repo.WriteDen(odd, "# Odd\n");
@@ -922,7 +922,7 @@ public sealed class GitHistoryTests
         var diff = repo.History.Diff(new HistoryDiffQuery(start), Token).Value;
 
         Assert.Equal(
-            [(HistoryChangeKind.Modified, Mara), (HistoryChangeKind.Added, odd)],
+            [(HistoryChangeKind.Modified, Ilse), (HistoryChangeKind.Added, odd)],
             diff.Files.Select(f => (f.Change.Kind, f.Change.Path)).OrderBy(c => c.Path, StringComparer.Ordinal));
         var patch = diff.Files.Single(f => f.Change.Path == odd).Patch;
         Assert.StartsWith($"diff --git a/{odd} b/{odd}\n", patch, StringComparison.Ordinal);
@@ -1038,7 +1038,7 @@ public sealed class GitHistoryTests
             repo.Git("config", "diff.submodule", diffSubmodule);
         }
 
-        repo.WriteDen(Mara, "# Mara Voss\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
         repo.WriteDen(Fen, "# Fen Harbour\n");
         var first = repo.CommitAll("first");
         repo.Git("update-index", "--add", "--cacheinfo", $"160000,{first},universes/maps");
@@ -1048,7 +1048,7 @@ public sealed class GitHistoryTests
 
         // The link's blob is its target's path; Fen's blob stands in for one.
         var target = repo.Git("rev-parse", $"HEAD:{Fen}").Trim();
-        repo.Git("update-index", "--cacheinfo", $"120000,{target},{Mara}");
+        repo.Git("update-index", "--cacheinfo", $"120000,{target},{Ilse}");
         repo.Git("update-index", "--cacheinfo", $"160000,{start},{Fen}");
         repo.Git("update-index", "--cacheinfo", $"160000,{start},universes/maps");
         repo.Git("update-index", "--force-remove", "universes/old-maps");
@@ -1060,23 +1060,23 @@ public sealed class GitHistoryTests
         var back = repo.History.Diff(new HistoryDiffQuery(linked, start), Token).Value.Files;
 
         Assert.Equal(
-            [new HistoryFileChange(HistoryChangeKind.Modified, Mara), new HistoryFileChange(HistoryChangeKind.Deleted, Fen)],
+            [new HistoryFileChange(HistoryChangeKind.Modified, Ilse), new HistoryFileChange(HistoryChangeKind.Deleted, Fen)],
             forward.Select(f => f.Change).OrderBy(c => c.Path, StringComparer.Ordinal));
         Assert.Equal(
-            [new HistoryFileChange(HistoryChangeKind.Modified, Mara), new HistoryFileChange(HistoryChangeKind.Deleted, Fen)],
+            [new HistoryFileChange(HistoryChangeKind.Modified, Ilse), new HistoryFileChange(HistoryChangeKind.Deleted, Fen)],
             repo.History.Log(new HistoryLogQuery(Limit: 1), Token).Value.Single().Changes.OrderBy(c => c.Path, StringComparer.Ordinal));
         Assert.Empty(repo.History.Log(new HistoryLogQuery(Limit: 2), Token).Value[1].Changes);
         Assert.All(forward.Concat(back), f => Assert.DoesNotContain("Submodule", f.Patch, StringComparison.Ordinal));
-        var mara = forward.Single(f => f.Change.Path == Mara).Patch;
-        Assert.Matches($"^diff --git a/{Mara} b/{Mara}\ndeleted file mode 100644\n(.*\n)*-# Mara Voss\ndiff --git a/{Mara} b/{Mara}\nnew file mode 120000\n(.*\n)*\\+# Fen Harbour\n$", mara);
+        var ilse = forward.Single(f => f.Change.Path == Ilse).Patch;
+        Assert.Matches($"^diff --git a/{Ilse} b/{Ilse}\ndeleted file mode 100644\n(.*\n)*-# Ilse Tarrow\ndiff --git a/{Ilse} b/{Ilse}\nnew file mode 120000\n(.*\n)*\\+# Fen Harbour\n$", ilse);
         var fen = forward.Single(f => f.Change.Path == Fen).Patch;
         Assert.StartsWith($"diff --git a/{Fen} b/{Fen}\ndeleted file mode 100644\n", fen, StringComparison.Ordinal);
         Assert.DoesNotContain("Subproject", fen, StringComparison.Ordinal);
 
         Assert.Equal(
-            [new HistoryFileChange(HistoryChangeKind.Modified, Mara), new HistoryFileChange(HistoryChangeKind.Added, Fen)],
+            [new HistoryFileChange(HistoryChangeKind.Modified, Ilse), new HistoryFileChange(HistoryChangeKind.Added, Fen)],
             back.Select(f => f.Change).OrderBy(c => c.Path, StringComparer.Ordinal));
-        Assert.Contains("\n+# Mara Voss\n", back.Single(f => f.Change.Path == Mara).Patch, StringComparison.Ordinal);
+        Assert.Contains("\n+# Ilse Tarrow\n", back.Single(f => f.Change.Path == Ilse).Patch, StringComparison.Ordinal);
         var fenBack = back.Single(f => f.Change.Path == Fen).Patch;
         Assert.StartsWith($"diff --git a/{Fen} b/{Fen}\nnew file mode 100644\n", fenBack, StringComparison.Ordinal);
         Assert.DoesNotContain("Subproject", fenBack, StringComparison.Ordinal);
@@ -1092,14 +1092,14 @@ public sealed class GitHistoryTests
     {
         using var repo = TestRepo.Create();
         repo.Git("config", "core.symlinks", "true");
-        repo.WriteDen(Mara, "# Mara Voss\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
         repo.WriteDen(Fen, "# Fen Harbour\n");
         var start = repo.CommitAll("start");
-        var mara = Path.Combine(repo.DenRoot, Mara.Replace('/', Path.DirectorySeparatorChar));
-        File.Delete(mara);
+        var ilse = Path.Combine(repo.DenRoot, Ilse.Replace('/', Path.DirectorySeparatorChar));
+        File.Delete(ilse);
         try
         {
-            File.CreateSymbolicLink(mara, "../locations/fen-harbour.md");
+            File.CreateSymbolicLink(ilse, "../locations/fen-harbour.md");
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
         {
@@ -1109,8 +1109,8 @@ public sealed class GitHistoryTests
         var diff = repo.History.Diff(new HistoryDiffQuery(start), Token).Value;
 
         var file = Assert.Single(diff.Files);
-        Assert.Equal(new HistoryFileChange(HistoryChangeKind.Modified, Mara), file.Change);
-        Assert.Contains("\n-# Mara Voss\n", file.Patch, StringComparison.Ordinal);
+        Assert.Equal(new HistoryFileChange(HistoryChangeKind.Modified, Ilse), file.Change);
+        Assert.Contains("\n-# Ilse Tarrow\n", file.Patch, StringComparison.Ordinal);
         Assert.Contains("\nnew file mode 120000\n", file.Patch, StringComparison.Ordinal);
         Assert.Contains("\n+../locations/fen-harbour.md\n", file.Patch, StringComparison.Ordinal);
     }
@@ -1120,10 +1120,10 @@ public sealed class GitHistoryTests
     public void ADiffInASha256RepositoryWritesNothing()
     {
         using var repo = TestRepo.Create(objectFormat: "sha256");
-        repo.WriteDen(Mara, "# Mara Voss\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
         var start = repo.CommitAll("start");
         Assert.Equal(64, start.Length);
-        repo.WriteDen(Mara, "# Mara Voss\n\nA pilot.\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n\nA pilot.\n");
         repo.WriteDen(Fen, "# Fen Harbour\n");
         repo.WriteDen("universes/empty.md", string.Empty);
         var objects = Objects(repo);
@@ -1131,7 +1131,7 @@ public sealed class GitHistoryTests
         var diff = repo.History.Diff(new HistoryDiffQuery(), Token).Value;
 
         Assert.Equal(
-            [(HistoryChangeKind.Added, "universes/empty.md"), (HistoryChangeKind.Modified, Mara), (HistoryChangeKind.Added, Fen)],
+            [(HistoryChangeKind.Added, "universes/empty.md"), (HistoryChangeKind.Modified, Ilse), (HistoryChangeKind.Added, Fen)],
             diff.Files.Select(f => (f.Change.Kind, f.Change.Path)).OrderBy(c => c.Path, StringComparer.Ordinal));
         Assert.Equal(objects, Objects(repo));
     }
@@ -1141,37 +1141,37 @@ public sealed class GitHistoryTests
     public void ADiffLeavesOutWhatASparseCheckoutKeepsOffTheDisk()
     {
         using var repo = TestRepo.Create();
-        repo.WriteDen(Mara, "# Mara Voss\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
         repo.WriteDen(Fen, "# Fen Harbour\n");
         var start = repo.CommitAll("start");
         repo.Git("sparse-checkout", "set", "universes/vael/entities/characters");
         Assert.False(File.Exists(Path.Combine(repo.DenRoot, Fen.Replace('/', Path.DirectorySeparatorChar))));
-        repo.WriteDen(Mara, "# Mara Voss\n\nA pilot.\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n\nA pilot.\n");
 
         var diff = repo.History.Diff(new HistoryDiffQuery(start), Token).Value;
 
-        Assert.Equal([new HistoryFileChange(HistoryChangeKind.Modified, Mara)], diff.Files.Select(f => f.Change));
+        Assert.Equal([new HistoryFileChange(HistoryChangeKind.Modified, Ilse)], diff.Files.Select(f => f.Change));
     }
 
     [Theory]
     [InlineData(null)]
     [InlineData(Fen)]
-    [InlineData(Mara)]
+    [InlineData(Ilse)]
     [Trait("Scenario", "SC-HIST-6")]
     public void ADiffWithASparseIndexWritesNothing(string? path)
     {
         using var repo = TestRepo.Create();
-        repo.WriteDen(Mara, "# Mara Voss\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
         repo.WriteDen(Fen, "# Fen Harbour\n");
         var start = repo.CommitAll("start");
         repo.Git("sparse-checkout", "set", "--sparse-index", "universes/vael/entities/characters");
-        repo.WriteDen(Mara, "# Mara Voss\n\nA pilot.\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n\nA pilot.\n");
         var objects = Objects(repo);
 
         var diff = repo.History.Diff(new HistoryDiffQuery(start, Path: path), Token).Value;
 
         Assert.Equal(
-            path == Fen ? [] : [new HistoryFileChange(HistoryChangeKind.Modified, Mara)],
+            path == Fen ? [] : [new HistoryFileChange(HistoryChangeKind.Modified, Ilse)],
             diff.Files.Select(f => f.Change));
         Assert.Equal(objects, Objects(repo));
     }
@@ -1184,15 +1184,15 @@ public sealed class GitHistoryTests
         other.WriteRepo("map.md", "# Map\n");
         other.CommitAll("map");
         using var repo = TestRepo.Create();
-        repo.WriteDen(Mara, "# Mara Voss\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
         repo.Git("-c", "protocol.file.allow=always", "submodule", "--quiet", "add", other.Root, "universes/maps");
         var start = repo.CommitAll("start");
         File.AppendAllText(Path.Combine(repo.DenRoot, "universes", "maps", "map.md"), "Edited.\n");
-        repo.WriteDen(Mara, "# Mara Voss\n\nA pilot.\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n\nA pilot.\n");
 
         var diff = repo.History.Diff(new HistoryDiffQuery(start), Token).Value;
 
-        Assert.Equal([new HistoryFileChange(HistoryChangeKind.Modified, Mara)], diff.Files.Select(f => f.Change));
+        Assert.Equal([new HistoryFileChange(HistoryChangeKind.Modified, Ilse)], diff.Files.Select(f => f.Change));
     }
 
     /// <summary>Every file in the repository's object store, loose objects and packs alike.</summary>
@@ -1225,7 +1225,7 @@ public sealed class GitHistoryTests
     public void ATagNamesTheLatestCheckpointAndIsNeverMoved()
     {
         using var repo = TestRepo.Create("vael-notes");
-        repo.WriteDen(Mara, "# Mara Voss\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n");
         var start = repo.CommitAll("start");
         repo.WriteRepo("README.md", "# outside the den\n");
         repo.CommitAll("outside");
@@ -1238,7 +1238,7 @@ public sealed class GitHistoryTests
         Assert.Equal([tag], history.Tags("book/vael/", Token).Value);
         Assert.Equal("Freeze Ember", repo.Git("tag", "-l", "--format=%(contents)", "book/vael/ember/final").TrimEnd('\n'));
 
-        repo.WriteDen(Mara, "# Mara Voss\n\nChanged.\n");
+        repo.WriteDen(Ilse, "# Ilse Tarrow\n\nChanged.\n");
         var later = history.Checkpoint(new CheckpointRequest("later"), Token).Value!;
         var refused = Assert.Throws<HistoryException>(() => history.Tag(new TagRequest("book/vael/ember/final", later.Id), Token));
         Assert.Contains("already has a tag 'book/vael/ember/final'", refused.Message, StringComparison.Ordinal);

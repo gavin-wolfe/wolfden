@@ -190,26 +190,26 @@ public sealed class UniverseChoiceTests : IDisposable
     [Trait("Scenario", "SC-MCP-13")]
     public void ACheckOfOneUniverseFindsAnIdSharedWithAnotherUniverse()
     {
-        // Mara Voss copied from Starfall into the Drift, id and all, and a
+        // Ilse Tarrow copied from Starfall into the Drift, id and all, and a
         // Drift note that links to her.
-        const string starfallMara = "universes/starfall/series/long-dark/entities/characters/mara-voss.md";
-        const string driftMara = "universes/drift/entities/characters/mara-voss.md";
+        const string starfallIlse = "universes/starfall/series/long-dark/entities/characters/ilse-tarrow.md";
+        const string driftIlse = "universes/drift/entities/characters/ilse-tarrow.md";
         const string driftNote = "universes/drift/entities/notes/crew.md";
-        _den.Write(driftMara, _den.Read(starfallMara));
-        _den.Write(driftNote, "---\ntype: note\nname: Crew\nstatus: canon\n---\n\nAboard: [[Mara Voss]].\n");
+        _den.Write(driftIlse, _den.Read(starfallIlse));
+        _den.Write(driftNote, "---\ntype: note\nname: Crew\nstatus: canon\n---\n\nAboard: [[Ilse Tarrow]].\n");
 
         var whole = _tools.Check(limit: 5000);
         var drift = _tools.Check(universe: "drift", limit: 5000);
 
         // The whole den: F-ID-3 on both copies, and the link breaks.
-        Assert.Contains(whole.Diagnostics, d => d.Path == starfallMara && d.Rule == "F-ID-3");
-        Assert.Contains(whole.Diagnostics, d => d.Path == driftMara && d.Rule == "F-ID-3");
+        Assert.Contains(whole.Diagnostics, d => d.Path == starfallIlse && d.Rule == "F-ID-3");
+        Assert.Contains(whole.Diagnostics, d => d.Path == driftIlse && d.Rule == "F-ID-3");
         Assert.Contains(whole.Diagnostics, d => d.Path == driftNote && d.Rule == "F-LINK-8");
 
         // The Drift alone: the same findings on its files, naming Starfall's copy.
         Assert.Null(drift.Note);
-        var dup = Assert.Single(drift.Diagnostics, d => d.Path == driftMara && d.Rule == "F-ID-3");
-        Assert.Contains(starfallMara, dup.Message, StringComparison.Ordinal);
+        var dup = Assert.Single(drift.Diagnostics, d => d.Path == driftIlse && d.Rule == "F-ID-3");
+        Assert.Contains(starfallIlse, dup.Message, StringComparison.Ordinal);
         Assert.Equal(
             whole.Diagnostics.Where(d => d.Rule == "F-ID-3" && d.Path.StartsWith("universes/drift/", StringComparison.Ordinal)),
             drift.Diagnostics.Where(d => d.Rule == "F-ID-3"));

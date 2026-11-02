@@ -17,7 +17,7 @@ public class SpoilerTests
 {
     private const string MinaFile = "universes/dracula/books/dracula/entities/characters/mina-harker.md";
     private const string QuinceyFile = "universes/dracula/books/dracula/entities/characters/quincey-harker.md";
-    private const string MaraFile = "universes/starfall/series/long-dark/entities/characters/mara-voss.md";
+    private const string IlseFile = "universes/starfall/series/long-dark/entities/characters/ilse-tarrow.md";
     private const string PikeFile = "universes/starfall/series/long-dark/books/ash/entities/characters/halden-pike.md";
     private const string DraculaBook = "universes/dracula/books/dracula/book.md";
     private const string LongDarkSeries = "universes/starfall/series/long-dark/series.md";
@@ -88,15 +88,15 @@ public class SpoilerTests
         if (universe == "starfall")
         {
             den.Write(LongDarkSeries, den.Read(LongDarkSeries).Replace("books: [ember, ash]\n", "books: [ember, ash]\nchapter_heading: [pov, setting, when]\n", StringComparison.Ordinal));
-            // A chapter whose POVs are Mara Voss and, by a labelled id link, Pike, whom an Ember reader hasn't met.
+            // A chapter whose POVs are Ilse Tarrow and, by a labelled id link, Pike, whom an Ember reader hasn't met.
             den.Write(EmberBook, den.Read(EmberBook).Replace(
                 "  - { key: \"2\", number: 2 }",
-                "  - { key: \"2\", number: 2, fields: { pov: [\"[[mara-voss]]\", \"[[01JA7Q8M4XK3V9R2D5W8HN6TQC|the new hand]]\"], setting: [\"[[kessan-reach]]\"] } }",
+                "  - { key: \"2\", number: 2, fields: { pov: [\"[[ilse-tarrow]]\", \"[[01JA7Q8M4XK3V9R2D5W8HN6TQC|the new hand]]\"], setting: [\"[[kessan-reach]]\"] } }",
                 StringComparison.Ordinal));
             Assert.Contains("|the new hand]]", den.Read(EmberBook), StringComparison.Ordinal);
             Assert.Contains("chapter_heading:", den.Read(LongDarkSeries), StringComparison.Ordinal);
             // A link by id to an entity met later (Halden Pike, from ash), with a label that doesn't name him.
-            den.Write(MaraFile, den.Read(MaraFile).Replace(
+            den.Write(IlseFile, den.Read(IlseFile).Replace(
                 "Executive officer of the *Tessaly*.", "Executive officer of the *Tessaly*. Distrusts [[01JA7Q8M4XK3V9R2D5W8HN6TQC|the new hand]].", StringComparison.Ordinal)
                 // And a field that links him by id (#179): search matches a link's name only once he's met.
                 .Replace("  species: { value: human, from: \"ember:prologue\" }", "  species: { value: human, from: \"ember:prologue\" }\n  watch_mate: \"[[01JA7Q8M4XK3V9R2D5W8HN6TQC]]\"", StringComparison.Ordinal));

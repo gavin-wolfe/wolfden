@@ -14,43 +14,43 @@ public class LeadEditTests
     [Fact]
     public void ReplacingTheLeadKeepsTheSpacingAndSections()
     {
-        var file = Md("---\nname: Mara\n---\n\n\n# Mara\n\nOld text.\n\n\n## Notes\nLast.\n");
+        var file = Md("---\nname: Ilse\n---\n\n\n# Ilse\n\nOld text.\n\n\n## Notes\nLast.\n");
 
-        var result = file.WithLead("# Mara\n\nNew text.\nTwo lines.\n\n");
+        var result = file.WithLead("# Ilse\n\nNew text.\nTwo lines.\n\n");
 
-        Assert.Equal("---\nname: Mara\n---\n\n\n# Mara\n\nNew text.\nTwo lines.\n\n\n## Notes\nLast.\n", result.Text);
+        Assert.Equal("---\nname: Ilse\n---\n\n\n# Ilse\n\nNew text.\nTwo lines.\n\n\n## Notes\nLast.\n", result.Text);
     }
 
     [Fact]
     public void LineBreaksBecomeTheFilesOwn()
     {
-        var file = Md("---\r\nname: Mara\r\n---\r\n\r\nOld.\r\n\r\n## Notes\r\nLast.\r\n");
+        var file = Md("---\r\nname: Ilse\r\n---\r\n\r\nOld.\r\n\r\n## Notes\r\nLast.\r\n");
 
-        Assert.Equal("---\r\nname: Mara\r\n---\r\n\r\nNew.\r\nMore.\r\n\r\n## Notes\r\nLast.\r\n", file.WithLead("New.\nMore.").Text);
+        Assert.Equal("---\r\nname: Ilse\r\n---\r\n\r\nNew.\r\nMore.\r\n\r\n## Notes\r\nLast.\r\n", file.WithLead("New.\nMore.").Text);
     }
 
     [Fact]
     public void AnEmptyLeadGetsTheText()
     {
-        var file = Md("---\nname: Mara\n---\n## Notes\nLast.\n");
+        var file = Md("---\nname: Ilse\n---\n## Notes\nLast.\n");
 
-        Assert.Equal("---\nname: Mara\n---\nOpening.\n\n## Notes\nLast.\n", file.WithLead("Opening.").Text);
+        Assert.Equal("---\nname: Ilse\n---\nOpening.\n\n## Notes\nLast.\n", file.WithLead("Opening.").Text);
     }
 
     [Fact]
     public void ALeadCanBeCleared()
     {
-        var file = Md("---\nname: Mara\n---\n\nOld.\n\n## Notes\nLast.\n");
+        var file = Md("---\nname: Ilse\n---\n\nOld.\n\n## Notes\nLast.\n");
 
-        Assert.Equal("---\nname: Mara\n---\n\n\n## Notes\nLast.\n", file.WithLead("").Text);
+        Assert.Equal("---\nname: Ilse\n---\n\n\n## Notes\nLast.\n", file.WithLead("").Text);
     }
 
     [Fact]
     public void ALeadWithoutSectionsOrAFinalNewlineKeepsNone()
     {
-        var file = Md("---\nname: Mara\n---\n\nOld.");
+        var file = Md("---\nname: Ilse\n---\n\nOld.");
 
-        Assert.Equal("---\nname: Mara\n---\n\nNew.", file.WithLead("New.").Text);
+        Assert.Equal("---\nname: Ilse\n---\n\nNew.", file.WithLead("New.").Text);
     }
 
     [Theory]
@@ -59,7 +59,7 @@ public class LeadEditTests
     [InlineData("Setext\n---")]
     public void TextThatWouldChangeTheSectionsIsRefused(string text)
     {
-        var file = Md("---\nname: Mara\n---\n\nOld.\n\n## Notes\nLast.\n");
+        var file = Md("---\nname: Ilse\n---\n\nOld.\n\n## Notes\nLast.\n");
 
         Assert.Throws<ArgumentException>(() => file.WithLead(text));
     }

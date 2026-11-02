@@ -7,31 +7,31 @@ namespace Wolfden.Core.Tests;
 /// <summary>Resolving links by id, slug, name, and alias, through the scope chain (format.md §10.2).</summary>
 public class LinkResolutionTests
 {
-    private const string MaraId = "01JA7Q8M4XK3V9R2D5W8HN6TQB";
+    private const string IlseId = "01JA7Q8M4XK3V9R2D5W8HN6TQB";
     private const string Note = Starfall + "/entities/notes/links.md";
 
-    /// <summary>A den with Mara Voss, a station whose slug is "voss", and a note holding <paramref name="links"/>.</summary>
+    /// <summary>A den with Ilse Tarrow, a station whose slug is "tarrow", and a note holding <paramref name="links"/>.</summary>
     private static LinkIndex Tiers(string links)
     {
         var source = Den()
-            .Entity(LongDark, "mara-voss", Character("Mara Voss", $"id: {MaraId}", "aliases: [Voss, \"the Commander\"]"),
+            .Entity(LongDark, "ilse-tarrow", Character("Ilse Tarrow", $"id: {IlseId}", "aliases: [Tarrow, \"the Commander\"]"),
                 "## Shoulder injury\nHit.\n\n### Recovery\nSlow.\n")
-            .Entity(Starfall, "voss", "type: location\nname: Voss Relay\nstatus: canon", folder: "locations")
+            .Entity(Starfall, "tarrow", "type: location\nname: Tarrow Relay\nstatus: canon", folder: "locations")
             .Entity(Starfall, "decoy", "type: note\nname: " + "01JA7Q8M4XK3V9R2D5W8HN6TQB".Replace("B", "C", StringComparison.Ordinal) + "\nstatus: canon", folder: "notes")
             .Entity(Starfall, "links", "type: note\nname: Links\nstatus: canon", links, folder: "notes");
         return LinkIndex.Load(source);
     }
 
     [Theory]
-    [InlineData("[[mara-voss]]", "Mara Voss", LinkMatchKind.Slug)]
-    [InlineData("[[MARA-VOSS]]", "Mara Voss", LinkMatchKind.Slug)]
-    [InlineData("[[Mara Voss]]", "Mara Voss", LinkMatchKind.Name)]
-    [InlineData("[[mara   voss]]", "Mara Voss", LinkMatchKind.Name)]
-    [InlineData("[[the commander]]", "Mara Voss", LinkMatchKind.Alias)]
-    [InlineData("[[" + MaraId + "]]", "Mara Voss", LinkMatchKind.Id)]
-    [InlineData("[[Voss]]", "Voss Relay", LinkMatchKind.Slug)]
-    [InlineData("[[voss relay]]", "Voss Relay", LinkMatchKind.Name)]
-    [InlineData("[[mara-voss|Voss]]", "Mara Voss", LinkMatchKind.Slug)]
+    [InlineData("[[ilse-tarrow]]", "Ilse Tarrow", LinkMatchKind.Slug)]
+    [InlineData("[[ILSE-TARROW]]", "Ilse Tarrow", LinkMatchKind.Slug)]
+    [InlineData("[[Ilse Tarrow]]", "Ilse Tarrow", LinkMatchKind.Name)]
+    [InlineData("[[ilse   tarrow]]", "Ilse Tarrow", LinkMatchKind.Name)]
+    [InlineData("[[the commander]]", "Ilse Tarrow", LinkMatchKind.Alias)]
+    [InlineData("[[" + IlseId + "]]", "Ilse Tarrow", LinkMatchKind.Id)]
+    [InlineData("[[Tarrow]]", "Tarrow Relay", LinkMatchKind.Slug)]
+    [InlineData("[[tarrow relay]]", "Tarrow Relay", LinkMatchKind.Name)]
+    [InlineData("[[ilse-tarrow|Tarrow]]", "Ilse Tarrow", LinkMatchKind.Slug)]
     public void TheFirstTierWithAMatchWins(string link, string name, LinkMatchKind kind)
     {
         var index = Tiers(link + "\n");
@@ -46,34 +46,34 @@ public class LinkResolutionTests
     [Fact]
     public void AnIdBeatsANameThatLooksLikeAnId()
     {
-        // The decoy note is named with Mara's id, but with its last letter changed.
-        var decoyName = MaraId.Replace("B", "C", StringComparison.Ordinal);
-        var index = Tiers($"[[{MaraId}]] [[{decoyName}]] [[{MaraId.ToLowerInvariant()}]]\n");
+        // The decoy note is named with Ilse's id, but with its last letter changed.
+        var decoyName = IlseId.Replace("B", "C", StringComparison.Ordinal);
+        var index = Tiers($"[[{IlseId}]] [[{decoyName}]] [[{IlseId.ToLowerInvariant()}]]\n");
 
-        Assert.Equal("Mara Voss", index.Link(Note, $"[[{MaraId}]]").Target!.Name);
+        Assert.Equal("Ilse Tarrow", index.Link(Note, $"[[{IlseId}]]").Target!.Name);
         Assert.Equal(LinkMatchKind.Name, index.Link(Note, $"[[{decoyName}]]").Resolution.MatchedBy);
         // A lowercase id isn't an id (F-ID-1), and matches nothing else.
-        Assert.Equal(LinkOutcome.Broken, index.Link(Note, $"[[{MaraId.ToLowerInvariant()}]]").Outcome);
+        Assert.Equal(LinkOutcome.Broken, index.Link(Note, $"[[{IlseId.ToLowerInvariant()}]]").Outcome);
     }
 
     [Fact]
     public void HyphensAndSpacesStayDistinct()
     {
-        // [[mara voss]] is the name, not the slug, and [[voss-relay]] is neither.
-        var index = Tiers("[[mara voss]] [[voss-relay]]\n");
+        // [[ilse tarrow]] is the name, not the slug, and [[tarrow-relay]] is neither.
+        var index = Tiers("[[ilse tarrow]] [[tarrow-relay]]\n");
 
-        Assert.Equal(LinkMatchKind.Name, index.Link(Note, "[[mara voss]]").Resolution.MatchedBy);
-        Assert.Equal(LinkOutcome.Broken, index.Link(Note, "[[voss-relay]]").Outcome);
+        Assert.Equal(LinkMatchKind.Name, index.Link(Note, "[[ilse tarrow]]").Resolution.MatchedBy);
+        Assert.Equal(LinkOutcome.Broken, index.Link(Note, "[[tarrow-relay]]").Outcome);
     }
 
     [Fact]
     public void HeadingsMatchSectionsAtAnyLevel()
     {
-        var index = Tiers("[[mara-voss#shoulder  INJURY]] [[mara-voss#Recovery]] [[mara-voss#Missing]]\n");
+        var index = Tiers("[[ilse-tarrow#shoulder  INJURY]] [[ilse-tarrow#Recovery]] [[ilse-tarrow#Missing]]\n");
 
-        Assert.Equal("Shoulder injury", index.Link(Note, "[[mara-voss#shoulder  INJURY]]").TargetSection!.Name);
-        Assert.Equal("Recovery", index.Link(Note, "[[mara-voss#Recovery]]").TargetSection!.Name);
-        var missing = index.Link(Note, "[[mara-voss#Missing]]");
+        Assert.Equal("Shoulder injury", index.Link(Note, "[[ilse-tarrow#shoulder  INJURY]]").TargetSection!.Name);
+        Assert.Equal("Recovery", index.Link(Note, "[[ilse-tarrow#Recovery]]").TargetSection!.Name);
+        var missing = index.Link(Note, "[[ilse-tarrow#Missing]]");
         Assert.Equal(LinkOutcome.Resolved, missing.Outcome);
         Assert.Null(missing.TargetSection);
         Assert.Equal([(Note, "F-LINK-9", 6)], index.Rules());
@@ -82,7 +82,7 @@ public class LinkResolutionTests
     [Fact]
     public void EmptyLinksAreWarnings()
     {
-        var index = Tiers("[[]] and [[ |Voss]]\n");
+        var index = Tiers("[[]] and [[ |Tarrow]]\n");
 
         Assert.Empty(index.Links);
         Assert.Equal([(Note, "F-LINK-3", 6), (Note, "F-LINK-3", 6)], index.Rules());
@@ -179,10 +179,10 @@ public class LinkResolutionTests
     public void TwoAliasesOfOneEntityAreOneMatch()
     {
         var source = Den()
-            .Entity(Starfall, "mara-voss", Character("Mara Voss", "aliases: [Voss, VOSS]"))
-            .Entity(Starfall, "note", Character("Note"), "[[voss]]\n");
+            .Entity(Starfall, "ilse-tarrow", Character("Ilse Tarrow", "aliases: [Tarrow, TARROW]"))
+            .Entity(Starfall, "note", Character("Note"), "[[tarrow]]\n");
 
-        Assert.Equal("mara-voss", LinkIndex.Load(source).Link($"{Starfall}/entities/characters/note.md", "[[voss]]").Target!.Slug);
+        Assert.Equal("ilse-tarrow", LinkIndex.Load(source).Link($"{Starfall}/entities/characters/note.md", "[[tarrow]]").Target!.Slug);
     }
 
     [Theory]
@@ -214,14 +214,14 @@ public class LinkResolutionTests
     public void AnEntityWithABadFileNameIsReachedByNameOnly()
     {
         var source = Den()
-            .With($"{Starfall}/entities/characters/Mara Voss.md", "---\ntype: character\nname: Mara Voss\n---\n")
-            .Entity(Starfall, "note", Character("Note"), "[[Mara Voss]] [[mara-voss]]\n");
+            .With($"{Starfall}/entities/characters/Ilse Tarrow.md", "---\ntype: character\nname: Ilse Tarrow\n---\n")
+            .Entity(Starfall, "note", Character("Note"), "[[Ilse Tarrow]] [[ilse-tarrow]]\n");
         var index = LinkIndex.Load(source);
 
-        Assert.Null(Assert.Single(index.Catalog.Entities, e => e.Name == "Mara Voss").Slug);
+        Assert.Null(Assert.Single(index.Catalog.Entities, e => e.Name == "Ilse Tarrow").Slug);
         Assert.Contains(index.Catalog.Diagnostics, d => d.Diagnostic.RuleId == "F-KEY-4");
-        Assert.Equal(LinkOutcome.Resolved, index.Link($"{Starfall}/entities/characters/note.md", "[[Mara Voss]]").Outcome);
-        Assert.Equal(LinkOutcome.Broken, index.Link($"{Starfall}/entities/characters/note.md", "[[mara-voss]]").Outcome);
+        Assert.Equal(LinkOutcome.Resolved, index.Link($"{Starfall}/entities/characters/note.md", "[[Ilse Tarrow]]").Outcome);
+        Assert.Equal(LinkOutcome.Broken, index.Link($"{Starfall}/entities/characters/note.md", "[[ilse-tarrow]]").Outcome);
     }
 
     [Fact]
@@ -276,13 +276,13 @@ public class LinkResolutionTests
     public void AnIdBeatsANameEqualToIt()
     {
         var source = Den()
-            .Entity(Starfall, "mara-voss", Character("Mara Voss", $"id: {MaraId}"))
-            .Entity(Starfall, "decoy", Character(MaraId))
-            .Entity(Starfall, "note", Character("Note"), $"[[{MaraId}]]\n");
+            .Entity(Starfall, "ilse-tarrow", Character("Ilse Tarrow", $"id: {IlseId}"))
+            .Entity(Starfall, "decoy", Character(IlseId))
+            .Entity(Starfall, "note", Character("Note"), $"[[{IlseId}]]\n");
 
-        var link = LinkIndex.Load(source).Link($"{Starfall}/entities/characters/note.md", $"[[{MaraId}]]");
+        var link = LinkIndex.Load(source).Link($"{Starfall}/entities/characters/note.md", $"[[{IlseId}]]");
 
-        Assert.Equal("mara-voss", link.Target!.Slug);
+        Assert.Equal("ilse-tarrow", link.Target!.Slug);
         Assert.Equal(LinkMatchKind.Id, link.Resolution.MatchedBy);
     }
 

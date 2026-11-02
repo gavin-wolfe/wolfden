@@ -142,7 +142,7 @@ describe('escapeWikiLinks', () => {
   });
 
   test('leaves code spans without [[ and fenced blocks alone', () => {
-    const md = 'Type `[x](y.md)`.\n```yaml\npov: "[[mara-voss]]"\n```\n';
+    const md = 'Type `[x](y.md)`.\n```yaml\npov: "[[ilse-tarrow]]"\n```\n';
     assert.equal(escapeWikiLinks(md), md);
   });
 });

@@ -109,7 +109,7 @@ public class TypeDefinitionTests
             fields:
               condition: { type: enum, values: [active, lost], default: Active }
               crew: { type: number, default: "many" }
-              captain: { type: ref, default: "[[mara-voss]]" }
+              captain: { type: ref, default: "[[ilse-tarrow]]" }
               class: { type: string, required: true, default: frigate }
             """;
 
@@ -301,7 +301,7 @@ public class TypeDefinitionTests
     [Theory]
     [InlineData("---\nid: 01JA7Q8M4XK3V9R2D5W8HN6TQB\n---\n# {{name}}\n", "F-TPL-3", 2)]
     [InlineData("---\nstatus: maybe\n---\n# {{name}}\n", "F-STAT-1", 2)]
-    [InlineData("---\naliases: Voss\n---\n# {{name}}\n", "F-ENT-4", 2)]
+    [InlineData("---\naliases: Tarrow\n---\n# {{name}}\n", "F-ENT-4", 2)]
     [InlineData("---\nfrom: ember:1.2\n---\n# {{name}}\n", "F-POS-2", 2)]
     [InlineData("---\nfields:\n  Bad Name: x\n---\n# {{name}}\n", "F-FLD-1", 3)]
     [InlineData("---\nstatus: draft\n", "F-FM-1", 1)]

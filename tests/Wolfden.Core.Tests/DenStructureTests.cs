@@ -53,7 +53,7 @@ public class DenStructureTests
     [Theory]
     [InlineData("universes/starfall/entities/locations/kessan-reach.md", "starfall")]
     [InlineData("universes/starfall/universe.md", "starfall")]
-    [InlineData("universes/starfall/series/long-dark/entities/characters/mara-voss.md", "long-dark")]
+    [InlineData("universes/starfall/series/long-dark/entities/characters/ilse-tarrow.md", "long-dark")]
     [InlineData("universes/starfall/series/long-dark/books/ash/entities/characters/halden-pike.md", "ash")]
     [InlineData(@"universes\starfall\series\long-dark\books\ember\book.md", "ember")]
     [InlineData("universes/starfall/books/a-quiet-moon/outline.md", "a-quiet-moon")]
@@ -146,7 +146,7 @@ public class DenStructureTests
             "  - { key: 2b, number: 0x3, title: Watch }",
             "  - key: \"3\"",
             "    number: +4",
-            "    fields: { pov: \"[[mara-voss]]\" }",
+            "    fields: { pov: \"[[ilse-tarrow]]\" }",
             "    x-note: kept"));
 
         Assert.Empty(den.Diagnostics);

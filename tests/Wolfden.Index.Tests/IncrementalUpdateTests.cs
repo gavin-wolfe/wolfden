@@ -19,17 +19,17 @@ public sealed class IncrementalUpdateTests
         var updater = new IndexUpdater(den.Root);
         updater.Rebuild("start");
         var written = File.GetLastWriteTimeUtc(den.IndexPath);
-        const string mara = "universes/starfall/series/long-dark/entities/characters/mara-voss.md";
-        den.Write(mara, File.ReadAllText(Path.Combine(den.Root, mara)).Replace("name: Mara Voss", "name: Mara Ellery", StringComparison.Ordinal));
+        const string ilse = "universes/starfall/series/long-dark/entities/characters/ilse-tarrow.md";
+        den.Write(ilse, File.ReadAllText(Path.Combine(den.Root, ilse)).Replace("name: Ilse Tarrow", "name: Ilse Ellery", StringComparison.Ordinal));
 
-        var update = updater.Apply(Batch(den, (WatcherChangeTypes.Changed, mara, null)), out _);
+        var update = updater.Apply(Batch(den, (WatcherChangeTypes.Changed, ilse, null)), out _);
 
         Assert.NotNull(update);
         Assert.Equal(IndexUpdateKind.Updated, update.Kind);
-        Assert.Equal([mara], update.Files);
+        Assert.Equal([ilse], update.Files);
         Assert.True(update.Rows > 0);
         using var index = DenIndex.Open(den.Root);
-        Assert.Equal("Mara Ellery", index.FindEntity("01JA7Q8M4XK3V9R2D5W8HN6TQB")!.Name);
+        Assert.Equal("Ilse Ellery", index.FindEntity("01JA7Q8M4XK3V9R2D5W8HN6TQB")!.Name);
         Assert.Equal(IndexStatus.Current, IndexBuilder.CheckFiles(den.Root));
         AssertSameAsFullRebuild(den, "after the edit");
         Assert.True(File.GetLastWriteTimeUtc(den.IndexPath) >= written);
@@ -137,9 +137,9 @@ public sealed class IncrementalUpdateTests
 
         Assert.Null(updater.Apply(Batch(den), out _));
         // A save that changes no bytes, as some editors do.
-        const string mara = "universes/starfall/series/long-dark/entities/characters/mara-voss.md";
-        File.SetLastWriteTimeUtc(Path.Combine(den.Root, mara), DateTime.UtcNow);
-        Assert.Null(updater.Apply(Batch(den, (WatcherChangeTypes.Changed, mara, null)), out _));
+        const string ilse = "universes/starfall/series/long-dark/entities/characters/ilse-tarrow.md";
+        File.SetLastWriteTimeUtc(Path.Combine(den.Root, ilse), DateTime.UtcNow);
+        Assert.Null(updater.Apply(Batch(den, (WatcherChangeTypes.Changed, ilse, null)), out _));
 
         Assert.Equal(before, File.ReadAllBytes(den.IndexPath));
     }
@@ -152,13 +152,13 @@ public sealed class IncrementalUpdateTests
         var updater = new IndexUpdater(den.Root);
         updater.Rebuild("start");
         // A query elsewhere saw an edit first and rebuilt the index itself.
-        const string mara = "universes/starfall/series/long-dark/entities/characters/mara-voss.md";
-        File.AppendAllText(Path.Combine(den.Root, mara), "\nA new line.\n");
+        const string ilse = "universes/starfall/series/long-dark/entities/characters/ilse-tarrow.md";
+        File.AppendAllText(Path.Combine(den.Root, ilse), "\nA new line.\n");
         IndexBuilder.EnsureUpToDate(den.Root);
         const string pike = "universes/starfall/series/long-dark/books/ash/entities/characters/halden-pike.md";
         File.AppendAllText(Path.Combine(den.Root, pike), "\nAnother line.\n");
 
-        var update = updater.Apply(Batch(den, (WatcherChangeTypes.Changed, mara, null), (WatcherChangeTypes.Changed, pike, null)), out _);
+        var update = updater.Apply(Batch(den, (WatcherChangeTypes.Changed, ilse, null), (WatcherChangeTypes.Changed, pike, null)), out _);
 
         Assert.Equal(IndexUpdateKind.Rebuilt, update!.Kind);
         Assert.Equal("another command rebuilt the index meanwhile", update.Reason);
@@ -178,10 +178,10 @@ public sealed class IncrementalUpdateTests
         var updater = new IndexUpdater(den.Root) { AfterCommit = () => File.Move(other, den.IndexPath, overwrite: true) };
         updater.Rebuild("start");
         IndexBuilder.BuildInto(den.Root, other);
-        const string mara = "universes/starfall/series/long-dark/entities/characters/mara-voss.md";
-        File.AppendAllText(Path.Combine(den.Root, mara), "\nA new line.\n");
+        const string ilse = "universes/starfall/series/long-dark/entities/characters/ilse-tarrow.md";
+        File.AppendAllText(Path.Combine(den.Root, ilse), "\nA new line.\n");
 
-        var update = updater.Apply(Batch(den, (WatcherChangeTypes.Changed, mara, null)), out _);
+        var update = updater.Apply(Batch(den, (WatcherChangeTypes.Changed, ilse, null)), out _);
 
         Assert.Equal(IndexUpdateKind.Rebuilt, update!.Kind);
         Assert.Equal("another command rebuilt the index meanwhile", update.Reason);
@@ -197,10 +197,10 @@ public sealed class IncrementalUpdateTests
         var updater = new IndexUpdater(den.Root);
         updater.Rebuild("start");
         File.Delete(den.IndexPath);
-        const string mara = "universes/starfall/series/long-dark/entities/characters/mara-voss.md";
-        File.AppendAllText(Path.Combine(den.Root, mara), "\nA new line.\n");
+        const string ilse = "universes/starfall/series/long-dark/entities/characters/ilse-tarrow.md";
+        File.AppendAllText(Path.Combine(den.Root, ilse), "\nA new line.\n");
 
-        var update = updater.Apply(Batch(den, (WatcherChangeTypes.Changed, mara, null)), out _);
+        var update = updater.Apply(Batch(den, (WatcherChangeTypes.Changed, ilse, null)), out _);
 
         Assert.Equal(IndexUpdateKind.Rebuilt, update!.Kind);
         AssertSameAsFullRebuild(den, "after the delete");
@@ -233,8 +233,8 @@ public sealed class IncrementalUpdateTests
         var update = updater.Apply(Batch(den, (WatcherChangeTypes.Renamed, to, from)), out _);
 
         Assert.Equal(IndexUpdateKind.Updated, update!.Kind);
-        Assert.Contains($"{to}/mara-voss.md", update.Files);
-        Assert.Contains($"{from}/mara-voss.md", update.Files);
+        Assert.Contains($"{to}/ilse-tarrow.md", update.Files);
+        Assert.Contains($"{from}/ilse-tarrow.md", update.Files);
         Assert.Equal(IndexStatus.Current, IndexBuilder.CheckFiles(den.Root));
         AssertSameAsFullRebuild(den, "after the move");
     }
@@ -245,8 +245,8 @@ public sealed class IncrementalUpdateTests
         using var den = TempDen.Starfall();
         var updater = new IndexUpdater(den.Root);
         updater.Rebuild("start");
-        const string mara = "universes/starfall/series/long-dark/entities/characters/mara-voss.md";
-        var full = Path.Combine(den.Root, mara);
+        const string ilse = "universes/starfall/series/long-dark/entities/characters/ilse-tarrow.md";
+        var full = Path.Combine(den.Root, ilse);
         File.AppendAllText(full, "\nA new line.\n");
 
         IReadOnlyList<string> retry;
@@ -258,11 +258,11 @@ public sealed class IncrementalUpdateTests
                 return;
             }
 
-            Assert.Null(updater.Apply(Batch(den, (WatcherChangeTypes.Changed, mara, null)), out retry));
+            Assert.Null(updater.Apply(Batch(den, (WatcherChangeTypes.Changed, ilse, null)), out retry));
         }
 
-        Assert.Equal([mara], retry);
-        Assert.Equal(IndexUpdateKind.Updated, updater.Apply(Batch(den, (WatcherChangeTypes.Changed, mara, null)), out _)!.Kind);
+        Assert.Equal([ilse], retry);
+        Assert.Equal(IndexUpdateKind.Updated, updater.Apply(Batch(den, (WatcherChangeTypes.Changed, ilse, null)), out _)!.Kind);
         AssertSameAsFullRebuild(den, "after the retry");
     }
 
@@ -321,7 +321,7 @@ public sealed class IncrementalUpdateTests
         using var den = TempDen.Starfall();
         var updater = new IndexUpdater(den.Root);
         updater.Rebuild("start");
-        den.Write($"{folder}/wren-ashby.md", "---\ntype: character\nname: Wren Ashby\n---\n\nA pilot who knows [[Mara Voss]].\n");
+        den.Write($"{folder}/wren-ashby.md", "---\ntype: character\nname: Wren Ashby\n---\n\nA pilot who knows [[Ilse Tarrow]].\n");
 
         var update = updater.Apply(Batch(den, (WatcherChangeTypes.Created, folder, null)), out _);
 
@@ -336,7 +336,7 @@ public sealed class IncrementalUpdateTests
         var updater = new IndexUpdater(den.Root);
         updater.Rebuild("start");
         const string note = "universes/starfall/series/long-dark/entities/ships/book.md";
-        den.Write(note, "---\ntype: item\nname: The Logbook\n---\n\nKept by [[Mara Voss]].\n");
+        den.Write(note, "---\ntype: item\nname: The Logbook\n---\n\nKept by [[Ilse Tarrow]].\n");
 
         var update = updater.Apply(Batch(den, (WatcherChangeTypes.Created, note, null)), out _);
 
@@ -430,29 +430,29 @@ public sealed class IncrementalUpdateTests
         using var den = TempDen.Starfall();
         var updater = new IndexUpdater(den.Root) { ReadAttempts = 2 };
         updater.Rebuild("start");
-        const string mara = "universes/starfall/series/long-dark/entities/characters/mara-voss.md";
-        var full = Path.Combine(den.Root, mara);
+        const string ilse = "universes/starfall/series/long-dark/entities/characters/ilse-tarrow.md";
+        var full = Path.Combine(den.Root, ilse);
         File.AppendAllText(full, "\nA new line.\n");
 
         using (new FileStream(full, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
         {
             for (var i = 0; i < 2; i++)
             {
-                Assert.Null(updater.Apply(Batch(den, (WatcherChangeTypes.Changed, mara, null)), out var retry));
-                Assert.Equal([mara], retry);
+                Assert.Null(updater.Apply(Batch(den, (WatcherChangeTypes.Changed, ilse, null)), out var retry));
+                Assert.Equal([ilse], retry);
             }
 
             // Then a rebuild, which leaves the file out, as any full load of the den would (#112).
-            var rebuilt = updater.Apply(Batch(den, (WatcherChangeTypes.Changed, mara, null)), out _)!;
+            var rebuilt = updater.Apply(Batch(den, (WatcherChangeTypes.Changed, ilse, null)), out _)!;
             Assert.Equal(IndexUpdateKind.Rebuilt, rebuilt.Kind);
-            Assert.Equal($"{mara} couldn't be read", rebuilt.Reason);
-            Assert.DoesNotContain(updater.State!.Catalog.Entities, e => e.Path == mara);
+            Assert.Equal($"{ilse} couldn't be read", rebuilt.Reason);
+            Assert.DoesNotContain(updater.State!.Catalog.Entities, e => e.Path == ilse);
             AssertSameAsFullRebuild(den, "while the file can't be read");
         }
 
         // Once it can be read, its next event brings it in.
-        Assert.Equal(IndexUpdateKind.Updated, updater.Apply(Batch(den, (WatcherChangeTypes.Changed, mara, null)), out _)!.Kind);
-        Assert.Contains(updater.State!.Catalog.Entities, e => e.Path == mara);
+        Assert.Equal(IndexUpdateKind.Updated, updater.Apply(Batch(den, (WatcherChangeTypes.Changed, ilse, null)), out _)!.Kind);
+        Assert.Contains(updater.State!.Catalog.Entities, e => e.Path == ilse);
         AssertSameAsFullRebuild(den, "once the file can be read");
     }
 

@@ -29,7 +29,7 @@ public static class DenPaths
     /// <item>isn't empty, <c>.</c>, or <c>..</c>, so the path can't leave the den;</item>
     /// <item>doesn't start with <c>.</c>: hidden files aren't part of the den (F-LAY-2), and <c>.git/</c> and <c>.wolfden/</c> are never written through the store;</item>
     /// <item>has no <c>\</c>, which is a separator on Windows but a letter on Linux, and none of <c>&lt; &gt; : " | ? *</c> or control characters, which Windows doesn't allow (a <c>:</c> would also name a drive or an NTFS stream);</item>
-    /// <item>doesn't end with a space or <c>.</c>, which Windows drops, so <c>mara.md.</c> would be <c>mara.md</c>;</item>
+    /// <item>doesn't end with a space or <c>.</c>, which Windows drops, so <c>ilse.md.</c> would be <c>ilse.md</c>;</item>
     /// <item>isn't a Windows device name such as <c>CON</c> or <c>nul.md</c>.</item>
     /// </list>
     /// These rules hold on every OS, so a den stays the same files wherever

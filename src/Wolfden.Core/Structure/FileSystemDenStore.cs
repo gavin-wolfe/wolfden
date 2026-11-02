@@ -13,8 +13,8 @@ namespace Wolfden.Core.Structure;
 /// <para>
 /// Names are matched in exact case, as reads match them, even on a
 /// case-insensitive file system. A write whose path differs only in case,
-/// or in Unicode form, from a file or folder that's there (<c>Mara.md</c>
-/// beside <c>mara.md</c>) is refused with <see cref="DenStoreError.CaseConflict"/>
+/// or in Unicode form, from a file or folder that's there (<c>Ilse.md</c>
+/// beside <c>ilse.md</c>) is refused with <see cref="DenStoreError.CaseConflict"/>
 /// on every OS: on Windows and macOS the two are one file, so the write
 /// would change a note other than the one named, and a den with both
 /// doesn't clone onto those systems. So is a name that's another name for

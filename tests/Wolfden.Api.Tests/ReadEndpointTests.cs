@@ -13,7 +13,7 @@ namespace Wolfden.Api.Tests;
 /// </summary>
 public class ReadEndpointTests
 {
-    private const string MaraFile = "universes/starfall/series/long-dark/entities/characters/mara-voss.md";
+    private const string IlseFile = "universes/starfall/series/long-dark/entities/characters/ilse-tarrow.md";
 
     [Fact]
     [Trait("Scenario", "SC-WEB-4")]
@@ -125,11 +125,11 @@ public class ReadEndpointTests
 
     [Theory]
     [Trait("Scenario", "SC-WEB-6")]
-    [InlineData("Mara Voss", null)]
-    [InlineData("Mara Voss", "ember:1")]
-    [InlineData("Mara Voss", "ember:2b")]
-    [InlineData("Mara Voss", "ash:3")]
-    [InlineData("Voss", "ash:epilogue")]
+    [InlineData("Ilse Tarrow", null)]
+    [InlineData("Ilse Tarrow", "ember:1")]
+    [InlineData("Ilse Tarrow", "ember:2b")]
+    [InlineData("Ilse Tarrow", "ash:3")]
+    [InlineData("Tarrow", "ash:epilogue")]
     [InlineData("Halden Pike", "ember:3")]
     [InlineData("Halden Pike", "ash:2")]
     [InlineData("Lantern", "ash:1")]
@@ -176,11 +176,11 @@ public class ReadEndpointTests
         using var den = TempDen.Starfall();
         await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
 
-        var page = (await server.GetJsonAsync("/api/entity?universe=starfall&entity=Mara%20Voss", HttpStatusCode.OK)).GetProperty("entity");
+        var page = (await server.GetJsonAsync("/api/entity?universe=starfall&entity=Ilse%20Tarrow", HttpStatusCode.OK)).GetProperty("entity");
 
         Assert.Equal(["starfall", "long-dark"], page.GetProperty("scope").EnumerateArray().Select(c => c.GetProperty("key").GetString()));
         Assert.Equal(["universe", "series"], page.GetProperty("scope").EnumerateArray().Select(c => c.GetProperty("kind").GetString()));
-        Assert.Equal(["Voss", "the Commander"], page.GetProperty("aliases").EnumerateArray().Select(a => a.GetString()));
+        Assert.Equal(["Tarrow", "the Commander"], page.GetProperty("aliases").EnumerateArray().Select(a => a.GetString()));
         var entry = page.GetProperty("entry");
         Assert.Equal("ember:1", entry.GetProperty("position").GetString());
         Assert.False(entry.GetProperty("inherited").GetBoolean());
@@ -235,19 +235,19 @@ public class ReadEndpointTests
         await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
 
         var full = (await server.GetJsonAsync("/api/entity?universe=starfall&entity=Kessan%20Reach", HttpStatusCode.OK)).GetProperty("entity");
-        var fromMara = full.GetProperty("backlinks").EnumerateArray().Where(b => b.GetProperty("path").GetString() == MaraFile).ToList();
-        Assert.Contains(fromMara, b => b.GetProperty("section").GetString() == "Shoulder injury" && b.GetProperty("site").GetString() == "entity_section");
-        Assert.Contains(fromMara, b => b.GetProperty("section").GetString() == "In command");
-        Assert.Contains(fromMara, b => b.GetProperty("field").GetString() == "posting" && b.GetProperty("site").GetString() == "entity_field_entry");
-        Assert.All(fromMara, b => Assert.Equal("Mara Voss", b.GetProperty("source").GetProperty("name").GetString()));
+        var fromIlse = full.GetProperty("backlinks").EnumerateArray().Where(b => b.GetProperty("path").GetString() == IlseFile).ToList();
+        Assert.Contains(fromIlse, b => b.GetProperty("section").GetString() == "Shoulder injury" && b.GetProperty("site").GetString() == "entity_section");
+        Assert.Contains(fromIlse, b => b.GetProperty("section").GetString() == "In command");
+        Assert.Contains(fromIlse, b => b.GetProperty("field").GetString() == "posting" && b.GetProperty("site").GetString() == "entity_field_entry");
+        Assert.All(fromIlse, b => Assert.Equal("Ilse Tarrow", b.GetProperty("source").GetProperty("name").GetString()));
 
         // At ember:1 the reader hasn't reached the injury (ember:2b), the command (ember:3), or the ash:4 posting.
         var early = (await server.GetJsonAsync("/api/entity?universe=starfall&entity=Kessan%20Reach&asOf=ember:1", HttpStatusCode.OK)).GetProperty("entity");
-        Assert.DoesNotContain(early.GetProperty("backlinks").EnumerateArray(), b => b.GetProperty("path").GetString() == MaraFile);
+        Assert.DoesNotContain(early.GetProperty("backlinks").EnumerateArray(), b => b.GetProperty("path").GetString() == IlseFile);
         var later = (await server.GetJsonAsync("/api/entity?universe=starfall&entity=Kessan%20Reach&asOf=ember:3", HttpStatusCode.OK)).GetProperty("entity");
         Assert.Equal(
             ["In command", "Shoulder injury"],
-            later.GetProperty("backlinks").EnumerateArray().Where(b => b.GetProperty("path").GetString() == MaraFile)
+            later.GetProperty("backlinks").EnumerateArray().Where(b => b.GetProperty("path").GetString() == IlseFile)
                 .Select(b => b.GetProperty("section").GetString()).Order(StringComparer.Ordinal));
 
         // The manifest's payoff names Halden Pike, but only from a-quiet-moon:2b.
@@ -263,7 +263,7 @@ public class ReadEndpointTests
     public async Task AsOfAPositionALinkToAnEntityTheReaderHasntMetDoesntSayWhatItReaches()
     {
         using var den = TempDen.Starfall();
-        den.Write(MaraFile, den.Read(MaraFile).Replace(
+        den.Write(IlseFile, den.Read(IlseFile).Replace(
             "Executive officer of the *Tessaly*.", "Executive officer of the *Tessaly*. Distrusts [[01JA7Q8M4XK3V9R2D5W8HN6TQC|the new hand]].", StringComparison.Ordinal));
         await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
 
@@ -271,16 +271,16 @@ public class ReadEndpointTests
             Assert.Single(page.GetProperty("entity").GetProperty("sections").EnumerateArray().Single(s => s.GetProperty("name").GetString() == "Overview")
                 .GetProperty("links").EnumerateArray());
 
-        var early = Link(await server.GetJsonAsync("/api/entity?universe=starfall&entity=Mara%20Voss&asOf=ember:1", HttpStatusCode.OK));
+        var early = Link(await server.GetJsonAsync("/api/entity?universe=starfall&entity=Ilse%20Tarrow&asOf=ember:1", HttpStatusCode.OK));
         Assert.False(early.GetProperty("inView").GetBoolean());
         Assert.Equal(JsonValueKind.Null, early.GetProperty("entity").ValueKind);
         Assert.Equal("resolved", early.GetProperty("outcome").GetString());
 
-        var met = Link(await server.GetJsonAsync("/api/entity?universe=starfall&entity=Mara%20Voss&asOf=ash:1", HttpStatusCode.OK));
+        var met = Link(await server.GetJsonAsync("/api/entity?universe=starfall&entity=Ilse%20Tarrow&asOf=ash:1", HttpStatusCode.OK));
         Assert.True(met.GetProperty("inView").GetBoolean());
         Assert.Equal("Halden Pike", met.GetProperty("entity").GetProperty("name").GetString());
 
-        var full = Link(await server.GetJsonAsync("/api/entity?universe=starfall&entity=Mara%20Voss", HttpStatusCode.OK));
+        var full = Link(await server.GetJsonAsync("/api/entity?universe=starfall&entity=Ilse%20Tarrow", HttpStatusCode.OK));
         Assert.Equal(JsonValueKind.Null, full.GetProperty("inView").ValueKind);
         Assert.Equal("Halden Pike", full.GetProperty("entity").GetProperty("name").GetString());
     }
@@ -314,19 +314,19 @@ public class ReadEndpointTests
     {
         using var den = TempDen.Starfall();
         den.Write("universes/drift/entities/characters/harbour-ghost.md", "---\ntype: character\nname: Harbour Ghost\nstatus: canon\n---\n");
-        den.Write(MaraFile, den.Read(MaraFile).Replace(
+        den.Write(IlseFile, den.Read(IlseFile).Replace(
             "Executive officer of the *Tessaly*.", "Executive officer of the *Tessaly*. Fears the [[Harbour Ghost]].", StringComparison.Ordinal));
 
         static JsonElement Link(JsonElement page) => Assert.Single(page.GetProperty("entity").GetProperty("sections").EnumerateArray()
             .Single(s => s.GetProperty("name").GetString() == "Overview").GetProperty("links").EnumerateArray());
 
         await using var all = await Server.StartAsync(new WolfdenApiOptions(den.Root));
-        var open = Link(await all.GetJsonAsync("/api/entity?universe=starfall&entity=Mara%20Voss", HttpStatusCode.OK));
+        var open = Link(await all.GetJsonAsync("/api/entity?universe=starfall&entity=Ilse%20Tarrow", HttpStatusCode.OK));
         Assert.Equal("broken", open.GetProperty("outcome").GetString());
         Assert.Contains("universe 'drift'", open.GetProperty("problem").GetString(), StringComparison.Ordinal);
 
         await using var pinned = await Server.StartAsync(new WolfdenApiOptions(den.Root) { PinnedUniverse = "starfall" });
-        var problem = Link(await pinned.GetJsonAsync("/api/entity?entity=Mara%20Voss", HttpStatusCode.OK)).GetProperty("problem").GetString();
+        var problem = Link(await pinned.GetJsonAsync("/api/entity?entity=Ilse%20Tarrow", HttpStatusCode.OK)).GetProperty("problem").GetString();
         Assert.Equal("'Harbour Ghost' matches no entity in universe 'starfall'.", problem);
     }
 
@@ -391,8 +391,8 @@ public class ReadEndpointTests
 
         static List<string?> Names(JsonElement json) => json.GetProperty("entities").EnumerateArray().Select(e => e.GetProperty("name").GetString()).ToList();
         var all = Names(await server.GetJsonAsync("/api/entities?universe=starfall&type=character", HttpStatusCode.OK));
-        Assert.Equal(["Mara Voss", "Halden Pike"], all);
-        Assert.Equal(["Mara Voss"], Names(await server.GetJsonAsync("/api/entities?universe=starfall&type=character&asOf=ember:3", HttpStatusCode.OK)));
+        Assert.Equal(["Ilse Tarrow", "Halden Pike"], all);
+        Assert.Equal(["Ilse Tarrow"], Names(await server.GetJsonAsync("/api/entities?universe=starfall&type=character&asOf=ember:3", HttpStatusCode.OK)));
         Assert.Equal(all, Names(await server.GetJsonAsync("/api/entities?universe=starfall&type=character&asOf=ash:1", HttpStatusCode.OK)));
 
         // The order and the members are the canon view's.
@@ -422,10 +422,10 @@ public class ReadEndpointTests
         Assert.Contains("Lantern", Entities(await server.GetJsonAsync("/api/search?query=lantern&universe=starfall", HttpStatusCode.OK)));
         var inAsh = await server.GetJsonAsync("/api/search?query=Tessaly&universe=starfall&book=ash", HttpStatusCode.OK);
         Assert.Contains("Halden Pike", Entities(inAsh));
-        Assert.Contains("Mara Voss", Entities(inAsh));
+        Assert.Contains("Ilse Tarrow", Entities(inAsh));
         var inMoon = await server.GetJsonAsync("/api/search?query=Tessaly&universe=starfall&book=a-quiet-moon", HttpStatusCode.OK);
         Assert.DoesNotContain("Halden Pike", Entities(inMoon));
-        Assert.DoesNotContain("Mara Voss", Entities(inMoon));
+        Assert.DoesNotContain("Ilse Tarrow", Entities(inMoon));
 
         Assert.Empty(Entities(await server.GetJsonAsync("/api/search?query=Tessaly&universe=starfall&status=idea", HttpStatusCode.OK)));
         Assert.Equal("bad_argument", (await server.GetJsonAsync("/api/search?query=Tessaly&status=lost", HttpStatusCode.BadRequest)).GetProperty("code").GetString());
@@ -445,17 +445,17 @@ public class ReadEndpointTests
             Assert.False(string.IsNullOrWhiteSpace(json.GetProperty("message").GetString()));
         }
 
-        await Expect("/api/entity?universe=starfall&entity=Mara%20Voss&asOf=ember:99", HttpStatusCode.BadRequest, "bad_position");
+        await Expect("/api/entity?universe=starfall&entity=Ilse%20Tarrow&asOf=ember:99", HttpStatusCode.BadRequest, "bad_position");
         await Expect("/api/canon?universe=starfall&asOf=nowhere:1", HttpStatusCode.BadRequest, "bad_position");
         await Expect("/api/hierarchy?asOf=nowhere", HttpStatusCode.BadRequest, "bad_position");
         await Expect("/api/entity?universe=starfall&entity=Nobody", HttpStatusCode.NotFound, "unknown_entity");
-        await Expect("/api/entity?universe=nowhere&entity=Mara%20Voss", HttpStatusCode.NotFound, "unknown_universe");
+        await Expect("/api/entity?universe=nowhere&entity=Ilse%20Tarrow", HttpStatusCode.NotFound, "unknown_universe");
         await Expect("/api/hierarchy?universe=nowhere", HttpStatusCode.NotFound, "unknown_universe");
         await Expect("/api/entities?universe=starfall&series=nope", HttpStatusCode.NotFound, "unknown_scope");
         await Expect("/api/entities?universe=starfall&type=dragon", HttpStatusCode.BadRequest, "unknown_type");
-        await Expect("/api/entity?entity=Mara%20Voss", HttpStatusCode.BadRequest, "universe_required");
+        await Expect("/api/entity?entity=Ilse%20Tarrow", HttpStatusCode.BadRequest, "universe_required");
         await Expect("/api/entity?universe=starfall", HttpStatusCode.BadRequest, "bad_argument");
-        await Expect("/api/entity?universe=starfall&entity=Mara%20Voss&as_of=ember:1", HttpStatusCode.BadRequest, "bad_argument");
+        await Expect("/api/entity?universe=starfall&entity=Ilse%20Tarrow&as_of=ember:1", HttpStatusCode.BadRequest, "bad_argument");
         await Expect("/api/entities?universe=starfall&type=ship&type=character", HttpStatusCode.BadRequest, "bad_argument");
         await Expect("/api/entities?universe=starfall&limit=lots", HttpStatusCode.BadRequest, "bad_argument");
         await Expect("/api/entities?universe=starfall&limit=0", HttpStatusCode.BadRequest, "bad_argument");
@@ -471,7 +471,7 @@ public class ReadEndpointTests
         Assert.EndsWith("Ask again with one of the candidates' keys.", ambiguous.GetProperty("message").GetString(), StringComparison.Ordinal);
 
         // Advice names the API's endpoints, not the MCP tools (#175).
-        var every = await server.GetJsonAsync("/api/entity?universe=*&entity=Mara%20Voss", HttpStatusCode.BadRequest);
+        var every = await server.GetJsonAsync("/api/entity?universe=*&entity=Ilse%20Tarrow", HttpStatusCode.BadRequest);
         Assert.Contains("is only for /api/search and /api/entities;", every.GetProperty("message").GetString(), StringComparison.Ordinal);
         Assert.DoesNotContain("list_entities", every.GetProperty("message").GetString(), StringComparison.Ordinal);
 

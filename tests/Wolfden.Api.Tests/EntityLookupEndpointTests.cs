@@ -151,23 +151,23 @@ public class EntityLookupEndpointTests
         await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root) { PinnedUniverse = "drift" });
 
         // Pinned: another universe is refused; the pinned one is the default.
-        var refused = await server.GetJsonAsync("/api/entities/lookup?universe=starfall&query=mara", HttpStatusCode.BadRequest);
+        var refused = await server.GetJsonAsync("/api/entities/lookup?universe=starfall&query=ilse", HttpStatusCode.BadRequest);
         Assert.Contains("wolfden serve --universe", refused.GetProperty("message").GetString(), StringComparison.Ordinal);
         Assert.Equal("drift", (await server.GetJsonAsync("/api/entities/lookup?query=a", HttpStatusCode.OK)).GetProperty("universe").GetString());
-        Assert.Equal("bad_argument", (await server.GetJsonAsync("/api/entities/lookup?universe=*&query=mara", HttpStatusCode.BadRequest)).GetProperty("code").GetString());
+        Assert.Equal("bad_argument", (await server.GetJsonAsync("/api/entities/lookup?universe=*&query=ilse", HttpStatusCode.BadRequest)).GetProperty("code").GetString());
 
         // No words, a parameter it doesn't take, and a limit out of range.
         Assert.Equal("bad_argument", (await server.GetJsonAsync("/api/entities/lookup?query=%20-%20", HttpStatusCode.BadRequest)).GetProperty("code").GetString());
-        Assert.Equal("bad_argument", (await server.GetJsonAsync("/api/entities/lookup?q=mara", HttpStatusCode.BadRequest)).GetProperty("code").GetString());
-        Assert.Equal("bad_argument", (await server.GetJsonAsync("/api/entities/lookup?query=mara&limit=101", HttpStatusCode.BadRequest)).GetProperty("code").GetString());
+        Assert.Equal("bad_argument", (await server.GetJsonAsync("/api/entities/lookup?q=ilse", HttpStatusCode.BadRequest)).GetProperty("code").GetString());
+        Assert.Equal("bad_argument", (await server.GetJsonAsync("/api/entities/lookup?query=ilse&limit=101", HttpStatusCode.BadRequest)).GetProperty("code").GetString());
 
         // GET only, and cross-site requests are refused like any other.
-        using (var post = await server.Client.PostAsync("/api/entities/lookup?query=mara", null, Token))
+        using (var post = await server.Client.PostAsync("/api/entities/lookup?query=ilse", null, Token))
         {
             Assert.Equal(HttpStatusCode.MethodNotAllowed, post.StatusCode);
         }
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/entities/lookup?query=mara");
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/entities/lookup?query=ilse");
         request.Headers.Add("Sec-Fetch-Site", "cross-site");
         using var response = await server.Client.SendAsync(request, Token);
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);

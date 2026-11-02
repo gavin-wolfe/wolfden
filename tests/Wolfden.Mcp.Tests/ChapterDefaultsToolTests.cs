@@ -61,19 +61,19 @@ public sealed class ChapterDefaultsToolTests : IDisposable
         var only = Assert.Single(read.Books);
         Assert.Equal(("ember", false, 5), (only.Key, only.Final, only.Chapters));
 
-        var set = Tools.UpdateChapterDefaults(read.Hash, Json("""[{"op": "add", "field": "pov", "value": "[[mara-voss]]"}]"""), "starfall", book: "ember");
+        var set = Tools.UpdateChapterDefaults(read.Hash, Json("""[{"op": "add", "field": "pov", "value": "[[ilse-tarrow]]"}]"""), "starfall", book: "ember");
 
         Assert.True(set.Changed);
-        Assert.Contains("chapter_defaults:\n  pov: [\"[[mara-voss]]\"]\n", _den.Read(Ember), StringComparison.Ordinal);
-        Assert.Equal("Book 'ember' chapter_defaults now sets pov: [[mara-voss]].", set.Effects[0]);
-        Assert.Equal("Book 'ember': chapters 1–2b now have pov [[mara-voss]]; chapters prologue, 3 keep their own.", set.Effects[1]);
+        Assert.Contains("chapter_defaults:\n  pov: [\"[[ilse-tarrow]]\"]\n", _den.Read(Ember), StringComparison.Ordinal);
+        Assert.Equal("Book 'ember' chapter_defaults now sets pov: [[ilse-tarrow]].", set.Effects[0]);
+        Assert.Equal("Book 'ember': chapters 1–2b now have pov [[ilse-tarrow]]; chapters prologue, 3 keep their own.", set.Effects[1]);
         Assert.Equal(2, set.Effects.Count);
         var pov = Assert.Single(set.ChapterDefaults!.Fields);
-        Assert.Equal("[\"[[mara-voss]]\"]", pov.Own!.Value.GetRawText());
+        Assert.Equal("[\"[[ilse-tarrow]]\"]", pov.Own!.Value.GetRawText());
         Assert.Equal("book", Tools.GetChapter("ember", "2", "starfall").Chapters[0].Fields.Single(f => f.Name == "pov").From);
 
         // Removing the last item leaves [], "none here"; clearing goes back to inheriting.
-        var removed = Tools.UpdateChapterDefaults(set.Hash, Json("""[{"op": "remove", "field": "pov", "value": "[[Mara-Voss]]"}]"""), "starfall", book: "ember");
+        var removed = Tools.UpdateChapterDefaults(set.Hash, Json("""[{"op": "remove", "field": "pov", "value": "[[Ilse-Tarrow]]"}]"""), "starfall", book: "ember");
         Assert.Contains("chapter_defaults:\n  pov: []\n", _den.Read(Ember), StringComparison.Ordinal);
         Assert.Equal("Book 'ember' chapter_defaults now sets pov: [] (\"none here\"), so chapters below that don't set their own have no pov.", removed.Effects[0]);
         Assert.Equal("Book 'ember': chapters 1–2b now have no pov ([]); chapters prologue, 3 keep their own.", removed.Effects[1]);
@@ -108,14 +108,14 @@ public sealed class ChapterDefaultsToolTests : IDisposable
         Assert.Equal(["ember", "ash"], series.Books.Select(b => b.Key));
 
         var result = Tools.UpdateChapterDefaults(
-            series.Hash, Json("""[{"op": "set", "field": "pov", "value": ["[[mara-voss]]"]}, {"op": "set", "field": "narration", "value": "third-limited"}]"""),
+            series.Hash, Json("""[{"op": "set", "field": "pov", "value": ["[[ilse-tarrow]]"]}, {"op": "set", "field": "narration", "value": "third-limited"}]"""),
             "starfall", series: "long-dark");
 
         Assert.Equal(
             [
-                "Series 'long-dark' chapter_defaults now sets pov: [[mara-voss]].",
-                "Book 'ember': chapters 1–2b now have pov [[mara-voss]]; chapters prologue, 3 keep their own.",
-                "Book 'ash': chapters 1–epilogue now have pov [[mara-voss]].",
+                "Series 'long-dark' chapter_defaults now sets pov: [[ilse-tarrow]].",
+                "Book 'ember': chapters 1–2b now have pov [[ilse-tarrow]]; chapters prologue, 3 keep their own.",
+                "Book 'ash': chapters 1–epilogue now have pov [[ilse-tarrow]].",
                 "Series 'long-dark' chapter_defaults now sets narration: third-limited.",
                 "Book 'ember': chapters prologue–3 now have narration third-limited.",
                 "Book 'ash': chapters 1–epilogue keep first from book 'ash' chapter_defaults.",
@@ -174,13 +174,13 @@ public sealed class ChapterDefaultsToolTests : IDisposable
     [Trait("Scenario", "SC-MCP-25")]
     public void ALinkInADefaultIsComparedByTheEntityItReaches()
     {
-        // A second Mara Voss at universe scope: [[mara-voss]] in the universe's defaults
-        // reaches her, and in the series' defaults the series' Mara Voss (F-LINK-7).
-        _den.Write(Universe + "/entities/characters/mara-voss.md", "---\nid: 01JB0000000000000000000M01\ntype: character\nname: Mara Voss\nstatus: canon\n---\n\nHer namesake.\n");
-        WriteUniverse("chapter_defaults: { pov: [\"[[mara-voss]]\"] }\n");
+        // A second Ilse Tarrow at universe scope: [[ilse-tarrow]] in the universe's defaults
+        // reaches her, and in the series' defaults the series' Ilse Tarrow (F-LINK-7).
+        _den.Write(Universe + "/entities/characters/ilse-tarrow.md", "---\nid: 01JB0000000000000000000M01\ntype: character\nname: Ilse Tarrow\nstatus: canon\n---\n\nHer namesake.\n");
+        WriteUniverse("chapter_defaults: { pov: [\"[[ilse-tarrow]]\"] }\n");
         _den.Write(Ash, "---\nid: 01JAQKFBF5KZNWJ47TAN9ZT24N\nname: Ash\nstatus: final\nchapters: [1, 2, 3, 4, epilogue]\n---\n");
         var series = Tools.GetChapterDefaults("starfall", series: "long-dark");
-        var change = Json("""[{"op": "set", "field": "pov", "value": ["[[mara-voss]]"]}]""");
+        var change = Json("""[{"op": "set", "field": "pov", "value": ["[[ilse-tarrow]]"]}]""");
 
         var refused = Assert.Throws<DenToolException>(() => Tools.UpdateChapterDefaults(series.Hash, change, "starfall", series: "long-dark"));
         Assert.Equal(ToolErrorCodes.Frozen, refused.Code);
@@ -190,10 +190,10 @@ public sealed class ChapterDefaultsToolTests : IDisposable
         // Unfrozen, the effect lines say the chapters changed, though the text is the same.
         _den.Write(Ash, "---\nid: 01JAQKFBF5KZNWJ47TAN9ZT24N\nname: Ash\nchapters: [1, 2, 3, 4, epilogue]\n---\n");
         var made = Tools.UpdateChapterDefaults(series.Hash, change, "starfall", series: "long-dark");
-        Assert.Contains("Book 'ash': chapters 1–epilogue now have pov [[mara-voss]].", made.Effects);
+        Assert.Contains("Book 'ash': chapters 1–epilogue now have pov [[ilse-tarrow]].", made.Effects);
 
-        // The same text names another Mara Voss, so it isn't "as the universe's does".
-        Assert.Equal("Series 'long-dark' chapter_defaults now sets pov: [[mara-voss]], in place of [[mara-voss]] from universe 'starfall' chapter_defaults.", made.Effects[0]);
+        // The same text names another Ilse Tarrow, so it isn't "as the universe's does".
+        Assert.Equal("Series 'long-dark' chapter_defaults now sets pov: [[ilse-tarrow]], in place of [[ilse-tarrow]] from universe 'starfall' chapter_defaults.", made.Effects[0]);
     }
 
     [Fact]
@@ -255,7 +255,7 @@ public sealed class ChapterDefaultsToolTests : IDisposable
         Assert.True(series.Books.Single(b => b.Key == "ash").Final);
 
         var refused = Assert.Throws<DenToolException>(() =>
-            Tools.UpdateChapterDefaults(series.Hash, Json("""[{"op": "add", "field": "pov", "value": "[[mara-voss]]"}]"""), "starfall", series: "long-dark"));
+            Tools.UpdateChapterDefaults(series.Hash, Json("""[{"op": "add", "field": "pov", "value": "[[ilse-tarrow]]"}]"""), "starfall", series: "long-dark"));
         Assert.Equal(ToolErrorCodes.Frozen, refused.Code);
         Assert.Contains("book 'ash', pov of chapters 1–epilogue", refused.Message, StringComparison.Ordinal);
         Assert.Equal(before, _den.Read(LongDark + "/series.md"));

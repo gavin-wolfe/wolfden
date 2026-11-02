@@ -206,7 +206,7 @@ public sealed class DenIndex : IDisposable
     /// order; a word ending in <c>*</c> matches as a prefix (<c>ambu*</c>).
     /// Words in a closed pair of double quotes (<c>"silver key"</c>) are a
     /// phrase: they match side by side, in order, as do the parts of a word
-    /// joined by punctuation (<c>mara-voss</c>), and a <c>*</c> at the end of
+    /// joined by punctuation (<c>ilse-tarrow</c>), and a <c>*</c> at the end of
     /// a phrase's last word makes that word a prefix (<c>"silver ke*"</c>).
     /// An unclosed quote is plain text, and empty quotes are ignored (#185).
     /// Other FTS5 syntax is searched for as plain text, and control

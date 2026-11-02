@@ -84,10 +84,10 @@ public class ContinuityCheckTests
     [Trait("Scenario", "SC-CHECK-1")]
     public void RenamingACharacterWithoutAnAliasBreaksTheOldLinks()
     {
-        // The writer renamed mara-voss.md to mara-ellery.md and changed her name.
+        // The writer renamed ilse-tarrow.md to ilse-ellery.md and changed her name.
         var source = Vael();
-        Note(source, A1, "mara-ellery", Character("Mara Ellery"));
-        Note(source, A2, "the-trial", "type: event\nname: The trial\nstatus: canon", "\n## Overview\n[[mara-voss]] testifies. [[Mara Voss]] lies.\n", folder: "events");
+        Note(source, A1, "ilse-ellery", Character("Ilse Ellery"));
+        Note(source, A2, "the-trial", "type: event\nname: The trial\nstatus: canon", "\n## Overview\n[[ilse-tarrow]] testifies. [[Ilse Tarrow]] lies.\n", folder: "events");
 
         var check = DenCheck.Run(source);
 
@@ -95,11 +95,11 @@ public class ContinuityCheckTests
         Assert.Equal(0, check.ErrorCount);
 
         // Keeping the old name as an alias fixes the name link; the slug link still needs rewriting.
-        Note(source, A1, "mara-ellery", Character("Mara Ellery", "aliases: [Mara Voss]"));
+        Note(source, A1, "ilse-ellery", Character("Ilse Ellery", "aliases: [Ilse Tarrow]"));
         var fixedCheck = DenCheck.Run(source);
         var left = Assert.Single(Found(fixedCheck));
         Assert.Equal("F-LINK-8", left.Rule);
-        Assert.Contains("[[mara-voss]]", Only(fixedCheck, "F-LINK-8").Message, StringComparison.Ordinal);
+        Assert.Contains("[[ilse-tarrow]]", Only(fixedCheck, "F-LINK-8").Message, StringComparison.Ordinal);
     }
 
     [Fact]

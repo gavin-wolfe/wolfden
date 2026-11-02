@@ -9,7 +9,7 @@ namespace Wolfden.Mcp.Tests;
 /// </summary>
 public sealed class FieldSearchToolTests : IDisposable
 {
-    private const string MaraFile = "universes/starfall/series/long-dark/entities/characters/mara-voss.md";
+    private const string IlseFile = "universes/starfall/series/long-dark/entities/characters/ilse-tarrow.md";
     private const string ReachFile = "universes/starfall/entities/locations/kessan-reach.md";
 
     /// <summary>Kessan Reach's id, so a link written with it holds none of its name.</summary>
@@ -19,8 +19,8 @@ public sealed class FieldSearchToolTests : IDisposable
 
     public FieldSearchToolTests()
     {
-        // Mara gets a plain home, a list of habits, and a berth that links Kessan Reach by id.
-        _den.Write(MaraFile, _den.Read(MaraFile).Replace(
+        // Ilse gets a plain home, a list of habits, and a berth that links Kessan Reach by id.
+        _den.Write(IlseFile, _den.Read(IlseFile).Replace(
             "  species: { value: human, from: \"ember:prologue\" }",
             $"  species: {{ value: human, from: \"ember:prologue\" }}\n  home: Saltmarsh Docks\n  habits: [chess, \"night watches\"]\n  berth: \"[[{ReachId}]]\"",
             StringComparison.Ordinal));
@@ -36,7 +36,7 @@ public sealed class FieldSearchToolTests : IDisposable
     {
         var hit = Assert.Single(Tools.Search("Lieutenant", "starfall").Hits);
 
-        Assert.Equal("Mara Voss", hit.Entity.Name);
+        Assert.Equal("Ilse Tarrow", hit.Entity.Name);
         Assert.Equal("rank", hit.Field);
         Assert.Null(hit.Section);
         Assert.Equal(10, hit.Line); // The entry's line.
@@ -65,8 +65,8 @@ public sealed class FieldSearchToolTests : IDisposable
         Assert.Empty(Tools.Search("saltmarsh harbour", "starfall", field: "home").Hits);
         Assert.Empty(Tools.Search("saltmarsh", "starfall", field: "rank").Hits);
 
-        // Only that field: Mara's name and sections hold "Voss" and "Tessaly", her home doesn't.
-        Assert.Empty(Tools.Search("Voss", "starfall", field: "home").Hits);
+        // Only that field: Ilse's name and sections hold "Tarrow" and "Tessaly", her home doesn't.
+        Assert.Empty(Tools.Search("Tarrow", "starfall", field: "home").Hits);
         Assert.All(Tools.Search("tessaly", "starfall", field: "posting").Hits, h => Assert.Equal("posting", h.Field));
     }
 

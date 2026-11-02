@@ -421,7 +421,7 @@ public sealed class LinkRecord
     /// <summary>1-based column.</summary>
     public int Column { get; set; }
 
-    /// <summary>The link as written, such as <c>[[mara-voss|Voss]]</c>.</summary>
+    /// <summary>The link as written, such as <c>[[ilse-tarrow|Tarrow]]</c>.</summary>
     public string Text { get; set; } = "";
 
     /// <summary>The target, trimmed.</summary>

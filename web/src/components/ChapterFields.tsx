@@ -699,8 +699,8 @@ function FieldForm({
 
 /**
  * An emptied list's outcome, shown before saving, with the other choice a
- * click away (#138): "pov: ~~Mara~~ → none in this chapter · use book
- * default (Voss) instead". Saving [] ("none here", #132) is the default;
+ * click away (#138): "pov: ~~Ilse~~ → none in this chapter · use book
+ * default (Tarrow) instead". Saving [] ("none here", #132) is the default;
  * the other takes the field out, so it inherits.
  */
 function InheritChoice({

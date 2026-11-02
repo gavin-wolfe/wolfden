@@ -139,6 +139,8 @@ public sealed class DenStoreTests : IDisposable
         store.WriteFile(Ilse, a);
         var torn = new ConcurrentBag<string>();
         var reads = 0;
+        var readerErrors = 0;
+        string? lastReaderError = null;
         var stop = 0;
 
         var reader = new Thread(() =>
@@ -157,6 +159,8 @@ public sealed class DenStoreTests : IDisposable
                 catch (Exception e) when (e is IOException or UnauthorizedAccessException)
                 {
                     // Windows: caught mid-replace. Not a torn read.
+                    Interlocked.Increment(ref readerErrors);
+                    Volatile.Write(ref lastReaderError, $"{e.GetType().Name} (0x{e.HResult:X8})");
                     Thread.Sleep(1);
                     continue;
                 }
@@ -164,7 +168,7 @@ public sealed class DenStoreTests : IDisposable
                 Interlocked.Increment(ref reads);
                 if (!seen.AsSpan().SequenceEqual(a) && !seen.AsSpan().SequenceEqual(b))
                 {
-                    torn.Add($"{seen.Length} bytes");
+                    torn.Add(DescribeRead(seen, a, b));
                 }
 
                 Thread.Sleep(1);
@@ -180,13 +184,35 @@ public sealed class DenStoreTests : IDisposable
         var watch = Stopwatch.StartNew();
         var readsBefore = Volatile.Read(ref reads);
         var written = 0;
+        var refused = 0;
+        DenStoreException? lastRefusal = null;
+        var current = a;
+        string Progress() =>
+            $"{written} writes, {refused} refused (last: {lastRefusal?.Message ?? "none"}); "
+            + $"{Volatile.Read(ref reads) - readsBefore} reads, {Volatile.Read(ref readerErrors)} failed (last: {Volatile.Read(ref lastReaderError) ?? "none"}); "
+            + $"{watch.Elapsed.TotalSeconds:F1} s.";
         try
         {
             while (written < Writes || Volatile.Read(ref reads) - readsBefore < ReadsDuringWrites)
             {
-                Assert.True(watch.Elapsed < TimeSpan.FromSeconds(60), $"The reader read {Volatile.Read(ref reads) - readsBefore} times in {written} writes.");
-                store.WriteFile(Ilse, written % 2 == 0 ? b : a, DenWriteMode.Replace);
-                written++;
+                Assert.True(watch.Elapsed < TimeSpan.FromSeconds(60), $"Too few writes and reads in time: {Progress()}");
+                var next = written % 2 == 0 ? b : a;
+                try
+                {
+                    store.WriteFile(Ilse, next, DenWriteMode.Replace);
+                    current = next;
+                    written++;
+                }
+                catch (DenStoreException e) when (e.Error == DenStoreError.InUse)
+                {
+                    // Windows can't replace a file that's open. The store tries
+                    // again for a moment, then says so: a save can be refused
+                    // when the reader's handle outlasts that (#173). That's a
+                    // failed save, not a torn read, and what it must leave
+                    // behind is checked below. It doesn't count as a write.
+                    refused++;
+                    lastRefusal = e;
+                }
             }
         }
         finally
@@ -195,7 +221,17 @@ public sealed class DenStoreTests : IDisposable
             reader.Join();
         }
 
-        Assert.Empty(torn);
+        Assert.True(torn.IsEmpty, $"A reader saw part of a note {torn.Count} times, such as: {string.Join("; ", torn.Distinct().Take(5))}. {Progress()}");
+
+        // After a refused save the note is the last one saved, unchanged.
+        Assert.True(File.ReadAllBytes(Full(Ilse)).AsSpan().SequenceEqual(current), $"The note isn't the last one saved. {Progress()}");
+    }
+
+    /// <summary>What a reader got that was neither version: enough to tell a cut-short read from a mix of the two.</summary>
+    private static string DescribeRead(byte[] seen, byte[] a, byte[] b)
+    {
+        var letters = string.Join(", ", seen.GroupBy(x => x).OrderBy(g => g.Key).Select(g => $"{g.Count()} x 0x{g.Key:X2}"));
+        return $"{seen.Length} bytes of {a.Length} or {b.Length} ({(letters.Length == 0 ? "empty" : letters)})";
     }
 
     [Fact]

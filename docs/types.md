@@ -153,7 +153,8 @@ Built-in packs change only by adding: new types, fields, sections, and
 chapter fields. Changing an existing built-in field's type, renaming a
 section, or adding or changing a `default` is a breaking change (#56).
 Adding a parent to a built-in type's `kind_of` (F-TYPE-13) counts as
-adding, since a link it reaches stops warning. Removing one is a breaking
+adding, since a link it reaches stops warning, and a filter by that parent
+only finds more notes. Removing one is a breaking
 change, since links that were fine would start to warn. Template prompts
 and headings may change in any release, since they only affect entities
 created afterward.

@@ -208,6 +208,27 @@ public sealed class QueryCommandTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "SC-CHECK-52")]
+    public void AKindCanTieWithTheTypeAskedForUntilAnIdOrFileNamePicksOne()
+    {
+        _den.Write("den.yaml", _den.Read("den.yaml") + "packs: [space-opera]\n");
+        _den.Write("universes/dracula/entities/locations/saltby-sands.md", "---\ntype: location\nname: Saltby\nstatus: canon\n---\n# Saltby\n");
+        _den.Write("universes/dracula/entities/ships/saltby-cutter.md", "---\nid: 01M4TF5EZK6918PFXASD6B9V0A\ntype: ship\nname: Saltby\nstatus: canon\n---\n# Saltby\n");
+
+        var (_, both, _) = Query("--brief", "--type", "location", "--entity", "Saltby");
+        var (_, byFileName, _) = Query("--brief", "--type", "location", "--entity", "saltby-cutter");
+        var (_, byId, _) = Query("--brief", "--type", "location", "--entity", "01M4TF5EZK6918PFXASD6B9V0A");
+
+        Assert.Contains("- Saltby (location, canon,", both, StringComparison.Ordinal);
+        Assert.Contains("- Saltby (ship, canon,", both, StringComparison.Ordinal);
+        foreach (var one in new[] { byFileName, byId })
+        {
+            Assert.Contains("- Saltby (ship, canon,", one, StringComparison.Ordinal);
+            Assert.DoesNotContain("- Saltby (location, canon,", one, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void QueryWritesOnlyTheIndex()
     {
         var before = Cli.Snapshot(_den.Root);

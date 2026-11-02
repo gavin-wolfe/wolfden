@@ -210,9 +210,10 @@ internal static partial class QueryCommand
 
         if (line.Value("--entity") is { } name)
         {
-            // Matched among the entities in the view, of the types asked for,
-            // so one the reader meets later, or one of another type, can't
-            // shadow or tie with the one wanted. Only if none matches is the
+            // Matched among the entities in the view, of the types asked for and
+            // their kinds, so one the reader meets later, or one that's neither,
+            // can't shadow or tie with the one wanted. A kind of a type asked for
+            // can tie, and then both are shown. Only if none matches is the
             // whole universe asked, to tell "not met yet" (an empty view) from
             // "no such entity" (an error).
             var among = met.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);

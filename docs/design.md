@@ -1626,7 +1626,7 @@ docs/
   the value as written, then `→` and the linked note's name or alias
   where that's what matched. The Field filter lists the fields notes
   give values for (`/api/fields`); as of a position, only those of
-  values in view, as the Type filter lists only met types. A field no
+  values in view, as the Type filter goes by met types. A field no
   note gives a value for is `bad_argument`; as of a position, so is one
   only notes the reader hasn't met give values for, judged from the
   same list, so the answer can't tell a later note's field from a

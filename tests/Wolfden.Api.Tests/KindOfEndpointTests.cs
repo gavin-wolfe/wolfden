@@ -92,6 +92,9 @@ public class KindOfEndpointTests
         Assert.Equal(["location", "settlement", "ship", "star-system", "world"], Strings(setting.GetProperty("accepts")));
     }
 
+    /// <summary>A world added by a test, which the reader meets at dracula:20.</summary>
+    private const string FarVesta = "Far Vesta";
+
     /// <summary>The name and own type of each note in a place: every kind of location, by every route, and a character beside them.</summary>
     private static readonly Dictionary<string, string> Places = new()
     {
@@ -143,7 +146,7 @@ public class KindOfEndpointTests
     }
 
     private static (string Name, string Type)[] NameAndType(IEnumerable<JsonElement> notes) =>
-        notes.Select(n => (n.GetProperty("name").GetString()!, n.GetProperty("type").GetString()!)).Where(n => Places.ContainsKey(n.Item1)).ToArray();
+        notes.Select(n => (n.GetProperty("name").GetString()!, n.GetProperty("type").GetString()!)).Where(n => Places.ContainsKey(n.Item1) || n.Item1 == FarVesta).ToArray();
 
     [Theory]
     [Trait("Scenario", "SC-CHECK-52")]
@@ -188,11 +191,61 @@ public class KindOfEndpointTests
         den.Write("universes/dracula/entities/worlds/far-vesta.md", "---\ntype: world\nname: Far Vesta\nstatus: canon\nfrom: \"dracula:20\"\n---\n# Far Vesta\n\n## Overview\nA waymark.\n");
         await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
 
-        var early = await server.GetJsonAsync("/api/canon?universe=dracula&type=location&asOf=dracula:5", HttpStatusCode.OK);
-        var later = await server.GetJsonAsync("/api/canon?universe=dracula&type=location&asOf=dracula:20", HttpStatusCode.OK);
+        foreach (var type in new[] { "location", "world" })
+        {
+            // list_entities, search, and canon_as_of, then a lookup.
+            var early = await Filter(server, type, "&asOf=dracula:5");
+            var later = await Filter(server, type, "&asOf=dracula:20");
+            Assert.All(early, results =>
+            {
+                Assert.DoesNotContain(results, r => r.Name == FarVesta);
 
-        Assert.DoesNotContain(early.GetProperty("entities").EnumerateArray(), e => e.GetProperty("name").GetString() == "Far Vesta");
-        Assert.Contains(later.GetProperty("entities").EnumerateArray(), e => e.GetProperty("name").GetString() == "Far Vesta");
+                // The filter still finds the kinds the reader has met.
+                Assert.Contains(results, r => r.Name == "Little Vesta");
+            });
+            Assert.All(later, results => Assert.Contains(results, r => r.Name == FarVesta));
+
+            var lookedUpEarly = await server.GetJsonAsync($"/api/entities/lookup?universe=dracula&query=vesta&type={type}&asOf=dracula:5", HttpStatusCode.OK);
+            var lookedUpLater = await server.GetJsonAsync($"/api/entities/lookup?universe=dracula&query=vesta&type={type}&asOf=dracula:20", HttpStatusCode.OK);
+            var earlyNames = lookedUpEarly.GetProperty("matches").EnumerateArray().Select(m => m.GetProperty("entity").GetProperty("name").GetString()).ToList();
+            Assert.DoesNotContain(FarVesta, earlyNames);
+            Assert.Contains("Little Vesta", earlyNames);
+            Assert.Contains(lookedUpLater.GetProperty("matches").EnumerateArray(), m => m.GetProperty("entity").GetProperty("name").GetString() == FarVesta);
+        }
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-CHECK-52")]
+    [InlineData("location", "", "Far Vesta,Little Vesta,Vesta")]
+    [InlineData("world", "", "Far Vesta,Little Vesta,Vesta")]
+    [InlineData("moon", "", "Little Vesta")]
+    [InlineData("character", "", "Ilse Tarrow")]
+    [InlineData("ship", "", "")]
+    [InlineData("location", "&asOf=dracula:5", "Little Vesta,Vesta")]
+    [InlineData("world", "&asOf=dracula:5", "Little Vesta,Vesta")]
+    [InlineData("moon", "&asOf=dracula:5", "Little Vesta")]
+    [InlineData("location", "&asOf=dracula:20", "Far Vesta,Little Vesta,Vesta")]
+    public async Task ASearchFindsKindsInFieldValues(string type, string asOf, string names)
+    {
+        // The word is only in field values, so only the field search can find it.
+        using var den = Filtering();
+        const string Fields = "status: canon\nfields:\n  kind: cairnstone\n---\n";
+        den.Write("universes/dracula/entities/worlds/vesta.md", $"---\ntype: world\nname: Vesta\n{Fields}# Vesta\n");
+        den.Write("universes/dracula/entities/moons/little-vesta.md", $"---\ntype: moon\nname: Little Vesta\n{Fields}# Little Vesta\n");
+        den.Write("universes/dracula/entities/characters/ilse-tarrow.md", $"---\ntype: character\nname: Ilse Tarrow\n{Fields}# Ilse Tarrow\n");
+        den.Write("universes/dracula/entities/worlds/far-vesta.md", $"---\ntype: world\nname: {FarVesta}\nfrom: \"dracula:20\"\n{Fields}# {FarVesta}\n");
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+
+        foreach (var field in new[] { "", "&field=kind" })
+        {
+            var found = await server.GetJsonAsync($"/api/search?universe=dracula&query=cairnstone&type={type}{asOf}{field}", HttpStatusCode.OK);
+
+            var hits = found.GetProperty("hits").EnumerateArray().ToList();
+            Assert.Equal(
+                names.Split(',', StringSplitOptions.RemoveEmptyEntries),
+                hits.Select(h => h.GetProperty("entity").GetProperty("name").GetString()!).Order(StringComparer.Ordinal));
+            Assert.All(hits, h => Assert.Equal("kind", h.GetProperty("field").GetString()));
+        }
     }
 
     [Fact]

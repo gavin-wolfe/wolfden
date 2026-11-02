@@ -324,7 +324,8 @@ kind_of: [ship, character]
   Parents outside the loop still count.
 - A value that isn't a type key, or a list item that isn't one, is a
   [warning], and only that value is ignored. A null or empty `kind_of` means
-  no parents. A parent named twice counts once, without a warning.
+  no parents. A parent named twice counts once, without a warning, and as
+  built in if a built-in file names it.
 
 If F-TYPE-4 replaces a type, the replaced definition's `kind_of` goes with
 it: a den-local `ship` with no `kind_of` isn't a location, whatever the
@@ -657,7 +658,7 @@ In the field order it comes after `row`.
 ---
 id: 01JB2C8Y0HR4M6N3KQ5TVW7XZA
 type: character
-name: Halden Pike
+name: Odile Renn
 status: candidate
 fields:
   role: dockmaster
@@ -872,22 +873,22 @@ once, in a container's `chapter_defaults`.
 
 ```yaml
 # series.md
-chapter_defaults: { narration: third-limited, tense: past, when: "2291" }
+chapter_defaults: { narration: third-limited, tense: past, when: "2324" }
 ```
 
 ```yaml
 # book.md
 chapter_defaults: { pov: "[[ilse-tarrow]]", setting: "[[kessan-reach]]" }
 chapters:
-  - { key: prologue, title: Before the Dark, fields: { when: "2284", tense: present } }
+  - { key: prologue, title: Before the Dark, fields: { when: "2318", tense: present } }
   - { key: "1", number: 1, title: Kessan Reach }
   - { key: "2", number: 2, fields: { pov: ["[[ilse-tarrow]]", "[[halden-pike]]"] } }
 ```
 
 Every chapter of this book is told in the third person, limited, in the
-past tense, from Ilse Tarrow's point of view, and takes place in 2291 at
+past tense, from Ilse Tarrow's point of view, and takes place in 2324 at
 Kessan Reach, except that the prologue is in the present tense and set in
-2284, and chapter 2 has two POV characters.
+2318, and chapter 2 has two POV characters.
 
 **F-CHAP-1.** A pack's `chapter.yaml` is a mapping with one key, `fields`,
 a mapping of field definitions as in §5 (F-FT-1, F-FT-2). A chapter field
@@ -1213,7 +1214,9 @@ Time and place for each beat, finer than a chapter's `when` and
 ## 10. Appendix: a den-local pack
 
 The Starfall den from format.md §13 adds a pack of its own, enabled in
-`den.yaml`, to give characters a rank and to add a ship type.
+`den.yaml`, to give characters a rank and to add a ship type. (The
+[Starfall sample](../samples/starfall/) gives characters a rank the same way,
+and uses the space opera pack's `ship`.)
 
 ```text
 starfall-den/

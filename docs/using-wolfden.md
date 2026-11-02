@@ -41,6 +41,17 @@ Set things up in this order. Each step builds on the ones before it.
    and turn on its history with `wolfden init <copy> --git`. Inside the
    clone, it's part of Wolfden's own repository, so its checkpoints would
    land there ([mcp-clients.md §2](mcp-clients.md#2-pick-a-den)).
+
+   To see a den partway through a series, try the invented
+   [Starfall sample](../samples/starfall/): one book frozen, one in progress,
+   a retcon, and things not yet decided. It comes with real history. With
+   [Node](https://nodejs.org/) installed, this replays eight checkpoints into a
+   new folder outside the clone, which you can then serve:
+
+   ```sh
+   node scripts/starfall-history/replay.mjs <new-folder>
+   wolfden serve <new-folder>
+   ```
 3. **Make your den, with history.** History is what lets you keep
    versions, see what changed, and freeze a finished book, so turn it on
    from the start:
@@ -206,8 +217,8 @@ fields:
   class: "[[survey-cutter]]"
   captain: "[[ilse-tarrow]]"
   location:
-    - { value: "[[kessan-reach]]", from: "ember:1" }
-    - { value: "[[velari-prime]]", from: "ember:20" }
+    - { value: "[[kessan-reach]]", from: "ember:9" }
+    - { value: "[[velari-prime]]", from: "ember:26" }
   condition: in service
 ---
 ```

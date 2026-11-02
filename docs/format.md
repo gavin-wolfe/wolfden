@@ -661,7 +661,7 @@ name: Ilse Tarrow
 aliases: [Tarrow, "the Commander"]
 status: canon
 fields:
-  species: "[[velari]]"
+  species: human
   rank:
     - { value: Lieutenant, from: "ember:1" }
     - { value: Commander,  from: "ember:22" }
@@ -1305,9 +1305,9 @@ own `from=` (F-SEC-9):
 ## Overview
 Executive officer of the *Tessaly*.
 
-### In command
+### Commander
 <!-- wolfden: from=ember:22 -->
-Takes command of the *Tessaly* after the ambush at [[kessan-reach]].
+Promoted after the ambush at [[kessan-reach]].
 ```
 
 A fact in a field works the same way. A single entry with a `from` keeps a
@@ -1459,7 +1459,7 @@ details live in an entity that the row links to.
 
 | row | beat | status | progress |
 |---|---|---|---|
-| 40 | Tarrow takes command. | candidate | outlined |
+| 40 | Tarrow makes commander. | candidate | outlined |
 ```
 
 ```abnf
@@ -1717,7 +1717,9 @@ the old one's comment; the MCP write tools say when a comment went.
 A complete den with one universe, one series, one book, and two entities.
 It uses only the core pack and loads with no errors. The core character
 type doesn't define `rank` (types.md §9.1), so `rank` gets an F-FLD-2
-warning. types.md §10 shows a den-local pack that adds it.
+warning. types.md §10 shows a den-local pack that adds it. It borrows names
+from the [Starfall sample](../samples/starfall/) but is much shorter, so its
+chapters don't line up with the sample's.
 
 ```text
 starfall-den/
@@ -1823,7 +1825,7 @@ fully recovers.
 | 1 | 1 | A distress call from the edge of [[the Reach]]. |
 | 2 | 2 | [[Ilse Tarrow]] leads the away team. |
 | 3 | 3 | The ambush. |
-| 4 | 4 | Tarrow takes command. |
+| 4 | 4 | Tarrow makes commander. |
 ```
 
 As of `ember:2`, Ilse Tarrow is a lieutenant with an Overview and no Shoulder

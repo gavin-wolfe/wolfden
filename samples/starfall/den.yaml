@@ -1,0 +1,7 @@
+format: 1
+name: Starfall
+authors:
+  wren-calder:
+    name: Wren Calder
+packs: [space-opera, starfall]
+spoiler_checks: true

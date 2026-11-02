@@ -29,6 +29,9 @@ public sealed class TempDen : IDisposable
     /// <summary>The Dracula sample, in place. <c>wolfden check</c> never writes, so tests can read it directly.</summary>
     public static string DraculaRoot => Path.Combine(RepoRoot, "samples", "dracula");
 
+    /// <summary>The Starfall sample (#34), in place.</summary>
+    public static string StarfallSampleRoot => Path.Combine(RepoRoot, "samples", "starfall");
+
     /// <summary>The den root.</summary>
     public string Root { get; }
 

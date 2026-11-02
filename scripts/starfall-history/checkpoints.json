@@ -1,0 +1,98 @@
+[
+  {
+    "message": "Start the Starfall notes: the Reach, the relays, the Velari",
+    "date": "2026-01-11T09:30:00+00:00",
+    "final": [
+      ".gitignore",
+      "den.yaml",
+      "packs/starfall/",
+      "universes/starfall/entities/factions/",
+      "universes/starfall/entities/locations/",
+      "universes/starfall/entities/notes/dates-and-the-calendar.md",
+      "universes/starfall/entities/worlds/vesta.md",
+      "universes/starfall/entities/polities/",
+      "universes/starfall/entities/settlements/vesta-yards.md",
+      "universes/starfall/entities/star-systems/"
+    ]
+  },
+  {
+    "message": "Plan The Long Dark and outline Ember",
+    "date": "2026-01-25T19:10:00+00:00",
+    "final": [
+      "universes/starfall/entities/worlds/velari-prime.md",
+      "universes/starfall/entities/settlements/halcyon-relay.md",
+      "universes/starfall/entities/worlds/ostrel.md",
+      "universes/starfall/entities/worlds/tamber.md",
+      "universes/starfall/entities/settlements/kessan-station.md",
+      "universes/starfall/entities/settlements/ostrel-skim.md",
+      "universes/starfall/series/long-dark/books/ember/entities/events/ambush-at-kessan-reach.md",
+      "universes/starfall/series/long-dark/entities/characters/halden-pike.md",
+      "universes/starfall/series/long-dark/entities/characters/joss-marrable.md",
+      "universes/starfall/series/long-dark/entities/characters/tomas-reyne.md",
+      "universes/starfall/series/long-dark/entities/ship-classes/",
+      "universes/starfall/series/long-dark/entities/ships/lantern.md"
+    ]
+  },
+  {
+    "message": "Ember, chapters 1 to 14: the Tessaly goes silent, the first dead station",
+    "date": "2026-03-08T20:45:00+00:00",
+    "final": [
+      "universes/starfall/series/long-dark/books/ember/entities/events/first-dead-station.md",
+      "universes/starfall/series/long-dark/books/ember/entities/events/tessaly-goes-silent.md",
+      "universes/starfall/series/long-dark/books/ember/entities/items/",
+      "universes/starfall/series/long-dark/entities/threads/what-the-logs-were-cut-off-from-saying.md"
+    ]
+  },
+  {
+    "message": "Ember, chapters 15 to 30: the cut logs, the ambush, the Velari are alive",
+    "date": "2026-05-17T21:05:00+00:00",
+    "final": [
+      "universes/starfall/series/long-dark/books/ember/outline.md"
+    ]
+  },
+  {
+    "message": "Freeze book 'ember' of universe 'starfall'",
+    "date": "2026-06-14T10:00:00+00:00",
+    "final": [
+      "universes/starfall/series/long-dark/books/ember/book.md"
+    ],
+    "tag": "book/starfall/ember/final",
+    "tagMessage": "Freeze book 'ember' of universe 'starfall'."
+  },
+  {
+    "message": "Plan Ash: Brandt comes back, the traitor and the crews are undecided",
+    "date": "2026-07-05T18:20:00+00:00",
+    "remove": [
+      "universes/starfall/series/long-dark/entities/ideas/ilse-part-velari.md"
+    ],
+    "final": [
+      "universes/starfall/series/long-dark/books/ash/book.md",
+      "universes/starfall/series/long-dark/books/ash/entities/",
+      "universes/starfall/series/long-dark/entities/characters/ilse-tarrow.md",
+      "universes/starfall/series/long-dark/entities/ships/tessaly.md",
+      "universes/starfall/series/long-dark/entities/threads/the-access-codes.md",
+      "universes/starfall/series/long-dark/entities/threads/the-silent-stations.md",
+      "universes/starfall/series/long-dark/entities/threads/who-buried-the-records.md",
+      "universes/starfall/series/long-dark/series.md"
+    ]
+  },
+  {
+    "message": "Retcon: there was no plague",
+    "date": "2026-08-02T22:15:00+00:00",
+    "final": [
+      "universes/starfall/entities/notes/velari-plague.md",
+      "universes/starfall/entities/species/velari.md",
+      "universes/starfall/entities/technologies/relay-network.md"
+    ]
+  },
+  {
+    "message": "Ash to chapter 12, and A Quiet Moon",
+    "date": "2026-10-18T20:30:00+00:00",
+    "final": [
+      "README.md",
+      "universes/starfall/books/a-quiet-moon/",
+      "universes/starfall/series/long-dark/books/ash/outline.md",
+      "universes/starfall/universe.md"
+    ]
+  }
+]

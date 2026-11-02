@@ -1,0 +1,10 @@
+fields:
+  rank:
+    type: string
+    temporal: true
+    description: Military rank.
+  posting:
+    type: ref
+    to: [location]
+    temporal: true
+    description: The ship or place they're assigned to.

@@ -138,7 +138,7 @@ name: Ilse Tarrow
 aliases: [Tarrow, "the Commander"]
 status: canon                    # see format.md §9.3 for all six
 fields:
-  species: "[[velari]]"
+  species: human
   rank:
     - { value: Lieutenant, from: "ember:1" }
     - { value: Commander,  from: "ember:22" }
@@ -2571,15 +2571,16 @@ demos, and test fixtures.
   told in dated journals and letters by several narrators, which makes it a
   well-known, checkable test of timelines, POV, and story position vs.
   in-world time. Readers can verify its accuracy for themselves.
-- **Invented series** (full): the universe **Starfall**, with the original
-  two-book series *The Long Dark*: *Ember* frozen and *Ash* in progress. A
-  relay network connects the settled worlds of the Kessan Reach, and one by
-  one its stations are going silent. Lieutenant Ilse Tarrow commands the
-  *Lantern*, an aging survey ship sent to find out why. A standalone, *A Quiet
-  Moon*, sits beside the series. It shows ideas, open threads, a retcon,
-  outline rows continuing across books, and packs. It ships with **history**:
-  a script replays a series of snapshots into a fresh git repo, so the
-  versioning features have something real to show.
+- **`starfall`** (full, invented): the universe **Starfall**, with the
+  original two-book series *The Long Dark*: *Ember* frozen and *Ash* in
+  progress. A relay network connects the settled worlds of the Kessan Reach,
+  and one by one its stations are going silent. Lieutenant Ilse Tarrow's ship,
+  the *Tessaly*, goes silent too, and she's left with the *Lantern*, an aging
+  survey ship, to find out why. A standalone, *A Quiet Moon*, sits beside the
+  series. It shows ideas, open threads, a retcon, outline rows continuing
+  across books, and packs. It ships with **history**: a script
+  (`scripts/starfall-history/replay.mjs`) replays a series of snapshots into a
+  fresh git repo, so the versioning features have something real to show.
 - **Possible later sample:** the Oz series, whose author contradicted
   himself often across 14 books. It would be a good stress test for
   continuity checks.

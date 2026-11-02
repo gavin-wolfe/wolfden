@@ -37,7 +37,8 @@ technical to use it.
   already buttons, with git doing the work underneath. You can keep editing
   the markdown files in [Obsidian](https://obsidian.md) or VS Code side by
   side with the app. To see what a den looks like, browse the
-  [Dracula sample](samples/dracula/).
+  [Dracula sample](samples/dracula/), or the invented
+  [Starfall sample](samples/starfall/), which comes with version history.
 
 ## Try it
 
@@ -94,7 +95,8 @@ Obsidian, see [Using Wolfden](docs/using-wolfden.md).
 ## License
 
 Code: [MIT](LICENSE). The built-in packs in `packs/` (types and
-templates): [MIT-0](packs/LICENSE). Sample datasets in `samples/`:
+templates): [MIT-0](packs/LICENSE). Sample datasets in `samples/`,
+and the older versions of a sample in `scripts/starfall-history/versions/`:
 [CC-BY-4.0](samples/LICENSE).
 
 **Your writing is yours.** Wolfden's licenses cover Wolfden itself. They

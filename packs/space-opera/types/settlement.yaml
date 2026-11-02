@@ -1,0 +1,34 @@
+name: Settlement
+plural: settlements
+description: >-
+  A place people live or work, on a world or off one: a city, a colony, an
+  orbital station, a mining outpost.
+fields:
+  part_of:
+    type: ref
+    to: [planet, star-system, location]
+    description: The planet it's on or orbits, or the star system if neither.
+  kind:
+    type: text
+    description: What sort of place it is, such as a colony or a relay station.
+  population:
+    type: text
+    temporal: true
+    description: >-
+      How many live here, in the story's own terms, such as "a few thousand"
+      or "abandoned".
+  controlled_by:
+    type: ref
+    to: [polity, faction]
+    temporal: true
+    description: The polity or group that holds it.
+sections:
+  - name: Overview
+    description: What the place is and why it matters, in a paragraph.
+  - name: Description
+    description: What it looks, sounds, and smells like.
+  - name: Society
+    description: Who lives here and how they get by.
+  - name: History
+    description: What happened here before and during the story.
+template: settlement.md

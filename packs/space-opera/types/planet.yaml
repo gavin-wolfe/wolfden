@@ -1,0 +1,32 @@
+name: Planet
+plural: planets
+description: A world of any kind, including a moon.
+fields:
+  part_of:
+    type: ref
+    to: [star-system, planet, location]
+    description: The star system it's in, or the planet a moon circles.
+  kind:
+    type: text
+    description: What sort of world it is, such as an ocean world or a moon.
+  population:
+    type: text
+    temporal: true
+    description: >-
+      How many live here, in the story's own terms, such as "about 40
+      million" or "abandoned".
+  controlled_by:
+    type: ref
+    to: [polity, faction]
+    temporal: true
+    description: The polity or group that holds it.
+sections:
+  - name: Overview
+    description: What the world is and why it matters, in a paragraph.
+  - name: Environment
+    description: Its climate, gravity, air, and what it takes to live there.
+  - name: Society
+    description: Who lives here and how they get by.
+  - name: History
+    description: What happened here before and during the story.
+template: planet.md

@@ -38,7 +38,7 @@ public sealed class BuiltInPacks : IDenStore
     /// <summary>The built-in packs' files, as embedded.</summary>
     public static BuiltInPacks Instance => Shared.Value;
 
-    /// <summary>The keys of the built-in packs, in ASCII order. In v0, only <c>core</c>.</summary>
+    /// <summary>The keys of the built-in packs, in ASCII order.</summary>
     public IReadOnlyList<string> Keys { get; }
 
     /// <summary>Parsed pack files. They never change while the process runs, so each is parsed once.</summary>

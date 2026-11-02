@@ -26,14 +26,15 @@ repository.
 8. [Chapter fields](#8-chapter-fields)
 9. [The core pack](#9-the-core-pack)
 10. [Appendix: a den-local pack](#10-appendix-a-den-local-pack)
+11. [The space opera pack](#11-the-space-opera-pack)
 
 ## 1. Conventions
 
 Requirement words, rule ids, severities, and notation are as in
 format.md §1. Rules in this document use the areas `F-PACK` (packs and
 combining), `F-TYPE` (type definitions and sections), `F-FT` (fields and
-field types), `F-TPL` (templates), `F-CHAP` (chapter fields), and `F-CORE`
-(the core pack).
+field types), `F-TPL` (templates), `F-CHAP` (chapter fields), `F-CORE`
+(the core pack), and `F-SPACE` (the space opera pack).
 
 **Pack files** are the files in a pack folder (§2.1): `pack.yaml`,
 `chapter.yaml`, type files, extension files, and templates. They are den
@@ -83,11 +84,11 @@ document expects a `.yaml` one (`pack.yml`, `chapter.yml`, or a `.yml`
 file in `types/` or `extensions/`): it is a [warning] ("did you mean
 ship.yaml?"), and it is not read.
 
-**F-PACK-4.** **Built-in** packs ship with Wolfden. In v0 the only
-built-in pack is `core` (§9). Its source is the `packs/core/` folder of the
-Wolfden repository, and it has the same layout as any other pack. Later
-milestones add other built-in packs (space opera and epic fantasy, M5)
-the same way.
+**F-PACK-4.** **Built-in** packs ship with Wolfden: `core` (§9) and
+`space-opera` (§11). The source of each is a folder of the same name in
+the Wolfden repository's `packs/` folder, and it has the same layout as
+any other pack. Later milestones add other built-in packs (epic fantasy,
+M5) the same way.
 
 **F-PACK-5.** A **den-local** pack is a folder directly in the den's
 `packs/` folder (format.md §5.1) that holds a `pack.yaml`. A folder there
@@ -1130,7 +1131,8 @@ chapter that differs, such as a flashback whose date and POV are out of
 step with the chapters around it, sets its own. `when` works the same way
 for the story's present: a space opera can set a far-future date once in
 `chapter_defaults` and override it as time moves on, and `setting` can
-link each chapter to the planet or star system where it happens. Made-up
+link each chapter to the place where it happens (for a place that is a
+type from another pack, see F-SPACE-2). Made-up
 calendars such as stardates wait for #37. A multi-POV book may set
 `pov` on every chapter. No check ties `pov` to `narration`. These fields
 are independent of an outline's `pov` column (F-OUT-9), which is per row.
@@ -1232,9 +1234,91 @@ character's sections end with core's `Open questions`, then the
 extension's `Service record`. A ship with no `condition` shows as
 `active`, marked as a default.
 
-If the den later enables a built-in pack that also defines `ship`, the
-den-local `ship` is still used, and the built-in one is ignored, with the
+If the den later enables a built-in pack that also defines `ship`, such as
+`space-opera` (§11), the den-local `ship` is still used, and the built-in one is ignored, with the
 F-TYPE-4 warning on `packs/starfall/types/ship.yaml` (F-PACK-11). The den
 means what it meant before. To adopt the built-in type instead, the den
 drops its own `types/ship.yaml` and moves any fields the built-in type
 lacks into `extensions/ship.yaml`.
+
+## 11. The space opera pack
+
+**F-SPACE-1.** The `space-opera` pack is built in, and enabled by listing
+it in `den.yaml` (F-PACK-7): `packs: [space-opera]`. It defines the eight
+types below, and no chapter fields or extensions. Its files, in
+[`packs/space-opera/`](../packs/space-opera/), are normative, as
+F-CORE-1 says of core's. Like core, it has no required fields, no required
+sections, and no defaults, and each type has a template.
+
+| Type | Folder | Fields | Standard sections |
+|---|---|---|---|
+| `star-system` | `star-systems` | `part_of`, `stars`, `controlled_by`\* | Overview, Description, Routes, History |
+| `planet` | `planets` | `part_of`, `kind`, `population`\*, `controlled_by`\* | Overview, Environment, Society, History |
+| `settlement` | `settlements` | `part_of`, `kind`, `population`\*, `controlled_by`\* | Overview, Description, Society, History |
+| `species` | `species` | `kind`, `homeworld`, `lifespan`, `population`\* | Overview, Biology, Culture, History |
+| `polity` | `polities` | `government`\*, `leader`\*, `capital`\*, `part_of`\* | Overview, Government, Goals, Military, History |
+| `ship-class` | `ship-classes` | `role`, `builder`, `crew`, `technologies` | Overview, Design, Capabilities, History |
+| `ship` | `ships` | `class`, `captain`\*, `owner`\*, `location`\*, `condition`\* | Overview, Description, Crew, Service history |
+| `technology` | `technologies` | `kind`, `created_by`, `controlled_by`\*, `introduced` | Overview, How it works, Limits, Consequences, History, Open questions |
+
+\* temporal. Every type also has `row` and `placeholder` (§5.5).
+
+| Field | Type | On |
+|---|---|---|
+| `part_of` | `ref` | star-system: to `location`; planet: to `star-system`, `planet` (a moon's planet), or `location`; settlement: to `planet`, `star-system`, or `location`; polity: to `polity` or `faction`, and temporal, since a state can join or leave a league |
+| `controlled_by` | `ref` to `polity` or `faction` | star-system, planet, settlement, technology |
+| `stars` | `text` | star-system |
+| `kind` | `text` | planet, settlement, species, technology: what sort of one it is |
+| `population` | `text` | planet, settlement, species: how many, in the story's own terms |
+| `homeworld` | `ref` to `planet` or `location` | species |
+| `lifespan` | `text` | species |
+| `government` | `text` | polity |
+| `leader` | `ref` to `character` | polity |
+| `capital` | `ref` to `planet`, `settlement`, or `location` | polity |
+| `role`, `crew` | `text` | ship-class |
+| `builder` | `ref` to `polity` or `faction` | ship-class |
+| `technologies` | list of `ref` to `technology` | ship-class |
+| `class` | `ref` to `ship-class` | ship |
+| `captain` | `ref` to `character` | ship |
+| `owner` | `ref` to `character`, `polity`, or `faction` | ship |
+| `location` | `ref` to `star-system`, `planet`, `settlement`, or `location` | ship |
+| `condition` | `text` | ship |
+| `created_by` | `ref` to `character`, `species`, `polity`, or `faction` | technology |
+| `introduced` | `date` | technology |
+
+Where a field here links to a place or a group, it also takes core's
+`location` or `faction`, so a den can keep a region or a guild as a core
+note. A character's `species` is core's text field, which can hold a link
+to a `species` note (§9). A rank or a posting is left to a den's extension
+(§10).
+
+**F-SPACE-2.** The pack's types are not core types, and a pack can't change
+a field it doesn't define (F-TYPE-8). So a core field that links to
+`location` or `faction`, such as the chapter field `setting`, an event's
+`location`, a character's `factions`, or a location's `part_of`, gets the
+F-LINK-11 warning when it links to a planet or a polity. The link still
+resolves and shows. A den that wants to link these freely redefines each
+field in its own pack, whose definition wins (F-PACK-11). Each redefined
+field is one clash warning on the den's file, which stays for as long as
+the den redefines it, so a den that widens four fields has four warnings.
+A chapter field goes in the pack's `chapter.yaml`, and a field of a core
+type, such as a character's or a faction's, in `extensions/<type>.yaml`:
+
+```yaml
+# packs/starfall/chapter.yaml
+fields:
+  setting:
+    type: ref
+    to: [location, star-system, planet, settlement, ship]
+    list: true
+```
+
+```yaml
+# packs/starfall/extensions/character.yaml
+fields:
+  factions:
+    type: ref
+    to: [faction, polity]
+    list: true
+    temporal: true
+```

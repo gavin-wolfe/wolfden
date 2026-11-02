@@ -40,7 +40,7 @@ internal static class NewCommand
         den's files only; nothing is committed.
 
           <type>              the type's key, such as 'character', 'location', or
-                              a type your den's own packs define
+                              a type from a pack your den enables
           <name>              the note's name (quote a name with spaces)
           --in <scope>        where it goes: '<universe>' (or '<universe>/') for
                               universe scope, or '<universe>/<key>' for a series

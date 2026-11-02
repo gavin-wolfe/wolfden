@@ -1,0 +1,32 @@
+name: Species
+plural: species
+description: >-
+  A kind of being, human or otherwise. A character's `species` field can
+  link here.
+fields:
+  kind:
+    type: text
+    description: What sort of life it is, such as a hive mind or a machine.
+  homeworld:
+    type: ref
+    to: [planet, location]
+    description: The world it comes from.
+  lifespan:
+    type: text
+    description: How long one lives, such as "about 300 years".
+  population:
+    type: text
+    temporal: true
+    description: >-
+      How many are left and where, in the story's own terms, such as
+      "spread across the Reach" or "thought extinct".
+sections:
+  - name: Overview
+    description: What they are, in a paragraph.
+  - name: Biology
+    description: Their bodies, senses, and needs.
+  - name: Culture
+    description: How they live, and how they see everyone else.
+  - name: History
+    description: Where they came from and how they have changed.
+template: species.md

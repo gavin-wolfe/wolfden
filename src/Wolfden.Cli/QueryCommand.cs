@@ -49,8 +49,9 @@ internal static partial class QueryCommand
                               the universe
           --book <key>        only entities filed in this book, its series, or
                               the universe
-          --type <type>       only entities of this type, such as 'character';
-                              give it more than once for several types
+          --type <type>       only entities of this type or a kind of it, so
+                              'location' also finds a den's worlds; give it
+                              more than once for several types
           --entity <name>     only this entity, named as a link would name it:
                               by name, alias, file name, or id, among the
                               entities the reader has met by then
@@ -191,7 +192,8 @@ internal static partial class QueryCommand
         {
             // Defined types (built-in and den-local packs), plus any type an
             // entity uses without a definition (F-ENT-2), so it can still be picked out.
-            var known = DenStructure.Load(root).Types.Types.Select(t => t.Key)
+            var denTypes = DenStructure.Load(root).Types;
+            var known = denTypes.Types.Select(t => t.Key)
                 .Concat(db.Entities.Where(e => e.UniverseId == universeId).Select(e => e.Type).Distinct())
                 .ToHashSet(StringComparer.Ordinal);
             if (types.FirstOrDefault(t => !known.Contains(t)) is { } unknown)
@@ -200,8 +202,10 @@ internal static partial class QueryCommand
                 return null;
             }
 
-            view = view with { Entities = view.Entities.Where(e => types.Contains(e.Type)).ToList() };
-            met = met.Where(e => types.Contains(e.Type)).ToList();
+            // A type and its kinds (types.md F-TYPE-13).
+            var matching = denTypes.WithKinds(types);
+            view = view with { Entities = view.Entities.Where(e => matching.Contains(e.Type)).ToList() };
+            met = met.Where(e => matching.Contains(e.Type)).ToList();
         }
 
         if (line.Value("--entity") is { } name)

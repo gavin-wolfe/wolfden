@@ -199,7 +199,7 @@ prompts. This list is for knowing what the assistant can do.
 |---|---|
 | `search` | Full-text search over names, aliases, leads, section text, and field values (a link in a field matches its note's name and aliases too); `field` searches one field's values. A hit in a field has `field` (its name) and `line` (the entry's line), with no `section`, such as `{"field": "occupation", "line": 10, "snippet": "[physician], professor", …}`. A query's words match anywhere in any order; words in double quotes (`"silver key"`) match as a phrase, side by side and in order. |
 | `get_entity` | One entity, by name, alias, file name, id, key, or path; with `as_of`, only what the reader knows at that position. |
-| `list_entities` | Entities by type, status, series, or book. |
+| `list_entities` | Entities by type, status, series, or book. A type includes its kinds here and in `search` and `canon_as_of`: `location` also finds a den's worlds ([types.md F-TYPE-13](types.md#3-type-definitions)), and each result says its own type. |
 | `canon_as_of` | Canon at a story position (or the end of the story), pinned canon first. |
 | `get_chapter` | A book's chapters and their fields, with each value's source (the chapter, or `chapter_defaults` above it), and each chapter's `heading`: its title, then the fields a `chapter_heading` lists, such as `"Ardent — Vesta Yards, 2350-04-12"`. A field the chapter writes with a value that's ignored is listed in the chapter's `ignored`, as written and why, such as `{"field": "setting", "as_written": "Whitby harbour", "reason": "setting is a link to one entity, …"}`; a list item that's left out has its number in `item`. A field written with no value (null) isn't a fault, so it isn't listed. |
 | `get_chapter_defaults` | A universe's, series', or book's `chapter_defaults`, and the books they reach. A default written with a value that's ignored has `ignored: true`, the value in `written`, and why in `reason`. |
@@ -294,10 +294,6 @@ fewer words; this list is for you, and for an assistant that reads the
 docs. The writer's own list is in
 [using-wolfden.md](using-wolfden.md#gotchas).
 
-- **A type filter is exact.** `list_entities` with `type: location` lists
-  location notes only, and misses a planet or a ship that's a kind of
-  location ([types.md F-TYPE-13](types.md#3-type-definitions)). The same
-  goes for `search` and `canon_as_of`. Ask for each type you want.
 - **Work through the tools, not the files.** An assistant that can
   also edit files, such as Claude Code, should still change notes with
   Wolfden's tools. They check each edit as the den reads it, keep

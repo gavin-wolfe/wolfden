@@ -300,10 +300,15 @@ kind_of: [ship, character]
   depends on those, such as a thread's `## Payoff` (F-CORE-4), stays with
   the type that defines it. It goes one way: a location isn't accepted
   where a `to` names only `planet`.
-- Nothing else follows it. A note's `type` is still its own, and filtering
-  notes by type (`list_entities`, `search`, `canon_as_of`) matches that
-  type only. There are no abstract types: a den can define `vehicle` as an
-  ordinary type and never make a note of it.
+- A filter by type includes its kinds. In `list_entities`, `search`, and
+  `canon_as_of`, and their API, CLI, and web equivalents, `location` also
+  finds worlds and ships, and `world` finds worlds and any kinds of world, such
+  as moons, but not other locations. A note found by several routes comes
+  once. There's no way to ask for exactly one type for now.
+- Nothing else follows it. A note's `type` is still its own, which is what
+  results show, and lists and folders still group by it. There are no abstract
+  types: a den can define `vehicle` as an ordinary type and never make a note
+  of it.
 - A parent that isn't an enabled type is a [warning] on the file that names
   it, and that parent is ignored. If a den-local type took the parent's
   folder and so replaced it (F-TYPE-5), and a built-in type names it, the

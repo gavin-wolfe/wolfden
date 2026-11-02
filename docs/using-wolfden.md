@@ -240,8 +240,10 @@ character's `factions` can link to a polity, and the polity's page lists
 those characters as a faction's page does. A link that's neither, such as a
 `setting` that links to a character, still gets a warning from
 `wolfden check`. A kind of location is still its own type, though: it has
-its own fields and folder, and asking for notes of type `location` doesn't
-list your planets.
+its own fields and folder, and each note still shows its own type. Asking
+for notes of type `location`, in a search or from your AI assistant, finds
+your worlds and ships too, and asking for `world` finds worlds and moons but
+no other locations.
 
 The full list is in [types.md §11](types.md#11-the-space-opera-pack).
 
@@ -271,7 +273,8 @@ plural: sentient-ships
 kind_of: [ship, character]
 ```
 
-- **It's only about what links accept.** The type gets none of its parents'
+- **It's only about what links accept and what filters find.** Asking for
+  a parent finds its kinds too. The type gets none of its parents'
   fields, sections, or template. Give it the ones it needs, or leave them
   out.
 - **You can add a parent to a type you don't own**, in your pack's

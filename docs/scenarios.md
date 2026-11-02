@@ -915,18 +915,50 @@ With the pack on, a character's `factions` links to the Reach Compact, a
   `setting` works the same way.
 - A warning's example link for a ref field can be a kind of its type.
 - The den's list of types says what each is a kind of.
-- A lookup or a filter by type `faction`, in `list_entities`, `search`, or
-  `canon_as_of`, is that type only, so it doesn't list the polity.
+- A lookup by type `faction` finds the polity too, and a filter by type does
+  (SC-CHECK-52).
 
 Spec: types.md F-TYPE-13, §9 "Faction", design.md §9 (#265). Covered by:
 `KindOfEndpointTests.APolitysPageListsItsMembersAsAFactionsDoes`,
 `KindOfEndpointTests.ARefsFieldTypeSaysWhichTypesItsPickerOffers`,
 `KindOfEndpointTests.TheTypeListSaysWhatEachTypeIsAKindOf`,
 `KindOfEndpointTests.AChapterFieldSaysWhichTypesItsPickerOffers`,
-`KindOfEndpointTests.FilteringByTypeMatchesANotesOwnTypeOnly` (API),
 `TypeKindOfTests.AnExampleLinkCanBeAKindOfTheFieldsType`,
 `FieldEditing.test.tsx` "looks up what a field accepts, so a kind of its
 type is offered too" (web).
+
+### SC-CHECK-52. Asking for locations finds my worlds
+
+The writer's den has the pack on and a pack of its own: a `moon` is a kind of
+`world`, a `sentient-ship` is a kind of `ship` and of `character`,
+and an `orbital-habitat` is a kind of `ship` and of `settlement`, so it
+reaches `location` by two routes. They or their assistant filter by type, in
+`list_entities`, `search`, `canon_as_of`, the API, `wolfden query --type`, or
+the search page.
+
+- `location` finds every one of these: locations, worlds, moons,
+  settlements, ships, sentient ships, and orbital habitats, each once.
+- `world` finds worlds and moons, and no other location.
+- `character` finds characters and sentient ships.
+- Each result shows its own type, so a moon says `moon`. A canon
+  view's order is as it was (F-VIEW-3).
+- At a position, a kind the reader hasn't met stays out.
+- A type with no kinds finds what it did, a type only a note uses finds that
+  note, and a type nothing knows is still refused (`unknown_type`).
+- The search page's Type filter also offers what the types of the notes the
+  reader has met are kinds of, so a den with worlds and no location notes
+  can still ask for `location`. Sidebar groups and folders don't change.
+
+Spec: types.md F-TYPE-13 (#269). Covered by:
+`KindOfEndpointTests.FilteringByTypeIncludesItsKinds`,
+`KindOfEndpointTests.AMixedCanonListKeepsItsOrder`,
+`KindOfEndpointTests.AKindTheReaderHasntMetStaysOutOfAFilterAtAPosition`,
+`KindOfEndpointTests.ATypeWithNoKindsAndAnUnknownTypeBehaveAsBefore` (API),
+`TypeKindOfTests.AFilterMatchesATypeAndItsKinds` (core),
+`McpServerTests.AToolsTypeFilterIncludesKindsOfTheTypeAndShowsEachOwnType` (MCP),
+`QueryCommandTests.ATypeFilterIncludesKindsOfTheType` (CLI),
+`Search.test.tsx` "offers what a met type is a kind of in the Type filter, as
+filtering by it includes its kinds" (web).
 
 ## RT: saving a note keeps what the writer wrote
 

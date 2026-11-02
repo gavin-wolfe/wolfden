@@ -185,6 +185,30 @@ public sealed class QueryCommandTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "SC-CHECK-52")]
+    public void ATypeFilterIncludesKindsOfTheType()
+    {
+        _den.Write("den.yaml", _den.Read("den.yaml") + "packs: [starfall]\n");
+        _den.Write("packs/starfall/pack.yaml", "name: Starfall\n");
+        _den.Write("packs/starfall/types/world.yaml", "name: World\nplural: worlds\nkind_of: location\n");
+        _den.Write("packs/starfall/types/moon.yaml", "name: Moon\nplural: moons\nkind_of: world\n");
+        _den.Write("universes/dracula/entities/worlds/vesta.md", "---\ntype: world\nname: Vesta\nstatus: canon\n---\n# Vesta\n");
+        _den.Write("universes/dracula/entities/moons/little-vesta.md", "---\ntype: moon\nname: Little Vesta\nstatus: canon\n---\n# Little Vesta\n");
+
+        var (_, locations, _) = Query("--brief", "--type", "location");
+        var (_, worlds, _) = Query("--brief", "--type", "world");
+        var (_, picked, _) = Query("--brief", "--type", "location", "--entity", "Little Vesta");
+
+        Assert.Contains("- Vesta (world, canon,", locations, StringComparison.Ordinal);
+        Assert.Contains("- Little Vesta (moon, canon,", locations, StringComparison.Ordinal);
+        Assert.Contains("(location, canon,", locations, StringComparison.Ordinal);
+        Assert.Contains("- Vesta (world, canon,", worlds, StringComparison.Ordinal);
+        Assert.Contains("- Little Vesta (moon, canon,", worlds, StringComparison.Ordinal);
+        Assert.DoesNotContain("(location, canon,", worlds, StringComparison.Ordinal);
+        Assert.Contains("- Little Vesta (moon, canon,", picked, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void QueryWritesOnlyTheIndex()
     {
         var before = Cli.Snapshot(_den.Root);

@@ -53,6 +53,26 @@ public class TypeKindOfTests
     }
 
     [Fact]
+    [Trait("Scenario", "SC-CHECK-52")]
+    public void AFilterMatchesATypeAndItsKinds()
+    {
+        // The den's own world, so this holds whichever types the pack names.
+        var types = Types(
+            Own()
+            .With("packs/starfall/types/world.yaml", "name: World\nplural: worlds\nkind_of: location\n")
+            .With("packs/starfall/types/moon.yaml", "name: Moon\nplural: moons\nkind_of: world\n")
+            .With("packs/starfall/types/sentient-ship.yaml", "name: Sentient Ship\nplural: sentient-ships\nkind_of: [ship, character]\n"));
+
+        Assert.Equal(["moon", "world"], types.WithKinds(["world"]).Order(StringComparer.Ordinal));
+        Assert.Equal(["character", "sentient-ship"], types.WithKinds(["character"]).Order(StringComparer.Ordinal));
+        Assert.Equal(["species"], types.WithKinds(["species"]));
+
+        // A type no pack defines is only itself, and a kind named too counts once.
+        Assert.Equal(["zeppelin"], types.WithKinds(["zeppelin"]));
+        Assert.Equal(["moon", "world"], types.WithKinds(["world", "moon"]).Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-CHECK-48")]
     public void OnlyAKindIsAcceptedNotItsParentOrASibling()
     {

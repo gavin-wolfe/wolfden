@@ -85,6 +85,40 @@ public sealed class McpServerTests : IAsyncLifetime
     }
 
     [Fact]
+    [Trait("Scenario", "SC-CHECK-52")]
+    public async Task AToolsTypeFilterIncludesKindsOfTheTypeAndShowsEachOwnType()
+    {
+        _den.Write("den.yaml", _den.Read("den.yaml") + "packs: [space-opera, starfall]\n");
+        _den.Write("packs/starfall/pack.yaml", "name: Starfall\n");
+        // The den's own world, so this holds whichever types the pack names.
+        _den.Write("packs/starfall/types/world.yaml", "name: World\nplural: worlds\nkind_of: location\n");
+        _den.Write("packs/starfall/types/moon.yaml", "name: Moon\nplural: moons\nkind_of: world\n");
+        _den.Write("universes/dracula/entities/worlds/vesta.md", "---\ntype: world\nname: Vesta\nstatus: canon\n---\n# Vesta\n");
+        _den.Write("universes/dracula/entities/moons/little-vesta.md", "---\ntype: moon\nname: Little Vesta\nstatus: canon\n---\n# Little Vesta\n");
+
+        async Task<Dictionary<string, string>> Listed(string type)
+        {
+            var result = await Call("list_entities", new() { ["type"] = type });
+            Assert.NotEqual(true, result.IsError);
+            using var json = JsonDocument.Parse(Text(result));
+            return json.RootElement.GetProperty("entities").EnumerateArray()
+                .ToDictionary(e => e.GetProperty("name").GetString()!, e => e.GetProperty("type").GetString()!);
+        }
+
+        var locations = await Listed("location");
+        Assert.Equal("world", locations["Vesta"]);
+        Assert.Equal("moon", locations["Little Vesta"]);
+        Assert.Contains("location", locations.Values);
+
+        Assert.Equal(new Dictionary<string, string> { ["Vesta"] = "world", ["Little Vesta"] = "moon" }, await Listed("world"));
+
+        // The description says so, since agents read it.
+        var tools = await Client.ListToolsAsync(cancellationToken: TestContext.Current.CancellationToken);
+        var schema = tools.Single(t => t.Name == "list_entities").JsonSchema.GetProperty("properties").GetProperty("type");
+        Assert.Contains("a kind of it", schema.GetProperty("description").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-MCP-10")]
     public async Task EachToolAnswersWithJson()
     {

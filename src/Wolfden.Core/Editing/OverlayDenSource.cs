@@ -66,6 +66,9 @@ public sealed class OverlayDenSource : IDenSource
     public bool FolderExists(string path) => _den.FolderExists(path) || Below(path).Any();
 
     /// <inheritdoc />
+    public bool CannotList(string path) => _den.CannotList(path);
+
+    /// <inheritdoc />
     public IEnumerable<string> GetFolderLinks(string path) => _den.GetFolderLinks(path);
 
     /// <summary>The overlay's paths under folder <paramref name="path"/>, relative to it.</summary>

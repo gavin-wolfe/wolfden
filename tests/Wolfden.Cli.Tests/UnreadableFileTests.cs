@@ -1,11 +1,13 @@
 using System.Runtime.Versioning;
+using System.Text.Json;
 
 namespace Wolfden.Cli.Tests;
 
 /// <summary>
 /// <c>check</c>, <c>index</c>, and <c>query</c> don't fail on a note they
 /// can't read: it's left out, as if it weren't there (#112). The index
-/// tests cover broken links and the watcher.
+/// tests cover broken links and the watcher. <c>check</c> also lists it, as an
+/// error (F-GEN-5, #284).
 /// </summary>
 public sealed class UnreadableFileTests
 {
@@ -18,14 +20,22 @@ public sealed class UnreadableFileTests
         using var den = TempDen.DraculaCopy();
         using var deleted = TempDen.DraculaCopy();
         File.Delete(Full(deleted.Root, Jonathan));
-        var (expectedExit, expected, _) = Cli.Run("check", deleted.Root);
+        var (_, expected, _) = Cli.Run("check", deleted.Root);
 
         using (Unreadable(Full(den.Root, Jonathan)))
         {
             var (checkExit, check, checkError) = Cli.Run("check", den.Root);
-            Assert.Equal(expectedExit, checkExit);
-            Assert.Equal(expected.Replace(deleted.Root, "<den>", StringComparison.Ordinal), check.Replace(den.Root, "<den>", StringComparison.Ordinal));
+            Assert.Equal(CliApp.ExitErrors, checkExit);
+            Assert.Contains($"{Jonathan}: error F-GEN-5: This file couldn't be read", check, StringComparison.Ordinal);
+            Assert.Equal(WithoutUnreadable(expected), WithoutUnreadable(check));
             Assert.Empty(checkError);
+
+            var (jsonExit, json, _) = Cli.Run("check", den.Root, "--json");
+            Assert.Equal(CliApp.ExitErrors, jsonExit);
+            using var report = JsonDocument.Parse(json);
+            var found = Assert.Single(report.RootElement.GetProperty("diagnostics").EnumerateArray(), d => d.GetProperty("rule").GetString() == "F-GEN-5");
+            Assert.Equal(Jonathan, found.GetProperty("path").GetString());
+            Assert.Equal("error", found.GetProperty("severity").GetString());
 
             var (indexExit, _, indexError) = Cli.Run("index", "--den", den.Root);
             Assert.Equal(CliApp.ExitOk, indexExit);
@@ -41,6 +51,10 @@ public sealed class UnreadableFileTests
         var (_, after, _) = Cli.Run("query", "--den", den.Root, "--at", "dracula:12", "--brief", "--type", "character");
         Assert.Contains(Jonathan, after, StringComparison.Ordinal);
     }
+
+    /// <summary>The check's output without the F-GEN-5 line and the summary, whose counts it changes.</summary>
+    private static IEnumerable<string> WithoutUnreadable(string output) =>
+        output.ReplaceLineEndings("\n").Split('\n').Where(l => !l.Contains("F-GEN-5", StringComparison.Ordinal) && !l.Contains("Checked ", StringComparison.Ordinal));
 
     private static string Full(string root, string path) => Path.Combine(root, path.Replace('/', Path.DirectorySeparatorChar));
 

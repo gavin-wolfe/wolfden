@@ -202,7 +202,24 @@ public sealed partial class DenTools
     // The shared read helpers the write tools use too (DenReader).
 
     /// <summary>Brings the index up to date, opens it, and runs <paramref name="query"/>, turning failures into tool errors.</summary>
-    private T WithIndex<T>(Func<DenIndex, T> query) => Reader.WithIndex(query);
+    /// <remarks>
+    /// The write tools find what they write through this. So a lookup that
+    /// fails because a file can't be read, a note or the <c>book.md</c> of the
+    /// book it's in, says that rather than that nothing matches (#284).
+    /// </remarks>
+    private T WithIndex<T>(Func<DenIndex, T> query)
+    {
+        try
+        {
+            return Reader.WithIndex(query);
+        }
+        catch (DenToolException e) when (e.Code is ToolErrorCodes.UnknownEntity or ToolErrorCodes.UnknownScope or ToolErrorCodes.UnknownUniverse
+            or ToolErrorCodes.NoUniverse or ToolErrorCodes.DenNotLoaded)
+        {
+            LoadWholeDen();
+            throw;
+        }
+    }
 
     /// <summary>The universe a call is about. See <see cref="DenReader.ChooseUniverse"/>.</summary>
     private ContainerRecord? ChooseUniverse(IndexDbContext db, string? universe, string? position, bool allowAll) =>

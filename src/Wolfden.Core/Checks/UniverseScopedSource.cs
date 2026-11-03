@@ -36,6 +36,8 @@ internal sealed class UniverseScopedSource : IDenSource
 
     public bool FolderExists(string path) => Allowed(path, isFile: false) && _inner.FolderExists(path);
 
+    public bool CannotList(string path) => Allowed(path, isFile: false) && _inner.CannotList(path);
+
     public IEnumerable<string> GetFolderLinks(string path) =>
         _inner.GetFolderLinks(path).Where(d => Allowed(Join(path, d), isFile: false)).ToList();
 

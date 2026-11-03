@@ -13,7 +13,8 @@ namespace Wolfden.Core.Checks;
 /// checks that only <c>check</c> runs: continuity and types
 /// (<see cref="ContinuityChecks"/>, <see cref="FieldChecks"/>), outlines
 /// (<see cref="OutlineChecks"/>), and layout (<see cref="LayoutChecks"/>). It reads the files
-/// directly, never the index, and never writes (F-ID-6).
+/// directly, never the index, and never writes (F-ID-6). A file or folder it
+/// couldn't read is reported too (F-GEN-5).
 /// </summary>
 public sealed class DenCheck
 {
@@ -92,9 +93,10 @@ public sealed class DenCheck
     /// <summary>Checks a den. Never throws for bad content: problems come back as <see cref="Diagnostics"/>.</summary>
     public static DenCheck Run(IDenSource source) => Run(source, idsElsewhere: null);
 
-    private static DenCheck Run(IDenSource source, IReadOnlyDictionary<string, IReadOnlyList<string>>? idsElsewhere)
+    private static DenCheck Run(IDenSource den, IReadOnlyDictionary<string, IReadOnlyList<string>>? idsElsewhere)
     {
-        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(den);
+        var source = new TrackingDenSource(den);
         var structure = DenStructure.Load(source);
         var catalog = EntityCatalog.Load(structure, source, idsElsewhere);
         var links = LinkIndex.Build(catalog, source);
@@ -105,6 +107,9 @@ public sealed class DenCheck
             .Concat(outlines)
             .Concat(structure.IsLoaded ? LayoutChecks.Run(catalog, source) : [])
             .Concat(ContinuityChecks.Run(catalog, source, rows))
+
+            // Last: everything above has read what it reads by now (F-GEN-5, #284).
+            .Concat(source.Unreadable.Select(u => u.ToDiagnostic()))
             .OrderBy(d => d.Path, StringComparer.Ordinal)
             .ThenBy(d => d.Diagnostic.Line ?? 0)
             .ThenBy(d => d.Diagnostic.RuleId, StringComparer.Ordinal)

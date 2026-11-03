@@ -9,6 +9,7 @@ namespace Wolfden.Cli.Tests;
 /// <c>check</c>, <c>index</c>, and <c>query</c> don't fail on a folder the
 /// user may not list: it's left out, as if it weren't there (#116). The
 /// index tests cover container folders, a stale index, and the watcher.
+/// <c>check</c> also lists it, as an error (F-GEN-5, #284).
 /// </summary>
 public sealed class UnlistableFolderTests
 {
@@ -22,13 +23,14 @@ public sealed class UnlistableFolderTests
         using var den = TempDen.DraculaCopy();
         using var deleted = TempDen.DraculaCopy();
         Directory.Delete(Full(deleted.Root, Characters), recursive: true);
-        var (expectedExit, expected, _) = Cli.Run("check", deleted.Root);
+        var (_, expected, _) = Cli.Run("check", deleted.Root);
 
         using (Unlistable(Full(den.Root, Characters)))
         {
             var (checkExit, check, checkError) = Cli.Run("check", den.Root);
-            Assert.Equal(expectedExit, checkExit);
-            Assert.Equal(expected.Replace(deleted.Root, "<den>", StringComparison.Ordinal), check.Replace(den.Root, "<den>", StringComparison.Ordinal));
+            Assert.Equal(CliApp.ExitErrors, checkExit);
+            Assert.Contains($"{Characters}: error F-GEN-5: This folder couldn't be listed", check, StringComparison.Ordinal);
+            Assert.Equal(WithoutUnreadable(expected), WithoutUnreadable(check));
             Assert.Empty(checkError);
 
             var (indexExit, _, indexError) = Cli.Run("index", "--den", den.Root);
@@ -45,6 +47,10 @@ public sealed class UnlistableFolderTests
         var (_, after, _) = Cli.Run("query", "--den", den.Root, "--at", "dracula:12", "--brief", "--type", "character");
         Assert.Contains(Jonathan, after, StringComparison.Ordinal);
     }
+
+    /// <summary>The check's output without the F-GEN-5 line and the summary, whose counts it changes.</summary>
+    private static IEnumerable<string> WithoutUnreadable(string output) =>
+        output.ReplaceLineEndings("\n").Split('\n').Where(l => !l.Contains("F-GEN-5", StringComparison.Ordinal) && !l.Contains("Checked ", StringComparison.Ordinal));
 
     private static string Full(string root, string path) => Path.Combine(root, path.Replace('/', Path.DirectorySeparatorChar));
 

@@ -41,7 +41,7 @@ public sealed partial class DenTools
         var (path, _) = Locate(entity, universe);
         var den = Snapshot();
         var structure = DenStructure.Load(den);
-        var bytes = den.TryReadFile(path) ?? throw Gone(path);
+        var bytes = den.TryReadFile(path) ?? throw GoneOrUnreadable(den, path);
         var read = EntityCatalog.ReadEntityFile(structure, path, bytes);
         var e = read.Entity ?? throw new DenToolException(
             ToolErrorCodes.InvalidEdit, $"{path} has errors now, so the den leaves it out and it can't be edited here. {ToolWords.Cap(Words.CheckFile(path))} to see them.");

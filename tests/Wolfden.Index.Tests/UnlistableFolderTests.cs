@@ -250,8 +250,9 @@ public sealed class UnlistableFolderTests
         AssertSameAsFullRebuild(den, "once the folder can be listed");
     }
 
+    /// <summary>The diagnostics, without the F-GEN-5 that says a folder couldn't be listed, which one deleted doesn't have (#284).</summary>
     private static List<string> Describe(DenCheck check) =>
-        check.Diagnostics.Select(d => $"{d.Path}|{d.Diagnostic.RuleId}|{d.Diagnostic.Line}|{d.Diagnostic.Message}").ToList();
+        check.Diagnostics.Where(d => d.Diagnostic.RuleId != "F-GEN-5").Select(d => $"{d.Path}|{d.Diagnostic.RuleId}|{d.Diagnostic.Line}|{d.Diagnostic.Message}").ToList();
 
     private static List<string> Entities(TempDen den) => EntityCatalog.Load(den.Root).Entities.Select(e => e.Path).ToList();
 

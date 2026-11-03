@@ -391,9 +391,7 @@ public sealed partial class DenTools
         var (path, _) = Locate(entity, universe);
         using (EnterWrite())
         {
-            var den = Snapshot();
-            var structure = DenStructure.Load(den);
-            var catalog = EntityCatalog.Load(structure, den);
+            var (den, structure, catalog, links) = LoadWholeDen();
             var target = catalog.FindByPath(path) ?? throw (den.FileExists(path)
                 ? new DenToolException(
                     ToolErrorCodes.InvalidEdit, $"{path} has errors now, so the den leaves it out and it can't be edited here. {ToolWords.Cap(Words.CheckFile(path))} to see them.")
@@ -408,7 +406,6 @@ public sealed partial class DenTools
                 return Unchanged(path, target.File.ToBytes(), target);
             }
 
-            var links = LinkIndex.Build(catalog, den);
             SectionRenamePlan plan;
             try
             {
@@ -434,6 +431,7 @@ public sealed partial class DenTools
             var files = plan.Files.ToDictionary(p => p.Key, p => p.Value, StringComparer.Ordinal);
             var idAdded = AddMissingId(target, files);
             var check = Check(den, structure, files);
+            RefuseUnreadable(den);
             Save(files, plan.Originals, created: null);
             var after = EntityCatalog.ReadEntityFile(check.Structure, path, files[path]).Entity!;
             var effects = new List<string>
@@ -696,8 +694,8 @@ public sealed partial class DenTools
 
         using (EnterWrite())
         {
-            var den = Snapshot();
-            var structure = DenStructure.Load(den);
+            // Every link is resolved again with the new entity there, so nothing can be missing (#284).
+            var (den, structure, _, links) = LoadWholeDen();
             var u = structure.FindUniverse(universeKey) ?? throw Gone($"universes/{universeKey}");
             Container scope = filter is null ? u
                 : filter.Kind == CanonFilterKind.Series ? u.Series.Single(s => s.Key == filter.Key)
@@ -752,7 +750,7 @@ public sealed partial class DenTools
             // A new name can take links from the entity they reach now (F-LINK-7: the nearest scope wins):
             // refused unless allow_relinks, as for a copy (maintainer decision on #29, 2026-10-28).
             var (_, _, changed) = CheckNewEntityLinks(
-                den, EntityCatalog.Load(structure, den), check, files, allowRelinks, "created", "create it with those links moving to it", "the new entity");
+                den, links, check, files, allowRelinks, "created", "create it with those links moving to it", "the new entity");
             Save(files, null, created: made.Path);
             var effects = new List<string> { $"Created {made.Path} from the '{type.Key}' template, with id {id}." };
             if (!entity.Status.IsInCanon())
@@ -1105,7 +1103,7 @@ public sealed partial class DenTools
         {
             var den = Snapshot();
             var structure = DenStructure.Load(den);
-            var original = den.TryReadFile(path) ?? throw Gone(path);
+            var original = den.TryReadFile(path) ?? throw GoneOrUnreadable(den, path);
             CheckHash(path, original, hash);
             var read = EntityCatalog.ReadEntityFile(structure, path, original);
             var before = read.Entity ?? throw new DenToolException(
@@ -1189,6 +1187,51 @@ public sealed partial class DenTools
     }
 
     private IDenSource Snapshot() => Store is FileSystemDenStore disk ? disk.Snapshot() : Store;
+
+    /// <summary>
+    /// Loads everything the den reads, for a write that has to have seen
+    /// every file: one that rewrites or checks links across the den. A file
+    /// that can't be read would count as absent (#112), so its links wouldn't
+    /// follow, and a final book's refusal wouldn't come, so the write is
+    /// refused as a whole instead (<see cref="RefuseUnreadable"/>, #284).
+    /// </summary>
+    private (TrackingDenSource Den, DenStructure Structure, EntityCatalog Catalog, LinkIndex Links) LoadWholeDen()
+    {
+        var den = new TrackingDenSource(Snapshot());
+        var structure = DenStructure.Load(den);
+        var catalog = EntityCatalog.Load(structure, den);
+        var links = LinkIndex.Build(catalog, den);
+        RefuseUnreadable(den);
+        return (den, structure, catalog, links);
+    }
+
+    /// <summary>
+    /// Refuses a write if <paramref name="den"/> couldn't read a file or list
+    /// a folder so far. Called once more just before saving, in case one
+    /// became unreadable after the first load: what's worked out from reading
+    /// the den again, with the edit, would miss it.
+    /// </summary>
+    private static void RefuseUnreadable(TrackingDenSource den)
+    {
+        var unreadable = den.Unreadable;
+        if (unreadable.Count > 0)
+        {
+            throw Unreadable(unreadable);
+        }
+    }
+
+    private static DenToolException Unreadable(IReadOnlyList<UnreadablePath> paths)
+    {
+        var named = string.Join(", ", paths.Take(ListedLinkChanges).Select(p => p.Path));
+        var more = paths.Count > ListedLinkChanges ? $", and {paths.Count - ListedLinkChanges} more" : "";
+        return new DenToolException(
+            ToolErrorCodes.DenUnreadable,
+            $"Couldn't read {named}{more}, so Wolfden can't see everything this depends on, and nothing was changed. {UnreadablePath.WhatToDo(paths)}");
+    }
+
+    /// <summary>What to say when the file at <paramref name="path"/> gave no bytes: it's unreadable if it's still there, or else gone.</summary>
+    private static DenToolException GoneOrUnreadable(IDenSource den, string path) =>
+        den.FileExists(path) ? Unreadable([new UnreadablePath(path, IsFolder: false)]) : Gone(path);
 
     private static string RequireHash(string? hash)
     {

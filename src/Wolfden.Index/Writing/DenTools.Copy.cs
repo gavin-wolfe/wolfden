@@ -75,9 +75,7 @@ public sealed partial class DenTools
 
         using (EnterWrite())
         {
-            var den = Snapshot();
-            var structure = DenStructure.Load(den);
-            var catalog = EntityCatalog.Load(structure, den);
+            var (den, structure, catalog, beforeLinks) = LoadWholeDen();
             var source = catalog.FindByPath(path) ?? throw (den.FileExists(path)
                 ? new DenToolException(
                     ToolErrorCodes.InvalidEdit, $"{path} has errors now, so the den leaves it out and it can't be copied. {ToolWords.Cap(Words.CheckFile(path))} to see them.")
@@ -120,7 +118,7 @@ public sealed partial class DenTools
             var files = new Dictionary<string, byte[]>(StringComparer.Ordinal) { [newPath] = bytes };
             var check = Check(den, structure, files);
 
-            var (links, afterLinks, changed) = CheckNewEntityLinks(den, catalog, check, files, allowRelinks, "copied", "make the copy anyway", "the copy");
+            var (links, afterLinks, changed) = CheckNewEntityLinks(den, beforeLinks, check, files, allowRelinks, "copied", "make the copy anyway", "the copy");
 
             Save(files, null, created: newPath);
             var after = afterLinks.Catalog.FindByPath(newPath) ?? EntityCatalog.ReadEntityFile(check.Structure, newPath, bytes).Entity!;
@@ -145,12 +143,12 @@ public sealed partial class DenTools
     /// <param name="anyway">How the refusal says to override: <c>make the copy anyway</c>.</param>
     /// <param name="newOne">What the refusal calls the new entity: <c>the copy</c>.</param>
     private (LinkIndex Before, LinkIndex After, IReadOnlyList<LinkChange> Changed) CheckNewEntityLinks(
-        IDenSource den, EntityCatalog catalog, DenWriteCheckResult check, Dictionary<string, byte[]> files, bool allowRelinks,
+        TrackingDenSource den, LinkIndex links, DenWriteCheckResult check, Dictionary<string, byte[]> files, bool allowRelinks,
         string done, string anyway, string newOne)
     {
-        var links = LinkIndex.Build(catalog, den);
         var overlay = new OverlayDenSource(den, files);
         var afterLinks = LinkIndex.Build(EntityCatalog.Load(check.Structure, overlay), overlay);
+        RefuseUnreadable(den);
         var changed = LinkChanges.Between(links, afterLinks);
         var relinked = changed.Where(l => l.Before.Outcome == LinkOutcome.Resolved
             && (l.After.Outcome != LinkOutcome.Resolved || l.After.Target!.Path != l.Before.Target!.Path)).ToList();

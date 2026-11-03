@@ -473,6 +473,8 @@ internal sealed class IndexUpdater
         public IEnumerable<string> GetFolderLinks(string path) => inner.GetFolderLinks(path);
 
         public bool FolderExists(string path) => inner.FolderExists(path);
+
+        public bool CannotList(string path) => inner.CannotList(path);
     }
 
     /// <summary>

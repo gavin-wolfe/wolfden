@@ -90,6 +90,8 @@ internal sealed class HashingDenSource(IDenSource inner) : IDenSource
         return false;
     }
 
+    public bool CannotList(string path) => inner.CannotList(path);
+
     public IEnumerable<string> GetDirectories(string path)
     {
         var names = inner.GetDirectories(path).ToList();

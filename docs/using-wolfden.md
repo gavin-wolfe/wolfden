@@ -1213,15 +1213,17 @@ out and has no page. Fix it and save.
   spoiler-safe: a note left out says only that it's left out, with **Show
   everything** to see why.
 - **A file another program holds locked can't be read,** so it's listed as that,
-  with no **Edit file**, since nothing is wrong with what's in it. Close it there,
+  with no **Edit file**, since this isn't about what's in it. Close it there,
   and the entry clears within a minute. Any errors inside it can't be seen until
   then, in the list or in `wolfden check`. A held `book.md`, `series.md`, or
   `universe.md` is also listed by its folder, saying not to add a file, since it's
-  there.
+  there. A held pack is also listed under `den.yaml` in the same way.
 - **While such a file is held,** a fix can be refused if its save had to read that
   file: `den.yaml`, a pack, a book's, series', or universe's own file, or an
   outline. Another note being held doesn't stop a fix. Close the file named, and
-  save again. Your text stays in the editor.
+  save again. Your text stays in the editor. If that file is above the one you
+  opened, the message names it there too, rather than the file seeming to have an
+  error: close it, then reload the page.
 - **With `--universe`,** the list has that universe's errors and the den-level
   ones, as `wolfden check --universe` does.
 

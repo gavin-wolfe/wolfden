@@ -104,8 +104,8 @@ a folder it reads that's there but can't be listed, is reported, so a check
 never passes a den it didn't see all of. It's an [error] on that path with no
 line, and it says what to do: close the file in the program that has it open,
 or check its permissions. It's about the machine, not what's in the file, so
-F-GEN-4 doesn't apply, nothing is wrong with the file, and it clears once the
-file can be read. A file deleted while the check runs isn't reported: it's
+F-GEN-4 doesn't apply. Any errors inside it can't be seen until then, and it
+clears once the file can be read. A file deleted while the check runs isn't reported: it's
 absent. The other parts of the den read such a file as absent too, so links
 to it can show as broken until then, and a `den.yaml` or listed `pack.yaml`
 that can't be read means the den can't be loaded, as if it were missing. The

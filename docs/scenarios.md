@@ -3275,6 +3275,7 @@ Spec: format.md F-GEN-5, F-BOOK-1 (#284). Covered by:
 `LockedFileWriteTests.AFrozenBooksLockedBookFileCantSkipTheFrozenRefusal`,
 `LockedFileWriteTests.ANoteInAFrozenBookWhoseBookFileIsLockedSaysSoAsWellAsNotFound`,
 `LockedFileWriteTests.AChapterDefaultCantReachAFrozenBookWhoseBookFileIsLocked`.
+
 ### SC-MCP-40. My assistant hears that the den has errors
 
 A note has `status: maybe`, and another has a typo in a section comment.
@@ -5869,17 +5870,26 @@ I have a note open for writing in another program, with the den's page open.
 
 - Within a minute, the top bar counts it. Its entry is the same as in
   `wolfden check` (F-GEN-5): it couldn't be read, and how to fix that. It has no
-  Edit file, and says there's nothing to edit and that it clears by itself.
+  Edit file, and says it isn't about what's in the file, so there's nothing to
+  edit, and that it clears by itself.
 - A held `den.yaml` says it couldn't be read, and not also that it's missing. If
   it really is gone, it says that.
 - A held `book.md`, `series.md`, or `universe.md` is listed, and so is its folder,
   as in `wolfden check`. The folder's entry says not to add a file, since it's
   there. A folder that really has no file still says to add it.
+- A held pack's `pack.yaml`, or its folder if Wolfden can't look in it, also lists
+  `den.yaml` as naming a pack that isn't there, with no Edit file, saying not to add
+  anything. Another pack named in `den.yaml` that really isn't there is unchanged.
 - A folder Wolfden can't look in is listed as a folder, whatever its name.
 - A server pinned to a universe doesn't list, or say anything of, a held file in
   another one.
 - A link straight to a held file says it can't be read, not that it may have been
-  moved or deleted. So does saving it.
+  moved or deleted, and to reload the page once it's closed. So does saving it, in
+  a save's words.
+- Opening or saving a note below a held `den.yaml`, listed `pack.yaml`,
+  `universe.md`, `series.md`, or `book.md` names that file, rather than saying the
+  note or something above it has an error. A real error above it is still what's
+  blamed, even with a sibling book held.
 - Fixing a file from the list is refused, with the held file named and nothing
   written, while a file that save had to read can't be read: `den.yaml`, a pack, a
   container's file, or an outline. Another note being held doesn't stop it.

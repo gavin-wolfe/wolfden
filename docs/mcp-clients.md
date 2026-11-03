@@ -339,7 +339,7 @@ docs. The writer's own list is in
   Another program has the file open, or its permissions don't let
   Wolfden read it. Nothing was written. Tell the writer which file it is,
   and retry the same call once they've closed it. Don't call it broken:
-  the file is fine. `check` reports the same thing as F-GEN-5, and until
+  this isn't about what's in it. `check` reports the same thing as F-GEN-5, and until
   it's closed, links to that file can show as broken.
 - **`den_notice` means some of the den is missing.** While the den has
   errors, every result but `check`'s has a short `den_notice`, such as

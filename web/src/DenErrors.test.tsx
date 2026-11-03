@@ -33,6 +33,7 @@ function error(extra: Partial<DenErrorView> = {}): DenErrorView {
     section: null,
     sectionLine: null,
     canEdit: true,
+    heldFile: null,
     ...extra,
   }
 }
@@ -204,6 +205,31 @@ describe('the top bar’s problems', () => {
     expect(links[1]).toContain('path=universes')
     expect(links[1]).not.toContain('at=')
     expect(links[2]).toContain('at=dracula:1')
+  })
+
+  it('SC-WEB-96: a file that can’t be read has no Edit file, and a folder doesn’t ask for a file that’s there', async () => {
+    const book = 'universes/dracula/books/dracula'
+    stubApi({
+      override: (path) =>
+        path === '/api/den/errors'
+          ? list(
+              error({ path: book, kind: 'folder', reach: 'container', line: null, rule: 'F-LAY-4', message: "The book folder 'dracula' has no book.md, so it's skipped.", canEdit: false, heldFile: `${book}/book.md` }),
+              error({ path: `${book}/book.md`, kind: 'book', reach: 'container', line: null, rule: 'F-GEN-5', message: "This file couldn't be read.", canEdit: false }),
+              error({ path: 'universes/dracula/books/empty', kind: 'folder', reach: 'container', line: null, rule: 'F-LAY-4', message: "The book folder 'empty' has no book.md, so it's skipped.", canEdit: false }),
+            )
+          : undefined,
+    })
+    renderApp('/')
+
+    fireEvent.click(await screen.findByRole('button', { name: /3 problems/ }))
+
+    const dialog = await screen.findByRole('dialog', { name: '3 problems in this den' })
+    expect(within(dialog).queryByRole('link', { name: 'Edit file' })).toBeNull()
+    expect(within(dialog).getByText(/Don’t add a file: book\.md is there/)).toBeTruthy()
+    expect(within(dialog).getByText(/nothing is wrong with what’s in it/)).toBeTruthy()
+
+    // A folder that really has no file still says to add it, and only that one does.
+    expect(within(dialog).getAllByText(/This folder is missing its file/)).toHaveLength(1)
   })
 
   it('SC-WEB-90: says what each reach leaves out', () => {

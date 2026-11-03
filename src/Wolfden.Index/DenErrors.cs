@@ -1,4 +1,6 @@
+using Wolfden.Core.Checks;
 using Wolfden.Core.History;
+using Wolfden.Core.Structure;
 
 namespace Wolfden.Index;
 
@@ -26,7 +28,8 @@ public enum DenErrorReach
 /// <param name="Reach">What it leaves out.</param>
 /// <param name="Section">For <see cref="DenErrorReach.Section"/>, the section's name. A heading can give away a reveal, so a view at a story position doesn't say it.</param>
 /// <param name="SectionLine">For <see cref="DenErrorReach.Section"/>, the line of the section's heading.</param>
-public sealed record DenError(string Path, int? Line, string Rule, string Message, DenErrorReach Reach, string? Section, int? SectionLine);
+/// <param name="HeldFile">For a container folder said to have no file (F-LAY-4), the file if it's there but can't be read (F-GEN-5), so there's nothing to add.</param>
+public sealed record DenError(string Path, int? Line, string Rule, string Message, DenErrorReach Reach, string? Section, int? SectionLine, string? HeldFile = null);
 
 /// <summary>Works out what an error reaches.</summary>
 public static class DenErrors
@@ -55,6 +58,12 @@ public static class DenErrors
         if (path == "den.yaml")
         {
             return DenFileKinds.Den;
+        }
+
+        // The den's own folder, when it can't be listed (F-GEN-5).
+        if (path == ".")
+        {
+            return DenFileKinds.Folder;
         }
 
         var names = path.Split('/');
@@ -163,10 +172,10 @@ public sealed record DenErrorList(bool DenLoaded, IReadOnlyList<DenError> Errors
 /// universe's errors and the den-level ones count, as in a check of that universe.
 /// </summary>
 /// <remarks>
-/// An empty list doesn't prove the den is clean: a note held open is absent from
-/// the index, so its errors aren't in it. <c>wolfden check</c> says the same today.
-/// Files that can't be read (F-GEN-5, #284) belong in <see cref="Read"/>, as
-/// errors added to the index's.
+/// The index reads a note held open as absent, so what's wrong inside it isn't
+/// known, but that it couldn't be read is (F-GEN-5, #284): <see cref="Read"/> adds
+/// that to the index's errors, as <c>wolfden check</c> does. Taking a lock doesn't
+/// change a file's size or time, so it shows when the answer's age runs out.
 /// </remarks>
 /// <param name="root">The den's folder.</param>
 /// <param name="watcherWait">The longest to wait for a running watcher to catch up.</param>
@@ -181,6 +190,9 @@ public sealed class DenErrorWatch(string root, TimeSpan watcherWait, string? pin
     private readonly System.Diagnostics.Stopwatch _age = new();
     private string? _fingerprint;
     private DenErrorList? _last;
+
+    /// <summary>What a container folder's file is called (format.md §5.1).</summary>
+    private static readonly string[] ContainerFiles = ["universe.md", "series.md", "book.md"];
 
     /// <summary>How many times this has read the errors, so tests can see that an unchanged den costs no index update.</summary>
     public int Reads { get; private set; }
@@ -209,12 +221,36 @@ public sealed class DenErrorWatch(string root, TimeSpan watcherWait, string? pin
         }
     }
 
-    /// <summary>Brings the index up to date, and reads the errors from it.</summary>
+    /// <summary>
+    /// Brings the index up to date, reads the errors from it, and adds what
+    /// couldn't be read. The index reads such a file as absent, so that takes
+    /// a check of its own, the same one <c>wolfden check</c> runs, so the two
+    /// list the same paths (<see cref="DenCheck"/>).
+    /// </summary>
     private DenErrorList Read()
     {
         IndexBuilder.EnsureUpToDate(root, watcherWait);
+        var tracked = new TrackingDenSource(new FileSystemDenSource(root));
+        _ = DenCheck.Run(tracked, pinned);
+
+        // Even pinned, the other universes' container files are read, for story order.
+        var unreadable = tracked.Unreadable.Where(u => !DenErrors.IsOutsidePin(u.Path, pinned)).ToList();
+        var held = unreadable.Where(u => !u.IsFolder).Select(u => u.Path).ToHashSet(StringComparer.Ordinal);
         using var index = DenIndex.Open(root);
-        var errors = index.Errors().Where(e => !DenErrors.IsOutsidePin(e.Path, pinned)).ToList();
+        var errors = index.Errors()
+            .Where(e => !DenErrors.IsOutsidePin(e.Path, pinned))
+
+            // A den.yaml that's there isn't missing, as in check.
+            .Where(e => !(held.Contains("den.yaml") && e.Path == "den.yaml" && e.Rule == "F-DEN-1"))
+            .Select(e => e.Rule == "F-LAY-4" ? e with { HeldFile = ContainerFiles.Select(f => $"{e.Path}/{f}").FirstOrDefault(held.Contains) } : e)
+            .Concat(unreadable.Select(u =>
+            {
+                var said = u.ToDiagnostic();
+                return new DenError(u.Path, null, said.Diagnostic.RuleId, said.Diagnostic.Message, u.IsFolder ? DenErrorReach.Container : DenErrors.ReachOfFileError(u.Path), null, null);
+            }))
+            .OrderBy(e => e.Path, StringComparer.Ordinal)
+            .ThenBy(e => e.Line ?? 0)
+            .ToList();
         var paths = errors.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
         var names = index.Context.Entities.Where(e => paths.Contains(e.Path)).Select(e => new { e.Path, e.Name }).ToList()
             .ToDictionary(e => e.Path, e => e.Name, StringComparer.Ordinal);

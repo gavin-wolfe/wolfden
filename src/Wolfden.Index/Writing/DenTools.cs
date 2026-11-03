@@ -223,7 +223,7 @@ public sealed partial class DenTools
                 throw;
             }
 
-            throw new DenToolException(e.Code, $"{e.Message} {MayBeWhy(unreadable)}", e.Candidates);
+            throw new DenToolException(e.Code, $"{e.Message} {MayBeWhy(unreadable)}", e.Candidates) { LeftOut = e.LeftOut };
         }
     }
 

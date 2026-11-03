@@ -11,6 +11,9 @@ namespace Wolfden.Core.Structure;
 /// <param name="IsFolder">True for a folder that can't be listed.</param>
 public sealed record UnreadablePath(string Path, bool IsFolder)
 {
+    /// <summary>The rule of <see cref="ToDiagnostic"/>.</summary>
+    public const string RuleId = "F-GEN-5";
+
     /// <summary>What a writer can do about <paramref name="paths"/>, as sentences.</summary>
     public static string WhatToDo(IEnumerable<UnreadablePath> paths)
     {
@@ -22,7 +25,7 @@ public sealed record UnreadablePath(string Path, bool IsFolder)
 
     /// <summary>This path as a <c>wolfden check</c> diagnostic (format.md F-GEN-5).</summary>
     public DenDiagnostic ToDiagnostic() => new(Path, new Diagnostic(
-        "F-GEN-5",
+        RuleId,
         DiagnosticSeverity.Error,
         null,
         (IsFolder ? "This folder couldn't be listed, so what's in it wasn't checked, and links to it may show as broken. "

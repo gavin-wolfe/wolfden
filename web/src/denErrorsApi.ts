@@ -21,6 +21,8 @@ export interface DenErrorView {
   sectionLine: number | null
   /** True if Edit file can open it here. */
   canEdit: boolean
+  /** For a folder said to have no file, that file if it's there but can't be read. */
+  heldFile: string | null
 }
 
 export interface DenErrors {
@@ -67,7 +69,15 @@ export function leavesOut(error: Pick<DenErrorView, 'reach' | 'kind' | 'section'
 }
 
 /** Why Edit file can't open it, and where to fix it instead. */
-export function fixElsewhere(error: Pick<DenErrorView, 'kind' | 'path'>): string {
+export function fixElsewhere(error: Pick<DenErrorView, 'kind' | 'path' | 'rule' | 'heldFile'>): string {
+  if (error.rule === 'F-GEN-5') {
+    return 'There’s nothing to edit here, since nothing is wrong with what’s in it. This clears by itself within a minute of Wolfden being able to read it.'
+  }
+
+  if (error.heldFile) {
+    return `Don’t add a file: ${error.heldFile.split('/').pop()} is there, but Wolfden can’t read it right now. It’s in this list too, and this clears with it.`
+  }
+
   switch (error.kind) {
     case 'den':
       return 'Wolfden can’t edit den.yaml here: it’s missing, or this server is pinned to one universe and every universe shares it. Fix it in your own editor, or restore it.'

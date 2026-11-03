@@ -907,6 +907,20 @@ public sealed partial class DenTools
             (bad.Reference.Site, bad.Reference.Field, bad.Reference.Section?.Name, bad.Reference.Content ?? bad.Reference.Text, bad.Shape);
     }
 
+    /// <summary><see cref="CheckWrittenPositions(CatalogEntity?, CatalogEntity)"/> for a write that read through <paramref name="den"/>.</summary>
+    private void CheckWrittenPositions(CatalogEntity? before, CatalogEntity after, TrackingDenSource den)
+    {
+        try
+        {
+            CheckWrittenPositions(before, after);
+        }
+        catch (DenToolException e) when (e.Code == ToolErrorCodes.BadPosition && InThisUniverse(den.Unreadable).Count > 0)
+        {
+            // A book.md that can't be read has no book or chapters to the den: say so, not only that there's no such place.
+            throw new DenToolException(e.Code, $"{e.Message} {MayBeWhy(InThisUniverse(den.Unreadable))}");
+        }
+    }
+
     /// <summary>The positions written in the entity's file that parse but don't resolve in its universe (F-POS-4), in file order.</summary>
     private static IEnumerable<PositionReference> UnresolvedReferences(CatalogEntity entity) =>
         PositionScanner.Scan(entity.File, entity.Definition?.PositionFields).References
@@ -1124,16 +1138,7 @@ public sealed partial class DenTools
             var files = new Dictionary<string, byte[]>(StringComparer.Ordinal) { [path] = bytes };
             var check = Check(den, structure, files);
             var after = EntityCatalog.ReadEntityFile(check.Structure, path, bytes).Entity!;
-            try
-            {
-                CheckWrittenPositions(before, after);
-            }
-            catch (DenToolException e) when (e.Code == ToolErrorCodes.BadPosition && InThisUniverse(tracked.Unreadable).Count > 0)
-            {
-                // A book.md that can't be read has no book or chapters to the den: say so, not only that there's no such place.
-                throw new DenToolException(e.Code, $"{e.Message} {MayBeWhy(InThisUniverse(tracked.Unreadable))}");
-            }
-
+            CheckWrittenPositions(before, after, tracked);
             Save(files, new Dictionary<string, byte[]>(StringComparer.Ordinal) { [path] = original }, created: null);
             var said = effects(before, after).ToList();
             if (idAdded is not null)

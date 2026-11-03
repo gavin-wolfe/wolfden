@@ -4,6 +4,7 @@ import { Link, Outlet, useRouterState } from '@tanstack/react-router'
 import { denQuery } from '../api'
 import { useUniverseKey } from '../hooks'
 import { CheckpointIndicator } from './CheckpointIndicator'
+import { DenErrorsIndicator } from './DenErrorsIndicator'
 import { ContainerCreatedNotice, NewContainerProvider } from './NewContainer'
 import { CreatedNotice, NewEntityProvider, NewMenu } from './NewEntity'
 import { PositionBar } from './PositionBar'
@@ -89,6 +90,7 @@ export function Layout() {
             {universe && <NewMenu universe={universe} />}
             <SearchBox universe={universe} />
             <PositionBar universe={universe} />
+            <DenErrorsIndicator />
             <CheckpointIndicator />
           </header>
           <div className="body">

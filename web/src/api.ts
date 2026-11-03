@@ -248,11 +248,22 @@ export interface ApiError {
 /** An error the API answered with, carrying its stable code. */
 export class ApiRequestError extends Error {
   readonly code: string
+  /** For a note an error leaves out of the den: what's known of it, with nothing in it as of a story position (#280). */
+  readonly leftOut: LeftOutNote | null
 
-  constructor(code: string, message: string) {
+  constructor(code: string, message: string, leftOut: LeftOutNote | null = null) {
     super(message)
     this.code = code
+    this.leftOut = leftOut
   }
+}
+
+export interface LeftOutNote {
+  /** The file with the error, which can be its book's or series' file. */
+  path: string | null
+  line: number | null
+  rule: string | null
+  message: string | null
 }
 
 /** Fetches JSON from the API, turning an error answer into an ApiRequestError. */
@@ -264,6 +275,7 @@ export async function getJson<T>(path: string): Promise<T> {
     throw new ApiRequestError(
       typeof error?.code === 'string' ? error.code : 'http_error',
       typeof error?.message === 'string' ? error.message : `The server answered ${response.status}.`,
+      isObject(body) ? ((body as { leftOut?: LeftOutNote }).leftOut ?? null) : null,
     )
   }
 

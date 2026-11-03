@@ -71,7 +71,7 @@ const EditingContext = createContext<Editing | null>(null)
 // CodeMirror is loaded when an editor first opens, so reading the den doesn't wait for it.
 const LazyEditor = lazy(() => import('./MarkdownEditor').then((m) => ({ default: m.MarkdownEditor })))
 
-function MarkdownEditor(props: ComponentProps<typeof LazyEditor>) {
+export function MarkdownEditor(props: ComponentProps<typeof LazyEditor>) {
   return (
     <Suspense fallback={<Loading what="the editor" />}>
       <LazyEditor {...props} />
@@ -212,7 +212,7 @@ export function EditingProvider({
  * The page's own question before unsaved changes are dropped, by leaving
  * the page or by Cancel or Escape: "Keep editing" (focused) or discard.
  */
-function UnsavedPrompt({ question, discard, onKeep, onDiscard }: { question: string; discard: string; onKeep: () => void; onDiscard: () => void }) {
+export function UnsavedPrompt({ question, discard, onKeep, onDiscard }: { question: string; discard: string; onKeep: () => void; onDiscard: () => void }) {
   const id = useId()
   return (
     <div className="banner leave-prompt" role="alertdialog" aria-labelledby={id}>
@@ -248,7 +248,7 @@ export function EditingStatus() {
 }
 
 /** What a save did: its effects, the pinned canon it touched, and the file's warnings. */
-function SaveResult({ saved, onDismiss }: { saved: Saved; onDismiss: () => void }) {
+export function SaveResult({ saved, onDismiss }: { saved: Saved; onDismiss: () => void }) {
   const { result } = saved
   return (
     <div className="save-result" role="status" id="edit-saved" tabIndex={-1}>

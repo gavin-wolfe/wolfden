@@ -1212,9 +1212,16 @@ out and has no page. Fix it and save.
   it names sections even at an early chapter. Pages at a position stay
   spoiler-safe: a note left out says only that it's left out, with **Show
   everything** to see why.
-- **A note another program holds locked can't be read,** so Wolfden treats it as
-  absent, and its errors aren't listed. `wolfden check` doesn't see them either.
-  They show within a minute of it being let go.
+- **A file another program holds locked can't be read,** so it's listed as that,
+  with no **Edit file**, since nothing is wrong with what's in it. Close it there,
+  and the entry clears within a minute. Any errors inside it can't be seen until
+  then, in the list or in `wolfden check`. A held `book.md`, `series.md`, or
+  `universe.md` is also listed by its folder, saying not to add a file, since it's
+  there.
+- **While such a file is held,** a fix can be refused if its save had to read that
+  file: `den.yaml`, a pack, a book's, series', or universe's own file, or an
+  outline. Another note being held doesn't stop a fix. Close the file named, and
+  save again. Your text stays in the editor.
 - **With `--universe`,** the list has that universe's errors and the den-level
   ones, as `wolfden check --universe` does.
 
@@ -1413,8 +1420,8 @@ in it, which Wolfden calls a checkpoint.
   a new book, or a freeze, says which file, and changes nothing. Otherwise
   links in that note would break without a word. Close the file there,
   then try again.
-- **`wolfden check` lists it as an error** (F-GEN-5), and links to that
-  note can show as broken until it's closed. If no program has it open,
+- **`wolfden check` and the top bar's problems list it as an error** (F-GEN-5),
+  and links to that note can show as broken until it's closed. If no program has it open,
   check the file's permissions. The same goes for a folder Wolfden isn't
   allowed to look in.
 - **Pages still open.** A note that can't be read is left out of pages and

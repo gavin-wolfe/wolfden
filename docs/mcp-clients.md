@@ -347,8 +347,8 @@ docs. The writer's own list is in
   answer. Call check with severity 'error' to see them."` It names no note or
   section, so it's the same at a story position. Tell the writer once, not with every
   result. In a pinned
-  session it counts that universe's errors and the den-level ones. Duplicate ids
-  are warnings, so they don't count. Asking for a note an error leaves out says
+  session it counts that universe's errors and the den-level ones. A file that
+  can't be read counts too. Duplicate ids are warnings, so they don't count. Asking for a note an error leaves out says
   so and names the line; with `as_of`, it says so only for a path or an id,
   and doesn't say which line or why.
 - **`allow_relinks` only with the writer's say-so.** A create, copy,

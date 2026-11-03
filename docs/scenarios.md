@@ -5749,13 +5749,13 @@ editor, I break a note's frontmatter.
 - A pack's file or a folder has no Edit file, and says to fix it outside Wolfden.
 - An unchanged den isn't hashed again however often it's asked.
 - Two notes with one id are a warning (F-ID-3), so they aren't listed.
-- A note another program holds open with no sharing is absent, as in
-  `wolfden check` (#112), so its errors aren't listed, and no problems doesn't
-  prove there are none. The list looks again at least every minute, so they come
-  back once it's let go, though its size and time didn't change.
+- A note another program holds open with no sharing is listed as one that can't
+  be read (SC-WEB-96), but what's wrong inside it can't be seen. The list looks
+  again at least every minute, so its own errors come back once it's let go,
+  though its size and time didn't change.
 
 Spec: F-GEN-2 (#280). Covered by:
-`SectionErrorIndexTests.ANoteHeldOpenIsMissingFromTheListAndComesBackWithNoChangeToSee`,
+`SectionErrorIndexTests.ANoteHeldOpenIsListedAsHeldAndItsOwnErrorsComeBackWithNoChangeToSee`,
 `DenErrorEndpointTests.AnOutsideChangeShowsInTheListAndClearsWhenFixed`,
 `DenErrorEndpointTests.TheListSaysHowFarEachErrorReaches`,
 `DenErrorEndpointTests.AnOutlineWithAnErrorIsListedAsCheckListsIt`,
@@ -5861,4 +5861,35 @@ Spec: F-GEN-2 (#280). Covered by:
 
 Spec: F-VIEW-1, F-GEN-2 (#280). Covered by:
 `DenErrorEndpointTests.NothingAtAPositionLeaksWhatsLeftOut`,
+`web/src/DenErrors.test.tsx`.
+
+### SC-WEB-96. Another program holds a file while I'm fixing problems
+
+I have a note open for writing in another program, with the den's page open.
+
+- Within a minute, the top bar counts it. Its entry is the same as in
+  `wolfden check` (F-GEN-5): it couldn't be read, and how to fix that. It has no
+  Edit file, and says there's nothing to edit and that it clears by itself.
+- A held `den.yaml` says it couldn't be read, and not also that it's missing. If
+  it really is gone, it says that.
+- A held `book.md`, `series.md`, or `universe.md` is listed, and so is its folder,
+  as in `wolfden check`. The folder's entry says not to add a file, since it's
+  there. A folder that really has no file still says to add it.
+- A folder Wolfden can't look in is listed as a folder, whatever its name.
+- A server pinned to a universe doesn't list, or say anything of, a held file in
+  another one.
+- A link straight to a held file says it can't be read, not that it may have been
+  moved or deleted. So does saving it.
+- Fixing a file from the list is refused, with the held file named and nothing
+  written, while a file that save had to read can't be read: `den.yaml`, a pack, a
+  container's file, or an outline. Another note being held doesn't stop it.
+- A save that brings a note back, with a position in a book whose `book.md` is
+  held, is `bad_position`, and says that file may be why.
+- The page of a note left out still says what's wrong with it, and adds the held
+  file.
+
+Spec: F-GEN-5, F-GEN-2 (#284, #280). Covered by:
+`HeldFileErrorTests`,
+`SectionErrorIndexTests.ANoteHeldOpenIsListedAsHeldAndItsOwnErrorsComeBackWithNoChangeToSee`,
+`SectionErrorIndexTests.TheDensOwnFolderReachesAsAFolder`,
 `web/src/DenErrors.test.tsx`.

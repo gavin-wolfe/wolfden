@@ -2,7 +2,7 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { editorViewIn } from './components/MarkdownEditor'
-import { denErrorsQuery, DEN_ERRORS_POLL_MS, leavesOut, type DenErrors, type DenErrorView, type FileSource } from './denErrorsApi'
+import { denErrorsQuery, DEN_ERRORS_POLL_MS, fixElsewhere, leavesOut, type DenErrors, type DenErrorView, type FileSource } from './denErrorsApi'
 import { renderApp, stubApi } from './test/harness'
 
 beforeAll(() => {
@@ -225,11 +225,17 @@ describe('the top bar’s problems', () => {
 
     const dialog = await screen.findByRole('dialog', { name: '3 problems in this den' })
     expect(within(dialog).queryByRole('link', { name: 'Edit file' })).toBeNull()
-    expect(within(dialog).getByText(/Don’t add a file: book\.md is there/)).toBeTruthy()
-    expect(within(dialog).getByText(/nothing is wrong with what’s in it/)).toBeTruthy()
+    expect(within(dialog).getByText(/don’t add anything: book\.md is there/)).toBeTruthy()
+    expect(within(dialog).getByText(/This isn’t about what’s in it.*able to read it/)).toBeTruthy()
 
     // A folder that really has no file still says to add it, and only that one does.
     expect(within(dialog).getAllByText(/This folder is missing its file/)).toHaveLength(1)
+  })
+
+  it('SC-WEB-96: a folder that can’t be listed and a pack that can’t be read say so in their own words', () => {
+    expect(fixElsewhere({ kind: 'folder', path: 'universes/dracula/vol.2', rule: 'F-GEN-5', heldFile: null })).toMatch(/This isn’t about what’s in it.*able to look in it/)
+    expect(fixElsewhere({ kind: 'den', path: 'den.yaml', rule: 'F-DEN-4', heldFile: 'packs/mine' })).toContain('don’t add anything: mine is there')
+    expect(fixElsewhere({ kind: 'den', path: 'den.yaml', rule: 'F-DEN-4', heldFile: null })).toContain('Wolfden can’t edit den.yaml here')
   })
 
   it('SC-WEB-90: says what each reach leaves out', () => {

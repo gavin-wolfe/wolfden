@@ -27,8 +27,8 @@ public sealed record DenErrorsResult(int Version, int Count, bool Truncated, boo
 /// <param name="Reach">What it leaves out: <c>section</c>, <c>file</c>, <c>container</c>, or <c>den</c>.</param>
 /// <param name="Section">For a section, its name.</param>
 /// <param name="SectionLine">For a section, its heading's line.</param>
-/// <param name="CanEdit">True if Edit file can open it here (<c>/api/file/source</c>), which it can't while the file can't be read (F-GEN-5).</param>
-/// <param name="HeldFile">For a container folder said to have no file, that file if it's there but can't be read, or null.</param>
+/// <param name="CanEdit">True if Edit file can open it here (<c>/api/file/source</c>), which it can't while the file can't be read (F-GEN-5), and there's no use while the cause is <paramref name="HeldFile"/>.</param>
+/// <param name="HeldFile">For a container folder said to have no file, or a pack said not to be there, what's there but can't be read, or null.</param>
 public sealed record DenErrorView(
     string Path, string? Universe, string? Name, string Kind, int? Line, string Rule, string Message, string Reach, string? Section, int? SectionLine, bool CanEdit, string? HeldFile);
 
@@ -73,11 +73,11 @@ internal static class FileEndpoints
             ReadEndpoints.ResultVersion, list.Errors.Count, list.Errors.Count > ListedErrors, list.DenLoaded,
             list.Errors.Take(ListedErrors).Select(e =>
             {
-                var kind = DenErrors.KindOf(e.Path);
+                var kind = e.IsFolder ? DenFileKinds.Folder : DenErrors.KindOf(e.Path);
                 return new DenErrorView(
                     e.Path, DenErrors.UniverseOf(e.Path), list.Names.GetValueOrDefault(e.Path), kind, e.Line, e.Rule, e.Message, e.Reach.ToString().ToLowerInvariant(),
                     e.Section, e.SectionLine,
-                    e.Rule != UnreadablePath.RuleId && DenErrors.CanEdit(kind, tools.PinnedUniverse) && (kind != DenFileKinds.Den || File.Exists(Path.Combine(tools.Root, "den.yaml"))),
+                    e.Rule != UnreadablePath.RuleId && e.HeldFile is null && DenErrors.CanEdit(kind, tools.PinnedUniverse) && (kind != DenFileKinds.Den || File.Exists(Path.Combine(tools.Root, "den.yaml"))),
                     e.HeldFile);
             }).ToList());
     }

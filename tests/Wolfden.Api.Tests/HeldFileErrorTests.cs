@@ -149,11 +149,12 @@ public sealed class HeldFileErrorTests
         Assert.Equal(JsonValueKind.Null, folder.GetProperty("heldFile").ValueKind);
     }
 
-    [Fact]
+    [Theory]
     [Trait("Scenario", "SC-WEB-96")]
-    public async Task AFolderThatCantBeListedIsListedAsAFolderWhateverItsName()
+    [InlineData("universes/dracula/vol.2")]
+    [InlineData("universes/dracula/entities/notes.md")]
+    public async Task AFolderThatCantBeListedIsListedAsAFolderWhateverItsName(string Folder)
     {
-        const string Folder = "universes/dracula/vol.2";
         using var den = TempDen.Dracula();
         Directory.CreateDirectory(Full(den, Folder));
         await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
@@ -162,6 +163,7 @@ public sealed class HeldFileErrorTests
             var error = Assert.Single(await Errors(server), e => Text(e, "rule") == "F-GEN-5");
 
             Assert.Equal(Folder, Text(error, "path"));
+            Assert.Equal("folder", Text(error, "kind"));
             Assert.Equal("container", Text(error, "reach"));
             Assert.False(error.GetProperty("canEdit").GetBoolean());
         }
@@ -211,11 +213,129 @@ public sealed class HeldFileErrorTests
             Assert.Equal("den_unreadable", Text(error, "code"));
             Assert.Contains(path, Text(error, "message"), StringComparison.Ordinal);
             Assert.DoesNotContain("moved or deleted", Text(error, "message"), StringComparison.Ordinal);
+
+            // The writer only opened a page.
+            Assert.DoesNotContain("nothing was changed", Text(error, "message"), StringComparison.Ordinal);
+            Assert.DoesNotContain("try again", Text(error, "message"), StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("reload this page", Text(error, "message"), StringComparison.Ordinal);
         }
 
         var gone = await server.GetJsonAsync($"/api/file/source?path={Encoded(Swales.Replace("mr-swales", "nobody", StringComparison.Ordinal))}", HttpStatusCode.NotFound);
         Assert.Equal("unknown_file", Text(gone, "code"));
         Assert.Contains("moved or deleted", Text(gone, "message"), StringComparison.Ordinal);
+    }
+
+    // Starfall's den: a note in a book in a series, with a den-local pack.
+    private const string InSeries = "universes/starfall/series/long-dark";
+    private const string InBook = InSeries + "/books/ash";
+    private const string NoteInBook = InBook + "/entities/characters/halden-pike.md";
+
+    /// <summary>Each file above the note that stops it being read as the den would, and what a pinned session sees.</summary>
+    public static TheoryData<string, string?> FilesAboveANote() => new()
+    {
+        { "den.yaml", null },
+        { "packs/starfall/pack.yaml", null },
+        { "universes/starfall/universe.md", null },
+        { InSeries + "/series.md", null },
+        { InBook + "/book.md", null },
+        { "den.yaml", "starfall" },
+        { InBook + "/book.md", "starfall" },
+    };
+
+    [Theory]
+    [MemberData(nameof(FilesAboveANote))]
+    [Trait("Scenario", "SC-WEB-96")]
+    public async Task OpeningANoteBelowAHeldFileNamesThatFileNotAnError(string held, string? pinned)
+    {
+        using var den = TempDen.Starfall();
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root) { PinnedUniverse = pinned });
+        using (LockedFile.Hold(Full(den, held)))
+        {
+            var error = await server.GetJsonAsync($"/api/file/source?path={Encoded(NoteInBook)}", HttpStatusCode.ServiceUnavailable);
+
+            Assert.Equal("den_unreadable", Text(error, "code"));
+            Assert.Contains(held, Text(error, "message"), StringComparison.Ordinal);
+            Assert.Contains("reload this page", Text(error, "message"), StringComparison.Ordinal);
+            Assert.DoesNotContain("Fix ", Text(error, "message"), StringComparison.Ordinal);
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(FilesAboveANote))]
+    [Trait("Scenario", "SC-WEB-96")]
+    public async Task SavingANoteBelowAHeldFileNamesThatFileNotAnError(string held, string? pinned)
+    {
+        using var den = TempDen.Starfall();
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root) { PinnedUniverse = pinned });
+        var before = den.Read(NoteInBook);
+        var hash = await HashOf(server, NoteInBook);
+        using (LockedFile.Hold(Full(den, held)))
+        {
+            var (status, json) = await Save(server, NoteInBook, before + "\nA line more.\n", hash);
+
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, status);
+            Assert.Equal("den_unreadable", Text(json, "code"));
+            Assert.Contains(held, Text(json, "message"), StringComparison.Ordinal);
+            Assert.DoesNotContain("Fix ", Text(json, "message"), StringComparison.Ordinal);
+            Assert.Equal(before, den.Read(NoteInBook));
+        }
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-96")]
+    public async Task ARealErrorAboveANoteIsStillBlamedThoughASiblingIsHeld()
+    {
+        using var den = TempDen.Starfall();
+        var book = InBook + "/book.md";
+        den.Write(book, "---\nstatus: nope" + den.Read(book)[3..]);
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+        using (LockedFile.Hold(Full(den, InSeries + "/books/ember/book.md")))
+        {
+            var error = await server.GetJsonAsync($"/api/file/source?path={Encoded(NoteInBook)}", HttpStatusCode.UnprocessableEntity);
+
+            Assert.Equal("invalid_edit", Text(error, "code"));
+            Assert.Contains("An error in what holds", Text(error, "message"), StringComparison.Ordinal);
+            Assert.DoesNotContain("ember", Text(error, "message"), StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-96")]
+    public async Task AHeldPackSaysItsThereAndDenYamlHasNoEditFile()
+    {
+        using var den = TempDen.Starfall();
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+        using (LockedFile.Hold(Full(den, "packs/starfall/pack.yaml")))
+        {
+            var errors = await Errors(server);
+
+            var named = Assert.Single(errors, e => Text(e, "rule") == "F-DEN-4");
+            Assert.Equal("packs/starfall/pack.yaml", Text(named, "heldFile"));
+            Assert.False(named.GetProperty("canEdit").GetBoolean());
+            Assert.Contains(errors, e => Text(e, "rule") == "F-GEN-5" && Text(e, "path") == "packs/starfall/pack.yaml");
+        }
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-96")]
+    public async Task APackFolderThatCantBeListedSaysItsThereAndAnotherPacksErrorDoesnt()
+    {
+        using var den = TempDen.Starfall();
+        den.Write("den.yaml", den.Read("den.yaml").Replace("packs: [", "packs: [locked, absent, ", StringComparison.Ordinal));
+        Directory.CreateDirectory(Full(den, "packs/locked"));
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+        using (LockedFile.Unlistable(Full(den, "packs/locked")))
+        {
+            var errors = await Errors(server);
+
+            var locked = Assert.Single(errors, e => Text(e, "rule") == "F-DEN-4" && Text(e, "message").Contains("'locked'", StringComparison.Ordinal));
+            Assert.Equal("packs/locked", Text(locked, "heldFile"));
+            Assert.False(locked.GetProperty("canEdit").GetBoolean());
+
+            var absent = Assert.Single(errors, e => Text(e, "rule") == "F-DEN-4" && Text(e, "message").Contains("'absent'", StringComparison.Ordinal));
+            Assert.Equal(JsonValueKind.Null, absent.GetProperty("heldFile").ValueKind);
+            Assert.True(absent.GetProperty("canEdit").GetBoolean());
+        }
     }
 
     [Fact]

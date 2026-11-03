@@ -599,6 +599,21 @@ button.peek {
   margin: 0;
 }
 
+.badge.problem {
+  color: var(--broken);
+}
+
+.left-out-flag {
+  border-left: 3px solid var(--broken);
+  margin: 0.5rem 0;
+  padding: 0.25rem 0.75rem;
+}
+
+.left-out-flag p,
+.left-out-flag ul {
+  margin: 0.25rem 0;
+}
+
 .section.bookkeeping {
   opacity: 0.85;
 }

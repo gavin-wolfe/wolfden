@@ -83,7 +83,7 @@ public sealed class TrackingDenSourceTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-CHECK-59")]
+    [Trait("Scenario", "SC-CHECK-63")]
     public void CheckReportsAFolderThatCantBeListed()
     {
         var check = DenCheck.Run(new UnlistableSource(Den(), Characters));
@@ -94,7 +94,7 @@ public sealed class TrackingDenSourceTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-CHECK-59")]
+    [Trait("Scenario", "SC-CHECK-63")]
     public void ACheckOfOneUniverseReportsOnlyItsOwnUnreadableFiles()
     {
         const string inDrift = "universes/drift/universe.md";

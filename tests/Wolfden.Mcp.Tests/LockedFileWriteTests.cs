@@ -54,7 +54,7 @@ public sealed class LockedFileWriteTests : IDisposable
 
     [Theory]
     [MemberData(nameof(DenWideWrites))]
-    [Trait("Scenario", "SC-MCP-35")]
+    [Trait("Scenario", "SC-MCP-38")]
     public void ALockedNoteRefusesADenWideWriteAndNothingIsWritten(string tool)
     {
         var swales = Tools.GetEntity("Mr. Swales").Entity!.Hash!;
@@ -78,7 +78,7 @@ public sealed class LockedFileWriteTests : IDisposable
     }
 
     [Fact]
-    [Trait("Scenario", "SC-MCP-35")]
+    [Trait("Scenario", "SC-MCP-38")]
     public void TheLinksInALockedNoteFollowOnceItsClosedAndTheWriteIsRepeated()
     {
         var hash = Tools.GetEntity("Mr. Swales").Entity!.Hash!;
@@ -97,7 +97,7 @@ public sealed class LockedFileWriteTests : IDisposable
     [Theory]
     [InlineData(Swales)]
     [InlineData(Outline)]
-    [Trait("Scenario", "SC-MCP-35")]
+    [Trait("Scenario", "SC-MCP-38")]
     public void TheNoteBeingRenamedOrAnOutlineIsNamedWhenItsTheOneLocked(string locked)
     {
         var hash = Tools.GetEntity("Mr. Swales").Entity!.Hash!;
@@ -115,7 +115,7 @@ public sealed class LockedFileWriteTests : IDisposable
     }
 
     [Fact]
-    [Trait("Scenario", "SC-MCP-36")]
+    [Trait("Scenario", "SC-MCP-39")]
     public void ALockedNoteInAFrozenBookCantSkipTheFrozenRefusal()
     {
         WriteAftermath(withMemories: true);
@@ -138,7 +138,7 @@ public sealed class LockedFileWriteTests : IDisposable
     }
 
     [Fact]
-    [Trait("Scenario", "SC-MCP-36")]
+    [Trait("Scenario", "SC-MCP-39")]
     public void AFrozenBooksLockedBookFileCantSkipTheFrozenRefusal()
     {
         WriteAftermath(withMemories: true);
@@ -157,7 +157,7 @@ public sealed class LockedFileWriteTests : IDisposable
     }
 
     [Fact]
-    [Trait("Scenario", "SC-MCP-36")]
+    [Trait("Scenario", "SC-MCP-39")]
     public void ANoteInAFrozenBookWhoseBookFileIsLockedIsNamedRatherThanNotFound()
     {
         WriteAftermath(withMemories: true);
@@ -176,7 +176,7 @@ public sealed class LockedFileWriteTests : IDisposable
     }
 
     [Fact]
-    [Trait("Scenario", "SC-MCP-36")]
+    [Trait("Scenario", "SC-MCP-39")]
     public void AChapterDefaultCantReachAFrozenBookWhoseBookFileIsLocked()
     {
         WriteAftermath(withMemories: false);
@@ -198,7 +198,7 @@ public sealed class LockedFileWriteTests : IDisposable
     }
 
     [Fact]
-    [Trait("Scenario", "SC-MCP-35")]
+    [Trait("Scenario", "SC-MCP-38")]
     public void AFolderThatCantBeListedRefusesADenWideWriteAndIsNamed()
     {
         var hash = Tools.GetEntity("Mr. Swales").Entity!.Hash!;
@@ -217,7 +217,7 @@ public sealed class LockedFileWriteTests : IDisposable
     }
 
     [Fact]
-    [Trait("Scenario", "SC-MCP-35")]
+    [Trait("Scenario", "SC-MCP-38")]
     public void AWriteToOneFileIsntStoppedByALockedNoteElsewhere()
     {
         using (LockedFile.Hold(Full(Note)))
@@ -227,7 +227,7 @@ public sealed class LockedFileWriteTests : IDisposable
     }
 
     [Fact]
-    [Trait("Scenario", "SC-MCP-35")]
+    [Trait("Scenario", "SC-MCP-38")]
     public void AFileDeletedBetweenListingAndReadingIsntAFailure()
     {
         var hash = Tools.GetEntity("Mr. Swales").Entity!.Hash!;
@@ -241,7 +241,7 @@ public sealed class LockedFileWriteTests : IDisposable
     }
 
     [Fact]
-    [Trait("Scenario", "SC-CHECK-59")]
+    [Trait("Scenario", "SC-CHECK-63")]
     public void TheCheckToolListsALockedNoteAsAnError()
     {
         Assert.DoesNotContain(Tools.Check().Diagnostics, d => d.Rule == "F-GEN-5");
@@ -263,7 +263,7 @@ public sealed class LockedFileWriteTests : IDisposable
     }
 
     [Fact]
-    [Trait("Scenario", "SC-CHECK-59")]
+    [Trait("Scenario", "SC-CHECK-63")]
     public void TheCheckToolListsAFolderThatCantBeListed()
     {
         using (LockedFile.Unlistable(Full(Notes)))

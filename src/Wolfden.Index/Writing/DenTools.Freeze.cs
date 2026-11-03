@@ -1,4 +1,5 @@
 using Wolfden.Core.History;
+using Wolfden.Core.Entities;
 using Wolfden.Core.Structure;
 using Wolfden.Core.Yaml;
 using Wolfden.Index.Reading;
@@ -100,6 +101,7 @@ public sealed partial class DenTools
         var (universeKey, key) = BookArgument(book, universe);
         using (EnterWrite())
         {
+            RefuseLeftOutSections(universeKey, key);
             var (target, bytes, changed, idAdded, warnings) = SetStatus(universeKey, key, expectedHash, BookStatus.Final);
             var said = $"Book '{target.Name}'";
             var history = History();
@@ -334,6 +336,36 @@ public sealed partial class DenTools
         var check = Check(den, structure, files);
         Save(files, new Dictionary<string, byte[]>(StringComparer.Ordinal) { [path] = original }, created: null);
         return (target, bytes, true, idAdded, Warnings(check));
+    }
+
+    /// <summary>
+    /// Refuses to freeze a book with a section an error leaves out (format.md
+    /// F-BOOK-1, F-GEN-2): it would be fixed in place only by unfreezing, and the
+    /// snapshot would record a book with text no view shows.
+    /// </summary>
+    private void RefuseLeftOutSections(string universeKey, string key)
+    {
+        var den = Snapshot();
+        var structure = DenStructure.Load(den);
+        var target = FindBook(structure, universeKey, key);
+        var found = structure.Diagnostics.Concat(EntityCatalog.Load(structure, den).Diagnostics)
+            .Where(d => d.Diagnostic.LeftOut is not null && IsAtOrUnder(d.Path, target.Path))
+            .OrderBy(d => d.Path, StringComparer.Ordinal).ThenBy(d => d.Diagnostic.Line ?? 0)
+            .ToList();
+        if (found.Count > 0)
+        {
+            // A book already final can't be edited (F-BOOK-1), so fixing comes after unfreezing. How to
+            // unfreeze goes last, on its own line, so a command in it can be copied cleanly.
+            var final = target.Status == BookStatus.Final;
+            var next = final
+                ? "It's already marked final, and a final book can't be edited, so unfreeze it, fix these, and freeze it again. To fix: "
+                : "Fix these first: ";
+            throw new DenToolException(
+                ToolErrorCodes.InvalidEdit,
+                $"Book '{target.Key}' can't be frozen yet: a bad section comment leaves text out of it, and a frozen book can't be fixed without unfreezing. {next}" +
+                string.Join("; ", found.Select(d => $"{d.Path}:{d.Diagnostic.Line?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "-"}: {d.Diagnostic.RuleId}: {d.Diagnostic.Message}")) +
+                (final ? $"\n{Unfreezing(target)}" : ""));
+        }
     }
 
     /// <summary>True if the latest checkpoint holds the file as <paramref name="bytes"/>; false if not, or if the backend can't say.</summary>

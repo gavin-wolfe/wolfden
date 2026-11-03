@@ -48,9 +48,12 @@ new numbers. Tests, diagnostics, and issues cite rules by id.
 
 A rule that a validator enforces ends with its severity.
 
-- **[error]**: the file is invalid. Wolfden reports it and doesn't index it
-  (F-GEN-2 says how far that reaches). The app and MCP tools MUST refuse to
-  write a file that would have an error.
+- **[error]**: something in the file is invalid. Wolfden reports it and
+  leaves out what it reaches: the file, or for a bad section comment only
+  that section (F-GEN-2 says how far). `wolfden check` fails. The app and MCP
+  tools MUST refuse a write that would add an error. A bad section comment
+  that's already in the file doesn't block a save of it, so the rest of a
+  note can still be edited, and any other error must be gone once it's saved.
 - **[warning]**: the file is valid and indexed. `wolfden check` reports the
   warning.
 
@@ -60,10 +63,22 @@ an agent) and has no diagnostic.
 **F-GEN-1.** `wolfden check` exits non-zero when the den has any error.
 Warnings alone don't make it fail.
 
-**F-GEN-2.** An error in an entity file or `outline.md` excludes that file.
-An error in `universe.md`, `series.md`, or `book.md` excludes that container
-and everything under it, since scopes and positions there can't be
-interpreted. An error in `den.yaml` means the den can't be loaded.
+**F-GEN-2.** A bad value in a well-formed section comment, or a repeated
+attribute in one (F-SEC-10), leaves out only that section and its
+subsections, in any file. The rest of the file stays indexed, and so does a
+container and what's under it. Any other error reaches further. An error in
+an entity file or `outline.md` excludes that file. An error in `universe.md`,
+`series.md`, or `book.md` excludes that container and everything under it,
+since scopes and positions there can't be interpreted. An error in `den.yaml`
+means the den can't be loaded.
+
+A file or container that another error leaves out is left out whole, and a
+bad section comment in it is still reported as an [error].
+
+A section left out this way isn't live (F-SEC-8), has no range or pin, and no
+view at a story position shows it or says it's there, since a heading can
+give away a reveal (F-VIEW-1, F-VIEW-2). It isn't lost: its text stays in the
+file, and links in it still resolve, so a rename or a move rewrites them.
 
 **F-GEN-3.** Validators MUST report every diagnostic they find, not just the
 first. Each diagnostic SHOULD carry the rule id, the file path, and a line
@@ -627,7 +642,9 @@ other value is an [error]. `final` marks a frozen book (design.md §5).
 Writers MUST refuse edits within a final book's scope (its `book.md`,
 `outline.md`, and entities) until it's unfrozen. `status: final` is the
 whole freeze. The git tag that freezing adds when the den has git history
-(design.md §6, #31) isn't part of the format.
+(design.md §6, #31) isn't part of the format. Freezing is refused while a
+section in the book's `book.md` or entities is left out by an error (F-GEN-2),
+since a frozen book can't be fixed without unfreezing.
 
 **F-BOOK-2.** `chapters` is an optional list. The list order is the chapter
 order. A missing or empty list means the book has no chapters yet, and
@@ -1076,10 +1093,10 @@ order, and a value MAY be double-quoted. A section's comment takes:
   a section out of bookkeeping even if its name matches a bookkeeping
   pattern, unless its parent section is bookkeeping, in which case it's a
   [warning] and does nothing. Without it, F-SEC-12 decides. Any other value
-  is an [error].
+  is an [error] (F-SEC-10).
 
-A repeated attribute is an [error]. Any other attribute is a [warning], and
-is kept as written.
+A repeated attribute is an [error] (F-SEC-10). Any other attribute is a
+[warning], and is kept as written.
 
 ```markdown
 ## Shoulder injury
@@ -1099,9 +1116,11 @@ A missing `until` depends on the section:
   `from` after its own among the other live level-2 sections with the same
   name (matched as in F-SEC-3), or at the end of the story if there is
   none. A section is **live** if it's in canon (F-STAT-3), isn't
-  bookkeeping (F-SEC-12), its positions resolve (F-POS-4), and its
-  explicit range isn't empty. So a bookkeeping section never ends an
-  earlier one, since canon views leave it out. Its `from` here
+  bookkeeping (F-SEC-12), isn't left out by an error (F-GEN-2), its
+  positions resolve (F-POS-4), and its explicit range isn't empty. So a
+  bookkeeping section never ends an earlier one, since canon views leave it
+  out. Nor does a section with a typo in its comment: the earlier one keeps
+  applying until the typo is fixed. Its `from` here
   is the one this rule gives it, explicit or not. A standard section that
   isn't live runs to the end of the story, so views that show
   out-of-canon facts, such as an idea bank, still have a range for it.
@@ -1149,9 +1168,11 @@ CommonMark HTML block that runs to the next `-->` in the file, or to the
 end of the file, and headings
 inside it aren't headings (F-SEC-1), so the warning SHOULD name the line
 where that block ends. Values are still checked strictly. In a comment that
-does match, a bad value (`status=maybe`, `from=ember:14.2`, `pin=yes`) or a
-repeated attribute is an [error] (F-SEC-7), since guessing what it meant
-would be worse. A wolfden comment anywhere else, whether well-formed or
+does match, a bad value (`status=maybe`, `from=ember:14.2`, `pin=yes`,
+`canon=x`) or a repeated attribute is an [error] (F-SEC-7), since guessing what
+it meant would be worse: a reveal showing early, or an idea reading as canon,
+is worse than a missing fact. It leaves out that section and its subsections,
+not the file (F-GEN-2). A wolfden comment anywhere else, whether well-formed or
 not, is a [warning] and does nothing. That includes one at the end of a
 heading line (`## Shoulder injury <!-- wolfden: from=ember:19 -->`), where
 the warning says to move it to the next line, and any in `outline.md`.
@@ -1191,15 +1212,16 @@ ambiguous links are still reported.
 | `<!-- wolfden: from=ember:19 -->` | valid |
 | `<!-- wolfden: from="ember:19" until=ember:30 -->` | valid |
 | `<!--wolfden: until=ash:1 -->` | valid |
-| `<!-- wolfden: from=ember:19 from=ember:20 -->` | [error] F-SEC-7 |
-| `<!-- wolfden: from=ember:14.2 -->` | [error] F-POS-2 |
+| `<!-- wolfden: from=ember:19 from=ember:20 -->` | [error] F-SEC-7, section left out |
+| `<!-- wolfden: from=ember:14.2 -->` | [error] F-POS-2, section left out |
 | `<!-- wolfden: from=ember:19` (no `-->`) | [warning] F-SEC-10, ignored |
 | `<!-- wolfden: from=ember:19-->` | valid |
 | `<!-- wolfden: pov=Zoë -->` | [warning] F-SEC-7 (unknown attribute, not malformed) |
 | `<!-- wolfden: -->` | [warning] F-SEC-10, no attributes, ignored |
 | `<!-- wolfden: status=undecided pin=true -->` | valid ([warning] F-PIN-3) |
-| `<!-- wolfden: status=maybe -->` | [error] F-STAT-1 |
-| `<!-- wolfden: pin=yes -->` | [error] F-PIN-1 |
+| `<!-- wolfden: status=maybe -->` | [error] F-STAT-1, section left out |
+| `<!-- wolfden: pin=yes -->` | [error] F-PIN-1, section left out |
+| `<!-- wolfden: canon=x -->` | [error] F-SEC-7, section left out |
 | `<!-- wolfden: canon=false -->` | valid, bookkeeping (F-SEC-12) |
 | `<!-- wolfden: pov=ilse -->` | [warning] F-SEC-7 |
 | a blank line, then `<!-- wolfden: from=ember:19 -->` | valid (F-SEC-6) |
@@ -1276,7 +1298,8 @@ are left out of an earlier view by position alone. For each included
 entity it shows the lead, each field's value at `p` from its live entries
 (F-TMP-4), and the in-canon sections in effect at `p` (F-SEC-8, F-SEC-9),
 except bookkeeping sections (F-SEC-12). Facts whose positions don't
-resolve are left out (F-POS-4). `p` MAY be omitted, which means the end of
+resolve are left out (F-POS-4), and so are sections an error leaves out
+(F-GEN-2), which the view doesn't mention. `p` MAY be omitted, which means the end of
 the story: all canon so far.
 
 A view MAY be **filtered** to a series or book `S` of `U`. It then covers
@@ -1423,13 +1446,14 @@ a [warning]. Canon text is an in-canon fact (F-STAT-3): a section, a field
 entry, or an outline row. It is also the lead and the plain field values
 of an in-canon entity, judged by the entity's status, and a chapter
 item's `fields` and a container's `chapter_defaults`, which count as in
-canon. Container bodies and the free-form notes of an outline aren't
-checked.
+canon. Container bodies, the free-form notes of an outline, and sections an
+error leaves out (F-GEN-2) aren't checked.
 
 **F-LINK-13.** A link's **position** depends on where it is:
 
 - In an entry (F-TMP-1), on any field: the entry's `from`.
-- In a section: the section's effective `from` (F-SEC-9).
+- In a section: the section's effective `from` (F-SEC-9). A section an
+  error leaves out (F-GEN-2) has none, so a link in it isn't checked here.
 - Elsewhere in an entity (the lead, or a plain field): the entity's `from`
   (F-ENT-6).
 - In an outline row: its `chapter` cell (F-OUT-9), or else the start of

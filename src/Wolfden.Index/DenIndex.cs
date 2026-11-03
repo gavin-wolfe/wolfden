@@ -30,7 +30,10 @@ public sealed record SearchHit(
     string Status, bool IsBookkeeping, bool InComment, string Text, IReadOnlyList<TextMatch> Matches)
 {
     /// <summary>True if the hit is canon text: its status is <c>draft</c> or <c>canon</c>, and it isn't bookkeeping.</summary>
-    public bool IsInCanon => Status is "draft" or "canon" && !IsBookkeeping;
+    public bool IsInCanon => Status is "draft" or "canon" && !IsBookkeeping && !IsLeftOut;
+
+    /// <summary>True for a match in a section an error leaves out (format.md F-GEN-2). It's found only without a position, and never counts as canon.</summary>
+    public bool IsLeftOut { get; init; }
 }
 
 /// <summary>
@@ -201,6 +204,19 @@ public sealed class DenIndex : IDisposable
     }
 
     /// <summary>
+    /// The den's errors, by path and line, each with what it leaves out
+    /// (format.md F-GEN-2): one section, the file, a container and everything
+    /// under it, or the whole den.
+    /// </summary>
+    public IReadOnlyList<DenError> Errors() =>
+        Context.Diagnostics.Where(d => d.Severity == "error").OrderBy(d => d.Id).ToList()
+            .Select(d => new DenError(
+                d.Path, d.Line, d.RuleId, d.Message,
+                d.LeftOutSection is not null ? DenErrorReach.Section : DenErrors.ReachOfFileError(d.Path),
+                d.LeftOutSection, d.LeftOutSectionLine))
+            .ToList();
+
+    /// <summary>
     /// Full-text search for every word and phrase of <paramref name="text"/>,
     /// ignoring case and accents. Words are matched whole, anywhere and in any
     /// order; a word ending in <c>*</c> matches as a prefix (<c>ambu*</c>).
@@ -238,7 +254,8 @@ public sealed class DenIndex : IDisposable
             SELECT e.key, e.name, e.path, s.name, s.line,
                    snippet(search, -1, char(1), char(2), '…', 12), bm25(search, 10.0, 1.0, 0.5) AS rank,
                    coalesce(s.status, e.status), coalesce(s.is_bookkeeping, 0),
-                   instr(highlight(search, 2, char(1), char(2)), char(1)) > 0
+                   instr(highlight(search, 2, char(1), char(2)), char(1)) > 0,
+                   s.left_out_json IS NOT NULL
             FROM search
             JOIN entities e ON e.id = search.entity_id
             LEFT JOIN sections s ON s.id = search.section_id
@@ -269,7 +286,10 @@ public sealed class DenIndex : IDisposable
                     reader.GetBoolean(8),
                     reader.GetBoolean(9),
                     marked.Text,
-                    marked.Matches));
+                    marked.Matches)
+                {
+                    IsLeftOut = reader.GetBoolean(10),
+                });
             }
         }
         finally

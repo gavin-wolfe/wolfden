@@ -2,9 +2,10 @@ import { Suspense, createContext, lazy, useCallback, useContext, useEffect, useI
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useBlocker } from '@tanstack/react-router'
 import { EditError, postEdit, sourceQuery, type EditPath, type EntitySource, type WriteResult } from '../editApi'
+import type { SectionProblem } from '../api'
 import { addImage, type AddedImage } from '../imageApi'
 import { Markdown } from './Markdown'
-import { ErrorState, Loading } from './States'
+import { ErrorMark, ErrorState, Loading, fileProblemsHeading } from './States'
 
 // Editing a note in place (#28; maintainer decisions on #28, 2026-10-27):
 // one piece at a time (the lead, a section, or the whole file), as Markdown
@@ -274,10 +275,11 @@ function SaveResult({ saved, onDismiss }: { saved: Saved; onDismiss: () => void 
       )}
       {result.warnings.length > 0 && (
         <div className="warnings">
-          <p>Warnings in the file:</p>
+          <p>{fileProblemsHeading(result.warnings)}</p>
           <ul>
             {result.warnings.map((w) => (
               <li key={`${w.line}:${w.rule}:${w.message}`}>
+                <ErrorMark severity={w.severity} />
                 {w.line !== null && `Line ${w.line}: `}
                 {w.message} <span className="muted">({w.rule})</span>
               </li>
@@ -530,6 +532,7 @@ export function PieceEditor({ target, what, file }: { target: TextTarget; what: 
         </button>
       </div>
       {piece && target.kind === 'section' && <SectionCommentNote target={target} source={source.data} />}
+      {target.kind === 'file' && <FileProblems source={source.data} />}
       <div hidden={preview}>
         <MarkdownEditor
           value={text}
@@ -587,6 +590,39 @@ function SectionCommentNote({ target, source }: { target: { line: number; name: 
       Kept as it is: <code>{section.comment}</code> <span className="muted">(change it with Edit file)</span>
     </p>
   ) : null
+}
+
+/** Says what's wrong with a section an error leaves out of the story views, naming each line. Its text stays in the file and on the page. */
+export function LeftOutFlag({ problems, hint }: { problems: SectionProblem[]; hint: string }) {
+  return (
+    <div className="left-out-flag" role="note">
+      <p>
+        <strong>Left out of every story view</strong> until this is fixed. {hint}
+      </p>
+      <ul>
+        {problems.map((p) => (
+          <li key={`${p.line}:${p.rule}:${p.message}`}>
+            {p.line !== null ? `Line ${p.line}: ` : ''}
+            {p.message} <span className="muted">({p.rule})</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/** In Edit file, the errors that leave sections out, once each (a subsection repeats its parent's), since this is where they get fixed. */
+function FileProblems({ source }: { source: EntitySource | undefined }) {
+  const seen = new Set<string>()
+  const problems = (source?.sections ?? [])
+    .flatMap((s) => s.leftOut ?? [])
+    .filter((p) => {
+      const key = `${p.line}:${p.rule}:${p.message}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  return problems.length > 0 ? <LeftOutFlag problems={problems} hint="Fix the comment here." /> : null
 }
 
 export function SaveError({ error }: { error: Error }) {

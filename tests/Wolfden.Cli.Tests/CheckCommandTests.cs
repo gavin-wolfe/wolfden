@@ -75,6 +75,29 @@ public class CheckCommandTests
             output);
     }
 
+    [Fact]
+    [Trait("Scenario", "SC-CHECK-59")]
+    public void ABadSectionCommentFailsTheCheckAndTheNoteIsStillChecked()
+    {
+        using var den = TempDen.FromFiles(new Dictionary<string, string>
+        {
+            ["den.yaml"] = "format: 1\n",
+            ["universes/vael/universe.md"] = "---\nid: 01JC5CK1000000000000000001\nname: Vael\norder: [a1]\n---\n",
+            ["universes/vael/books/a1/book.md"] = "---\nid: 01JC5CK1000000000000000003\nname: Book 1\nchapters: [1]\n---\n",
+            ["universes/vael/books/a1/entities/characters/orrin-fell.md"] =
+                "---\nid: 01JC5CK1000000000000000005\ntype: character\nname: Orrin Fell\nstatus: canon\n---\n\n## Overview\nSails.\n\n## Secret\n<!-- wolfden: status=maybe -->\nThe heir.\n",
+        });
+
+        var (exitCode, output, _) = Check(den.Root);
+
+        Assert.Equal(CliApp.ExitErrors, exitCode);
+        Assert.Contains(
+            "universes/vael/books/a1/entities/characters/orrin-fell.md:12: error F-STAT-1: 'maybe' isn't a status. Use idea, undecided, candidate, draft, canon, or retconned. 'Secret' is left out until this is fixed.",
+            output,
+            StringComparison.Ordinal);
+        Assert.Contains("Checked 1 entity", output, StringComparison.Ordinal);
+    }
+
     /// <summary>The YAML parser's message for torn.md, which the test doesn't pin down.</summary>
     private static string ErrorMessage(TempDen den) =>
         Core.Checks.DenCheck.Run(den.Root).Diagnostics.Single(d => d.Diagnostic.RuleId == "F-YAML-1").Diagnostic.Message;

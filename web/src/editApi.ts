@@ -1,5 +1,5 @@
 import { queryOptions } from '@tanstack/react-query'
-import { ApiRequestError, apiPath, getJson, type EntitySummary } from './api'
+import { ApiRequestError, apiPath, getJson, type EntitySummary, type SectionProblem } from './api'
 import type { Json } from './fieldModel'
 
 // The editing API (#28; src/Wolfden.Api/WriteEndpoints.cs): an entity's
@@ -26,6 +26,8 @@ export interface SourceSection {
   body: string
   pinned: boolean
   parent: number | null
+  /** Why an error leaves this section out of every story view, or null or missing if it isn't left out. */
+  leftOut?: SectionProblem[] | null
 }
 
 /** An entity's file as an editor needs it (GET /api/entity/source). */

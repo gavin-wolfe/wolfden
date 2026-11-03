@@ -381,6 +381,13 @@ public sealed class SectionRecord
     /// <summary>True for a bookkeeping section (F-SEC-12), which canon views leave out.</summary>
     public bool IsBookkeeping { get; set; }
 
+    /// <summary>
+    /// Why an error leaves the section out (format.md F-GEN-2), as a JSON list of
+    /// <see cref="SectionProblem"/>, or null if it isn't left out. A section left
+    /// out has null ordinals and isn't pinned, so no view at a position finds it.
+    /// </summary>
+    public string? LeftOutJson { get; set; }
+
     /// <summary>The comment's <c>from</c> as written, or null.</summary>
     public string? FromText { get; set; }
 
@@ -541,6 +548,12 @@ public sealed class OutlineRowRecord
     public string CellsJson { get; set; } = "{}";
 }
 
+/// <summary>An error that leaves a section out (format.md F-GEN-2), as a section keeps it.</summary>
+/// <param name="Line">The 1-based line of the section comment with the error: for a subsection left out with its parent, the parent's.</param>
+/// <param name="Rule">The rule, such as <c>F-STAT-1</c>.</param>
+/// <param name="Message">The message.</param>
+public sealed record SectionProblem(int? Line, string Rule, string Message);
+
 /// <summary>
 /// A diagnostic from loading the den (format.md §1.3). It's keyed by
 /// <see cref="Path"/>, not by a file row, since some diagnostics are about
@@ -565,4 +578,10 @@ public sealed class DiagnosticRecord
 
     /// <summary>The message.</summary>
     public string Message { get; set; } = "";
+
+    /// <summary>For an error that leaves out one section and no more (format.md F-GEN-2), the section's name. Null for any other diagnostic, including a bad section comment in a file another error leaves out whole.</summary>
+    public string? LeftOutSection { get; set; }
+
+    /// <summary>The 1-based line of <see cref="LeftOutSection"/>'s heading, or null.</summary>
+    public int? LeftOutSectionLine { get; set; }
 }

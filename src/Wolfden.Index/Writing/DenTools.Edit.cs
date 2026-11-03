@@ -63,7 +63,8 @@ public sealed partial class DenTools
             FrozenReason(entity),
             new SourceLead(file.LeadLine, EditorText(file.Lead)),
             file.Sections.Select(s => new SourceSection(
-                s.Index, s.Name, s.Level, s.Line, s.Comment?.Text, EditorText(s.Body), facts[s].Pinned, s.Parent?.Index)).ToList(),
+                s.Index, s.Name, s.Level, s.Line, s.Comment?.Text, EditorText(s.Body), facts[s].Pinned, s.Parent?.Index,
+                s.IsLeftOut ? s.LeftOutBecause.Select(p => new SectionProblem(p.Line, p.RuleId, p.Message)).ToList() : null)).ToList(),
             entity.Definition?.Sections.Select(d => d.Name).ToList() ?? [],
             (file.Frontmatter?["fields"] as YamlMapping)?.Entries.Where(e => e.KeyText is not null)
                 .Select(e => new SourceField(e.KeyText!, e.Key.Line, AsWritten(e.Value))).ToList() ?? [],

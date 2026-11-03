@@ -85,9 +85,20 @@ internal sealed record ScopeOption(string Option, string Into, string Done)
         problem = $"the den has no universe '{key}'" + (only is null ? "" : $", and universe '{only.Key}' has no series or book '{key}'") +
             $", so {Option} '{key}' doesn't name a scope." +
             (holders.Count > 0 ? $" To {Into} the series or book '{key}', give {Option} {string.Join(" or ", holders)}." : "") +
+            KeysIn(structure) +
             $" Give {Option} '<universe>' or '<universe>/<series or book>'.";
         return false;
     }
+
+    /// <summary>What's there to name, for a message: each universe's series keys, and its book keys if <paramref name="books"/>, starting with a space.</summary>
+    internal static string KeysIn(DenStructure structure, bool books = true) =>
+        string.Concat(structure.Universes.Select(u =>
+        {
+            var series = u.Series.Select(s => s.Key).ToList();
+            var bookKeys = books ? u.Books.Select(b => b.Key).ToList() : [];
+            var parts = new[] { series.Count > 0 ? $"series: {string.Join(", ", series)}" : null, bookKeys.Count > 0 ? $"books: {string.Join(", ", bookKeys)}" : null }.OfType<string>().ToList();
+            return parts.Count > 0 ? $" Universe '{u.Key}' has {string.Join("; ", parts)}." : $" Universe '{u.Key}' has no {(books ? "series or books" : "series")} yet.";
+        }));
 
     /// <summary>A series or book key of <paramref name="universe"/>, with <c>series:</c> or <c>book:</c> before it to say which.</summary>
     private bool TryWork(Universe universe, string key, out string? series, out string? book, out string problem)

@@ -95,6 +95,56 @@ public sealed class NewContainerCommandTests : IDisposable
 
     [Fact]
     [Trait("Scenario", "SC-CLI-16")]
+    public void AnInThatNamesNothingListsTheSeriesAndBooksThere()
+    {
+        Assert.Equal(CliApp.ExitOk, New("series", "The Long Dark").ExitCode);
+        var before = Cli.Snapshot(_den.Root);
+
+        // The Getting Started slip: the series' key is from its whole name.
+        var (exitCode, output, error) = New("book", "Ember", "--in", "long-dark", "--chapters", "24");
+
+        Assert.Equal(CliApp.ExitUsage, exitCode);
+        Assert.Empty(output);
+        Assert.Contains("--in 'long-dark' doesn't name a scope.", error, StringComparison.Ordinal);
+        Assert.Contains("Universe 'dracula' has series: the-long-dark; books: dracula.", error, StringComparison.Ordinal);
+
+        // The key it lists works.
+        Assert.Equal(before, Cli.Snapshot(_den.Root));
+        Assert.Equal(CliApp.ExitOk, New("book", "Ember", "--in", "the-long-dark", "--chapters", "24").ExitCode);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-CLI-16")]
+    public void WithSeveralUniversesTheListForANewBookNamesEachOnesSeriesAndNoBooks()
+    {
+        using var den = TempDen.Empty();
+        den.Write("den.yaml", "format: 1\nname: Two\n");
+        den.Write("universes/vael/universe.md", "---\nname: Vael\n---\n");
+        den.Write("universes/vael/series/the-long-dark/series.md", "---\nname: The Long Dark\n---\n");
+        den.Write("universes/vael/books/tide/book.md", "---\nname: Tide\n---\n");
+        den.Write("universes/orra/universe.md", "---\nname: Orra\n---\n");
+
+        var (exitCode, _, error) = Cli.Run(["new", "--den", den.Root, "book", "Ember", "--in", "long-dark"]);
+
+        Assert.Equal(CliApp.ExitUsage, exitCode);
+        Assert.Contains("Universe 'vael' has series: the-long-dark.", error, StringComparison.Ordinal);
+        Assert.Contains("Universe 'orra' has no series yet.", error, StringComparison.Ordinal);
+        Assert.DoesNotContain("tide", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-CLI-16")]
+    public void ANewSeriesInSomethingElseNamesTheUniverses()
+    {
+        var (exitCode, _, error) = New("series", "The Harker Papers", "--in", "nowhere");
+
+        Assert.Equal(CliApp.ExitUsage, exitCode);
+        Assert.Contains("A series goes in a universe", error, StringComparison.Ordinal);
+        Assert.Contains("The den's universes: dracula.", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-CLI-16")]
     public void FirstPutsItAtTheStart()
     {
         var (exitCode, output, _) = New("book", "Dracula's Guest", "--first");

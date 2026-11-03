@@ -501,18 +501,18 @@ internal static class NewCommand
             return true;
         }
 
-        // A bare key that's no universe, in a den with several: say where it could go, naming universes and series only.
-        if (structure.IsLoaded && structure.Universes.Count > 1 && !value.Contains('/', StringComparison.Ordinal) && !value.Contains(':', StringComparison.Ordinal))
+        // A bare key that's no universe, in a den with several or for a new series: say where it could go.
+        if (structure.IsLoaded && (structure.Universes.Count > 1 || series) && !value.Contains('/', StringComparison.Ordinal) && !value.Contains(':', StringComparison.Ordinal))
         {
             var holders = structure.Universes.Where(x => x.Series.Any(s => s.Key == value)).Select(x => $"'{x.Key}/{value}'").ToList();
             var asBook = structure.Universes.Any(x => x.FindBook(value) is not null);
             problem = $"the den has no universe '{value}', so --in '{value}' doesn't name one." +
                 (series
-                    ? " A series goes in a universe: give --in '<universe>'."
+                    ? $" A series goes in a universe: give --in '<universe>'. The den's universes: {string.Join(", ", structure.Universes.Select(u => u.Key))}."
                     : (holders.Count > 0
                         ? $" To put the book in the series '{value}', give --in {string.Join(" or ", holders)}."
                         : asBook ? $" '{value}' is a book, and a book goes in a universe or a series." : "") +
-                      " Give --in '<universe>' for a standalone book, or '<universe>/<series>'.");
+                      ScopeOption.KeysIn(structure, books: false) + " Give --in '<universe>' for a standalone book, or '<universe>/<series>'.");
             return false;
         }
 

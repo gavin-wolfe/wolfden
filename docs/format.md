@@ -76,6 +76,19 @@ id, is a [warning], and the rule says how views handle it. So editing one
 file never makes a different file invalid. (A container folder that lacks
 its container file, F-LAY-4, is a problem with the folder itself.)
 
+**F-GEN-5.** A file `wolfden check` reads that's there but can't be read, or
+a folder it reads that's there but can't be listed, is reported, so a check
+never passes a den it didn't see all of. It's an [error] on that path with no
+line, and it says what to do: close the file in the program that has it open,
+or check its permissions. It's about the machine, not what's in the file, so
+F-GEN-4 doesn't apply, nothing is wrong with the file, and it clears once the
+file can be read. A file deleted while the check runs isn't reported: it's
+absent. The other parts of the den read such a file as absent too, so links
+to it can show as broken until then. The app and MCP tools MUST refuse, as a
+whole, a write that depends on every file, one that rewrites or checks links
+across the den (F-RT-5) or that reaches books it can't see (F-BOOK-1), while
+this is so. They MUST name the path and write nothing. (#284.)
+
 ### 1.4 Notation and terms
 
 Grammars use ABNF ([RFC 5234]), except that quoted strings are

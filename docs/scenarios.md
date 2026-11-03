@@ -1123,6 +1123,30 @@ Spec: types.md §9, F-TYPE-4, F-PACK-11 (#33). Covered by:
 `EpicFantasyPackTests.ADensTypeInSpeciesFolderWarnsOnThePacksThatNameTheCoreOne`,
 `EpicFantasyPackTests.ADensTypeWithAnotherFolderAndKindOfSpeciesClearsEveryWarning`.
 
+### SC-CHECK-59. Check lists what it couldn't read
+
+Another program holds a note with no sharing, or the writer's account may not
+list a `characters/` folder, while they run `wolfden check`.
+
+- The report has one more error for it, on its path with no line:
+  `F-GEN-5: This file couldn't be read, so it wasn't checked, and links to it
+  may show as broken.`, and what to do. `--json` and the MCP `check` tool have
+  it too. `check` exits 1, since it can't vouch for what it didn't see.
+- Links to that note can still show as broken: the rest of the report is what
+  it would be if the note were deleted. Once it can be read, it's all gone.
+- A note deleted as the check runs isn't listed (SC-CLI-8).
+- A check of one universe lists only what's its own, or what every universe
+  shares.
+
+Spec: format.md F-GEN-1, F-GEN-5 (#284). Covered by:
+`LockedFileWriteTests.TheCheckToolListsALockedNoteAsAnError` (MCP),
+`LockedFileWriteTests.TheCheckToolListsAFolderThatCantBeListed` (MCP),
+`TrackingDenSourceTests.CheckReportsAFolderThatCantBeListed` (Core),
+`TrackingDenSourceTests.ACheckOfOneUniverseReportsOnlyItsOwnUnreadableFiles` (Core),
+`UnreadableFileTests.AFileThatCantBeReadIsCheckedAsIfItWerentThere` (Core),
+`UnreadableFileTests.ANoteThatCantBeReadIsLeftOutAndTheCommandsStillWork` (CLI),
+`UnlistableFolderTests.AFolderThatCantBeListedIsLeftOutAndTheCommandsStillWork` (CLI).
+
 ## RT: saving a note keeps what the writer wrote
 
 Background: the files are the writer's, and Wolfden is only one of the
@@ -1584,6 +1608,8 @@ its permissions don't let the writer read it.
   note weren't there, so links to it are reported as they would be if it
   were deleted. Once the note can be read again, the next query sees that
   the files changed and rebuilds the index with it.
+- If the note is still there, `check` also lists it (SC-CHECK-59). A note
+  that's gone, or a link that points nowhere, gets nothing more.
 
 Spec: design.md §7 (#112). Covered by:
 `UnreadableFileTests.AFileThatCantBeReadIsCheckedAsIfItWerentThere` (Core),
@@ -1607,6 +1633,7 @@ it. Another time, a sync tool deletes a series folder just as
   reported as they would be if it were deleted. Once the folder can be
   listed again, the next query sees that the files changed and rebuilds
   the index with what's in it.
+- If the folder is still there, `check` also lists it (SC-CHECK-59).
 
 Spec: design.md §7 (#116). Covered by:
 `UnlistableFolderTests.AFolderDeletedAfterItsParentWasListedIsCheckedAsIfItWerentThere` (Core),
@@ -3027,6 +3054,53 @@ Spec: types.md F-CHAP-3, F-CHAP-5 (#233). Covered by:
 `WriteToolTests.ChapterFieldRefusalsNameTheChapterNotAYamlPath`,
 `WriteToolTests.ARefusalNamesAChapterByItsTitleOnOneLine`,
 `ChapterDefaultsToolTests.AnAddToADefaultThatIsntAListNamesTheContainerAndSaysWhatToDo` (MCP).
+
+### SC-MCP-35. A rename while another program holds a note
+
+The writer has a note open in a program that keeps it to itself, and asks
+the assistant to rename Mr. Swales. That note links to him.
+
+- The rename is refused as a whole with `den_unreadable`. The error names
+  the file, says nothing was changed, and says to close it there and try
+  again. Nothing in the den is written, so the note's link doesn't break.
+- The same goes for `change_alias`, `rename_section`, `move_entity`,
+  `copy_entity`, and `create_entity`, and if the note held is the one being
+  renamed, or an outline. A folder Wolfden may not list is refused the same
+  way, naming the folder, and says to check its permissions.
+- Once it's closed, the same call goes through and the note's links follow.
+- A write to one file, such as adding a chapter, isn't stopped by a note
+  held elsewhere: it doesn't depend on that note.
+- A note deleted just as the den is read isn't a failure. It's gone, so the
+  rename goes ahead.
+
+Spec: format.md F-GEN-5, F-RT-5 (#284). Covered by:
+`LockedFileWriteTests.ALockedNoteRefusesADenWideWriteAndNothingIsWritten`,
+`LockedFileWriteTests.TheLinksInALockedNoteFollowOnceItsClosedAndTheWriteIsRepeated`,
+`LockedFileWriteTests.TheNoteBeingRenamedOrAnOutlineIsNamedWhenItsTheOneLocked`,
+`LockedFileWriteTests.AFolderThatCantBeListedRefusesADenWideWriteAndIsNamed`,
+`LockedFileWriteTests.AWriteToOneFileIsntStoppedByALockedNoteElsewhere`,
+`LockedFileWriteTests.AFileDeletedBetweenListingAndReadingIsntAFailure`.
+
+### SC-MCP-36. A locked file can't get a write past a frozen book
+
+A book is final. A note in it links to Mr. Swales, and another program holds
+that note, or the book's own `book.md`, with no sharing. The assistant asks
+to rename Mr. Swales.
+
+- It's refused with `den_unreadable`, naming the file, and nothing is
+  written. With the file treated as absent, the rename would have seen no
+  link in a final book and gone ahead.
+- Once the file is closed, the same call gets the usual `frozen` refusal.
+- A note in that book whose `book.md` is held is named too, rather than
+  being reported as an entity that doesn't exist.
+- A change to a universe's `chapter_defaults` while a final book's `book.md`
+  below it is held is refused the same way, and is `frozen` once it's closed.
+
+Spec: format.md F-GEN-5, F-BOOK-1 (#284). Covered by:
+`LockedFileWriteTests.ALockedNoteInAFrozenBookCantSkipTheFrozenRefusal`,
+`LockedFileWriteTests.AFrozenBooksLockedBookFileCantSkipTheFrozenRefusal`,
+`LockedFileWriteTests.ANoteInAFrozenBookWhoseBookFileIsLockedIsNamedRatherThanNotFound`,
+`LockedFileWriteTests.AChapterDefaultCantReachAFrozenBookWhoseBookFileIsLocked`.
 
 ## STORE: Wolfden saves, moves, and deletes notes
 

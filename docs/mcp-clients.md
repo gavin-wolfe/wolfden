@@ -238,6 +238,14 @@ prompts. This list is for knowing what the assistant can do.
   have to rewrite a link in one is refused as a whole, and so is a change
   to a series' or universe's `chapter_defaults` that would change what a
   final book's chapters have.
+- **A file Wolfden can't read stops the writes that need it.** A rename,
+  move, copy, or create checks links across the whole den, and a change
+  to `chapter_defaults` looks at every book below it. If a note, `book.md`,
+  or outline is there but can't be read, because another program has it
+  open with no sharing, or a folder can't be listed, the write is refused
+  as a whole with `den_unreadable`, names the file, and writes nothing
+  (format.md F-GEN-5). So links in that file don't break, and a final
+  book's refusal isn't skipped. `check` lists such a file as an error.
 - **Effects, not just bytes.** Results say what an edit means for the
   story: a status that takes an entity out of canon views, a chapter left
   with no POV, the links a rename rewrote, and any link that would now
@@ -322,6 +330,12 @@ docs. The writer's own list is in
   yours was written; retry the same call. If it then comes back
   `stale_file`, read again as usual. If it keeps happening, ask the
   writer what's running.
+- **`den_unreadable` naming a file means ask the writer to close it.**
+  Another program has the file open, or its permissions don't let
+  Wolfden read it. Nothing was written. Tell the writer which file it is,
+  and retry the same call once they've closed it. Don't call it broken:
+  the file is fine. `check` reports the same thing as F-GEN-5, and until
+  it's closed, links to that file can show as broken.
 - **`allow_relinks` only with the writer's say-so.** A create, copy,
   rename, or move that would send existing links to a different note is
   refused, with the links listed. Show them to the writer, and set

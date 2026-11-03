@@ -1316,6 +1316,22 @@ in it, which Wolfden calls a checkpoint.
   in `den.yaml` ([format.md F-DEN-7](format.md)). It sees links, not
   prose.
 
+### Files another program has open
+
+- **A note another program holds can stop a rename.** A few programs open
+  a file so nothing else can read it. While one does, Wolfden can't see
+  what's in that note, so it refuses a rename, a move, a copy, or a new
+  note, says which file, and changes nothing. Otherwise links in that note
+  would break without a word. Close the file there, then try again.
+- **`wolfden check` lists it as an error** (F-GEN-5), and links to that
+  note can show as broken until it's closed. If no program has it open,
+  check the file's permissions. The same goes for a folder Wolfden isn't
+  allowed to look in.
+- **Pages still open.** A note that can't be read is left out of pages and
+  searches until it can be, so it can seem to have gone. Nothing happened
+  to it. Editors that let others read what they have open, as most do,
+  never cause any of this.
+
 ### Images and other editors
 
 - **Image paths start from the note's folder,** or from the den's top

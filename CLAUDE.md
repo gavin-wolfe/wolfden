@@ -7,7 +7,7 @@ Guidance for AI coding agents working in this repository.
 Wolfden is an open-source story bible / writer's wiki for long, interconnected
 fiction. See `README.md` for the pitch. Design docs live in `docs/`.
 
-**Status:** pre-code, in design. Nothing is built yet.
+**Status:** pre-release. The format, CLI, MCP server, web UI, and packs are built; nothing has been released yet. Next is dogfooding on real notes.
 
 ## Decisions made (2026-10-10)
 

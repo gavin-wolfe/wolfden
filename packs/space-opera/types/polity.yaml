@@ -1,9 +1,9 @@
 name: Polity
 plural: polities
 description: >-
-  A state that holds territory: an empire, a republic, a league of worlds.
-  The places it holds name it in their `controlled_by` field. A group
-  without territory is a faction.
+  A faction that governs territory, at any size: an empire, a republic, a
+  league of worlds, a single city. The places it holds name it in their
+  `controlled_by` field. A group that governs no territory is a faction.
 kind_of: faction
 fields:
   government:

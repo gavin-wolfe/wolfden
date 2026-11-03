@@ -1,0 +1,45 @@
+name: Creature
+plural: creatures
+description: >-
+  A kind of being with no culture of its own: a griffin, a wolf, a dragon that
+  eats sheep. A dragon that holds councils and keeps laws is a species. One
+  named individual is a character, whose `species` field can link here.
+kind_of: species
+fields:
+  kind:
+    type: text
+    description: What sort of being it is, such as a beast, a spirit, or a swarm.
+  habitat:
+    type: ref
+    to: location
+    temporal: true
+    description: Where they're found.
+  diet:
+    type: text
+    description: What they eat.
+  danger:
+    type: text
+    description: >-
+      How much of a threat they are, in the story's own terms, such as
+      "harmless unless cornered" or "takes a whole village".
+  lifespan:
+    type: text
+    description: How long one lives, such as "about 300 years".
+  population:
+    type: text
+    temporal: true
+    description: >-
+      How many there are and where, in the story's own terms, such as
+      "common in the hills" or "thought extinct".
+sections:
+  - name: Overview
+    description: What they are, in a paragraph.
+  - name: Body
+    description: Their bodies, senses, and needs.
+  - name: Habits
+    description: How they hunt, nest, and breed, and what sets them off.
+  - name: Lore
+    description: What people believe about them, and how far it's true.
+  - name: History
+    description: Where they came from and how they have changed.
+template: creature.md

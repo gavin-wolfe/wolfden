@@ -1,16 +1,17 @@
 name: Species
 plural: species
 description: >-
-  A kind of being, human or otherwise. A character's `species` field can
-  link here.
+  A kind of being with a culture of its own, human or otherwise. A
+  character's `species` field can link here. A pack can add kinds of it, such
+  as epic fantasy's creature for beings with no culture.
 fields:
   kind:
     type: text
-    description: What sort of life it is, such as a hive mind or a machine.
-  homeworld:
+    description: What sort of life it is, such as a people, a hive mind, or a machine.
+  origin:
     type: ref
-    to: [world, location]
-    description: The world it comes from.
+    to: location
+    description: Where they come from.
   lifespan:
     type: text
     description: How long one lives, such as "about 300 years".
@@ -19,7 +20,7 @@ fields:
     temporal: true
     description: >-
       How many are left and where, in the story's own terms, such as
-      "spread across the Reach" or "thought extinct".
+      "scattered along the coast" or "thought extinct".
 sections:
   - name: Overview
     description: What they are, in a paragraph.

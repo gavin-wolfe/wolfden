@@ -1,0 +1,40 @@
+name: Magic System
+plural: magic-systems
+description: >-
+  A kind of magic with rules of its own: where the power comes from, what it
+  costs, what it can't do, and who can use it. Its rules go here, so that the
+  story keeps to them.
+fields:
+  kind:
+    type: text
+    description: What sort of magic it is, such as rune work or blood rites.
+  source:
+    type: text
+    temporal: true
+    description: >-
+      Where the power comes from, in a few words or as a link to a note. What
+      people believe can give way to the truth as the story goes on.
+  practiced_by:
+    type: ref
+    to: [culture, species, order, faction, character]
+    list: true
+    temporal: true
+    description: The cultures, peoples, orders, groups, or individuals who use it.
+sections:
+  - name: Overview
+    description: What it is and what it does, in a paragraph.
+  - name: How it works
+    description: How it's worked, as far as the story needs to say.
+  - name: Costs
+    description: What each use takes from the one using it, or from someone else.
+  - name: Limits
+    description: What it can't do, however much anyone pays.
+  - name: Who can use it
+    description: Who can learn it, who can't, and who decides.
+  - name: Consequences
+    description: What it changed about how people live and fight.
+  - name: History
+    description: Where it came from and how it spread.
+  - name: Open questions
+    description: What isn't decided about it yet.
+template: magic-system.md

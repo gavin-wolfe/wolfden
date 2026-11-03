@@ -25,7 +25,7 @@ public sealed class StarfallSampleCanonViewTests : IClassFixture<StarfallSampleC
         var velari = Entity("ember:14", "Velari");
 
         Assert.Equal("\"extinct\"", Field(velari, "population"));
-        Assert.DoesNotContain(velari.Fields, f => f.Name == "homeworld");
+        Assert.DoesNotContain(velari.Fields, f => f.Name == "origin");
         Assert.DoesNotContain(velari.Sections, s => s.Name == "Alive");
         Assert.DoesNotContain(view.Entities, e => e.Name == "Velari Prime");
         foreach (var term in new[] { "terrified", "cover story", "Commander", "flechette", "Greta" })

@@ -36,7 +36,7 @@ public sealed class CreateEndpointTests : IDisposable
         var types = (await server.GetJsonAsync("/api/types", HttpStatusCode.OK)).GetProperty("types").EnumerateArray().ToList();
 
         var keys = types.Select(t => t.GetProperty("key").GetString()).ToList();
-        Assert.Equal(["character", "event", "faction", "idea", "item", "location", "note", "ship", "thread"], keys.Order(StringComparer.Ordinal));
+        Assert.Equal(["character", "culture", "event", "faction", "idea", "item", "location", "note", "ship", "species", "thread"], keys.Order(StringComparer.Ordinal));
         var ship = types.Single(t => t.GetProperty("key").GetString() == "ship");
         Assert.Equal("Ship", ship.GetProperty("name").GetString());
         Assert.Equal("ships", ship.GetProperty("plural").GetString());

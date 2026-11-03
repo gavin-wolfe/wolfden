@@ -6,7 +6,7 @@ status: canon
 from: "ember:3"
 fields:
   kind: Aquatic and communal
-  homeworld: { value: "[[velari-prime]]", from: "ember:27" }
+  origin: { value: "[[velari-prime]]", from: "ember:27" }
   lifespan: about 300 years
   population:
     - { value: extinct, from: "ember:3" }

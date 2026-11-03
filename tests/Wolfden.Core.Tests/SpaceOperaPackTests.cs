@@ -39,7 +39,7 @@ public class SpaceOperaPackTests
         Assert.Equal(["core", "space-opera"], den.Types.Packs.Select(p => p.Key));
         var pack = den.Types.Packs[1];
         Assert.Equal(("Space Opera", true, "builtin:packs/space-opera"), (pack.Name, pack.IsBuiltIn, pack.Folder));
-        Assert.Equal(16, den.Types.Types.Count);
+        Assert.Equal(17, den.Types.Types.Count);
     }
 
     [Fact]
@@ -58,12 +58,11 @@ public class SpaceOperaPackTests
     [InlineData("star-system", "star-systems", "Star System")]
     [InlineData("world", "worlds", "World")]
     [InlineData("settlement", "settlements", "Settlement")]
-    [InlineData("species", "species", "Species")]
     [InlineData("polity", "polities", "Polity")]
     [InlineData("ship-class", "ship-classes", "Ship Class")]
     [InlineData("ship", "ships", "Ship")]
     [InlineData("technology", "technologies", "Technology")]
-    public void TheEightTypesHaveTheirFoldersNamesAndTemplates(string key, string plural, string name)
+    public void TheSevenTypesHaveTheirFoldersNamesAndTemplates(string key, string plural, string name)
     {
         var type = Type(key);
 
@@ -79,7 +78,6 @@ public class SpaceOperaPackTests
     [InlineData("star-system", "part_of stars controlled_by")]
     [InlineData("world", "part_of kind population controlled_by")]
     [InlineData("settlement", "part_of kind population controlled_by")]
-    [InlineData("species", "kind homeworld lifespan population")]
     [InlineData("polity", "government leader capital part_of")]
     [InlineData("ship-class", "role builder crew technologies")]
     [InlineData("ship", "class captain owner location condition")]
@@ -93,7 +91,6 @@ public class SpaceOperaPackTests
     [InlineData("star-system", "controlled_by")]
     [InlineData("world", "population controlled_by")]
     [InlineData("settlement", "population controlled_by")]
-    [InlineData("species", "population")]
     [InlineData("polity", "government leader capital part_of")]
     [InlineData("ship-class", "")]
     [InlineData("ship", "captain owner location condition")]
@@ -107,7 +104,6 @@ public class SpaceOperaPackTests
     [InlineData("star-system", "Overview|Description|Routes|History")]
     [InlineData("world", "Overview|Environment|Society|History")]
     [InlineData("settlement", "Overview|Description|Society|History")]
-    [InlineData("species", "Overview|Biology|Culture|History")]
     [InlineData("polity", "Overview|Government|Goals|Military|History")]
     [InlineData("ship-class", "Overview|Design|Capabilities|History")]
     [InlineData("ship", "Overview|Description|Crew|Service history")]
@@ -132,7 +128,6 @@ public class SpaceOperaPackTests
     [InlineData("world", "controlled_by", "polity faction")]
     [InlineData("settlement", "part_of", "world star-system location")]
     [InlineData("settlement", "controlled_by", "polity faction")]
-    [InlineData("species", "homeworld", "world location")]
     [InlineData("polity", "leader", "character")]
     [InlineData("polity", "capital", "world settlement location")]
     [InlineData("polity", "part_of", "polity faction")]
@@ -163,7 +158,7 @@ public class SpaceOperaPackTests
         // warning, and adding a default later is a breaking change (§2.4).
         var types = Types.Types.Where(t => t.Pack.Key == "space-opera").ToList();
 
-        Assert.Equal(8, types.Count);
+        Assert.Equal(7, types.Count);
         Assert.All(types.SelectMany(t => t.Fields), f => Assert.False(f.IsRequired));
         Assert.All(types.SelectMany(t => t.Fields), f => Assert.Null(f.Default));
         Assert.All(types.SelectMany(t => t.Sections), s => Assert.False(s.IsRequired));
@@ -192,7 +187,7 @@ public class SpaceOperaPackTests
             .Entity(Starfall, "vesta", Note("world", "Vesta", "  part_of: \"[[tessaly]]\"\n"), folder: "worlds")
             .Entity(Starfall, "little-vesta", Note("world", "Little Vesta", "  part_of: \"[[vesta]]\"\n  kind: moon\n"), folder: "worlds")
             .Entity(Starfall, "vesta-yards", Note("settlement", "Vesta Yards", "  part_of: \"[[little-vesta]]\"\n"), folder: "settlements")
-            .Entity(Starfall, "velari", Note("species", "Velari", "  homeworld: \"[[vesta]]\"\n"), folder: "species")
+            .Entity(Starfall, "velari", Note("species", "Velari", "  origin: \"[[vesta]]\"\n"), folder: "species")
             .Entity(Starfall, "reach-compact", Note("polity", "Reach Compact", "  leader: \"[[ilse-tarrow]]\"\n  capital: \"[[vesta-yards]]\"\n"), folder: "polities")
             .Entity(Starfall, "relay", Note("technology", "Relay", "  created_by: \"[[velari]]\"\n  controlled_by: \"[[reach-compact]]\"\n"), folder: "technologies")
             .Entity(Starfall, "survey", Note("ship-class", "Survey", "  builder: \"[[reach-compact]]\"\n  technologies: [\"[[relay]]\"]\n"), folder: "ship-classes")
@@ -238,7 +233,6 @@ public class SpaceOperaPackTests
     [InlineData("settlement", "location")]
     [InlineData("ship", "location")]
     [InlineData("polity", "faction")]
-    [InlineData("species", "")]
     [InlineData("ship-class", "")]
     [InlineData("technology", "")]
     [Trait("Scenario", "SC-CHECK-45")]

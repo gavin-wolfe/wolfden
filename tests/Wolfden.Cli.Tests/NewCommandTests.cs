@@ -40,6 +40,37 @@ public sealed class NewCommandTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "SC-CHECK-53")]
+    public void ARealmNeedsTheEpicFantasyPackAndThenComesFromItsTemplate()
+    {
+        Assert.NotEqual(CliApp.ExitOk, New("realm", "Orrowmere").ExitCode);
+
+        _den.Write("den.yaml", _den.Read("den.yaml") + "packs: [epic-fantasy]\n");
+        var (exitCode, _, error) = New("realm", "Orrowmere");
+
+        Assert.Equal(CliApp.ExitOk, exitCode);
+        Assert.Empty(error);
+        var text = _den.Read("universes/dracula/entities/realms/orrowmere.md");
+        Assert.Contains("type: realm\nname: Orrowmere\nstatus: draft\nfields:\n  part_of:\n  kind:\n  controlled_by:\n  seat:\n  borders:\n  population:\n", text, StringComparison.Ordinal);
+        Assert.Contains("# Orrowmere\n\n## Overview\n", text, StringComparison.Ordinal);
+
+        // Every type's template makes a note that check passes, in its own folder.
+        foreach (var (type, folder) in new[]
+        {
+            ("magic-system", "magic-systems"), ("creature", "creatures"), ("deity", "deities"), ("artifact", "artifacts"), ("order", "orders"),
+        })
+        {
+            Assert.Equal(CliApp.ExitOk, New(type, "Sennowe").ExitCode);
+            Assert.True(_den.Exists($"universes/dracula/entities/{folder}/sennowe.md"), type);
+        }
+
+        var check = Cli.Run(["check", "--den", _den.Root]);
+        Assert.Equal(CliApp.ExitOk, check.ExitCode);
+        Assert.DoesNotContain("entities/realms/", check.Output, StringComparison.Ordinal);
+        Assert.DoesNotContain("sennowe", check.Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-CHECK-45")]
     public void AShipNeedsTheSpaceOperaPackAndThenComesFromItsTemplate()
     {
@@ -59,7 +90,7 @@ public sealed class NewCommandTests : IDisposable
         // Every type's template makes a note that check passes, in its own folder.
         foreach (var (type, folder) in new[]
         {
-            ("star-system", "star-systems"), ("world", "worlds"), ("settlement", "settlements"), ("species", "species"),
+            ("star-system", "star-systems"), ("world", "worlds"), ("settlement", "settlements"),
             ("polity", "polities"), ("ship-class", "ship-classes"), ("technology", "technologies"),
         })
         {

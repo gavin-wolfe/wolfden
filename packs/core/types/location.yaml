@@ -11,6 +11,9 @@ fields:
     to: faction
     temporal: true
     description: The group that holds it.
+  kind:
+    type: text
+    description: What sort of place it is, such as a continent, a city, or a room.
 sections:
   - name: Overview
     description: What the place is, in a paragraph.

@@ -1,0 +1,56 @@
+name: Realm
+plural: realms
+description: >-
+  A land defined by who rules it, such as a kingdom, an empire, or a duchy,
+  or a plane of existence. A continent or other plain geography is a location
+  with a `kind`, and sits above realms through `part_of`. A city in a realm is
+  a location whose `part_of` links here. Whoever governs is a faction, named
+  in `controlled_by`, since rule can change while the land carries on.
+kind_of: location
+fields:
+  part_of:
+    type: ref
+    to: [realm, location]
+    temporal: true
+    description: >-
+      The land or larger realm it's in, such as a continent, or the kingdom
+      a duchy answers to.
+  kind:
+    type: text
+    description: What sort of realm it is, such as a kingdom, a duchy, or a plane.
+  controlled_by:
+    type: ref
+    to: faction
+    temporal: true
+    description: The faction that rules it, such as a dynasty or a council.
+  seat:
+    type: ref
+    to: location
+    temporal: true
+    description: The seat of power, such as a capital city or a fortress.
+  borders:
+    type: text
+    temporal: true
+    description: >-
+      Where it ends, in the story's own terms, such as "the river to the
+      north". For a plane, the ways in and out.
+  population:
+    type: text
+    temporal: true
+    description: >-
+      How many live here, in the story's own terms, such as "a few thousand"
+      or "abandoned".
+sections:
+  - name: Overview
+    description: What the realm is and why it matters, in a paragraph.
+  - name: Land
+    description: What it looks like, and what it's like to live there or cross it.
+  - name: Society
+    description: Who lives here and how they get by.
+  - name: Rule
+    description: How rule works here, and who would take it if they could.
+  - name: Neighbors
+    description: Who it trades with, fears, or fights, and over what.
+  - name: History
+    description: What happened here before and during the story.
+template: realm.md

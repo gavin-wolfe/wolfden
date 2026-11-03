@@ -1,0 +1,48 @@
+name: Order
+plural: orders
+description: >-
+  A group bound by a creed and ranks: a knighthood, a monastery, a circle of
+  mages. A family, a court, or a warband, with no vows to keep, is a faction.
+  Membership is each member character's `factions` field, as for any faction.
+kind_of: faction
+fields:
+  kind:
+    type: text
+    description: What sort of order it is, such as a knighthood or a monastery.
+  leader:
+    type: ref
+    to: character
+    temporal: true
+    description: Who leads it.
+  base:
+    type: ref
+    to: location
+    temporal: true
+    description: Where it's based.
+  part_of:
+    type: ref
+    to: [order, faction]
+    description: The larger group it belongs to.
+  patron:
+    type: ref
+    to: [deity, character, faction]
+    temporal: true
+    description: The god, person, or group it answers to.
+sections:
+  - name: Overview
+    description: What the order is, in a paragraph.
+  - name: Creed
+    description: What its members swear to, and what happens to those who break it.
+  - name: Ranks
+    description: The ranks, what each may do, and how anyone rises.
+  - name: Goals
+    description: What it wants.
+  - name: Methods
+    description: How it goes about getting it.
+  - name: Members
+    description: >-
+      Members who don't have a page yet, and the ranks people hold. Members
+      with a page are listed from their `factions` field.
+  - name: History
+    description: Where it came from and how it has changed.
+template: order.md

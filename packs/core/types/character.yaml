@@ -29,7 +29,9 @@ fields:
   heritage:
     type: text
     temporal: true
-    description: Where they come from, such as a family, people, or culture.
+    description: >-
+      Where they come from, such as a family, people, or culture. Plain text,
+      or a link to a culture note.
   born:
     type: date
     description: In-world date of birth.
@@ -40,7 +42,7 @@ fields:
     type: text
     description: >-
       What kind of being they are, where that matters. Plain text, or a
-      link to a species entity when a pack defines a species type.
+      link to a species note.
   factions:
     type: ref
     to: faction

@@ -1,0 +1,46 @@
+name: Deity
+plural: deities
+description: >-
+  One named god or other worshipped power. A deity is a kind of character, so
+  it can lead a faction, own an artifact, or be a chapter's point of view. A
+  kind of god is a species, and a pantheon is a faction.
+kind_of: character
+fields:
+  species:
+    type: text
+    description: >-
+      What kind of god it is. Plain text, or a link to a species note.
+  factions:
+    type: ref
+    to: faction
+    list: true
+    temporal: true
+    description: The pantheons and other groups it belongs to.
+  domains:
+    type: text
+    list: true
+    description: What it holds sway over, such as the sea, oaths, or the harvest.
+  worshippers:
+    type: ref
+    to: [culture, species, realm, order, faction, character]
+    list: true
+    temporal: true
+    description: Who worships it.
+  condition:
+    type: text
+    temporal: true
+    description: The state it's in, such as "present", "sleeping", "dead", or "never real".
+sections:
+  - name: Overview
+    description: Who it is, in a paragraph.
+  - name: Powers
+    description: What it can really do, and what it can't.
+  - name: Worship
+    description: How it's worshipped, its symbols and rites, and what it asks of the faithful.
+  - name: Myths
+    description: What the faithful tell about it, true or not.
+  - name: History
+    description: What it has actually done, before and during the story.
+  - name: Open questions
+    description: What isn't decided about it yet.
+template: deity.md

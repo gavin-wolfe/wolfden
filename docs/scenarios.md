@@ -1081,6 +1081,7 @@ whose `species` links to that note. A deity's `worshippers` links to a creature.
 
 Spec: types.md F-FANTASY-1, F-TYPE-13 (#33). Covered by:
 `EpicFantasyPackTests.OneNamedBeastsSpeciesLinksToItsCreature`,
+`EpicFantasyPackTests.TheExampleNotesLinkToOneAnotherWithoutWarnings`,
 `EpicFantasyPackTests.AFieldThatAsksForASpeciesTakesACreatureButNotTheOtherWayRound`.
 
 ### SC-CHECK-57. A god has a kind, a pantheon, and worshippers
@@ -1109,12 +1110,18 @@ core had one.
   notes mean what they meant.
 - A den's type under another key that uses the same folder, such as an `alien`
   with `plural: species`, replaces core's type, with the F-TYPE-5 warning.
+- With a pack on whose fields name core's `species`, those fields get F-FT-9
+  too, and with the epic fantasy pack, `creature` gets F-TYPE-13 and a
+  `worshippers` link to the den's type gets F-LINK-11.
+- Giving the den's type another folder and `kind_of: species` clears them all.
 
 Spec: types.md §9, F-TYPE-4, F-PACK-11 (#33). Covered by:
 `BuiltInPacksTests.SpeciesAndCultureAreCoreAndKindsOfNothing`,
 `BuiltInPacksTests.ACharactersSpeciesAndHeritageAreTextThatCanHoldALink`,
 `BuiltInPacksTests.ADensOwnTypeWinsOverTheNewCoreOne`,
-`BuiltInPacksTests.ADensTypeInTheNewFolderUnderAnotherKeyReplacesTheCoreOne`.
+`BuiltInPacksTests.ADensTypeInTheNewFolderUnderAnotherKeyReplacesTheCoreOne`,
+`EpicFantasyPackTests.ADensTypeInSpeciesFolderWarnsOnThePacksThatNameTheCoreOne`,
+`EpicFantasyPackTests.ADensTypeWithAnotherFolderAndKindOfSpeciesClearsEveryWarning`.
 
 ## RT: saving a note keeps what the writer wrote
 

@@ -333,9 +333,12 @@ one. Every den now has these two types. A den that already defined its own, unde
 the same key, is unchanged, apart from the F-TYPE-4 warning on its file. A den's
 type that uses the folder under another key, such as an `alien` with
 `plural: species`, replaces the core type instead (types.md F-TYPE-5), with that
-warning on its file. With the fantasy pack on as well, the pack's references to
-the core type then warn too, and links there to the den's type get F-LINK-11,
-until the den adds `kind_of` or renames its folder.
+warning on its file. With a pack on whose fields name that core type, such as
+epic fantasy's `worshippers` or space opera's `created_by`, those references
+warn too (F-FT-9), and epic fantasy's `creature` loses its parent (F-TYPE-13). A
+link in those fields to the den's type gets F-LINK-11. All of it clears when the
+den gives its type another folder and `kind_of: species`, or `kind_of: culture`.
+Neither one alone is enough.
 
 **Decided (#33): rulers are factions, and a god is a character.** There's no
 fantasy government type: a realm names its rulers in `controlled_by`, as space

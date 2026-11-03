@@ -54,7 +54,7 @@ public class EpicFantasyPackTests
         den = Note(den, "culture", "cultures", "sedgefolk", "The Sedgefolk", "  kind: ethnic group\n  homeland: \"[[vaskerrow]]\"\n  languages: [Sedge Cant]\n");
         den = Note(den, "creature", "creatures", "sedge-drake", "Sedge Drake", "  kind: beast\n  habitat: \"[[varrowland]]\"\n  diet: sheep\n  danger: takes a whole flock\n  population: thought extinct\n");
         den = Note(den, "deity", "deities", "oshelleth", "Oshelleth",
-            "  species: a sleeping god\n  factions: [\"[[house-ostrand]]\"]\n  domains: [the banked fire, debts]\n  worshippers: [\"[[sedgefolk]]\", \"[[ondrahi]]\", \"[[vaskerrow]]\", \"[[banked-flame]]\", \"[[house-ostrand]]\", \"[[maret-ostrand]]\"]\n  condition: sleeping\n");
+            "  species: a sleeping god\n  factions: [\"[[house-ostrand]]\"]\n  domains: [the banked fire, debts]\n  worshippers: [\"[[sedgefolk]]\", \"[[ondrahi]]\", \"[[sedge-drake]]\", \"[[vaskerrow]]\", \"[[banked-flame]]\", \"[[house-ostrand]]\", \"[[maret-ostrand]]\"]\n  condition: sleeping\n");
         den = Note(den, "artifact", "artifacts", "widows-wick", "The Widow's Wick",
             "  kind: lamp wick\n  owner: \"[[banked-flame]]\"\n  location: \"[[the-moss-quarter]]\"\n  created_by: \"[[ondrahi]]\"\n  powered_by: \"[[cindertithe]]\"\n  condition: whole\n");
         den = Note(den, "order", "orders", "banked-flame", "The Banked Flame",
@@ -379,7 +379,8 @@ public class EpicFantasyPackTests
     {
         // What the guide says happens when a writer changes their mind.
         var source = Note(Fantasy(), "location", "locations", "varrowland", "Varrowland");
-        source = source.With($"{Fable}/entities/realms/vaskerrow.md", $"---\ntype: location\nname: Fablerow\nstatus: canon\nfields:\n  part_of:\n    - {{ value: \"[[varrowland]]\", from: \"the-long-tithe:1\" }}\n  seat: \"[[varrowland]]\"\n---\n");
+        source = Note(source, "location", "locations", "tenhallow", "Tenhallow", "  part_of: \"[[vaskerrow]]\"\n");
+        source = source.With($"{Fable}/entities/realms/vaskerrow.md", $"---\ntype: location\nname: Vaskerrow\nstatus: canon\nfields:\n  part_of:\n    - {{ value: \"[[varrowland]]\", from: \"the-long-tithe:1\" }}\n  seat: \"[[varrowland]]\"\n---\n");
 
         var check = DenCheck.Run(source);
 
@@ -387,7 +388,56 @@ public class EpicFantasyPackTests
         Assert.Equal(
             ["F-FLD-2", "F-LAY-6", "F-TMP-8"],
             check.Diagnostics.Where(d => d.Path.EndsWith("vaskerrow.md", StringComparison.Ordinal) && d.Diagnostic.RuleId != "F-ID-2").Select(d => d.Diagnostic.RuleId).Order(StringComparer.Ordinal));
-        Assert.Contains(LinkIndex.Load(source).Links, l => l.Occurrence.Path.EndsWith("vaskerrow.md", StringComparison.Ordinal) && l.Target?.Name == "Varrowland");
+
+        // Links still lead to it, and links from it still lead out.
+        var index = LinkIndex.Load(source);
+        var note = Assert.Single(index.Catalog.Entities, e => e.Name == "Vaskerrow");
+        Assert.Contains(index.LinksTo(note), l => l.Occurrence.Path == $"{Fable}/entities/locations/tenhallow.md");
+        Assert.Contains(index.Links, l => l.Occurrence.Path == $"{Fable}/entities/realms/vaskerrow.md" && l.Target?.Name == "Varrowland");
+        Assert.DoesNotContain(index.Diagnostics, d => d.Path == $"{Fable}/entities/locations/tenhallow.md");
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-CHECK-58")]
+    [InlineData("epic-fantasy", "F-FT-9 F-TYPE-13 F-TYPE-5")]
+    [InlineData("space-opera", "F-FT-9 F-TYPE-5")]
+    public void ADensTypeInSpeciesFolderWarnsOnThePacksThatNameTheCoreOne(string pack, string rules)
+    {
+        var den = DenStructure.Load(new MemoryDenSource()
+            .With("den.yaml", $"format: 1\npacks: [{pack}, mine]\n")
+            .With("packs/mine/pack.yaml", "name: Mine\n")
+            .With("packs/mine/types/alien.yaml", "name: Alien\nplural: species\n"));
+
+        Assert.Null(den.Types.Find("species"));
+        Assert.Equal(rules.Split(' '), den.Diagnostics.Select(d => d.Diagnostic.RuleId).Distinct().Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-CHECK-58")]
+    public void ADensTypeWithAnotherFolderAndKindOfSpeciesClearsEveryWarning()
+    {
+        MemoryDenSource Den(string type, string folder)
+        {
+            var source = Fantasy()
+                .With("den.yaml", "format: 1\npacks: [epic-fantasy, mine]\n")
+                .With("packs/mine/pack.yaml", "name: Mine\n")
+                .With("packs/mine/types/alien.yaml", type);
+            source = Note(source, "alien", folder, "aurrendi", "Aurrendi");
+            return Note(source, "deity", "deities", "oshelleth", "Oshelleth", "  worshippers: [\"[[aurrendi]]\"]\n");
+        }
+
+        // Each half alone leaves something, as design.md §4 says.
+        var neither = Den("name: Alien\nplural: species\n", "species");
+        var kindOnly = Den("name: Alien\nplural: species\nkind_of: species\n", "species");
+        var folderOnly = Den("name: Alien\nplural: aliens\n", "aliens");
+        var both = Den("name: Alien\nplural: aliens\nkind_of: species\n", "aliens");
+
+        Assert.Contains(LinkIndex.Load(neither).Diagnostics, d => d.Diagnostic.RuleId == "F-LINK-11");
+        Assert.NotEmpty(DenStructure.Load(kindOnly).Diagnostics);
+        Assert.Contains(LinkIndex.Load(kindOnly).Diagnostics, d => d.Diagnostic.RuleId == "F-LINK-11");
+        Assert.Empty(DenStructure.Load(folderOnly).Diagnostics);
+        Assert.Contains(LinkIndex.Load(folderOnly).Diagnostics, d => d.Diagnostic.RuleId == "F-LINK-11");
+        Assert.All(DenCheck.Run(both).Diagnostics, d => Assert.Equal("F-ID-2", d.Diagnostic.RuleId));
     }
 
     [Fact]

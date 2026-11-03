@@ -501,8 +501,16 @@ internal static class NewCommand
             return true;
         }
 
-        // A universe's key and a name that's no series or book of it: a book can only go in a series, so say so.
+        // No such universe: say what a series or a book can go in, which isn't what a note can.
         var slash = value.IndexOf('/', StringComparison.Ordinal);
+        if (structure.IsLoaded && slash > 0 && structure.FindUniverse(value[..slash].Trim()) is null)
+        {
+            problem = $"the den has no universe '{value[..slash].Trim()}', so --in '{value}' doesn't name one.{ScopeOption.UniversesIn(structure)}" +
+                (series ? " A series goes in a universe: give --in '<universe>'." : " Give --in '<universe>' for a standalone book, or '<universe>/<series>'.");
+            return false;
+        }
+
+        // A universe's key and a name that's no series or book of it: a book can only go in a series, so say so.
         if (structure.IsLoaded && slash > 0 && structure.FindUniverse(value[..slash].Trim()) is { } inUniverse)
         {
             var rest = value[(slash + 1)..].Trim();

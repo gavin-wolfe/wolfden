@@ -360,6 +360,29 @@ function pieceOf(source: EntitySource, target: TextTarget | { kind: 'rename' | '
   }
 }
 
+/** An editor whose source couldn't be read when it opened: nothing has been typed, so this is the way out. */
+export function SourceFailed({ error }: { error: Error }) {
+  const editing = useEditing()!
+  const close = useRef<HTMLButtonElement>(null)
+  useEffect(() => close.current?.focus(), [])
+  return (
+    <div
+      className="editor-panel"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          e.preventDefault()
+          editing.close()
+        }
+      }}
+    >
+      <ErrorState error={error} />
+      <button type="button" ref={close} onClick={() => editing.close()}>
+        Close
+      </button>
+    </div>
+  )
+}
+
 /** Fetches the note's source when an editor opens, and gives the piece it edits, kept as it was when it opened. */
 function useOpenedPiece(target: TextTarget | { kind: 'rename' | 'remove'; line: number; name: string }) {
   const editing = useEditing()!
@@ -367,7 +390,7 @@ function useOpenedPiece(target: TextTarget | { kind: 'rename' | 'remove'; line: 
   const [piece, setPiece] = useState<Piece | null>(null)
   const [missing, setMissing] = useState(false)
   // Only the file as fetched for this editor, never an answer cached from an earlier one.
-  const fresh = source.isFetchedAfterMount && !source.isFetching
+  const fresh = source.isFetchedAfterMount && !source.isFetching && !source.isError
   useEffect(() => {
     if (fresh && source.data && piece === null && !missing) {
       const found = pieceOf(source.data, target)
@@ -466,7 +489,7 @@ export function PieceEditor({ target, what, file }: { target: TextTarget; what: 
 
   // Once it has opened, the editor stays whatever the file does: the writer's text is in it, and Save says what's wrong.
   if (source.isError && piece === null) {
-    return <ErrorState error={source.error} />
+    return <SourceFailed error={source.error} />
   }
 
   if (missing) {
@@ -913,7 +936,7 @@ export function AddSection({ file }: { file: string }) {
   const afterSave = useAfterSave()
   const addImageHere = useAddImage()
   const source = useQuery({ ...sourceQuery(editing.universe, editing.entityKey), refetchOnMount: 'always' })
-  const fresh = source.isFetchedAfterMount && !source.isFetching
+  const fresh = source.isFetchedAfterMount && !source.isFetching && !source.isError
   const [base, setBase] = useState<EntitySource | null>(null)
   const [name, setName] = useState('')
   const [before, setBefore] = useState('')
@@ -966,7 +989,7 @@ export function AddSection({ file }: { file: string }) {
   }
 
   if (source.isError && base === null) {
-    return <ErrorState error={source.error} />
+    return <SourceFailed error={source.error} />
   }
 
   if (!base) {

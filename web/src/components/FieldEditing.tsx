@@ -22,8 +22,8 @@ import {
   type Problem,
 } from '../fieldModel'
 import { describePosition, positionLabel } from '../story'
-import { Conflict, DiscardPrompt, EditButton, SaveError, useAfterSave, useEditing } from './Editing'
-import { ErrorState, Loading } from './States'
+import { Conflict, DiscardPrompt, EditButton, SaveError, useAfterSave, useEditing, SourceFailed } from './Editing'
+import { Loading } from './States'
 
 // Editing a note's fields in place (#28, part b): one field at a time, with
 // a control for its type from the type definition. A field is edited as its
@@ -177,7 +177,7 @@ export function FieldEditor({ name, positions }: { name: string; positions: Posi
   const editing = useEditing()!
   const afterSave = useAfterSave()
   const source = useQuery({ ...sourceQuery(editing.universe, editing.entityKey), refetchOnMount: 'always' })
-  const fresh = source.isFetchedAfterMount && !source.isFetching
+  const fresh = source.isFetchedAfterMount && !source.isFetching && !source.isError
   const [base, setBase] = useState<EntitySource | null>(null)
   const [draft, setDraft] = useState<FieldDraft | null>(null)
   const [initial, setInitial] = useState('')
@@ -220,7 +220,7 @@ export function FieldEditor({ name, positions }: { name: string; positions: Posi
   }, [firstId])
 
   if (source.isError && base === null) {
-    return <ErrorState error={source.error} />
+    return <SourceFailed error={source.error} />
   }
 
   if (!base) {

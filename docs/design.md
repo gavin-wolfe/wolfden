@@ -1912,8 +1912,9 @@ docs/
     editor opened on it, and an error waits for the form to close, so
     neither a new answer nor a failed one can take the editor away. That
     question is the one thing asked again by itself: other answers aren't
-    refetched on focus or when the network comes back, and queries ignore
-    the browser's online state, since the server is on this computer. A
+    refetched on focus or when the network comes back, and queries and
+    writes ignore the browser's online state, since the server is on this
+    computer. A
     failed answer is tried again every 15 seconds while the server answers
     (#285).
   - **Adding images** (#187; v0 behaviour, not a recorded decision). The

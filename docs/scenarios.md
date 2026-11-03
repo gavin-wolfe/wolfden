@@ -5562,10 +5562,12 @@ editor, changes it.
 - If that question fails (the server was stopped, say), the page stays as it
   is, including when the tab comes back. The History tab asks for itself on
   coming back, and says if it can't.
-- With no network, as on a laptop with its Wi-Fi off, it all still works: the
-  server is on the same computer.
+- With no network, as on a laptop with its Wi-Fi off, it all still works, reads
+  and writes: the server is on the same computer. A write goes at once, and
+  none waits to fire when the network comes back.
 - A refresh that fails shows the error, and is tried again every 15 seconds
-  while the server answers, so the page comes back by itself.
+  while the server answers, so the page comes back by itself, however long
+  the answer takes.
 - As of a position, the new answer is still as of that position.
 
 Spec: #285. Covered by: `web/src/LiveRefresh.test.tsx`,
@@ -5587,6 +5589,8 @@ program adds lines above that section.
   error shows when the form closes.
 - A form opened before the page's first answer about the files still catches
   up on later writes when it closes.
+- An editor whose source can't be read when it opens shows the error with a
+  Close button, and Escape does the same. Nothing has been typed yet.
 - Saving is refused as stale, and the writer sees both versions, as ever
   in the conflict dialog.
 - On Save or Cancel, the page shows the file as it is now.

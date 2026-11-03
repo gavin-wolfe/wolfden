@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react'
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { entitiesQuery, positionsQuery } from './api'
+import { useShownError } from './formHold'
 import { splitByView, type LaterEntity } from './story'
 import type { EntitySummary } from './api'
 import type { StorySearch } from './router'
@@ -50,7 +51,10 @@ export function useEntitiesInView(universe: string) {
   const positions = useQuery(positionsQuery(universe))
 
   const isPending = all.isPending || positions.isPending || (at !== undefined && inView.isPending)
-  const error = all.error ?? positions.error ?? (at !== undefined ? inView.error : null)
+  const failedAll = useShownError(all)
+  const failedPositions = useShownError(positions)
+  const failedInView = useShownError(inView)
+  const error = failedAll ?? failedPositions ?? (at !== undefined ? failedInView : null)
   const viewKeys = at !== undefined && inView.data ? new Set(inView.data.entities.map((e) => e.key)) : null
 
   /** Splits some of the universe's entities into those met and those met later. */

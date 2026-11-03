@@ -3,7 +3,7 @@ import { render } from '@testing-library/react'
 import { QueryClient } from '@tanstack/react-query'
 import { createMemoryHistory } from '@tanstack/react-router'
 import { App } from '../App'
-import { refreshDefaults } from '../formHold'
+import { refreshDefaults, writeDefaults } from '../formHold'
 import type {
   DenSummary,
   EntityListResult,
@@ -320,7 +320,7 @@ export function renderApp(url: string) {
   // jsdom has no scrolling; the router restores scroll positions.
   window.scrollTo = () => {}
   const history = createMemoryHistory({ initialEntries: [url] })
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, ...refreshDefaults } } })
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, ...refreshDefaults }, mutations: writeDefaults } })
   const result = render(<App queryClient={queryClient} history={history} />)
   return { ...result, history, queryClient }
 }

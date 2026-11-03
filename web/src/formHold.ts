@@ -69,3 +69,10 @@ export const refreshDefaults = {
   refetchOnWindowFocus: false,
   refetchOnReconnect: false,
 } as const
+
+/**
+ * The same for writes. Otherwise a write made while the browser says it's
+ * offline waits, with its form locked, and is sent by itself when the browser
+ * says it's back, perhaps long after the writer gave up on it.
+ */
+export const writeDefaults = { networkMode: 'always' } as const

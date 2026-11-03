@@ -69,10 +69,14 @@ export function LiveRefresh() {
     }
 
     const before = Date.now() - RETRY_FAILED_MS
-    void client.refetchQueries({
-      type: 'active',
-      predicate: (query) => query.queryKey[0] !== FILES_KEY && query.state.status === 'error' && query.state.errorUpdatedAt <= before,
-    })
+    // An answer can take longer than the time between these checks, on a large den, so one under way is left to finish.
+    void client.refetchQueries(
+      {
+        type: 'active',
+        predicate: (query) => query.queryKey[0] !== FILES_KEY && query.state.status === 'error' && query.state.errorUpdatedAt <= before,
+      },
+      { cancelRefetch: false },
+    )
   }, [answeredAt, held, client])
   return null
 }

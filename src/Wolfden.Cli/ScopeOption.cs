@@ -111,14 +111,28 @@ internal sealed record ScopeOption(string Option, string Into, string Done)
         problem = "";
         if (key.StartsWith("series:", StringComparison.Ordinal))
         {
-            series = key["series:".Length..].Trim();
-            return true;
+            var named = key["series:".Length..].Trim();
+            if (universe.Series.Any(s => s.Key == named))
+            {
+                series = named;
+                return true;
+            }
+
+            problem = $"universe '{universe.Key}' has no series '{named}'.{KeysIn([universe])}";
+            return false;
         }
 
         if (key.StartsWith("book:", StringComparison.Ordinal))
         {
-            book = key["book:".Length..].Trim();
-            return true;
+            var named = key["book:".Length..].Trim();
+            if (universe.FindBook(named) is not null)
+            {
+                book = named;
+                return true;
+            }
+
+            problem = $"universe '{universe.Key}' has no book '{named}'.{KeysIn([universe])}";
+            return false;
         }
 
         var isSeries = universe.Series.Any(s => s.Key == key);

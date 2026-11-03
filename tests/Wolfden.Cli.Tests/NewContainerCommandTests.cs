@@ -160,6 +160,26 @@ public sealed class NewContainerCommandTests : IDisposable
         Assert.Equal(CliApp.ExitUsage, exitCode);
         Assert.Contains("the den has no universe 'bogus'", error, StringComparison.Ordinal);
         Assert.Contains("The den's universes: dracula.", error, StringComparison.Ordinal);
+        Assert.Contains("for a standalone book, or '<universe>/<series>'.", error, StringComparison.Ordinal);
+        Assert.DoesNotContain("series or book", error, StringComparison.Ordinal);
+
+        var forSeries = New("series", "The Harker Papers", "--in", "bogus/long-dark");
+        Assert.Equal(CliApp.ExitUsage, forSeries.ExitCode);
+        Assert.Contains("A series goes in a universe", forSeries.Error, StringComparison.Ordinal);
+        Assert.DoesNotContain("series or book", forSeries.Error, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-CLI-16")]
+    [InlineData("dracula/series:nope", "universe 'dracula' has no series 'nope'.")]
+    [InlineData("dracula/book:nope", "universe 'dracula' has no book 'nope'.")]
+    public void AScopeNamedWithItsKindThatIsntThereSaysSoInTheSameWords(string scope, string words)
+    {
+        var (exitCode, _, error) = New("character", "Sister Agatha", "--in", scope);
+
+        Assert.Equal(CliApp.ExitUsage, exitCode);
+        Assert.Contains("wolfden new: " + words, error, StringComparison.Ordinal);
+        Assert.Contains("books: dracula.", error, StringComparison.Ordinal);
     }
 
     [Fact]

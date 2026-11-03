@@ -787,15 +787,15 @@ character.
 - Before the line is added, `wolfden new ship` is refused, and a
   hand-written `type: ship` is an unknown type (F-ENT-2).
 - With it, the pack loads after core with no diagnostics, and each of the
-  eight types has its folder, template, fields, and sections. A new note
+  seven types has its folder, template, fields, and sections. A new note
   from any of the templates passes `wolfden check`.
 - Links between the types get no warnings. A `location` or a `faction`
   is accepted wherever the pack's fields link to a place or a group.
 - A moon's `part_of` can link to a world with `kind: gas giant`, and a
   fuel-mining platform's `part_of` to that same gas giant, with no warnings.
 - A star system, world, settlement, and ship are kinds of location, and a
-  polity is a kind of faction. A species, ship class, and technology are
-  kinds of nothing.
+  polity is a kind of faction. A ship class and a technology are kinds of
+  nothing.
 - The `class` that links to a character gets the F-LINK-11 warning:
   `class` is a ref to ship-class.
 - A den that doesn't list the pack is unchanged.
@@ -993,6 +993,135 @@ Spec: types.md F-TYPE-13 (#269). Covered by:
 `QueryCommandTests.AKindCanTieWithTheTypeAskedForUntilAnIdOrFileNamePicksOne` (CLI),
 `Search.test.tsx` "offers what a met type is a kind of in the Type filter, as
 filtering by it includes its kinds" (web).
+
+### SC-CHECK-53. I write epic fantasy and turn on the pack
+
+The writer adds `packs: [epic-fantasy]` to `den.yaml`, then makes a kingdom
+with `wolfden new realm "Vaskerrow"`, and notes for its magic, a beast, a god,
+an artifact, and an order. Another writer's story has both starships and
+dragons, and lists both packs.
+
+- Before the line is added, `wolfden new realm` is refused, and a hand-written
+  `type: realm` is an unknown type (F-ENT-2).
+- With it, the pack loads after core with no diagnostics, and each of the six
+  types has its folder, template, fields, and sections. A new note from any of
+  the templates passes `wolfden check`.
+- Links between the types get no warnings.
+- Both packs load together with no diagnostics. They share no type or folder.
+- A den's own `realm` is still used, with the F-TYPE-4 warning on the den's
+  file, and a folder `packs/epic-fantasy/` of its own shadows the built-in pack,
+  with the F-PACK-10 warning.
+
+Spec: types.md F-FANTASY-1 (#33). Covered by:
+`EpicFantasyPackTests.ListingThePackInDenYamlEnablesItAfterCore`,
+`EpicFantasyPackTests.ADenThatDoesntListThePackDoesntHaveItsTypes`,
+`EpicFantasyPackTests.TheExampleNotesLinkToOneAnotherWithoutWarnings`,
+`EpicFantasyPackTests.BothGenrePacksCanBeOnTogether`,
+`EpicFantasyPackTests.ADensOwnRealmWinsOverThePacks`,
+`EpicFantasyPackTests.ADenLocalPackNamedEpicFantasyShadowsTheBuiltInOne`,
+`NewCommandTests.ARealmNeedsTheEpicFantasyPackAndThenComesFromItsTemplate`.
+
+### SC-CHECK-54. A realm counts as a place, and a god as a character
+
+With the pack on, a chapter's `setting` links to a realm and its `pov` to a
+deity. A character's `factions` links to an order. A faction's `leader` is a
+deity. A den's own field that asks for an item links to an artifact. By mistake,
+one chapter's `setting` links to a deity.
+
+- None of these gets a warning except the mistake, which gets the F-LINK-11
+  warning: `setting` is a ref to location or a kind of it (realm).
+- A realm is a kind of location, an order of faction, an artifact of item, a
+  deity of character, and a creature of species. A magic system is a kind of
+  nothing.
+- `wolfden query --type location` finds realms, `faction` finds orders, `item`
+  finds artifacts, and `character` finds deities. `realm` finds no plain
+  locations.
+
+Spec: types.md F-FANTASY-2, F-TYPE-13 (#33). Covered by:
+`EpicFantasyPackTests.EachTypeIsAKindOfWhatItIs`,
+`EpicFantasyPackTests.CoreFieldsTakeThePacksKindsOfTheirTypes`,
+`EpicFantasyPackTests.AFieldThatAsksForAnItemTakesAnArtifact`,
+`EpicFantasyPackTests.ALinkToTheWrongKindOfNoteIsTheUsualWarning`,
+`QueryCommandTests.ATypeFilterFindsTheFantasyPacksKinds`.
+
+### SC-CHECK-55. A kingdom sits on a continent, and a city in the kingdom
+
+The writer's continent is a core location with `kind: continent`. The kingdom
+is a realm whose `part_of` links to the continent, and its capital is a location
+whose `part_of` links to the kingdom. The house that rules it is a faction,
+named in the realm's `controlled_by`, with a value for each stretch of the story.
+By mistake, a fort's `controlled_by` links to the realm itself.
+
+- A location's `kind` is a core field, so `kind: continent` gets no warning, in
+  a den with or without a pack. New locations get a line for it.
+- The nesting gets no warnings, and each place's page lists what links to it.
+- The fort gets the F-LINK-11 warning, which says `controlled_by` is a ref to
+  faction or a kind of it. The usage guide says what to do: make a note for the
+  faction that rules the realm, and link to that.
+- If the realm becomes a location later, its links still work. `wolfden check`
+  warns about the folder, about a field a location doesn't have, and about a timed
+  `part_of`, which a location's isn't.
+
+Spec: types.md F-FANTASY-1, §9 (#33). Covered by:
+`EpicFantasyPackTests.ALocationCanSayWhatSortOfPlaceItIs`,
+`EpicFantasyPackTests.AWholeStackOfPlacesNestsThroughPartOf`,
+`EpicFantasyPackTests.TheRealmsRulersAreAFactionSoAPlaceHeldByARealmWarns`,
+`EpicFantasyPackTests.ARealmChangedToALocationKeepsItsLinksAndSaysWhatToFix`.
+
+### SC-CHECK-56. One dragon, and the kind of being it is
+
+The writer's sedge drakes are a creature, and one named drake is a character
+whose `species` links to that note. A deity's `worshippers` links to a creature.
+
+- The character's link gets no warning, since `species` is core's text field,
+  and the creature's page lists the character.
+- A creature is a kind of species, so a field that asks for a species takes one.
+  It goes one way: a field that asks for a creature gets the F-LINK-11 warning
+  if it links to any other species.
+
+Spec: types.md F-FANTASY-1, F-TYPE-13 (#33). Covered by:
+`EpicFantasyPackTests.OneNamedBeastsSpeciesLinksToItsCreature`,
+`EpicFantasyPackTests.TheExampleNotesLinkToOneAnotherWithoutWarnings`,
+`EpicFantasyPackTests.AFieldThatAsksForASpeciesTakesACreatureButNotTheOtherWayRound`.
+
+### SC-CHECK-57. A god has a kind, a pantheon, and worshippers
+
+The writer's deity has a `species` that links to a kind of god, `factions` that
+links to its pantheon, and `worshippers` that links to a culture.
+
+- None of these gets a warning. `kind_of: character` passes on no fields, so
+  the deity defines its own `gender`, `pronouns`, `species`, and `factions`, and
+  a `Want` section, as a character's.
+
+Spec: types.md F-FANTASY-1, F-TYPE-13 (#33). Covered by:
+`EpicFantasyPackTests.ADeityDeclaresItsOwnSpeciesAndFactionsSinceKindOfPassesNoFields`.
+
+### SC-CHECK-58. Every den has species and culture
+
+Every den now has the core types `species` and `culture`, with or without a
+pack. Another writer made a `species` or `culture` type of their own, before
+core had one.
+
+- `species` has `origin`, a link to a location, so a world fits, since it's a
+  kind of location. A culture has no leaders or members list, and is a kind of
+  nothing. A character's `species` and `heritage` stay plain text that can hold
+  a link.
+- The den's own type is used, with the F-TYPE-4 warning on its own file, and its
+  notes mean what they meant.
+- A den's type under another key that uses the same folder, such as an `alien`
+  with `plural: species`, replaces core's type, with the F-TYPE-5 warning.
+- With a pack on whose fields name core's `species`, those fields get F-FT-9
+  too, and with the epic fantasy pack, `creature` gets F-TYPE-13 and a
+  `worshippers` link to the den's type gets F-LINK-11.
+- Giving the den's type another folder and `kind_of: species` clears them all.
+
+Spec: types.md §9, F-TYPE-4, F-PACK-11 (#33). Covered by:
+`BuiltInPacksTests.SpeciesAndCultureAreCoreAndKindsOfNothing`,
+`BuiltInPacksTests.ACharactersSpeciesAndHeritageAreTextThatCanHoldALink`,
+`BuiltInPacksTests.ADensOwnTypeWinsOverTheNewCoreOne`,
+`BuiltInPacksTests.ADensTypeInTheNewFolderUnderAnotherKeyReplacesTheCoreOne`,
+`EpicFantasyPackTests.ADensTypeInSpeciesFolderWarnsOnThePacksThatNameTheCoreOne`,
+`EpicFantasyPackTests.ADensTypeWithAnotherFolderAndKindOfSpeciesClearsEveryWarning`.
 
 ## RT: saving a note keeps what the writer wrote
 
@@ -5223,11 +5352,14 @@ Spec: design.md §9 ("Adding images", #187). Covered by:
 
 ### SC-WEB-82. The list of a pack's notes reads right
 
-With the space opera pack on, the contents tree and the universe page list
-the writer's notes by type.
+With the space opera pack or the epic fantasy pack on, the contents tree and
+the universe page list the writer's notes by type.
 
 - The lists are headed "Star systems", "Worlds", "Settlements", "Species",
-  "Polities", "Ship classes", "Ships", and "Technologies". "Species" is its
-  own plural.
+  "Polities", "Ship classes", "Ships", and "Technologies". "Species", from
+  core, is its own plural.
+- The epic fantasy lists are headed "Realms", "Magic systems", "Creatures",
+  "Deities", "Artifacts", and "Orders".
 
-Spec: types.md F-SPACE-1 (#32). Covered by: `web/src/typePlural.test.ts`.
+Spec: types.md F-SPACE-1, F-FANTASY-1 (#32, #33). Covered by:
+`web/src/typePlural.test.ts`.

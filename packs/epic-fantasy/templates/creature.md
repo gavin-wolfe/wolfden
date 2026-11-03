@@ -1,9 +1,11 @@
 ---
-type: species
+type: creature
 status: draft
 fields:
   kind:
-  homeworld:
+  habitat:
+  diet:
+  danger:
   lifespan:
   population:
 ---
@@ -13,11 +15,14 @@ fields:
 ## Overview
 <!-- What are they, as the reader first meets them? Put later reveals in a ### subsection with its own from=. -->
 
-## Biology
+## Body
 <!-- Their bodies, their senses, and what they need to live. -->
 
-## Culture
-<!-- How do they live, and how do they see everyone else? -->
+## Habits
+<!-- How do they hunt, nest, and breed, and what sets them off? -->
+
+## Lore
+<!-- What do people believe about them, and how far is it true? -->
 
 ## History
 <!-- Where did they come from, and how have they changed? Give each later era a subsection with its own from=. -->

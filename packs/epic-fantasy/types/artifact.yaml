@@ -1,0 +1,46 @@
+name: Artifact
+plural: artifacts
+description: >-
+  An object of power that the story turns on, with rules of its own. An
+  ordinary object that matters is a core item.
+kind_of: item
+fields:
+  kind:
+    type: text
+    description: What sort of object it is, such as a sword, a crown, or a book.
+  owner:
+    type: ref
+    to: [character, order, faction]
+    temporal: true
+    description: Who has it.
+  location:
+    type: ref
+    to: [realm, location]
+    temporal: true
+    description: Where it is.
+  created_by:
+    type: ref
+    to: [character, species, culture, order, faction]
+    description: Who made it.
+  powered_by:
+    type: ref
+    to: magic-system
+    description: The magic behind it.
+  condition:
+    type: text
+    temporal: true
+    description: The state it's in, such as "whole", "broken", or "lost".
+sections:
+  - name: Overview
+    description: What it is and why it matters, in a paragraph.
+  - name: Description
+    description: What it looks like, and how people recognize it.
+  - name: Powers
+    description: What it can do, and what it can't.
+  - name: Price
+    description: What it costs to use or to carry, and who pays.
+  - name: History
+    description: Where it came from and whose hands it passed through.
+  - name: Open questions
+    description: What isn't decided about it yet.
+template: artifact.md

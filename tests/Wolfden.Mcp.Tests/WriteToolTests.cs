@@ -178,7 +178,7 @@ public sealed class WriteToolTests : IDisposable
         var types = Tools.ListTypes().Types;
 
         Assert.Equal(
-            ["Character", "Event", "Faction", "Idea", "Item", "Location", "Note", "Thread"], types.Select(t => t.Name));
+            ["Character", "Culture", "Event", "Faction", "Idea", "Item", "Location", "Note", "Species", "Thread"], types.Select(t => t.Name));
         var thread = types.Single(t => t.Key == "thread");
         Assert.Equal("threads", thread.Plural);
         Assert.Equal("core", thread.Pack);

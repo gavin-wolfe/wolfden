@@ -1,0 +1,6 @@
+# The epic fantasy pack. Built in; a den turns it on with
+# `packs: [epic-fantasy]` in den.yaml (docs/types.md §12).
+name: Epic Fantasy
+description: >-
+  Types for stories of kingdoms and magic: realm, magic-system, creature,
+  deity, artifact, and order.

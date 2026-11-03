@@ -179,84 +179,261 @@ rather than making a note no view shows. Edits are checked the same way
 ## Adding a genre pack
 
 Every den has the core types: character, location, faction, item, event,
-thread, idea, and note. A **pack** adds types for a genre. Wolfden comes
-with one so far, `space-opera`. Turn it on with a line in `den.yaml`:
+thread, idea, note, species, and culture. A **pack** adds types for a genre.
+Wolfden comes with two, `space-opera` and `epic-fantasy`. Turn one on with a
+line in `den.yaml`, or both, if your story has starships and dragons:
 
 ```yaml
-packs: [space-opera]
+packs: [space-opera, epic-fantasy]
 ```
 
 The new types then show up everywhere the core ones do: under **New ▾**, in
-`wolfden new ship "Lantern"`, and to AI assistants. Nothing else in your
+`wolfden new ship "Columbia"`, and to AI assistants. Nothing else in your
 den changes, and notes you've written stay as they are.
+
+Fields that change over a story, such as `captain`, `location`,
+`controlled_by`, or `population`, can have a value for each stretch of it,
+so a view at a chapter shows the one true by then. Fields like `kind`,
+`population`, and `condition` are plain words of your own, such as `moon`,
+`about 40 million`, or `damaged`, rather than a fixed list.
+
+**Ranks, postings, and anything else** a pack leaves out can be added from
+your den's own pack
+([types.md §4](types.md#4-extensions-and-combining-packs) and
+[§10](types.md#10-appendix-a-den-local-pack)).
+
+**If you pick a type and change your mind,** nothing breaks. Change the note's
+`type:` line, and its links still lead to it. `wolfden check` then warns that
+the file belongs in the new type's folder, and names any field the new type
+doesn't have, whose value stays in the note. It also warns about a field with a
+value for each stretch of the story, if the new type's field has only one, as a
+realm's `part_of` does when the note becomes a location. A link gets a warning
+only if the field it's in doesn't accept the new type.
+
+The examples below come from history, astronomy, and old myth, because you
+already know them. They show how to file things, not what your own story's
+should be.
+
+### What a note is, and where it sits
+
+Two things sound alike and aren't: `kind_of` says what a note **is**, and
+`part_of` says where it **sits**.
+
+- **`kind_of` is written once, on a type.** `world` is `kind_of: location`,
+  so every world counts as a location. A chapter's `setting` can link to
+  one, and asking for notes of type `location` finds it. The packs have
+  already set this up, so you only write `kind_of` for
+  [types of your own](#your-own-types-and-kind_of).
+- **`part_of` is written on a note.** Europa's `part_of` links to Jupiter,
+  the planet it circles. Only that one moon says so.
+
+"Europa is a world" is `kind_of`, and "Europa is at Jupiter" is `part_of`. A
+type gets none of its parent's fields, so each note keeps its own type,
+fields, and folder. A `part_of` can cross types as far as you need, since
+every place here is a kind of location, and the worked examples below show
+how they nest.
+
+### Choosing a type: beings and peoples
+
+`species` and `culture` are core types. `creature` comes with the epic fantasy
+pack.
+
+| You're writing about | Use | Why |
+|---|---|---|
+| Neanderthals | `species` | A kind of being with a culture of its own |
+| Griffins, wolves | `creature` | A kind of being with no culture of its own |
+| Bucephalus, Alexander the Great's horse | `character` | One named individual, whose `species` field links to the note on horses |
+| The Norse | `culture` | People who share ancestry, language, and customs, with nobody in charge of them all |
+| The Hanseatic League | `faction` | A group that acts together, with members and a purpose |
+
+**Species or creature?** Ask whether it has a culture. A dragon that holds
+councils and keeps laws is a species. A dragon that eats sheep is a creature.
+One named dragon is a character, either way. A creature is a kind of species,
+so a field that links to a species takes a creature too. Without the epic
+fantasy pack, a species note does for both.
+
+**Culture or faction?** A faction can act: it has leaders, members, and goals.
+A culture is something people share, and it has no leaders or members list.
+A character can have both, with `heritage` for where they come from and
+`factions` for who they answer to. `heritage` and `species` are plain text
+that can hold a link to a note: `heritage: "[[norse]]"`.
+
+### Choosing a type: space opera
 
 | Type | Use it for | Fields | Folder |
 |---|---|---|---|
 | Star System | A star or group of stars | `part_of`, `stars`, `controlled_by` | `star-systems` |
 | World | A planet, moon, asteroid, or gas giant: a body in space that people can live on, visit, or build around | `part_of`, `kind`, `population`, `controlled_by` | `worlds` |
 | Settlement | A place people live or work, on a world, orbiting it, floating in its atmosphere, or out on its own, linked to its star system: a city, colony, orbital station, or fuel-mining platform | `part_of`, `kind`, `population`, `controlled_by` | `settlements` |
-| Species | A kind of being | `kind`, `homeworld`, `lifespan`, `population` | `species` |
-| Polity | A state that holds territory | `government`, `leader`, `capital`, `part_of` | `polities` |
+| Polity | A faction that governs territory, at any size | `government`, `leader`, `capital`, `part_of` | `polities` |
 | Ship Class | A design that ships are built to | `role`, `builder`, `crew`, `technologies` | `ship-classes` |
 | Ship | One ship | `class`, `captain`, `owner`, `location`, `condition` | `ships` |
 | Technology | A drive, a weapon, a network: anything with rules the story has to keep | `kind`, `created_by`, `controlled_by`, `introduced` | `technologies` |
 
-**The types link to each other.** A ship's `class` links to its ship
-class, a settlement's `part_of` to its world (or, if it has none, to its
-star system), a world's `part_of` to its star system (or, for a moon, to
-the world it circles), and a star system's `part_of` to a region, which is
-a core location. What's true of every ship of a design goes on the ship
-class, and what sets one ship apart goes on the ship:
+**World, settlement, or star system?** Ask what it is in space.
+
+| You're writing about | Use | Its `part_of` |
+|---|---|---|
+| The Solar System | `star-system` | A core location, if you need one, such as the Milky Way |
+| Mars | `world` with `kind: rock planet` | The Solar System |
+| Jupiter | `world` with `kind: gas giant` | The Solar System |
+| Europa | `world` with `kind: moon` | Jupiter |
+| Mir, the space station | `settlement` with `kind: orbital station` | Earth, the world it orbited |
+| A module aboard Mir | `location` | Mir |
+
+A world doesn't need anyone living on it. A settlement doesn't need ground under
+it. One with no world, out on its own, links to its star system.
+
+**Polity or faction?** A polity is a faction that governs territory, and any
+size counts.
+
+| You're writing about | Use | Why |
+|---|---|---|
+| The Roman Empire | `polity` | Governs territory |
+| The Icelandic Commonwealth | `polity` | Governs territory too: one island, with no king |
+| The Praetorian Guard | `faction`, `part_of` the Roman Empire | Acts as a group, and governs nothing of its own |
+| The British East India Company | Either | A trading company that came to rule territory |
+
+The last one shows the line blurring. Pick either, since a polity is a kind of
+faction, so a character's `factions` and a place's `controlled_by` take both,
+and the note's page lists its members either way. The places a polity holds
+name it in `controlled_by`.
+
+**A ship is a location that moves.** A ship is a kind of location, so a
+chapter's `setting` can link to one, and a core location, such as its brig, can
+name it in `part_of`. Where the ship is at the moment goes in its own `location`
+field, not `part_of`, since it changes. What's true of every ship of a design
+goes on the ship class, and what sets one ship apart goes on the ship:
 
 ```yaml
 ---
 type: ship
-name: Lantern
+name: Columbia
 status: canon
 fields:
-  class: "[[survey-cutter]]"
-  captain: "[[ilse-tarrow]]"
+  class: "[[apollo-command-module]]"
   location:
-    - { value: "[[kessan-reach]]", from: "ember:9" }
-    - { value: "[[velari-prime]]", from: "ember:26" }
+    - { value: "[[earth]]", from: "book-1:1" }
+    - { value: "[[the-moon]]", from: "book-1:9" }
   condition: in service
 ---
 ```
 
-Fields that change over a story, such as `captain`, `location`,
-`controlled_by`, or `population`, can have a value for each stretch of it,
-so a view at a chapter shows the one true by then. `kind`, `population`,
-and `condition` are plain words of your own, such as `moon`, `about 40
-million`, or `damaged`, rather than a fixed list.
+**A worked example.** Each line's `part_of` links to the line it's indented
+under:
 
-**A character's species** is the character's own `species` field, which
-can link to the species' note: `species: "[[velari]]"`.
+```text
+Milky Way          location     kind: galaxy
+  Solar System     star-system
+    Earth          world        kind: rock planet
+      The Moon     world        kind: moon
+      Mir          settlement   kind: orbital station
+    Mars           world        kind: rock planet
+    Jupiter        world        kind: gas giant
+      Europa       world        kind: moon
+```
 
-**Polity or faction?** A polity is a state with territory: the places it
-holds name it in their `controlled_by`. A group without territory, such
-as a crew, a guild, or a rebel cell, is a core faction. **Settlement or
-location?** A settlement is a whole place people live or work, such as a
-colony or a relay station. A place within it, such as a dock or a bar, is
-a core location, whose `part_of` can link to the settlement.
+The *Columbia* isn't in the tree, since it's a ship, and its `location` changes
+as the story goes on. A polity wouldn't be either, since it isn't a place.
 
-**Ranks and postings** aren't in the pack, since not every story has
-them. To add them, or anything else, extend the type from your den's own
-pack ([types.md §4](types.md#4-extensions-and-combining-packs) and
-[§10](types.md#10-appendix-a-den-local-pack)).
-
-**Places and groups count everywhere.** A star system, a world, a
-settlement, and a ship are kinds of location, and a polity is a kind of
-faction. So a chapter's `setting` can link to a world or a ship, a
-character's `factions` can link to a polity, and the polity's page lists
-those characters as a faction's page does. A link that's neither, such as a
-`setting` that links to a character, still gets a warning from
-`wolfden check`. A kind of location is still its own type, though: it has
-its own fields and folder, and each note still shows its own type. Asking
-for notes of type `location`, in a search or from your AI assistant, finds
-your worlds and ships too. Asking for `world` finds worlds, and your own
-`moon` type if it has `kind_of: world`, but no other locations.
+A link that isn't a place or a group, such as a `setting` that links to a
+character, still gets a warning from `wolfden check`. Asking for notes of type
+`location`, in a search or from your AI assistant, finds your worlds and ships
+too. Asking for `world` finds worlds, and your own `moon` type if it has
+`kind_of: world`, but no other locations.
 
 The full list is in [types.md §11](types.md#11-the-space-opera-pack).
+
+### Choosing a type: epic fantasy
+
+| Type | Use it for | For example | Fields | Folder |
+|---|---|---|---|---|
+| Realm | A land defined by who rules it, or a plane of existence | The Kingdom of France | `part_of`, `kind`, `controlled_by`, `seat`, `borders`, `population` | `realms` |
+| Magic System | A kind of magic with rules the story has to keep | Alchemy | `kind`, `source`, `practiced_by` | `magic-systems` |
+| Creature | A kind of being with no culture of its own | Griffins | `kind`, `habitat`, `diet`, `danger`, `lifespan`, `population` | `creatures` |
+| Deity | One named god or other worshipped power | Zeus | `gender`, `pronouns`, `species`, `factions`, `domains`, `worshippers`, `condition` | `deities` |
+| Artifact | An object of power with rules of its own | Excalibur | `kind`, `owner`, `location`, `created_by`, `powered_by`, `condition` | `artifacts` |
+| Order | A group bound by a creed and ranks | The Knights Templar | `kind`, `leader`, `base`, `part_of`, `patron` | `orders` |
+
+**Realm, location, or faction?** Ask what's left if the rulers fall.
+
+| You're writing about | Use | How it connects |
+|---|---|---|
+| Europe | `location` with `kind: continent` | Sits above realms, whose `part_of` links to it |
+| The Kingdom of France | `realm` with `kind: kingdom` | `part_of` Europe |
+| Paris | `location` with `kind: city` | `part_of` the Kingdom of France |
+| The House of Valois, then the House of Bourbon | `faction` | The realm names each in `controlled_by`, for its stretch of the story |
+
+A plane of existence is a realm too, with `kind: plane`. Rule can change while
+the land carries on, so the land and its rulers are two notes. A realm's
+`controlled_by` has a value for each stretch of the story, and so does its
+`seat`:
+
+```yaml
+---
+type: realm
+name: Kingdom of France
+status: canon
+fields:
+  part_of: "[[europe]]"
+  kind: kingdom
+  controlled_by:
+    - { value: "[[house-of-valois]]", from: "book-1:1" }
+    - { value: "[[house-of-bourbon]]", from: "book-2:14" }
+  seat:
+    - { value: "[[paris]]", from: "book-1:1" }
+    - { value: "[[versailles]]", from: "book-3:2" }
+---
+```
+
+A realm is a place, so a chapter's `setting` can link to one. It isn't a group,
+so a character's `factions` or a castle's `controlled_by` that links to a realm
+gets a warning from `wolfden check`. Link to the faction that rules it instead.
+
+**Order or faction?** An order is bound by a creed and ranks, as the Knights
+Templar were. A family, a court, or a warband, with no vows to keep, is a
+faction, as the House of Valois is. An order is a kind of faction, so a
+character's `factions` can link to one.
+
+**Artifact or item?** An artifact is an object of power, with powers and a
+price the story has to keep to, such as Excalibur. An ordinary object that
+matters, such as a stolen letter, is a core item. An artifact is a kind of item.
+
+**Gods.** One named god is a deity. A kind of god or divine being is a species,
+and a pantheon is a faction.
+
+| You're writing about | Use | How it connects |
+|---|---|---|
+| Zeus | `deity` | Its `factions` links to the Olympians |
+| The Olympians | `faction` | The pantheon |
+| The Titans, the valkyries | `species` | A deity's `species` field can link to one |
+| The ancient Greeks | `culture` | A deity's `worshippers` can link to one |
+| Odysseus | `character` | A mortal, however much the gods take an interest |
+
+A deity is a kind of character, so it can lead a faction or be a chapter's
+`pov`. Being a kind of character passes on no fields, so a deity has its own
+`gender`, `pronouns`, `species`, and `factions`, and a `Want` section, which work
+as a character's do. For anything else a character has, such as `Voice`, extend
+the type from your den's own pack.
+
+**A worked example.** Each line's `part_of` links to the line it's indented
+under:
+
+```text
+Europe                 location   kind: continent
+  Kingdom of France    realm      kind: kingdom
+    Paris              location   kind: city
+      The Latin Quarter location  kind: district
+```
+
+The House of Valois isn't in the tree, since it's a faction and not a place. The
+realm names it in `controlled_by`.
+
+**A realm isn't a polity.** If you use both packs, keep them apart: a realm is
+the land, and is a kind of location, while a polity is the faction that governs
+it. A realm's `controlled_by` can link to a polity.
+
+The full list is in [types.md §12](types.md#12-the-epic-fantasy-pack).
 
 ### Your own types and `kind_of`
 

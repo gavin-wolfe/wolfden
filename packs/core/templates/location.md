@@ -3,6 +3,7 @@ type: location
 status: draft
 fields:
   part_of:
+  kind:
 ---
 
 # {{name}}

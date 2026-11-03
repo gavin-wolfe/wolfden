@@ -1,0 +1,29 @@
+name: Culture
+plural: cultures
+description: >-
+  A group of people who share ancestry, language, or customs. It has no
+  leaders or members list: a group that acts together is a faction. A
+  character's `heritage` field can link here.
+fields:
+  kind:
+    type: text
+    description: What sort of culture it is, such as a nation, an ethnic group, or a subculture.
+  homeland:
+    type: ref
+    to: location
+    temporal: true
+    description: Where it lives or comes from.
+  languages:
+    type: text
+    list: true
+    description: The languages it speaks.
+sections:
+  - name: Overview
+    description: Who they are, in a paragraph.
+  - name: Customs
+    description: How they live, marry, eat, dress, and bury their dead.
+  - name: Beliefs
+    description: What they hold true, and what they hold sacred.
+  - name: History
+    description: Where they came from and how they have changed.
+template: culture.md

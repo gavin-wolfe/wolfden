@@ -93,6 +93,36 @@ public sealed class SectionErrorIndexTests : IDisposable
 
     [Fact]
     [Trait("Scenario", "SC-WEB-90")]
+    public void ANoteHeldOpenIsMissingFromTheListAndComesBackWithNoChangeToSee()
+    {
+        var torn = System.IO.Path.Combine(_den.Root, (Book + "/entities/characters/torn.md").Replace('/', System.IO.Path.DirectorySeparatorChar));
+        var watch = new DenErrorWatch(_den.Root, TimeSpan.Zero, null, TimeSpan.Zero);
+        var whole = watch.Current().Errors.Count;
+        using (new FileStream(torn, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            bool held;
+            try
+            {
+                File.ReadAllBytes(torn);
+                held = false;
+            }
+            catch (IOException)
+            {
+                held = true;
+            }
+
+            Assert.SkipUnless(held, "This file system doesn't stop reads of a file held open.");
+
+            // Not a clean bill of health: the note's own error isn't seen. check says the same until #284's F-GEN-5.
+            Assert.DoesNotContain(watch.Current().Errors, e => e.Path.EndsWith("torn.md", StringComparison.Ordinal));
+        }
+
+        // Its size and time didn't change, so only the answer's age brings it back.
+        Assert.Equal(whole, watch.Current().Errors.Count);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-90")]
     public void TheListHasEveryErrorCheckHas()
     {
         _den.Write(Book + "/outline.md", "---\nkey: [unclosed\n---\n\n# Outline\n");

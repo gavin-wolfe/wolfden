@@ -157,15 +157,28 @@ public sealed record DenErrorList(bool DenLoaded, IReadOnlyList<DenError> Errors
 /// the index up to date reads and hashes every file, so that's done only when
 /// a look at the files' sizes and times says something changed
 /// (<see cref="AutoCheckpointer.FilesFingerprint"/>, which reads no contents).
-/// Until then the last answer stands. Pinned, only the universe's errors and
-/// the den-level ones count, as in a check of that universe.
+/// Until then the last answer stands, for at most <paramref name="maxAge"/>,
+/// since sizes and times don't say everything: a file another program held open
+/// was read as absent (#112), and letting it go changes neither. Pinned, only the
+/// universe's errors and the den-level ones count, as in a check of that universe.
 /// </summary>
+/// <remarks>
+/// An empty list doesn't prove the den is clean: a note held open is absent from
+/// the index, so its errors aren't in it. <c>wolfden check</c> says the same today.
+/// Files that can't be read (F-GEN-5, #284) belong in <see cref="Read"/>, as
+/// errors added to the index's.
+/// </remarks>
 /// <param name="root">The den's folder.</param>
 /// <param name="watcherWait">The longest to wait for a running watcher to catch up.</param>
 /// <param name="pinned">The universe the session is pinned to, or null.</param>
-public sealed class DenErrorWatch(string root, TimeSpan watcherWait, string? pinned)
+/// <param name="maxAge">The longest an answer stands with no change seen, by default <see cref="DefaultMaxAge"/>.</param>
+public sealed class DenErrorWatch(string root, TimeSpan watcherWait, string? pinned, TimeSpan? maxAge = null)
 {
+    /// <summary>How long an answer stands by default: a full look costs a hash of the den, so not often, but it does come.</summary>
+    public static readonly TimeSpan DefaultMaxAge = TimeSpan.FromSeconds(60);
+
     private readonly Lock _lock = new();
+    private readonly System.Diagnostics.Stopwatch _age = new();
     private string? _fingerprint;
     private DenErrorList? _last;
 
@@ -183,21 +196,28 @@ public sealed class DenErrorWatch(string root, TimeSpan watcherWait, string? pin
             // Taken before the index is updated: a file that changes during the
             // update makes the next look differ, so it's never missed.
             var fingerprint = AutoCheckpointer.FilesFingerprint(root);
-            if (_last is not null && fingerprint == _fingerprint)
+            if (_last is not null && fingerprint == _fingerprint && _age.Elapsed < (maxAge ?? DefaultMaxAge))
             {
                 return _last;
             }
 
-            IndexBuilder.EnsureUpToDate(root, watcherWait);
-            using var index = DenIndex.Open(root);
-            var errors = index.Errors().Where(e => !DenErrors.IsOutsidePin(e.Path, pinned)).ToList();
-            var paths = errors.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
-            var names = index.Context.Entities.Where(e => paths.Contains(e.Path)).Select(e => new { e.Path, e.Name }).ToList()
-                .ToDictionary(e => e.Path, e => e.Name, StringComparer.Ordinal);
-            _last = new DenErrorList(index.Context.Dens.Single().IsLoaded, errors, names);
+            _last = Read();
             _fingerprint = fingerprint;
+            _age.Restart();
             Reads++;
             return _last;
         }
+    }
+
+    /// <summary>Brings the index up to date, and reads the errors from it.</summary>
+    private DenErrorList Read()
+    {
+        IndexBuilder.EnsureUpToDate(root, watcherWait);
+        using var index = DenIndex.Open(root);
+        var errors = index.Errors().Where(e => !DenErrors.IsOutsidePin(e.Path, pinned)).ToList();
+        var paths = errors.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
+        var names = index.Context.Entities.Where(e => paths.Contains(e.Path)).Select(e => new { e.Path, e.Name }).ToList()
+            .ToDictionary(e => e.Path, e => e.Name, StringComparer.Ordinal);
+        return new DenErrorList(index.Context.Dens.Single().IsLoaded, errors, names);
     }
 }

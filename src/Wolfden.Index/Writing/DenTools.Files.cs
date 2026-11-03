@@ -79,7 +79,7 @@ public sealed partial class DenTools
             file.IsReadable ? Lf(file.Text) : null,
             file.LineEndings switch { LineEndingKind.CrLf => "crlf", LineEndingKind.Mixed => "mixed", _ => "lf" },
             file.HasByteOrderMark,
-            file.IsReadable ? FileFrozen(kind, path, structure, Lf(file.Text)) : null,
+            !file.IsReadable ? null : kind == DenFileKinds.Den && structure.IsLoaded ? DenYamlLoads : FileFrozen(kind, path, structure, Lf(file.Text)),
             Errors(path, DiagnosticsIn(kind, path, bytes, structure)),
             entity is null ? null : Summary(entity));
     }
@@ -98,6 +98,10 @@ public sealed partial class DenTools
         var look = Snapshot();
         var looked = DenStructure.Load(look);
         var kind = CheckEditable(look, looked, path);
+        if (kind == DenFileKinds.Den && looked.IsLoaded)
+        {
+            throw new DenToolException(ToolErrorCodes.UnsupportedEdit, DenYamlLoads);
+        }
 
         // A note the den reads is saved as any other, with every rule of Edit file.
         if (kind == DenFileKinds.Note && look.TryReadFile(path) is { } now && EntityCatalog.ReadEntityFile(looked, path, now).Entity is not null)
@@ -116,6 +120,11 @@ public sealed partial class DenTools
             var den = Snapshot();
             var structure = DenStructure.Load(den);
             CheckEditable(den, structure, path);
+            if (kind == DenFileKinds.Den && structure.IsLoaded)
+            {
+                throw new DenToolException(ToolErrorCodes.UnsupportedEdit, DenYamlLoads);
+            }
+
             var original = den.TryReadFile(path) ?? throw Gone(path);
             CheckHash(path, original, hash);
             var current = Parsed(kind, original);
@@ -182,13 +191,8 @@ public sealed partial class DenTools
 
             var entity = kind == DenFileKinds.Note && healed ? EntityCatalog.ReadEntityFile(afterStructure, path, bytes).Entity : null;
             List<string> effects = [healed
-                ? "Saved the whole file. It's back in the den."
+                ? kind == DenFileKinds.Den ? "Saved the whole file. The den loads now, so errors in its files can show too." : "Saved the whole file. It's back in the den."
                 : $"Saved the whole file. It still has {errorsAfter.Count.ToString(CultureInfo.InvariantCulture)} error{(errorsAfter.Count == 1 ? "" : "s")}, so the den still leaves it out."];
-            if (kind == DenFileKinds.Den && healed)
-            {
-                effects.Add("The den loads now, so errors its files had can show too.");
-            }
-
             if (idAdded is not null)
             {
                 effects.Add($"The file had no id, so it was given {idAdded} (F-ID-6).");
@@ -201,6 +205,9 @@ public sealed partial class DenTools
                 IdAdded: idAdded);
         }
     }
+
+    /// <summary>Why a <c>den.yaml</c> that loads is shown but not saved here: changing it can change how every file reads.</summary>
+    private const string DenYamlLoads = "den.yaml loads, so it can't be changed here: Edit file saves it only to fix an error that stops the den loading. To change it, open it in your own editor.";
 
     private static DenToolException NoFile(string? path) => new(
         ToolErrorCodes.UnknownFile,
@@ -222,9 +229,7 @@ public sealed partial class DenTools
 
         if (kind == DenFileKinds.Den)
         {
-            return structure.IsLoaded
-                ? throw new DenToolException(ToolErrorCodes.UnsupportedEdit, "den.yaml loads, so it isn't edited here: it opens only to fix an error that stops the den loading. Open it in your own editor.")
-                : kind;
+            return kind;
         }
 
         if (!structure.IsLoaded)
@@ -386,7 +391,7 @@ public sealed partial class DenTools
     /// <summary>The text as far as the line that closes its frontmatter.</summary>
     private static string Head(string text)
     {
-        var end = text.IndexOf("\n---", 3, StringComparison.Ordinal);
+        var end = text.Length < 3 ? -1 : text.IndexOf("\n---", 3, StringComparison.Ordinal);
         return end < 0 ? text : text[..end];
     }
 

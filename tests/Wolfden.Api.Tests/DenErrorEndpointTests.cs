@@ -129,13 +129,16 @@ public sealed class DenErrorEndpointTests
         var (status, saved) = await Save(server, "den.yaml", good, await HashOf(server, "den.yaml"));
 
         Assert.Equal(HttpStatusCode.OK, status);
-        Assert.Contains("The den loads now, so errors its files had can show too.", saved.GetProperty("effects").EnumerateArray().Select(e => e.GetString()));
+        Assert.Contains("The den loads now, so errors in its files can show too.", saved.GetProperty("effects")[0].GetString(), StringComparison.Ordinal);
         Assert.True((await Errors(server)).GetProperty("denLoaded").GetBoolean());
         await server.GetJsonAsync("/api/den", HttpStatusCode.OK);
 
-        // Now it loads, it doesn't open here.
-        var again = await server.GetJsonAsync("/api/file/source?path=den.yaml", HttpStatusCode.UnprocessableEntity);
-        Assert.Equal("unsupported_edit", again.GetProperty("code").GetString());
+        // Now it loads, it shows here, and isn't saved here.
+        var again = await server.GetJsonAsync("/api/file/source?path=den.yaml", HttpStatusCode.OK);
+        Assert.Contains("own editor", again.GetProperty("frozen").GetString(), StringComparison.Ordinal);
+        var (refused, why) = await Save(server, "den.yaml", good + "# more\n", again.GetProperty("hash").GetString()!);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, refused);
+        Assert.Equal("unsupported_edit", why.GetProperty("code").GetString());
     }
 
     [Fact]
@@ -303,6 +306,72 @@ public sealed class DenErrorEndpointTests
         var (still, words) = await Save(server, BookFile, plain, await HashOf(server, BookFile));
         Assert.Equal(HttpStatusCode.Conflict, still);
         Assert.Contains("your own editor", words.GetProperty("message").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-91")]
+    public async Task AShortOrEmptySaveOfAFileLeftOutIsAnsweredAndAnIdStillHolds()
+    {
+        using var den = TempDen.Dracula();
+        den.Write(Broken, OneError);
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+        var hash = await HashOf(server, Broken);
+
+        foreach (var text in new[] { "", "x", "ab" })
+        {
+            var (status, _) = await Save(server, Broken, text, hash);
+            Assert.Equal(HttpStatusCode.UnprocessableEntity, status);
+        }
+
+        Assert.Equal(OneError, den.Read(Broken));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-91")]
+    public async Task AContainerThatLoadsKeepsTheUsualRules()
+    {
+        using var den = TempDen.Dracula();
+        const string Bad = "\n## Plan\n<!-- wolfden: status=maybe -->\nA plan.\n";
+        var book = den.Read(BookFile).ReplaceLineEndings("\n");
+        den.Write(BookFile, book + Bad);
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+        var source = await server.GetJsonAsync($"/api/file/source?path={Encoded(BookFile)}", HttpStatusCode.OK);
+        var hash = source.GetProperty("hash").GetString()!;
+        Assert.Equal("section", source.GetProperty("errors")[0].GetProperty("reach").GetString());
+
+        // It loads, so a frontmatter error can't be added, though the section's typo can stay.
+        var (added, _) = await Save(server, BookFile, book.Replace("status: draft", "status: nope", StringComparison.Ordinal) + Bad, hash);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, added);
+
+        var (kept, saved) = await Save(server, BookFile, book + Bad + "\nMore.\n", hash);
+        Assert.Equal(HttpStatusCode.OK, kept);
+        Assert.Equal("error", saved.GetProperty("warnings")[0].GetProperty("severity").GetString());
+
+        var (fixedUp, _) = await Save(server, BookFile, book, saved.GetProperty("hash").GetString()!);
+        Assert.Equal(HttpStatusCode.OK, fixedUp);
+        Assert.Equal(0, (await Errors(server)).GetProperty("count").GetInt32());
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-91")]
+    public async Task AUniverseAboveAFinalBookKeepsItsFrontmatterButNotItsTypos()
+    {
+        using var den = TempDen.Dracula();
+        const string Universe = "universes/dracula/universe.md";
+        const string Bad = "\n## Plan\n<!-- wolfden: status=maybe -->\nA plan.\n";
+        var universe = den.Read(Universe).ReplaceLineEndings("\n");
+        den.Write(Universe, universe + Bad);
+        den.Write(BookFile, den.Read(BookFile).Replace("status: draft", "status: final", StringComparison.Ordinal));
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+        var hash = await HashOf(server, Universe);
+
+        var (changed, json) = await Save(server, Universe, universe.Replace("name:", "name: Renamed\nold_name:", StringComparison.Ordinal) + Bad, hash);
+        Assert.Equal(HttpStatusCode.Conflict, changed);
+        Assert.Equal("frozen", json.GetProperty("code").GetString());
+
+        var (fixedUp, _) = await Save(server, Universe, universe, hash);
+        Assert.Equal(HttpStatusCode.OK, fixedUp);
+        Assert.Equal(universe, den.Read(Universe).ReplaceLineEndings("\n"));
     }
 
     [Theory]

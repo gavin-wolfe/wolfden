@@ -1157,7 +1157,7 @@ public sealed partial class DenTools
             var matches = Match(index, u.Id, entity.Trim(), null);
             var path = matches.Count switch
             {
-                0 => throw UnknownEntity(entity, u.Key),
+                0 => throw Reader.UnknownOrLeftOut(db, u, entity, null),
                 > 1 => throw Ambiguous(entity, matches, universes, scopes),
                 _ => matches[0].Path,
             };

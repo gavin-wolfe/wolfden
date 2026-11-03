@@ -42,6 +42,9 @@ public static class ToolErrorCodes
     /// <summary>No entity matches the name.</summary>
     public const string UnknownEntity = "unknown_entity";
 
+    /// <summary>The path isn't a file Wolfden can open for editing: it's missing, outside the den, or not one a writer edits (#280).</summary>
+    public const string UnknownFile = "unknown_file";
+
     /// <summary>More than one entity matches the name; the error lists them.</summary>
     public const string AmbiguousEntity = "ambiguous_entity";
 
@@ -104,6 +107,17 @@ public static class ToolErrorCodes
 }
 
 /// <summary>
+/// A note an error leaves out of the den (#280). Asked as of a story position,
+/// the members are null: the error's text and the file's name could say what
+/// the reader hasn't met, so it only says the note is left out.
+/// </summary>
+/// <param name="Path">The file with the error, which can be its book's or series' file.</param>
+/// <param name="Line">The error's line, or null.</param>
+/// <param name="Rule">The error's rule.</param>
+/// <param name="Message">The error's message.</param>
+public sealed record LeftOutNote(string? Path, int? Line, string? Rule, string? Message);
+
+/// <summary>
 /// A read or a tool call can't be answered. <see cref="DenReader"/> and the
 /// MCP tools throw it; the MCP server turns it into an error result, and
 /// the API into a <c>{code, message}</c> error.
@@ -142,6 +156,9 @@ public sealed class DenToolException : Exception
 
     /// <summary>For <c>ambiguous_entity</c>, the matches.</summary>
     public IReadOnlyList<EntitySummary>? Candidates { get; }
+
+    /// <summary>For an <c>unknown_entity</c> that's really a file the den leaves out for an error, what's known of it (#280).</summary>
+    public LeftOutNote? LeftOut { get; init; }
 
     /// <summary>
     /// For a write refused because links would change which entity they

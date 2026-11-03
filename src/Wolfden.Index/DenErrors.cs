@@ -1,4 +1,4 @@
-using Wolfden.Core.Structure;
+using Wolfden.Core.History;
 
 namespace Wolfden.Index;
 
@@ -36,14 +36,168 @@ public static class DenErrors
     public static DenErrorReach ReachOfFileError(string path)
     {
         ArgumentNullException.ThrowIfNull(path);
+        return KindOf(path) switch
+        {
+            DenFileKinds.Den => DenErrorReach.Den,
+            DenFileKinds.Universe or DenFileKinds.Series or DenFileKinds.Book or DenFileKinds.Folder => DenErrorReach.Container,
+            _ => DenErrorReach.File,
+        };
+    }
+
+    /// <summary>
+    /// What the file or folder at <paramref name="path"/> is, from where it
+    /// is alone (one of <see cref="DenFileKinds"/>; format.md §5.1), so it
+    /// can be said of a file the den couldn't read.
+    /// </summary>
+    public static string KindOf(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
         if (path == "den.yaml")
         {
-            return DenErrorReach.Den;
+            return DenFileKinds.Den;
         }
 
-        return DenPaths.Name(path) is "universe.md" or "series.md" or "book.md"
-            || !path.Contains('.', StringComparison.Ordinal) // a container folder without its file (F-LAY-4)
-            ? DenErrorReach.Container
-            : DenErrorReach.File;
+        var names = path.Split('/');
+        if (names[0] == "packs")
+        {
+            return DenFileKinds.Pack;
+        }
+
+        var other = names[^1].Contains('.', StringComparison.Ordinal) ? DenFileKinds.Other : DenFileKinds.Folder; // a container folder without its file (F-LAY-4)
+        if (names[0] != "universes" || names.Length < 3)
+        {
+            return other;
+        }
+
+        var at = 2;
+        var inSeries = names.Length > at + 2 && names[at] == "series";
+        at += inSeries ? 2 : 0;
+        var inBook = names.Length > at + 2 && names[at] == "books";
+        at += inBook ? 2 : 0;
+        return names[at] switch
+        {
+            "universe.md" when at == 2 && names.Length == 3 => DenFileKinds.Universe,
+            "series.md" when inSeries && !inBook && names.Length == at + 1 => DenFileKinds.Series,
+            "book.md" when inBook && names.Length == at + 1 => DenFileKinds.Book,
+            "outline.md" when inBook && names.Length == at + 1 => DenFileKinds.Outline,
+            "entities" when names.Length > at + 1 && names[^1].EndsWith(".md", StringComparison.Ordinal) => DenFileKinds.Note,
+            _ => other,
+        };
+    }
+
+    /// <summary>The universe the path is in, or null for a den-level one such as <c>den.yaml</c>.</summary>
+    public static string? UniverseOf(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        var names = path.Split('/');
+        return names.Length >= 2 && names[0] == "universes" ? names[1] : null;
+    }
+
+    /// <summary>
+    /// True if a session pinned to <paramref name="pinned"/> doesn't see the
+    /// path: it's in another universe. Den-level material counts for every
+    /// universe, as in a check of one universe (<see cref="UniverseCheck"/>).
+    /// </summary>
+    public static bool IsOutsidePin(string path, string? pinned) =>
+        pinned is not null && UniverseOf(path) is { } universe && universe != pinned;
+
+    /// <summary>
+    /// True if Wolfden's Edit file can open this kind of file: a note, an
+    /// outline, a container's file, and <c>den.yaml</c> unless the session is
+    /// pinned, since <c>den.yaml</c> is shared by every universe. A pack's
+    /// files and folders are fixed outside Wolfden.
+    /// </summary>
+    public static bool CanEdit(string kind, string? pinned) => kind switch
+    {
+        DenFileKinds.Note or DenFileKinds.Outline or DenFileKinds.Book or DenFileKinds.Series or DenFileKinds.Universe => true,
+        DenFileKinds.Den => pinned is null,
+        _ => false,
+    };
+}
+
+/// <summary>What a path in the den is (<see cref="DenErrors.KindOf"/>).</summary>
+public static class DenFileKinds
+{
+    /// <summary><c>den.yaml</c>.</summary>
+    public const string Den = "den";
+
+    /// <summary>A <c>universe.md</c>.</summary>
+    public const string Universe = "universe";
+
+    /// <summary>A <c>series.md</c>.</summary>
+    public const string Series = "series";
+
+    /// <summary>A <c>book.md</c>.</summary>
+    public const string Book = "book";
+
+    /// <summary>A book's <c>outline.md</c>.</summary>
+    public const string Outline = "outline";
+
+    /// <summary>An entity file.</summary>
+    public const string Note = "note";
+
+    /// <summary>A file of a den-local pack.</summary>
+    public const string Pack = "pack";
+
+    /// <summary>A folder.</summary>
+    public const string Folder = "folder";
+
+    /// <summary>Anything else.</summary>
+    public const string Other = "other";
+}
+
+/// <summary>The den's errors now (<see cref="DenErrorWatch.Current"/>).</summary>
+/// <param name="DenLoaded">False if <c>den.yaml</c> doesn't load, so nothing else was read.</param>
+/// <param name="Errors">The errors, by path and line.</param>
+/// <param name="Names">The name of each note in <paramref name="Errors"/> that the index has, by path.</param>
+public sealed record DenErrorList(bool DenLoaded, IReadOnlyList<DenError> Errors, IReadOnlyDictionary<string, string> Names);
+
+/// <summary>
+/// The den's errors, cheap enough to ask for every few seconds (#280). Bringing
+/// the index up to date reads and hashes every file, so that's done only when
+/// a look at the files' sizes and times says something changed
+/// (<see cref="AutoCheckpointer.FilesFingerprint"/>, which reads no contents).
+/// Until then the last answer stands. Pinned, only the universe's errors and
+/// the den-level ones count, as in a check of that universe.
+/// </summary>
+/// <param name="root">The den's folder.</param>
+/// <param name="watcherWait">The longest to wait for a running watcher to catch up.</param>
+/// <param name="pinned">The universe the session is pinned to, or null.</param>
+public sealed class DenErrorWatch(string root, TimeSpan watcherWait, string? pinned)
+{
+    private readonly Lock _lock = new();
+    private string? _fingerprint;
+    private DenErrorList? _last;
+
+    /// <summary>How many times this has read the errors, so tests can see that an unchanged den costs no index update.</summary>
+    public int Reads { get; private set; }
+
+    /// <summary>The errors as the files are now.</summary>
+    /// <exception cref="IOException">The index couldn't be read or rebuilt.</exception>
+    /// <exception cref="UnauthorizedAccessException">The index couldn't be read or rebuilt.</exception>
+    /// <exception cref="Microsoft.Data.Sqlite.SqliteException">The index couldn't be read.</exception>
+    public DenErrorList Current()
+    {
+        lock (_lock)
+        {
+            // Taken before the index is updated: a file that changes during the
+            // update makes the next look differ, so it's never missed.
+            var fingerprint = AutoCheckpointer.FilesFingerprint(root);
+            if (_last is not null && fingerprint == _fingerprint)
+            {
+                return _last;
+            }
+
+            IndexBuilder.EnsureUpToDate(root, watcherWait);
+            using var index = DenIndex.Open(root);
+            var errors = index.Errors().Where(e => !DenErrors.IsOutsidePin(e.Path, pinned)).ToList();
+            var paths = errors.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
+            var names = index.Context.Entities.Where(e => paths.Contains(e.Path)).Select(e => new { e.Path, e.Name }).ToList()
+                .ToDictionary(e => e.Path, e => e.Name, StringComparer.Ordinal);
+            _last = new DenErrorList(index.Context.Dens.Single().IsLoaded, errors, names);
+            _fingerprint = fingerprint;
+            Reads++;
+            return _last;
+        }
     }
 }

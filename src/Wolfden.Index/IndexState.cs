@@ -57,8 +57,8 @@ internal sealed class IndexState
     public required string WriteId { get; init; }
 }
 
-/// <summary>An <c>outline.md</c> of a book that loaded, and its rows, or null if the outline is excluded.</summary>
-internal sealed record OutlineFile(Book Book, string Path, IReadOnlyList<OutlineRow>? Rows);
+/// <summary>An <c>outline.md</c> of a book that loaded, its rows, or null if the outline is excluded, and the errors in it, so the den's list of errors has them (#280).</summary>
+internal sealed record OutlineFile(Book Book, string Path, IReadOnlyList<OutlineRow>? Rows, IReadOnlyList<Diagnostic> Errors);
 
 /// <summary>
 /// The rows that come from one entity: its entity row, aliases, field

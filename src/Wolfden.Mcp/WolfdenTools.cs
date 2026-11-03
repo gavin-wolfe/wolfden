@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
@@ -493,6 +494,39 @@ public sealed class WolfdenTools
                 return false;
             }
         }
+    }
+
+    /// <summary>The result with a <c>den_notice</c> member added to its JSON (#280). A result that isn't a JSON object passes through.</summary>
+    internal static CallToolResult WithNotice(CallToolResult result, string notice)
+    {
+        if (result.Content is not [TextContentBlock { Text: var text }])
+        {
+            return result;
+        }
+
+        JsonObject? json;
+        try
+        {
+            json = JsonNode.Parse(text) as JsonObject;
+        }
+        catch (JsonException)
+        {
+            return result;
+        }
+
+        if (json is null)
+        {
+            return result;
+        }
+
+        json["den_notice"] = notice;
+        var element = JsonSerializer.SerializeToElement(json, ToolJson.Options);
+        return new CallToolResult
+        {
+            Content = [new TextContentBlock { Text = json.ToJsonString(ToolJson.Options) }],
+            StructuredContent = element,
+            IsError = result.IsError,
+        };
     }
 
     /// <summary>A <c>bad_argument</c> error result for arguments that didn't bind, keeping what the SDK said about them.</summary>

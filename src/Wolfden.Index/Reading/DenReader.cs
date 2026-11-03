@@ -29,7 +29,7 @@ namespace Wolfden.Index.Reading;
 /// parameters and what to do next.
 /// </para>
 /// </remarks>
-public sealed class DenReader
+public sealed partial class DenReader
 {
     /// <summary>The statuses an entity can have (format.md F-ENT-5), in order.</summary>
     public static readonly IReadOnlyList<string> Statuses = ["idea", "undecided", "candidate", "draft", "canon", "retconned"];
@@ -434,7 +434,7 @@ public sealed class DenReader
             var matches = Match(index, u.Id, name, null);
             if (matches.Count == 0)
             {
-                throw UnknownEntity(entity, u.Key);
+                throw UnknownOrLeftOut(db, u, entity, null);
             }
 
             if (matches.Count > 1)
@@ -462,7 +462,7 @@ public sealed class DenReader
             // Matching every entity only tells "not met yet" from "no such entity".
             if (Match(index, u.Id, name, null).Count == 0)
             {
-                throw UnknownEntity(entity, u.Key);
+                throw UnknownOrLeftOut(db, u, entity, asOf);
             }
 
             return new GetEntityResult(
@@ -928,6 +928,76 @@ public sealed class DenReader
         ToolErrorCodes.UnknownEntity,
         $"No entity in universe '{universe}' matches '{name}' by id, path, file name, name, or alias. " +
         $"{ToolWords.Cap(Words.FindEntity)} to find it.");
+
+    /// <summary>
+    /// The error for a name no entity in the index matches: if it names a file
+    /// an error leaves out, that says so and names the line (#280); otherwise
+    /// <see cref="UnknownEntity"/>. It's found by its path, or a path under a
+    /// container that's left out, or among the files with errors by the id,
+    /// name, or file name written in them. As of a position, only a path or an
+    /// id counts, since saying a name matches would confirm a note the reader
+    /// hasn't met, and the answer doesn't say which file or what's wrong.
+    /// </summary>
+    public DenToolException UnknownOrLeftOut(IndexDbContext db, ContainerRecord universe, string name, string? asOf)
+    {
+        ArgumentNullException.ThrowIfNull(db);
+        ArgumentNullException.ThrowIfNull(universe);
+        ArgumentNullException.ThrowIfNull(name);
+        var wanted = name.Trim().Replace('\\', '/');
+        var prefix = universe.Path + "/";
+        var errors = db.Diagnostics.Where(d => d.Severity == "error" && d.LeftOutSection == null && d.Path.StartsWith(prefix)).OrderBy(d => d.Id).ToList();
+        var found = errors.FirstOrDefault(d => d.Path == wanted && DenErrors.KindOf(d.Path) == DenFileKinds.Note)
+            ?? errors.FirstOrDefault(d => DenErrors.ReachOfFileError(d.Path) == DenErrorReach.Container
+                && wanted.StartsWith(ContainerFolder(d.Path) + "/", StringComparison.Ordinal))
+            ?? errors.Where(d => DenErrors.KindOf(d.Path) == DenFileKinds.Note).FirstOrDefault(d => WrittenIn(d.Path, wanted, asOf is null));
+        if (found is null)
+        {
+            return UnknownEntity(name, universe.Key);
+        }
+
+        if (asOf is not null)
+        {
+            return new DenToolException(
+                ToolErrorCodes.UnknownEntity,
+                $"'{name}' can't be shown as of {asOf}: an error leaves it out of the den at every story position.")
+            {
+                LeftOut = new LeftOutNote(null, null, null, null),
+            };
+        }
+
+        var line = found.Line is { } at ? $", line {at.ToString(System.Globalization.CultureInfo.InvariantCulture)}" : "";
+        return new DenToolException(
+            ToolErrorCodes.UnknownEntity,
+            $"'{name}' is left out of the den by an error in {found.Path}{line}: {found.Message} ({found.RuleId}) It comes back once that's fixed.")
+        {
+            LeftOut = new LeftOutNote(found.Path, found.Line, found.RuleId, found.Message),
+        };
+
+        static string ContainerFolder(string path) => DenErrors.KindOf(path) == DenFileKinds.Folder ? path : path[..path.LastIndexOf('/')];
+
+        // The frontmatter may not parse, so its lines are read as text, as far as the closing '---'.
+        bool WrittenIn(string path, string text, bool byName)
+        {
+            if (((IDenSource)new FileSystemDenSource(Root)).TryReadFile(path) is not { } bytes)
+            {
+                return false;
+            }
+
+            var head = System.Text.Encoding.UTF8.GetString(bytes).Replace("\r\n", "\n", StringComparison.Ordinal).Split("\n---")[0];
+            var written = WrittenFrontmatterLine().Matches(head).GroupBy(m => m.Groups[1].Value, StringComparer.Ordinal)
+                .ToDictionary(g => g.Key, g => g.First().Groups[2].Value.Trim().Trim('"', '\''), StringComparer.Ordinal);
+            if (written.TryGetValue("id", out var id) && id == text)
+            {
+                return true;
+            }
+
+            var stem = path[(path.LastIndexOf('/') + 1)..^3];
+            return byName && (Wolfden.Core.Links.LinkText.Matches(stem, text) || (written.TryGetValue("name", out var named) && Wolfden.Core.Links.LinkText.Matches(named, text)));
+        }
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"^(id|name):[ \t]*(.*)$", System.Text.RegularExpressions.RegexOptions.Multiline | System.Text.RegularExpressions.RegexOptions.CultureInvariant)]
+    private static partial System.Text.RegularExpressions.Regex WrittenFrontmatterLine();
 
     /// <summary>An <c>ambiguous_entity</c> error for <paramref name="name"/>, listing its matches.</summary>
     public static DenToolException Ambiguous(

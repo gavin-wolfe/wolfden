@@ -56,6 +56,78 @@ public sealed class SectionErrorIndexTests : IDisposable
 
     public void Dispose() => _den.Dispose();
 
+    [Fact]
+    [Trait("Scenario", "SC-WEB-90")]
+    public void AnUnchangedDenIsNotReadAgainAndAChangedOneIs()
+    {
+        var watch = new DenErrorWatch(_den.Root, TimeSpan.Zero, null);
+        var first = watch.Current();
+        var rebuilds = 0;
+        void Count(string root)
+        {
+            if (root == _den.Root)
+            {
+                rebuilds++;
+            }
+        }
+
+        IndexBuilder.Rebuilding += Count;
+        try
+        {
+            Assert.Same(first, watch.Current());
+            Assert.Same(first, watch.Current());
+            Assert.Equal(1, watch.Reads);
+            Assert.Equal(0, rebuilds);
+
+            _den.Write(Book + "/entities/characters/torn.md", "---\nid: 01JC5CK1000000000000000006\ntype: character\nname: Torn\nstatus: canon\n---\n");
+
+            var next = watch.Current();
+            Assert.Equal(2, watch.Reads);
+            Assert.Equal(first.Errors.Count - 1, next.Errors.Count);
+        }
+        finally
+        {
+            IndexBuilder.Rebuilding -= Count;
+        }
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-90")]
+    public void TheListHasEveryErrorCheckHas()
+    {
+        _den.Write(Book + "/outline.md", "---\nkey: [unclosed\n---\n\n# Outline\n");
+        using var index = Index();
+
+        var listed = index.Errors().Select(e => (e.Path, e.Line, e.Rule, e.Message)).Order().ToList();
+
+        var check = Wolfden.Core.Checks.DenCheck.Run(_den.Root).Diagnostics
+            .Where(d => d.Diagnostic.Severity == Wolfden.Core.Documents.DiagnosticSeverity.Error)
+            .Select(d => (d.Path, d.Diagnostic.Line, d.Diagnostic.RuleId, d.Diagnostic.Message)).Order().ToList();
+        Assert.Equal(check, listed);
+        Assert.Contains(listed, e => e.Path == Book + "/outline.md");
+        Assert.Equal(DenErrorReach.File, index.Errors().First(e => e.Path == Book + "/outline.md").Reach);
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-WEB-90")]
+    [InlineData("den.yaml", "den")]
+    [InlineData("packs/mine/pack.yaml", "pack")]
+    [InlineData("universes/vael/universe.md", "universe")]
+    [InlineData("universes/vael/series/long/series.md", "series")]
+    [InlineData("universes/vael/books/a1/book.md", "book")]
+    [InlineData("universes/vael/series/long/books/a1/book.md", "book")]
+    [InlineData("universes/vael/books/a1/outline.md", "outline")]
+    [InlineData("universes/vael/entities/notes/x.md", "note")]
+    [InlineData("universes/vael/series/long/entities/x.md", "note")]
+    [InlineData("universes/vael/series/long/books/a1/entities/characters/x.md", "note")]
+    [InlineData("universes/vael/entities/notes/book.md", "note")]
+    [InlineData("universes/vael/books/a1", "folder")]
+    [InlineData("universes/vael", "folder")]
+    [InlineData("universes/vael/readme.md", "other")]
+    [InlineData("universes/vael/books/a1/notes.md", "other")]
+    [InlineData("notes.md", "other")]
+    public void APathsKindComesFromWhereItIs(string path, string kind) => Assert.Equal(kind, DenErrors.KindOf(path));
+
     private DenIndex Index()
     {
         IndexBuilder.Rebuild(_den.Root);

@@ -44,7 +44,9 @@ public sealed class UnreadableFileTests
         var without = MemoryDenSource.FromDirectory(MemoryDenSource.StarfallRoot).Without(path);
 
         var check = DenCheck.Run(unreadable);
-        Assert.Equal(Describe(DenCheck.Run(without)), Describe(check).Where(NotUnreadable));
+        var expected = Describe(DenCheck.Run(without))
+            .Where(d => failure == "deleted" || !d.StartsWith("den.yaml|F-DEN-1|", StringComparison.Ordinal));
+        Assert.Equal(expected, Describe(check).Where(NotUnreadable));
         Assert.Equal(Entities(without), Entities(unreadable));
         Assert.True(unreadable.Attempts > 0);
 
@@ -82,6 +84,19 @@ public sealed class UnreadableFileTests
         var expected = Describe(DenCheck.Run(without));
         Assert.Contains(expected, d => d.StartsWith("packs/spare|F-PACK-5|", StringComparison.Ordinal));
         Assert.Equal(expected, Describe(DenCheck.Run(unreadable)).Where(NotUnreadable));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-CHECK-63")]
+    public void AHeldDenYamlSaysSoRatherThanThatItsMissing()
+    {
+        var check = DenCheck.Run(new UnreadableSource(MemoryDenSource.FromDirectory(MemoryDenSource.StarfallRoot), "den.yaml", "locked"));
+
+        Assert.False(check.IsLoaded);
+        var only = Assert.Single(check.Diagnostics);
+        Assert.Equal("F-GEN-5", only.Diagnostic.RuleId);
+        Assert.StartsWith("den.yaml couldn't be read, so nothing else was checked.", only.Diagnostic.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("links", only.Diagnostic.Message, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -51,6 +51,17 @@ public sealed class DenCheck
     /// <summary>The number of warnings.</summary>
     public int WarningCount => Diagnostics.Count(d => d.Diagnostic.Severity == DiagnosticSeverity.Warning);
 
+    /// <summary>
+    /// True if a file or folder of universe <paramref name="universeKey"/>
+    /// couldn't be read (F-GEN-5), so a universe that didn't load may still
+    /// be there: it isn't an unknown universe, and this is what to report.
+    /// </summary>
+    public bool CouldntRead(string universeKey)
+    {
+        var folder = $"universes/{universeKey}";
+        return Diagnostics.Any(d => d.Diagnostic.RuleId == "F-GEN-5" && (d.Path == folder || d.Path.StartsWith(folder + "/", StringComparison.Ordinal)));
+    }
+
     /// <summary>Checks the den whose root folder is <paramref name="root"/>.</summary>
     public static DenCheck Run(string root) => Run(new FileSystemDenSource(root));
 
@@ -98,10 +109,14 @@ public sealed class DenCheck
         ArgumentNullException.ThrowIfNull(den);
         var source = new TrackingDenSource(den);
         var structure = DenStructure.Load(source);
+
+        // A den.yaml that's there isn't missing, so "add one" would be wrong: F-GEN-5 says what's the matter.
+        var denFileHeld = source.Unreadable.Any(u => u.Path == "den.yaml");
         var catalog = EntityCatalog.Load(structure, source, idsElsewhere);
         var links = LinkIndex.Build(catalog, source);
         var outlines = OutlineChecks.Run(structure, source, out var rows);
         var diagnostics = structure.Diagnostics
+            .Where(d => !(denFileHeld && d.Path == "den.yaml" && d.Diagnostic.RuleId == "F-DEN-1"))
             .Concat(catalog.Diagnostics)
             .Concat(links.Diagnostics)
             .Concat(outlines)

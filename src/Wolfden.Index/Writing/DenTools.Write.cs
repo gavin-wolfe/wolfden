@@ -1101,7 +1101,8 @@ public sealed partial class DenTools
         var (path, ids) = Locate(entity, universe);
         using (EnterWrite())
         {
-            var den = Snapshot();
+            var tracked = new TrackingDenSource(Snapshot());
+            IDenSource den = tracked;
             var structure = DenStructure.Load(den);
             var original = den.TryReadFile(path) ?? throw GoneOrUnreadable(den, path);
             CheckHash(path, original, hash);
@@ -1123,7 +1124,16 @@ public sealed partial class DenTools
             var files = new Dictionary<string, byte[]>(StringComparer.Ordinal) { [path] = bytes };
             var check = Check(den, structure, files);
             var after = EntityCatalog.ReadEntityFile(check.Structure, path, bytes).Entity!;
-            CheckWrittenPositions(before, after);
+            try
+            {
+                CheckWrittenPositions(before, after);
+            }
+            catch (DenToolException e) when (e.Code == ToolErrorCodes.BadPosition && tracked.Unreadable.Count > 0)
+            {
+                // A book.md that can't be read has no book or chapters to the den: say so, not only that there's no such place.
+                throw new DenToolException(e.Code, $"{e.Message} {MayBeWhy(tracked.Unreadable)}");
+            }
+
             Save(files, new Dictionary<string, byte[]>(StringComparer.Ordinal) { [path] = original }, created: null);
             var said = effects(before, after).ToList();
             if (idAdded is not null)
@@ -1197,12 +1207,18 @@ public sealed partial class DenTools
     /// </summary>
     private (TrackingDenSource Den, DenStructure Structure, EntityCatalog Catalog, LinkIndex Links) LoadWholeDen()
     {
+        var loaded = LoadTracked();
+        RefuseUnreadable(loaded.Den);
+        return loaded;
+    }
+
+    /// <summary>Everything the den reads, through a source that remembers what it couldn't.</summary>
+    private (TrackingDenSource Den, DenStructure Structure, EntityCatalog Catalog, LinkIndex Links) LoadTracked()
+    {
         var den = new TrackingDenSource(Snapshot());
         var structure = DenStructure.Load(den);
         var catalog = EntityCatalog.Load(structure, den);
-        var links = LinkIndex.Build(catalog, den);
-        RefuseUnreadable(den);
-        return (den, structure, catalog, links);
+        return (den, structure, catalog, LinkIndex.Build(catalog, den));
     }
 
     /// <summary>
@@ -1211,7 +1227,7 @@ public sealed partial class DenTools
     /// became unreadable after the first load: what's worked out from reading
     /// the den again, with the edit, would miss it.
     /// </summary>
-    private static void RefuseUnreadable(TrackingDenSource den)
+    private void RefuseUnreadable(TrackingDenSource den)
     {
         var unreadable = den.Unreadable;
         if (unreadable.Count > 0)
@@ -1220,17 +1236,44 @@ public sealed partial class DenTools
         }
     }
 
-    private static DenToolException Unreadable(IReadOnlyList<UnreadablePath> paths)
+    private DenToolException Unreadable(IReadOnlyList<UnreadablePath> paths) => new(
+        ToolErrorCodes.DenUnreadable,
+        $"Couldn't read {Named(paths)}, so Wolfden can't see everything this depends on, and nothing was changed. {UnreadablePath.WhatToDo(paths)}");
+
+    /// <summary>What to add to another error when something couldn't be read, since that may be its real cause.</summary>
+    private string MayBeWhy(IReadOnlyList<UnreadablePath> paths) =>
+        $"Couldn't read {Named(paths)} right now, which may be why. {UnreadablePath.WhatToDo(paths)}";
+
+    /// <summary>
+    /// The paths for a message, the first few by name. A session pinned to a
+    /// universe names nothing in another one (design.md), so those are only counted.
+    /// </summary>
+    private string Named(IReadOnlyList<UnreadablePath> paths)
     {
-        var named = string.Join(", ", paths.Take(ListedLinkChanges).Select(p => p.Path));
-        var more = paths.Count > ListedLinkChanges ? $", and {paths.Count - ListedLinkChanges} more" : "";
-        return new DenToolException(
-            ToolErrorCodes.DenUnreadable,
-            $"Couldn't read {named}{more}, so Wolfden can't see everything this depends on, and nothing was changed. {UnreadablePath.WhatToDo(paths)}");
+        var shown = paths.Where(p => !IsInAnotherUniverse(p.Path)).Select(p => p.Path).ToList();
+        var outside = paths.Count - shown.Count;
+        var said = shown.Take(ListedLinkChanges).ToList();
+        if (shown.Count > ListedLinkChanges)
+        {
+            said.Add($"and {shown.Count - ListedLinkChanges} more");
+        }
+
+        if (outside > 0)
+        {
+            said.Add(outside == 1 ? "a file outside this universe" : $"{outside} files or folders outside this universe");
+        }
+
+        return string.Join(", ", said);
+    }
+
+    private bool IsInAnotherUniverse(string path)
+    {
+        var segments = path.Split('/');
+        return PinnedUniverse is not null && segments.Length >= 2 && segments[0] == "universes" && segments[1] != PinnedUniverse;
     }
 
     /// <summary>What to say when the file at <paramref name="path"/> gave no bytes: it's unreadable if it's still there, or else gone.</summary>
-    private static DenToolException GoneOrUnreadable(IDenSource den, string path) =>
+    private DenToolException GoneOrUnreadable(IDenSource den, string path) =>
         den.FileExists(path) ? Unreadable([new UnreadablePath(path, IsFolder: false)]) : Gone(path);
 
     private static string RequireHash(string? hash)

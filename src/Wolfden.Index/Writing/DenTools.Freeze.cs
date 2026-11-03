@@ -101,6 +101,7 @@ public sealed partial class DenTools
         var (universeKey, key) = BookArgument(book, universe);
         using (EnterWrite())
         {
+            RefuseUnreadableBeforeCheckpoint();
             RefuseLeftOutSections(universeKey, key);
             var (target, bytes, changed, idAdded, warnings) = SetStatus(universeKey, key, expectedHash, BookStatus.Final);
             var said = $"Book '{target.Name}'";
@@ -254,6 +255,7 @@ public sealed partial class DenTools
         var (universeKey, key) = BookArgument(book, universe);
         using (EnterWrite())
         {
+            RefuseUnreadableBeforeCheckpoint();
             var (target, bytes, changed, idAdded, warnings) = SetStatus(universeKey, key, expectedHash, BookStatus.Draft);
             var said = $"Book '{target.Name}'";
             var history = History();
@@ -303,6 +305,20 @@ public sealed partial class DenTools
         var key = book.Trim();
         var (universeKey, _) = LocateBook(key, universe);
         return (universeKey, key);
+    }
+
+    /// <summary>
+    /// Refuses a freeze or an unfreeze that will checkpoint the den while a
+    /// den file can't be read (#284): git would fail on it, or leave it out,
+    /// after <c>book.md</c> had already changed. Without history, only
+    /// <c>book.md</c> is written, so nothing else needs reading.
+    /// </summary>
+    private void RefuseUnreadableBeforeCheckpoint()
+    {
+        if (History().CheckpointUnavailable is null)
+        {
+            LoadWholeDen();
+        }
     }
 
     /// <summary>

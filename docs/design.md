@@ -769,8 +769,9 @@ from the files:
   but unreadable" reads through a `TrackingDenSource`, which remembers each
   failure on the same reads as the load (#284): `check` lists them as errors
   (format.md F-GEN-5), and a write that depends on every file (rename, move,
-  section rename, alias change, copy, create, `chapter_defaults`) is refused
-  as a whole. A write to one file isn't stopped by another that can't be read.
+  section rename, alias change, copy, create, `chapter_defaults`, a new book
+  or series, and a freeze or unfreeze that will checkpoint) is refused as a
+  whole. A write to one file isn't stopped by another that can't be read.
 - **Watched** (#14; v0 behaviour, not a recorded decision). The file
   watcher collects a burst of saves (an editor's temporary file and
   rename, a git checkout) into one batch, and ignores hidden paths such as

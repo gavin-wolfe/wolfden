@@ -25,9 +25,10 @@ public sealed record UnreadablePath(string Path, bool IsFolder)
         "F-GEN-5",
         DiagnosticSeverity.Error,
         null,
-        (IsFolder
-            ? "This folder couldn't be listed, so what's in it wasn't checked, and links to it may show as broken. "
-            : "This file couldn't be read, so it wasn't checked, and links to it may show as broken. ") + WhatToDo([this])));
+        (IsFolder ? "This folder couldn't be listed, so what's in it wasn't checked, and links to it may show as broken. "
+            : Path == "den.yaml" ? "den.yaml couldn't be read, so nothing else was checked. "
+            : Path.EndsWith(".md", StringComparison.Ordinal) ? "This file couldn't be read, so it wasn't checked, and links to it may show as broken. "
+            : "This file couldn't be read, so it wasn't checked. ") + WhatToDo([this])));
 }
 
 /// <summary>

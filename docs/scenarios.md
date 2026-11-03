@@ -1206,6 +1206,12 @@ list a `characters/` folder, while they run `wolfden check`.
   `F-GEN-5: This file couldn't be read, so it wasn't checked, and links to it
   may show as broken.`, and what to do. `--json` and the MCP `check` tool have
   it too. `check` exits 1, since it can't vouch for what it didn't see.
+- If it's `den.yaml`, or a `pack.yaml` that `den.yaml` lists, the den doesn't
+  load, so `check` exits 2, as it does when the den couldn't be checked. A
+  held `den.yaml` says that it couldn't be read and nothing else was checked,
+  not that it's missing.
+- `check --universe X` with X's own `universe.md` held reports that, rather
+  than that the den has no universe X.
 - Links to that note can still show as broken: the rest of the report is what
   it would be if the note were deleted. Once it can be read, it's all gone.
 - A note deleted as the check runs isn't listed (SC-CLI-8).
@@ -1217,6 +1223,9 @@ Spec: format.md F-GEN-1, F-GEN-5 (#284). Covered by:
 `LockedFileWriteTests.TheCheckToolListsAFolderThatCantBeListed` (MCP),
 `TrackingDenSourceTests.CheckReportsAFolderThatCantBeListed` (Core),
 `TrackingDenSourceTests.ACheckOfOneUniverseReportsOnlyItsOwnUnreadableFiles` (Core),
+`UnreadableFileTests.AHeldDenYamlSaysSoRatherThanThatItsMissing` (Core),
+`LockedFileWriteTests.TheCheckToolReportsAUniverseWhoseFileIsLockedRatherThanUnknown` (MCP),
+`UnreadableFileTests.CheckingAUniverseWhoseFileCantBeReadReportsThat` (CLI),
 `UnreadableFileTests.AFileThatCantBeReadIsCheckedAsIfItWerentThere` (Core),
 `UnreadableFileTests.ANoteThatCantBeReadIsLeftOutAndTheCommandsStillWork` (CLI),
 `UnlistableFolderTests.AFolderThatCantBeListedIsLeftOutAndTheCommandsStillWork` (CLI).
@@ -3196,9 +3205,22 @@ the assistant to rename Mr. Swales. That note links to him.
   the file, says nothing was changed, and says to close it there and try
   again. Nothing in the den is written, so the note's link doesn't break.
 - The same goes for `change_alias`, `rename_section`, `move_entity`,
-  `copy_entity`, and `create_entity`, and if the note held is the one being
-  renamed, or an outline. A folder Wolfden may not list is refused the same
-  way, naming the folder, and says to check its permissions.
+  `copy_entity`, `create_entity`, and an `add_idea` that makes a new note,
+  and if an outline is what's held. A folder Wolfden may not list is refused
+  the same way, naming the folder, and says to check its permissions. So is
+  a file that becomes unreadable between the first read and the save.
+- If the note held is the one being renamed, or the name is simply wrong,
+  the error is still `unknown_entity`, and adds that the file couldn't be
+  read and may be why, since Wolfden can't tell which it is.
+- A new book or series is refused while a sibling's `book.md` or `series.md`
+  is held, since writing the story order would drop that sibling from it.
+- A freeze or unfreeze that will checkpoint is refused before `book.md`
+  changes. Without history it writes only `book.md`, and goes ahead.
+- A position in a book whose `book.md` is held is still `bad_position`, and
+  adds the same thing. `remove_section` goes ahead, and says links in the
+  held file weren't counted.
+- A session pinned to a universe says "a file outside this universe" instead
+  of naming a file in another one.
 - Once it's closed, the same call goes through and the note's links follow.
 - A write to one file, such as adding a chapter, isn't stopped by a note
   held elsewhere: it doesn't depend on that note.
@@ -3208,7 +3230,16 @@ the assistant to rename Mr. Swales. That note links to him.
 Spec: format.md F-GEN-5, F-RT-5 (#284). Covered by:
 `LockedFileWriteTests.ALockedNoteRefusesADenWideWriteAndNothingIsWritten`,
 `LockedFileWriteTests.TheLinksInALockedNoteFollowOnceItsClosedAndTheWriteIsRepeated`,
-`LockedFileWriteTests.TheNoteBeingRenamedOrAnOutlineIsNamedWhenItsTheOneLocked`,
+`LockedFileWriteTests.AnOutlineIsNamedWhenItsTheOneLocked`,
+`LockedFileWriteTests.ANoteLockedItselfKeepsUnknownEntityAndIsNamed`,
+`LockedFileWriteTests.AWrongNameKeepsItsErrorAndAddsWhatCouldntBeRead`,
+`LockedFileWriteTests.AFileThatBecomesUnreadableBeforeTheSaveRefusesTheWrite`,
+`LockedFileWriteTests.ALockedSiblingRefusesANewBookOrSeries`,
+`LockedFileWriteTests.APinnedSessionDoesntNameAFileInAnotherUniverse`,
+`LockedFileWriteTests.APositionInABookWhoseFileIsLockedSaysItCouldntBeRead`,
+`LockedFileWriteTests.RemovingASectionSaysItsLinksInALockedNoteWerentCounted`,
+`FreezeBookTests.AFreezeThatWillCheckpointIsRefusedWhileANoteIsLocked`,
+`FreezeBookTests.AFreezeWithoutHistoryIsntStoppedByALockedNote`,
 `LockedFileWriteTests.AFolderThatCantBeListedRefusesADenWideWriteAndIsNamed`,
 `LockedFileWriteTests.AWriteToOneFileIsntStoppedByALockedNoteElsewhere`,
 `LockedFileWriteTests.AFileDeletedBetweenListingAndReadingIsntAFailure`.
@@ -3223,15 +3254,15 @@ to rename Mr. Swales.
   written. With the file treated as absent, the rename would have seen no
   link in a final book and gone ahead.
 - Once the file is closed, the same call gets the usual `frozen` refusal.
-- A note in that book whose `book.md` is held is named too, rather than
-  being reported as an entity that doesn't exist.
+- A note in that book whose `book.md` is held gets `unknown_entity`, which
+  names that `book.md` as what couldn't be read and may be why.
 - A change to a universe's `chapter_defaults` while a final book's `book.md`
   below it is held is refused the same way, and is `frozen` once it's closed.
 
 Spec: format.md F-GEN-5, F-BOOK-1 (#284). Covered by:
 `LockedFileWriteTests.ALockedNoteInAFrozenBookCantSkipTheFrozenRefusal`,
 `LockedFileWriteTests.AFrozenBooksLockedBookFileCantSkipTheFrozenRefusal`,
-`LockedFileWriteTests.ANoteInAFrozenBookWhoseBookFileIsLockedIsNamedRatherThanNotFound`,
+`LockedFileWriteTests.ANoteInAFrozenBookWhoseBookFileIsLockedSaysSoAsWellAsNotFound`,
 `LockedFileWriteTests.AChapterDefaultCantReachAFrozenBookWhoseBookFileIsLocked`.
 
 ## STORE: Wolfden saves, moves, and deletes notes

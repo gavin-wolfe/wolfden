@@ -52,6 +52,23 @@ public sealed class UnreadableFileTests
         Assert.Contains(Jonathan, after, StringComparison.Ordinal);
     }
 
+    [Fact]
+    [Trait("Scenario", "SC-CHECK-63")]
+    public void CheckingAUniverseWhoseFileCantBeReadReportsThat()
+    {
+        using var den = TempDen.DraculaCopy();
+        const string universe = "universes/dracula/universe.md";
+
+        using (Unreadable(Full(den.Root, universe)))
+        {
+            var (exit, output, error) = Cli.Run("check", den.Root, "--universe", "dracula", "--no-index");
+
+            Assert.Equal(CliApp.ExitErrors, exit);
+            Assert.Contains($"{universe}: error F-GEN-5:", output, StringComparison.Ordinal);
+            Assert.Empty(error);
+        }
+    }
+
     /// <summary>The check's output without the F-GEN-5 line and the summary, whose counts it changes.</summary>
     private static IEnumerable<string> WithoutUnreadable(string output) =>
         output.ReplaceLineEndings("\n").Split('\n').Where(l => !l.Contains("F-GEN-5", StringComparison.Ordinal) && !l.Contains("Checked ", StringComparison.Ordinal));

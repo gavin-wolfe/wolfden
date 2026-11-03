@@ -103,6 +103,13 @@ async function askAgain(client: QueryClient) {
   await act(() => client.refetchQueries({ queryKey: denFilesQuery.queryKey }))
 }
 
+/** Asks for the open editor's source again, until the page has heard that it failed. */
+async function sourceFails(client: QueryClient) {
+  await act(() => client.refetchQueries({ queryKey: ['source'] }))
+  await waitFor(() => expect(client.getQueryCache().find({ queryKey: ['source'], exact: false })?.state.status).toBe('error'))
+  await act(() => new Promise((resolve) => setTimeout(resolve, 50)))
+}
+
 const FAILED = () => new Response(JSON.stringify({ code: 'den_unreadable', message: "Couldn't read the den." }), { status: 500 })
 
 describe('SC-WEB-85: an open page shows what an assistant just wrote', () => {
@@ -323,7 +330,7 @@ describe('SC-WEB-86: an outside write never touches an open editor', () => {
     expect(screen.getByRole('group', { name: 'Markdown of the section “Overview”' })).toBeTruthy()
 
     // Even if the editor's own question is asked again and fails.
-    await act(() => queryClient.refetchQueries({ queryKey: ['source'] }))
+    await sourceFails(queryClient)
     const group = screen.getByRole('group', { name: 'Markdown of the section “Overview”' })
     expect(editorViewIn(group)).toBe(view)
     expect(view.state.doc.toString()).toBe('The writer’s own words.')
@@ -333,6 +340,21 @@ describe('SC-WEB-86: an outside write never touches an open editor', () => {
 
     // The hold is off: the page says the note is gone.
     expect(await screen.findByText('There is no note E-MINA.')).toBeTruthy()
+  })
+
+  it('the same for Add section: its form stays when the note’s source fails', async () => {
+    const { now } = stubDen()
+    const { queryClient } = renderApp('/u/dracula/e/E-MINA')
+    await waitFor(() => expect(queryClient.getQueryData(denFilesQuery.queryKey)).toBeDefined())
+    fireEvent.click(await screen.findByRole('button', { name: 'Add a section' }))
+    const name = (await screen.findByLabelText('Section name')) as HTMLInputElement
+    fireEvent.change(name, { target: { value: 'A rumor' } })
+
+    now.source = FAILED()
+    await sourceFails(queryClient)
+
+    expect(screen.getByLabelText('Section name')).toBe(name)
+    expect(name.value).toBe('A rumor')
   })
 
   it('a form opened before the first answer about the files still catches up when it closes', async () => {
@@ -368,6 +390,7 @@ describe('SC-WEB-86: an outside write never touches an open editor', () => {
     now.hierarchy = FAILED()
     now.fingerprint = 'files-2'
     await askAgain(client)
+    await waitFor(() => expect(client.getQueryState(['hierarchy', 'dracula', null])?.fetchStatus).toBe('fetching'))
     return fail
   }
 

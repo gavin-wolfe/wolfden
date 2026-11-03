@@ -5,6 +5,10 @@ the **universe**, a **series**, or a **book**. This page helps you pick.
 The full rules are in [`design.md`](design.md#scope-and-inheritance) and
 [`format.md`](format.md) (F-ENT-6, F-LINK-6, F-LINK-7, F-VIEW-1).
 
+This page is about which level a note goes at. For which type it is, such as
+a world or a settlement, or a realm or a faction, see
+[What a note is, and where it sits](using-wolfden.md#what-a-note-is-and-where-it-sits).
+
 The examples use an invented universe, *Brackwater*, with one series,
 *Tidewater*, whose three books have the keys `book-1`, `book-2`, and
 `book-3`.

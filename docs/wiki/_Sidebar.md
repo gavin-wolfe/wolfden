@@ -30,6 +30,9 @@
 
 - [Types and packs](../types.md)
 - [The core pack](../types.md#9-the-core-pack)
+- [What a note is, and where it sits](../using-wolfden.md#what-a-note-is-and-where-it-sits)
+- [Choosing a type: space opera](../using-wolfden.md#choosing-a-type-space-opera)
+- [Choosing a type: epic fantasy](../using-wolfden.md#choosing-a-type-epic-fantasy)
 
 **FAQ / Gotchas**
 

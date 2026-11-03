@@ -27,6 +27,7 @@ repository.
 9. [The core pack](#9-the-core-pack)
 10. [Appendix: a den-local pack](#10-appendix-a-den-local-pack)
 11. [The space opera pack](#11-the-space-opera-pack)
+12. [The epic fantasy pack](#12-the-epic-fantasy-pack)
 
 ## 1. Conventions
 
@@ -34,7 +35,8 @@ Requirement words, rule ids, severities, and notation are as in
 format.md §1. Rules in this document use the areas `F-PACK` (packs and
 combining), `F-TYPE` (type definitions and sections), `F-FT` (fields and
 field types), `F-TPL` (templates), `F-CHAP` (chapter fields), `F-CORE`
-(the core pack), and `F-SPACE` (the space opera pack).
+(the core pack), `F-SPACE` (the space opera pack), and `F-FANTASY` (the epic
+fantasy pack).
 
 **Pack files** are the files in a pack folder (§2.1): `pack.yaml`,
 `chapter.yaml`, type files, extension files, and templates. They are den
@@ -84,11 +86,10 @@ document expects a `.yaml` one (`pack.yml`, `chapter.yml`, or a `.yml`
 file in `types/` or `extensions/`): it is a [warning] ("did you mean
 ship.yaml?"), and it is not read.
 
-**F-PACK-4.** **Built-in** packs ship with Wolfden: `core` (§9) and
-`space-opera` (§11). The source of each is a folder of the same name in
+**F-PACK-4.** **Built-in** packs ship with Wolfden: `core` (§9),
+`space-opera` (§11), and `epic-fantasy` (§12). The source of each is a folder of the same name in
 the Wolfden repository's `packs/` folder, and it has the same layout as
-any other pack. Later milestones add other built-in packs (epic fantasy,
-M5) the same way.
+any other pack. Later milestones can add other built-in packs the same way.
 
 **F-PACK-5.** A **den-local** pack is a folder directly in the den's
 `packs/` folder (format.md §5.1) that holds a `pack.yaml`. A folder there
@@ -106,7 +107,7 @@ den from loading. Files directly in `packs/` are ignored.
 name: Core
 description: >-
   The types every den has: character, location, faction, item, event,
-  thread, idea, and note.
+  thread, idea, note, species, and culture.
 ```
 
 **F-PACK-6.** The top level is a mapping with:
@@ -1007,18 +1008,17 @@ a whole list, nearest container first, and `[]` turns it off below.
 
 **F-CORE-1.** The core pack is built in and always enabled (F-DEN-4,
 F-PACK-7), unless a den-local pack shadows it (F-PACK-10). It defines the
-eight types below and the chapter fields `pov`, `narration`, `tense`,
+ten types below and the chapter fields `pov`, `narration`, `tense`,
 `when`, and `setting`. Its files, in [`packs/core/`](../packs/core/),
 are normative: where this section and those files differ, the files
 win, and the difference is a bug in this section. The core pack has no required fields
 and no required sections, so a hand-written note never gets a "missing"
 warning from it. Each type has a template in `packs/core/templates/`.
 
-The core pack is genre-neutral. Genre types, such as species, worlds,
-ships, and magic systems, come in other packs (design.md §4). A genre
-pack that tracks species adds a `species` *type*, rather than redefining
-the character's `species` field: the field is text, so it can hold a link
-to a species entity (`species: "[[velari]]"`). Other genre fields, such as
+The core pack is genre-neutral. Genre types, such as worlds, ships, and
+magic systems, come in other packs (design.md §4). A character's `species`
+and `heritage` are text, so each can hold a link: to a `species` note
+(`species: "[[velari]]"`), or to a `culture` note. Other genre fields, such as
 a rank, come as extensions (§4, §10).
 
 ### 9.1 Types
@@ -1026,7 +1026,9 @@ a rank, come as extensions (§4, §10).
 | Type | Folder | Fields | Standard sections |
 |---|---|---|---|
 | `character` | `characters` | `role`\*, `gender`\*, `pronouns`\*, `occupation`\*, `skills`\*, `heritage`\*, `born`, `died`, `species`, `factions`\* | Overview, Appearance, Backstory, Want, Wound, Voice, Relationships, Arc, Open questions |
-| `location` | `locations` | `part_of`, `controlled_by`\* | Overview, Description, History |
+| `location` | `locations` | `part_of`, `controlled_by`\*, `kind` | Overview, Description, History |
+| `species` | `species` | `kind`, `origin`, `lifespan`, `population`\* | Overview, Biology, Culture, History |
+| `culture` | `cultures` | `kind`, `homeland`\*, `languages` | Overview, Customs, Beliefs, History |
 | `faction` | `factions` | `leader`\*, `part_of`, `base`\* | Overview, Goals, Methods, Members, History |
 | `item` | `items` | `owner`\*, `location`\* | Overview, Description, History |
 | `event` | `events` | `when`, `ends`, `location`, `participants` | Overview, Causes, Consequences |
@@ -1039,13 +1041,19 @@ a rank, come as extensions (§4, §10).
 | Field | Type | On |
 |---|---|---|
 | `role` | `text` | character: their part in the story (protagonist, mentor) |
-| `gender`, `pronouns`, `heritage` | `text` | character |
+| `gender`, `pronouns` | `text` | character |
+| `heritage` | `text` | character: plain text, or a link to a `culture` note |
 | `occupation`, `skills` | list of `text` | character |
 | `born`, `died` | `date` | character |
-| `species` | `text` | character: plain text, or a link to a species entity |
+| `species` | `text` | character: plain text, or a link to a `species` note |
 | `factions` | list of `ref` to `faction` | character: the groups they belong to |
 | `part_of` | `ref` to the same type | location: the larger place; faction: the larger group |
 | `controlled_by` | `ref` to `faction` | location |
+| `kind` | `text` | location, species, culture: what sort of one it is |
+| `origin`, `homeland` | `ref` to `location` | species, culture; `homeland` is temporal |
+| `lifespan` | `text` | species |
+| `population` | `text` | species |
+| `languages` | list of `text` | culture |
 | `leader` | `ref` to `character` | faction |
 | `base` | `ref` to `location` | faction |
 | `owner` | `ref` to `character` or `faction` | item |
@@ -1319,7 +1327,7 @@ built-in type lacks into `extensions/ship.yaml`.
 ## 11. The space opera pack
 
 **F-SPACE-1.** The `space-opera` pack is built in, and enabled by listing
-it in `den.yaml` (F-PACK-7): `packs: [space-opera]`. It defines the eight
+it in `den.yaml` (F-PACK-7): `packs: [space-opera]`. It defines the seven
 types below, and no chapter fields or extensions. Its files, in
 [`packs/space-opera/`](../packs/space-opera/), are normative, as
 F-CORE-1 says of core's. Like core, it has no required fields, no required
@@ -1330,7 +1338,6 @@ sections, and no defaults, and each type has a template.
 | `star-system` | `star-systems` | `part_of`, `stars`, `controlled_by`\* | Overview, Description, Routes, History |
 | `world` | `worlds` | `part_of`, `kind`, `population`\*, `controlled_by`\* | Overview, Environment, Society, History |
 | `settlement` | `settlements` | `part_of`, `kind`, `population`\*, `controlled_by`\* | Overview, Description, Society, History |
-| `species` | `species` | `kind`, `homeworld`, `lifespan`, `population`\* | Overview, Biology, Culture, History |
 | `polity` | `polities` | `government`\*, `leader`\*, `capital`\*, `part_of`\* | Overview, Government, Goals, Military, History |
 | `ship-class` | `ship-classes` | `role`, `builder`, `crew`, `technologies` | Overview, Design, Capabilities, History |
 | `ship` | `ships` | `class`, `captain`\*, `owner`\*, `location`\*, `condition`\* | Overview, Description, Crew, Service history |
@@ -1339,8 +1346,11 @@ sections, and no defaults, and each type has a template.
 \* temporal. Every type also has `row` and `placeholder` (§5.5).
 
 `star-system`, `world`, `settlement`, and `ship` are `kind_of: location`,
-and `polity` is `kind_of: faction` (F-TYPE-13). `species`, `ship-class`, and
-`technology` are kinds of nothing.
+and `polity` is `kind_of: faction` (F-TYPE-13). `ship-class` and
+`technology` are kinds of nothing. `species` is a core type (§9).
+
+A `polity` is a faction that governs territory, at any size. A group that
+governs none is a core `faction`.
 
 A `world` is a planet, moon, asteroid, or gas giant: a body in space that
 people can live on, visit, or build around. Its `kind` says which. A
@@ -1353,10 +1363,8 @@ links to its star system instead.
 | `part_of` | `ref` | star-system: to `location`; world: to `star-system`, `world` (the world a moon circles), or `location`; settlement: to `world`, `star-system`, or `location`; polity: to `polity` or `faction`, and temporal, since a state can join or leave a league |
 | `controlled_by` | `ref` to `polity` or `faction` | star-system, world, settlement, technology |
 | `stars` | `text` | star-system |
-| `kind` | `text` | world, settlement, species, technology: what sort of one it is |
-| `population` | `text` | world, settlement, species: how many, in the story's own terms |
-| `homeworld` | `ref` to `world` or `location` | species |
-| `lifespan` | `text` | species |
+| `kind` | `text` | world, settlement, technology: what sort of one it is |
+| `population` | `text` | world, settlement: how many, in the story's own terms |
 | `government` | `text` | polity |
 | `leader` | `ref` to `character` | polity |
 | `capital` | `ref` to `world`, `settlement`, or `location` | polity |
@@ -1374,8 +1382,8 @@ links to its star system instead.
 Where a field here links to a place or a group, it also takes core's
 `location` or `faction`, so a den can keep a region or a guild as a core
 note. Since the pack's places and polities are kinds of those, such a field
-takes all of them, and not only the ones it names: a `homeworld` can be a
-settlement or a ship. The `to` lists name the likely ones, for the field's
+takes all of them, and not only the ones it names: a polity's `capital` can be
+a ship. The `to` lists name the likely ones, for the field's
 hint in the app. A character's `species` is core's text field, which can hold a link
 to a `species` note (§9). A rank or a posting is left to a den's extension
 (§10).
@@ -1392,3 +1400,81 @@ A den can still redefine a core field in its own pack, whose definition
 wins (F-PACK-11), to give it another type or a narrower `to`. Each
 redefined field is one clash warning on the den's file, which stays for as
 long as the den redefines it.
+
+## 12. The epic fantasy pack
+
+**F-FANTASY-1.** The `epic-fantasy` pack is built in, and enabled by listing
+it in `den.yaml` (F-PACK-7): `packs: [epic-fantasy]`. It defines the six
+types below, and no chapter fields or extensions. Its files, in
+[`packs/epic-fantasy/`](../packs/epic-fantasy/), are normative, as F-CORE-1
+says of core's. Like core, it has no required fields, no required sections,
+and no defaults, and each type has a template. It has no type key or folder in
+common with `space-opera`, so a den can enable both.
+
+| Type | Folder | Fields | Standard sections |
+|---|---|---|---|
+| `realm` | `realms` | `part_of`\*, `kind`, `controlled_by`\*, `seat`\*, `borders`\*, `population`\* | Overview, Land, Society, Rule, Neighbors, History |
+| `magic-system` | `magic-systems` | `kind`, `source`\*, `practiced_by`\* | Overview, How it works, Costs, Limits, Who can use it, Consequences, History, Open questions |
+| `creature` | `creatures` | `kind`, `habitat`\*, `diet`, `danger`, `lifespan`, `population`\* | Overview, Body, Habits, Lore, History |
+| `deity` | `deities` | `species`, `factions`\*, `domains`, `worshippers`\*, `condition`\* | Overview, Powers, Worship, Myths, History, Open questions |
+| `artifact` | `artifacts` | `kind`, `owner`\*, `location`\*, `created_by`, `powered_by`, `condition`\* | Overview, Description, Powers, Price, History, Open questions |
+| `order` | `orders` | `kind`, `leader`\*, `base`\*, `part_of`, `patron`\* | Overview, Creed, Ranks, Goals, Methods, Members, History |
+
+\* temporal. Every type also has `row` and `placeholder` (§5.5).
+
+`realm` is `kind_of: location`, `order` is `kind_of: faction`, `artifact` is
+`kind_of: item`, `deity` is `kind_of: character`, and `creature` is
+`kind_of: species` (F-TYPE-13). `magic-system` is a kind of nothing.
+
+A `realm` is a land defined by who rules it, or a plane of existence. A
+continent or other plain geography is a core `location` with a `kind`, and
+sits above realms through `part_of`. A city in a realm is a `location` whose
+`part_of` links to the realm. Whoever governs is a `faction`, named in the
+realm's `controlled_by`, because rule can change while the land carries on. So
+a realm is not a kind of faction, unlike the space opera pack's `polity`, and
+a core field that links to `faction`, such as a location's `controlled_by` or
+a character's `factions`, gets the F-LINK-11 warning if it links to a realm.
+
+A `creature` is a kind of being with no culture of its own, and a core
+`species` is one with a culture. One named individual is a `character`, whose
+`species` field can link to either.
+
+A `deity` is one named god. A kind of god is a `species`, a pantheon is a
+`faction`, and worshippers can be a `culture`. Since `kind_of` passes on no
+fields, `deity` defines its own `species` and `factions`, with the same field
+types as `character`'s.
+
+| Field | Type | On |
+|---|---|---|
+| `part_of` | `ref` | realm: to `realm` or `location`, and temporal, since a duchy can pass from one crown to another; order: to `order` or `faction` |
+| `controlled_by` | `ref` to `faction` | realm |
+| `seat`, `base` | `ref` to `location` | realm, order |
+| `kind` | `text` | realm, magic-system, creature, artifact, order: what sort of one it is |
+| `borders`, `population` | `text` | realm; `population` also on creature |
+| `source` | `text` | magic-system: in words, or a link to a note |
+| `practiced_by` | list of `ref` to `culture`, `species`, `order`, `faction`, or `character` | magic-system |
+| `habitat` | `ref` to `location` | creature |
+| `diet`, `danger`, `lifespan` | `text` | creature |
+| `species` | `text` | deity: in words, or a link to a species note |
+| `factions` | list of `ref` to `faction` | deity |
+| `domains` | list of `text` | deity |
+| `worshippers` | list of `ref` to `culture`, `species`, `realm`, `order`, `faction`, or `character` | deity |
+| `condition` | `text` | deity, artifact |
+| `owner` | `ref` to `character`, `order`, or `faction` | artifact |
+| `created_by` | `ref` to `character`, `species`, `culture`, `order`, or `faction` | artifact |
+| `location` | `ref` to `realm` or `location` | artifact |
+| `powered_by` | `ref` to `magic-system` | artifact |
+| `leader` | `ref` to `character` | order |
+| `patron` | `ref` to `deity`, `character`, or `faction` | order |
+
+Fields that link to `character`, `location`, `faction`, or `species` also take
+their kinds (F-TYPE-13), so an artifact's `owner` can be a deity, and a
+`practiced_by` can be a creature. An artifact and an order repeat the `owner`,
+`location`, `leader`, `base`, and `part_of` of `item` and `faction`, since a kind
+gets no fields from its parent.
+
+**F-FANTASY-2.** Core's fields link to the pack's types through `kind_of`
+(F-TYPE-13), as in F-SPACE-2. A chapter's `setting` takes a realm, and its
+`pov` takes a deity. A character's `factions` takes an order. A field that links
+to something else, such as a `setting` that links to a deity, is still the
+F-LINK-11 warning.

@@ -243,10 +243,11 @@ fields.
 
 - **core** (always on): character, location, faction, item, event, thread
   (a plot thread with planted and paid-off positions), idea, note
-  (free-form).
+  (free-form), species, culture.
 - **space-opera** (built in, enabled in `den.yaml`): star-system, world,
-  settlement, species, polity, ship-class, ship, technology.
-- **epic-fantasy** (planned): realm, magic-system, creature, deity, artifact, order.
+  settlement, polity, ship-class, ship, technology.
+- **epic-fantasy** (built in, enabled in `den.yaml`): realm, magic-system,
+  creature, deity, artifact, order.
 
 Dens can define their own types in `packs/`, or extend any enabled type
 by adding fields, sections, or a template (`extensions/`). Extensions
@@ -274,7 +275,7 @@ shows a need). It chains, a den's extension can add parents to any pack's
 type, and an unknown parent or a loop is a warning and is ignored. There
 are no abstract types. In the space opera pack, `star-system`, `world`,
 `settlement`, and `ship` are kinds of `location`, and `polity` of `faction`;
-epic fantasy (#33) would follow the same pattern (types.md F-TYPE-13).
+epic fantasy follows the same pattern (types.md F-TYPE-13, §12).
 
 This changes what #32 recorded in types.md F-SPACE-2: that a core field
 links only to core's own types, so a chapter set on a planet warns, and a
@@ -306,6 +307,37 @@ description names "planet" so writers looking for that word find it. A den
 that wants separate types can define them, such as `moon` with
 `kind_of: world`, and a filter by `world` then finds those too (#269).
 Nothing had been released, so nothing needed migrating.
+
+**Decided (#33): a realm is the land, and whoever governs it is a faction.** A
+`realm` is a land defined by who rules it, or a plane of existence, and is
+`kind_of: location` only. A continent or other plain geography is a `location`
+with a `kind`, which core now has, and sits above realms through `part_of`. A
+city in a realm is a `location` `part_of` the realm. Rule can change while the
+land carries on, so the rulers are a separate `faction`, named in the realm's
+`controlled_by` with a value for each stretch of the story. This differs from
+the space opera pack, where the `polity` is the state and is a faction, and
+a world is the place it holds: a fantasy story's kingdom is usually thought of
+as a land first. What sets a realm apart from a location is its `seat` of power
+and its `borders`, along with `population` and `kind`.
+
+**Decided (#33): species and culture are core, and a creature is a kind of
+species.** A kind of being isn't special to one genre, so `species` moved from
+the space opera pack to core, with `homeworld` renamed `origin`. A `creature`
+is `kind_of: species`, in the epic fantasy pack, and the line is whether it has
+a culture: a dragon that holds councils and keeps laws is a species, a dragon
+that eats sheep is a creature, and one named dragon is a character, whose
+`species` field says which. A `culture` is new in core: a group sharing ancestry,
+language, or customs. It's a kind of nothing, not of faction, since it has no
+leaders or members list. A character's `heritage` stays text that can link to
+one. Every den now has these two types. A den that already defined its own is
+unchanged, apart from the F-TYPE-4 warning on its file.
+
+**Decided (#33): rulers are factions, and a god is a character.** There's no
+fantasy government type: a realm names its rulers in `controlled_by`, as space
+opera places do. A `polity` stays separate, and is a faction that governs
+territory, at any size. A `deity` is `kind_of: character`, and declares its own
+`species` and `factions`, since `kind_of` passes on no fields. A kind of god is
+a species, a pantheon is a faction, and worshippers can be a culture.
 
 **Decided (#6): your writing is yours.** Wolfden's licenses place no
 conditions on the notes, manuscripts, or other content writers create with

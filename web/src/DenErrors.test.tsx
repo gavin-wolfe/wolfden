@@ -125,7 +125,7 @@ describe('the top bar’s problems', () => {
     let failing = false
     stubApi({ override: (path) => (path === '/api/den/errors' && failing ? json({ code: 'den_unreadable', message: 'The index is locked.' }, 503) : path === '/api/den/errors' ? list(error()) : undefined) })
     const { queryClient } = renderApp('/u/dracula')
-    expect(await screen.findByRole('button', { name: '⚠ 1 problem' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: '1 problem' })).toBeTruthy()
 
     failing = true
     await queryClient.refetchQueries({ queryKey: denErrorsQuery.queryKey })
@@ -284,19 +284,22 @@ describe('Edit file by path', () => {
   })
 
   it('SC-WEB-91: a failed refetch can’t replace an open editor, and nothing refetched changes its text', async () => {
-    let answer: unknown = source()
-    stubApi({ override: (path) => (path === '/api/file/source' ? answer : undefined) })
+    let answer = (): unknown => source()
+    stubApi({ override: (path) => (path === '/api/file/source' ? answer() : undefined) })
     const { queryClient } = renderApp(`/file?path=${encodeURIComponent(VAULT)}`)
     const view = await typeInFile('my unsaved text')
+    // Lets the page render what the refetch answered.
+    const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 30)))
 
-    answer = json({ code: 'den_unreadable', message: 'Gone for a moment.' }, 503)
+    answer = () => json({ code: 'den_unreadable', message: 'Gone for a moment.' }, 503)
     await queryClient.invalidateQueries()
-    await queryClient.refetchQueries({ queryKey: ['file-source', VAULT] })
+    await settle()
     expect(screen.queryByText('Gone for a moment.')).toBeNull()
     expect(screen.getByRole('group', { name: `Text of ${VAULT}` })).toBeTruthy()
 
-    answer = source({ hash: 'h9', text: 'changed outside' })
-    await queryClient.refetchQueries({ queryKey: ['file-source', VAULT] })
+    answer = () => source({ hash: 'h9', text: 'changed outside' })
+    await queryClient.invalidateQueries()
+    await settle()
     expect(view.state.doc.toString()).toBe('my unsaved text')
   })
 

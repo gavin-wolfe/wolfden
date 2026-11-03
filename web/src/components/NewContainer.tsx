@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useHoldRefresh } from '../formHold'
 import { useNavigate, useParams } from '@tanstack/react-router'
 import { ApiRequestError } from '../api'
 import { createContainer, worksQuery, type ContainerCreateResult } from '../containerApi'
@@ -190,6 +191,7 @@ function NewContainerDialog({
   const afterSave = useAfterSave()
   const client = useQueryClient()
   const navigate = useNavigate()
+  useHoldRefresh(true)
   const works = useQuery(worksQuery(universe, series))
 
   const [name, setName] = useState('')

@@ -4,6 +4,11 @@ import type { EntitySummary, PositionView } from './api'
 // A position is what the API's asOf takes: "book:chapter", or a bare book key
 // for the start of that book (format.md §8).
 
+/** What an untitled chapter is called: by its number, which can move when a chapter is inserted, or by its key if it has none. */
+export function chapterLabel(c: { key: string; number: number | null }): string {
+  return `Chapter ${c.number ?? c.key}`
+}
+
 /**
  * A chapter in words: "chapter 5", or, for a chapter without a number (such
  * as Dracula's closing note), its title in quotes, else "chapter <key>".

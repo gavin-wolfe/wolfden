@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useHoldRefresh } from '../formHold'
 import { bookFreezeQuery, changeFreeze, FAILED_SNAPSHOTS, type BookFreeze, type FreezeResult } from '../freezeApi'
 
 type Action = 'freeze' | 'finish' | 'unfreeze'
@@ -18,6 +19,7 @@ export function FreezeControl({ universe, book }: { universe: string; book: stri
   const client = useQueryClient()
   const [confirming, setConfirming] = useState<Action | null>(null)
   const [outcome, setOutcome] = useState<FreezeResult | null>(null)
+  useHoldRefresh(confirming !== null)
   const promptId = useId()
   const triggerRef = useRef<HTMLButtonElement>(null)
   const outcomeRef = useRef<HTMLDivElement>(null)

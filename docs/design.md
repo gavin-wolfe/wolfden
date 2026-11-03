@@ -1477,6 +1477,7 @@ docs/
   | `/api/entity` | `entity`, `universe`, `asOf` | `get_entity`, as a page: each field value or entry and each section lists its links, resolved from the index (the entity reached, or broken or ambiguous); also the scope's container chain, where the entity enters canon (its `from`, or its scope's start, inherited, format.md F-ENT-6), and its backlinks (which entity, field, section, chapter, or outline row). As of a position, a link to an entity the reader hasn't met doesn't say what it reaches, and only links in what the reader has met count as backlinks. |
   | `/api/canon` | `universe`, `asOf`, `series`, `book`, `type`, `brief` | `canon_as_of`. |
   | `/api/search` | `query`, `universe`, `type`, `canonOnly`, `limit`, `status`, `series`, `book`, `asOf`, `field` | `search`, with snippets; it can also keep entities of one status, those a series or book filter covers (as in a canon view), or, as of a position, hits in the entities, sections, and field values in the canon view there. Each hit adds `text`, the snippet without marks, and `matches`, the `start` and `length` of each match in it (UTF-16 code units), so the page never mistakes a note's own brackets for a match (#179). |
+  | `/api/den/files` | | A fingerprint of the den's files (their paths, sizes, and times, no contents), for an open page to see that something changed (#285). It's all this answers, and it doesn't bring the index up to date. |
   | `/api/fields` | `universe`, `asOf` | The names of the fields notes give values for, for the search page's Field filter (#179); as of a position, only those of values in the canon view there. |
   | `/api/history` | `entity`, `universe`, `limit`, `before` | `get_history`'s checkpoints, a page at a time. |
   | `/api/history/diff` | `entity`, `universe`, and `checkpoint`, or `from` and `to` | The entity file's unified diff: what one checkpoint changed (against the one before it, or for the first, against nothing, through the history provider's `DiffCheckpoint`), the change between two (`from` and `to`), or since one (`from`, or by default the latest) up to the file as it is now. |
@@ -1897,7 +1898,12 @@ docs/
     searches, and links anywhere, and shows its effects, the pinned
     canon it touched, the file's warnings, and that it isn't a
     checkpoint. A note the reader hasn't met can be edited once shown
-    with "Show it anyway".
+    with "Show it anyway". A write from outside refreshes an open page the
+    same way: while it's visible the page asks for `/api/den/files` every 5
+    seconds, and when the answer changes it refreshes every cached answer.
+    While an editor or form is open it waits, and the note's page stays as
+    the editor opened on it, so neither a new answer nor a failed one can
+    take the editor away (#285).
   - **Adding images** (#187; v0 behaviour, not a recorded decision). The
     lead, section, Add section, and Edit file editors have **Add
     image…** under them, and take an image dropped or pasted into the

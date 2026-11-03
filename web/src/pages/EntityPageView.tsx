@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Link, getRouteApi, useRouter, useRouterState } from '@tanstack/react-router'
 import { wasHistoryStep } from '../router'
@@ -49,20 +49,29 @@ export function EntityPageView() {
   const { at } = usePosition()
   // Editing shows the full note, whatever the position (maintainer decision on #28).
   const [target, setTarget] = useState<EditTarget | null>(null)
-  const page = useQuery({ ...entityQuery(universe, key, target ? undefined : at), placeholderData: target ? keepPreviousData : undefined })
+  const live = useQuery({ ...entityQuery(universe, key, target ? undefined : at), placeholderData: target ? keepPreviousData : undefined })
+  // While something's being edited the page stays as the editor opened on it. An answer already on its way when
+  // the editor opened could move a section's line, or fail, and either would take the editor and its text away.
+  const opened = useRef<typeof live.data>(undefined)
+  if (target === null) {
+    opened.current = undefined
+  } else if (opened.current === undefined && !live.isPlaceholderData) {
+    opened.current = live.data
+  }
+  const data = opened.current ?? live.data
   const view = useEntitiesInView(universe)
   // Only the API's page names the note, and it's null when the reader hasn't met it.
-  useDocumentTitle(page.data ? (page.data.entity?.name ?? 'Not met yet') : undefined)
+  useDocumentTitle(data ? (data.entity?.name ?? 'Not met yet') : undefined)
 
-  if (page.isPending) {
+  if (opened.current === undefined && live.isError) {
+    return <ErrorState error={live.error} />
+  }
+
+  if (!data) {
     return <Loading what="the note" />
   }
 
-  if (page.isError) {
-    return <ErrorState error={page.error} />
-  }
-
-  const { entity } = page.data
+  const { entity } = data
   if (!entity) {
     const summary = view.all?.entities.find((e) => e.key === key || e.id === key || e.path === key)
     // "Show it anyway" is shared with the History tab, and resets when the note or position changes (EntityRoute).
@@ -71,7 +80,7 @@ export function EntityPageView() {
         universe={universe}
         entityKey={key}
         summary={summary}
-        note={page.data.note}
+        note={data.note}
         positions={view.positions ?? []}
         at={at}
         edit={{ target, setTarget }}

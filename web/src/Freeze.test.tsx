@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import type { BookFreeze, FreezeResult } from './freezeApi'
-import { renderApp, stubApi } from './test/harness'
+import { hierarchy, renderApp, stubApi } from './test/harness'
 
 afterEach(() => {
   cleanup()
@@ -10,6 +10,32 @@ afterEach(() => {
 })
 
 const TAG = 'book/dracula/dracula/final'
+
+describe('SC-WEB-86: a final book offers nothing new in the contents tree', () => {
+  /** A book with one chapter-less character list, marked `status`, as the tree shows it. */
+  async function treeOf(status: string) {
+    const [book] = hierarchy.universe.books
+    stubApi({
+      override: (path, params) =>
+        path === '/api/hierarchy' ? { ...hierarchy, position: params.get('asOf'), universe: { ...hierarchy.universe, books: [{ ...book, status }] } } : undefined,
+    })
+    renderApp('/u/dracula/b/dracula')
+    const contents = await screen.findByRole('navigation', { name: 'Contents' })
+    await within(contents).findAllByText('Characters')
+    return contents
+  }
+
+  it('hides New <type> under a final book, and keeps it for the universe', async () => {
+    const contents = await treeOf('final')
+    expect(within(contents).queryByRole('button', { name: 'New Character in Dracula', hidden: true })).toBeNull()
+    expect(within(contents).getByRole('button', { name: /^New Location in/, hidden: true })).toBeTruthy()
+  })
+
+  it('shows New <type> under a book that isn’t final', async () => {
+    const contents = await treeOf('draft')
+    expect(await within(contents).findByRole('button', { name: 'New Character in Dracula', hidden: true })).toBeTruthy()
+  })
+})
 
 function freezeStatus(extra: Partial<BookFreeze> = {}): BookFreeze {
   return {

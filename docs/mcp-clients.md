@@ -354,9 +354,11 @@ docs. The writer's own list is in
   view, ideas and later reveals included. To draft or review a chapter,
   use `canon_as_of` at that chapter, or `get_entity` with `as_of`.
   `search` and `get_history` have no position.
-- **Writes land at once; only `checkpoint` records them.** The writer
-  sees each write straight away, in the web UI and their editor, but it
-  isn't in the den's history until a checkpoint. Make one at the end of
+- **Writes land at once; only `checkpoint` records them.** An open page
+  in the web UI shows each write within about 5 seconds, or once the
+  writer closes an editor or form they have open there. If they save a
+  note you changed meanwhile, they're shown both versions. A write isn't
+  in the den's history until a checkpoint. Make one at the end of
   a pass, not after each edit, with a message that says what the pass
   was and the assistant as `co_author`. It records the whole den unless
   `paths` names some files, so tell the writer what's in

@@ -5,7 +5,7 @@ import { ChapterFieldsSection } from '../components/ChapterFields'
 import { EntityList } from '../components/EntityList'
 import { ErrorState, Loading } from '../components/States'
 import { useDocumentTitle, useEntitiesInView, usePosition } from '../hooks'
-import { entryOf } from '../story'
+import { chapterLabel, entryOf } from '../story'
 import { findBook } from './BookPage'
 
 const route = getRouteApi('/u/$universe/b/$book/c/$chapter')
@@ -34,7 +34,12 @@ export function ChapterPage() {
   const view = useEntitiesInView(universe)
   const titled = hierarchy.data ? findBook(hierarchy.data.universe, book) : null
   const titledChapter = titled?.book.chapters.find((x) => x.key === chapter)
-  useDocumentTitle(titled && titledChapter ? `${headingOf(titledChapter) ?? `Chapter ${titledChapter.key}`} · ${titled.book.name}` : undefined)
+  useDocumentTitle(titled && titledChapter ? `${headingOf(titledChapter) ?? chapterLabel(titledChapter)} · ${titled.book.name}` : undefined)
+  // In prev and next: "3. The Quiet Hour", or for an untitled chapter what its own page is headed.
+  const stepLabel = (ch: ChapterNode): string => {
+    const heading = headingOf(ch)
+    return heading === null ? chapterLabel(ch) : `${ch.number ?? ch.key}. ${heading}`
+  }
 
   if (hierarchy.isPending) {
     return <Loading what="the chapter" />
@@ -77,7 +82,7 @@ export function ChapterPage() {
         </Link>
       </nav>
       <p className="eyebrow">Chapter {c.number ?? c.key}</p>
-      <h1>{headingOf(c) ?? `Chapter ${c.number ?? c.key}`}</h1>
+      <h1>{headingOf(c) ?? chapterLabel(c)}</h1>
       <p>
         {at === c.position ? (
           <span className="badge">You are reading as of this chapter</span>
@@ -106,14 +111,14 @@ export function ChapterPage() {
       <nav className="prev-next" aria-label="Chapters">
         {prev ? (
           <Link to="/u/$universe/b/$book/c/$chapter" params={{ universe, book: b.key, chapter: prev.key }} rel="prev">
-            ‹ {prev.number ?? prev.key}. {headingOf(prev)}
+            ‹ {stepLabel(prev)}
           </Link>
         ) : (
           <span />
         )}
         {next && (
           <Link to="/u/$universe/b/$book/c/$chapter" params={{ universe, book: b.key, chapter: next.key }} rel="next">
-            {next.number ?? next.key}. {headingOf(next)} ›
+            {stepLabel(next)} ›
           </Link>
         )}
       </nav>

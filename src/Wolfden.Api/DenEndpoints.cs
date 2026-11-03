@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using System.Text.Json.Serialization;
 using Microsoft.Data.Sqlite;
+using Wolfden.Core.History;
 using Wolfden.Index;
 
 namespace Wolfden.Api;
@@ -11,6 +12,11 @@ namespace Wolfden.Api;
 /// <param name="Status">Always <c>ok</c>: the server is up.</param>
 /// <param name="Wolfden">Wolfden's version.</param>
 public sealed record HealthResult(string Status, string Wolfden);
+
+/// <summary>Whether the den's files changed, from <c>GET /api/den/files</c> (#285).</summary>
+/// <param name="Version">The shape of this result, as for <c>--json</c> (design.md §7).</param>
+/// <param name="Fingerprint">A hash of each file's path, size, and time of last change. It changes when a file does, and means nothing else.</param>
+public sealed record DenFilesResult(int Version, string Fingerprint);
 
 /// <summary>The den and its universes, from <c>GET /api/den</c>.</summary>
 /// <param name="Version">The shape of this result, as for <c>--json</c> (design.md §7).</param>
@@ -74,6 +80,7 @@ public static class DenEndpoints
         var api = endpoints.MapGroup("/api");
         api.MapGet("/health", () => new HealthResult("ok", options.Version));
         api.MapGet("/den", () => Den(options));
+        api.MapGet("/den/files", () => new DenFilesResult(DenResultVersion, AutoCheckpointer.FilesFingerprint(options.DenRoot)));
         ReadEndpoints.Map(api, options);
         WriteEndpoints.Map(api, options);
         CheckpointEndpoints.Map(api, options);
@@ -108,7 +115,7 @@ public static class DenEndpoints
     }
 
     /// <summary>The paths under <c>/api</c> that answer GET.</summary>
-    private static readonly string[] GetPaths = ["health", "den", .. ReadEndpoints.Paths, .. WriteEndpoints.GetPaths, .. CreateEndpoints.GetPaths, .. ContainerEndpoints.GetPaths];
+    private static readonly string[] GetPaths = ["health", "den", "den/files", .. ReadEndpoints.Paths, .. WriteEndpoints.GetPaths, .. CreateEndpoints.GetPaths, .. ContainerEndpoints.GetPaths];
 
     /// <summary>The den's name and its universes, or the pinned one.</summary>
     internal static IResult Den(WolfdenApiOptions options)

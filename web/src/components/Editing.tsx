@@ -2,6 +2,7 @@ import { Suspense, createContext, lazy, useCallback, useContext, useEffect, useI
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useBlocker } from '@tanstack/react-router'
 import { EditError, postEdit, sourceQuery, type EditPath, type EntitySource, type WriteResult } from '../editApi'
+import { useHoldRefresh } from '../formHold'
 import { addImage, type AddedImage } from '../imageApi'
 import { Markdown } from './Markdown'
 import { ErrorState, Loading } from './States'
@@ -102,6 +103,7 @@ export function EditingProvider({
   setTarget: (target: EditTarget | null) => void
   children: ReactNode
 }) {
+  useHoldRefresh(target !== null)
   const [dirty, setDirty] = useState(false)
   const [saved, setSaved] = useState<Saved | null>(null)
   const [discarding, setDiscarding] = useState(false)

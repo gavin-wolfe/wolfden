@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiRequestError, positionsQuery, type PositionView } from '../api'
+import { useHoldRefresh } from '../formHold'
 import {
   bookChapterFieldsQuery,
   chapterDefaultsQuery,
@@ -491,6 +492,7 @@ function FieldForm({
   positions: PositionView[]
   onDone: (result: WriteResult | null) => void
 }) {
+  useHoldRefresh(true)
   const idBase = `c${useId().replace(/[^a-zA-Z0-9]/g, '')}`
   // What the form was opened on, kept while it's open: a refetch (say, on window focus) mustn't move it onto a
   // file the writer never saw, so the changes, the stale check, and the first send all use this.

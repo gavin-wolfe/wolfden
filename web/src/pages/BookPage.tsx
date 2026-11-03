@@ -8,7 +8,7 @@ import { FreezeControl } from '../components/FreezeControl'
 import { NewMenu } from '../components/NewEntity'
 import { ErrorState, Loading } from '../components/States'
 import { useDocumentTitle, usePosition } from '../hooks'
-import { ordinalOf } from '../story'
+import { chapterLabel, ordinalOf } from '../story'
 import { Counts } from './UniversePage'
 
 const route = getRouteApi('/u/$universe/b/$book')
@@ -101,7 +101,7 @@ export function BookPage() {
                 <Link to="/u/$universe/b/$book/c/$chapter" params={{ universe, book: b.key, chapter: c.key }}>
                   <span className="chapter-number">{c.number ?? ''}</span>
                   {/* The hierarchy is asked as of the position, so the heading names only what the reader has met (#227, #26). */}
-                  <span className="chapter-title">{c.heading ?? `Chapter ${c.key}`}</span>
+                  <span className="chapter-title">{c.heading ?? chapterLabel(c)}</span>
                 </Link>
                 {c.position === at && <span className="badge">you are here</span>}
                 {chapterFields && <ChapterFieldSummary universe={universe} chapter={chapterFields} met={met ?? undefined} />}

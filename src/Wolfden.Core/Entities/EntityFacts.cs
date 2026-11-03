@@ -182,12 +182,21 @@ public sealed class SectionFact
     public bool IsStandard { get; internal set; }
 
     /// <summary>
-    /// True if the section is live (F-SEC-8): in canon (F-STAT-3), not
-    /// bookkeeping (F-SEC-12), its positions resolve (F-POS-4), and its
-    /// range isn't empty. For a subsection, the range is its effective one
-    /// (F-SEC-9), so a subsection that is never in effect isn't live.
+    /// True if an error in its comment, or in the comment of a section holding
+    /// it, leaves it out (format.md F-GEN-2). It has no range and isn't
+    /// pinned, so nothing at a position finds it. Its status is only a
+    /// fallback then: what's written may be what's wrong.
     /// </summary>
-    public bool IsLive => Status.IsInCanon() && !IsBookkeeping && EffectiveFrom is { } from && EffectiveUntil is { } until
+    public bool IsLeftOut => Section.IsLeftOut;
+
+    /// <summary>
+    /// True if the section is live (F-SEC-8): in canon (F-STAT-3), not
+    /// bookkeeping (F-SEC-12), not left out (F-GEN-2), its positions resolve
+    /// (F-POS-4), and its range isn't empty. For a subsection, the range is
+    /// its effective one (F-SEC-9), so a subsection that is never in effect
+    /// isn't live.
+    /// </summary>
+    public bool IsLive => Status.IsInCanon() && !IsBookkeeping && !IsLeftOut && EffectiveFrom is { } from && EffectiveUntil is { } until
         && from.Point < until;
 }
 
@@ -256,8 +265,17 @@ public sealed class EntityFacts
             UntilText = Bound(section.Comment?["until"]),
         };
         fact.Status = FactStatuses.Effective(fact.OwnStatus, parent?.Status ?? Entity.Status);
-        (fact.EffectiveFrom, fact.EffectiveUntil) = Range(section, fact, parent);
-        fact.IsEmptyRange = IsEmptyRange(section, fact);
+        if (section.IsLeftOut)
+        {
+            // No range and no pin, so it's in no view at any position (F-GEN-2).
+            fact.Pinned = false;
+        }
+        else
+        {
+            (fact.EffectiveFrom, fact.EffectiveUntil) = Range(section, fact, parent);
+            fact.IsEmptyRange = IsEmptyRange(section, fact);
+        }
+
         _sections[section] = fact;
         return fact;
     }
@@ -309,8 +327,8 @@ public sealed class EntityFacts
 
         // A from that doesn't parse counts as unset (types.md F-FT-10). That
         // can only be a thread's paid_off here: a bad from= in a section
-        // comment is an error that excludes the file. A well-formed position
-        // that doesn't resolve leaves the section with no range (F-POS-4).
+        // comment leaves the section out, so it never gets here. A well-formed
+        // position that doesn't resolve leaves the section with no range (F-POS-4).
         if (fromText is not null && StoryPosition.TryParse(fromText, out var position, out _))
         {
             if (Entity.Universe.Resolve(position).Resolved is not { } resolved)

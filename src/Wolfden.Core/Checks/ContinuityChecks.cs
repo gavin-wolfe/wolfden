@@ -148,7 +148,7 @@ internal static class ContinuityChecks
     private static void CheckSubsections(EntityFacts facts, List<Diagnostic> found)
     {
         var universe = facts.Entity.Universe;
-        foreach (var fact in facts.Sections.Where(f => f.Section.Parent is not null && !f.IsEmptyRange))
+        foreach (var fact in facts.Sections.Where(f => f.Section.Parent is not null && !f.IsEmptyRange && !f.IsLeftOut))
         {
             var parent = facts[fact.Section.Parent!];
             if (parent.IsEmptyRange || parent.EffectiveFrom is not { } parentFrom || parent.EffectiveUntil is not { } parentUntil
@@ -198,7 +198,8 @@ internal static class ContinuityChecks
     /// <c>pin=true</c> or <c>pin: true</c> written on it whose effective
     /// status is out of canon. It's skipped where F-STAT-3 already says why
     /// the fact is out of canon, and for a bookkeeping section, which is
-    /// F-SEC-12's.
+    /// F-SEC-12's. A section an error leaves out (F-GEN-2) gets neither: its
+    /// status can't be told until the error is fixed.
     /// </summary>
     private static void CheckStatuses(EntityFacts facts, List<Diagnostic> found)
     {
@@ -206,7 +207,7 @@ internal static class ContinuityChecks
         foreach (var fact in facts.Sections)
         {
             var section = fact.Section;
-            if (section.Comment is not { } comment)
+            if (section.Comment is not { } comment || fact.IsLeftOut)
             {
                 continue;
             }

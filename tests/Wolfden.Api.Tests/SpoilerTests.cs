@@ -65,6 +65,86 @@ public class SpoilerTests
         Assert.Equal(["Jonathan Harker"], early.GetProperty("matches").EnumerateArray().Select(m => m.GetProperty("name").GetString()));
     }
 
+    /// <summary>
+    /// A section an error leaves out (#50) is named nowhere at any position:
+    /// its heading, its text, the links in it, or the fact that it's there, since
+    /// a heading can give away a reveal.
+    /// </summary>
+    [Theory]
+    [Trait("Scenario", "SC-WEB-83")]
+    [InlineData("dracula:1")]
+    [InlineData("dracula:5")]
+    [InlineData("dracula:22")]
+    [InlineData("dracula:27")]
+    [InlineData("dracula:note")]
+    public async Task NothingAsOfAPositionNamesASectionLeftOutByAnError(string asOf)
+    {
+        using var den = TempDen.Dracula();
+        den.Write(MinaFile, den.Read(MinaFile) + """
+
+            ## Quorlaxian bargain
+            <!-- wolfden: status=maybe pin=true from=dracula:1 -->
+            She strikes a zanthic pact with [[Quincey Harker]].
+
+            ### Zanthic terms
+            <!-- wolfden: from=dracula:1 -->
+            Vorpalite clauses.
+
+            """);
+        den.Write(DraculaBook, den.Read(DraculaBook) + """
+
+            ## Quorlaxian plan
+            <!-- wolfden: canon=x -->
+            Zanthic notes for the book.
+
+            """);
+
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+
+        // The check has something to check: the full view has them.
+        var full = (await server.GetJsonAsync("/api/entity?entity=Mina%20Harker", HttpStatusCode.OK)).GetProperty("entity").GetProperty("sections").EnumerateArray()
+            .Single(s => s.GetProperty("name").GetString() == "Zanthic terms");
+        Assert.Contains("F-STAT-1", full.GetProperty("leftOut")[0].GetProperty("rule").GetString(), StringComparison.Ordinal);
+
+        var asked = new List<string>
+        {
+            $"/api/hierarchy?universe=dracula&asOf={asOf}",
+            $"/api/entities?universe=dracula&asOf={asOf}&limit=1000",
+            $"/api/canon?universe=dracula&asOf={asOf}",
+            $"/api/entity?universe=dracula&asOf={asOf}&entity=Mina%20Harker",
+            $"/api/entity?universe=dracula&asOf={asOf}&entity=Jonathan%20Harker",
+            $"/api/fields?universe=dracula&asOf={asOf}",
+            $"/api/search?universe=dracula&asOf={asOf}&limit=200&query=zanthic",
+            $"/api/search?universe=dracula&asOf={asOf}&limit=200&query=quorlaxian",
+            $"/api/search?universe=dracula&asOf={asOf}&limit=200&query=vorpalite",
+            $"/api/search?universe=dracula&asOf={asOf}&limit=200&query=pact",
+            $"/api/entities/lookup?universe=dracula&asOf={asOf}&limit=100&query=quorlaxian",
+        };
+        foreach (var path in asked)
+        {
+            var json = await server.GetJsonAsync(path, HttpStatusCode.OK);
+            foreach (var (at, text) in Strings(json, "$"))
+            {
+                foreach (var word in new[] { "Quorlaxian", "Zanthic", "Vorpalite", "left out" })
+                {
+                    Assert.False(text.Contains(word, StringComparison.OrdinalIgnoreCase), $"{path} at {at} says '{word}': {text}");
+                }
+            }
+
+            Assert.False(json.TryGetProperty("leftOut", out _));
+            if (json.TryGetProperty("hits", out var hits))
+            {
+                Assert.Empty(hits.EnumerateArray());
+            }
+        }
+
+        // No backlink from it: on Quincey's page, once he's met, nothing points at Mina's left-out section.
+        var quincey = await server.GetJsonAsync("/api/entity?entity=Quincey%20Harker&universe=dracula&asOf=dracula:note", HttpStatusCode.OK);
+        Assert.DoesNotContain(
+            quincey.GetProperty("entity").GetProperty("backlinks").EnumerateArray(),
+            b => b.TryGetProperty("section", out var section) && section.GetString() == "Quorlaxian bargain");
+    }
+
     [Theory]
     [Trait("Scenario", "SC-WEB-6")]
     [InlineData("dracula", "dracula:1")]

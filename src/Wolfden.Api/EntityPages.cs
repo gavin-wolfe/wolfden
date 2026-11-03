@@ -70,7 +70,7 @@ internal static class EntityPages
                     f.Kind == "default" ? [] : byEntry[(f.Name, f.Line)].Select(Link).ToList())).ToList(),
                 (view.Sections ?? []).Select(s => new PageSection(
                     s.Name, s.Level, s.HeadingPath, s.Status, s.Pinned, s.From, s.Until, s.Line, s.Body, s.Bookkeeping,
-                    bySection[s.Line].Select(Link).ToList())).ToList(),
+                    bySection[s.Line].Select(Link).ToList(), s.LeftOut)).ToList(),
                 view.Hash,
                 Chain(containers, record.ScopeId),
                 Entry(record, containers),

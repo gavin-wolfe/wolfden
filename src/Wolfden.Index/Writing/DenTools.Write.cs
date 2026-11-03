@@ -1239,16 +1239,25 @@ public sealed partial class DenTools
     private static DenToolException Gone(string path) =>
         new(ToolErrorCodes.StaleFile, $"{path} isn't in the den now; it may have been moved or deleted since it was read. Look it up again.");
 
-    /// <summary>Checks the files as the den would read them, refusing any that would have an error.</summary>
-    private static DenWriteCheckResult Check(IDenSource den, DenStructure structure, Dictionary<string, byte[]> files)
+    /// <summary>
+    /// Checks the files as the den would read them, refusing any that would
+    /// have an error they don't have now (format.md §1.3). A bad section comment
+    /// that's already there doesn't refuse a save (<see cref="DenWriteCheck"/>).
+    /// </summary>
+    /// <param name="den">The den as it is now.</param>
+    /// <param name="structure">The den's structure as it is now.</param>
+    /// <param name="files">The files to check, by path.</param>
+    /// <param name="movedFrom">For a file that moves, its new path to its path now.</param>
+    private static DenWriteCheckResult Check(
+        IDenSource den, DenStructure structure, Dictionary<string, byte[]> files, IReadOnlyDictionary<string, string>? movedFrom = null)
     {
-        var check = DenWriteCheck.Check(den, structure, files);
-        if (check.HasErrors)
+        var check = DenWriteCheck.Check(den, structure, files, movedFrom);
+        if (check.AddsErrors)
         {
             throw new DenToolException(
                 ToolErrorCodes.InvalidEdit,
-                "The edit would leave errors, so the den would leave the file out, and nothing was written: " +
-                string.Join("; ", check.Errors.Select(d => $"{d.Path}:{d.Diagnostic.Line?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "-"}: {d.Diagnostic.RuleId}: {d.Diagnostic.Message}")));
+                "The edit would add errors, so nothing was written: " +
+                string.Join("; ", check.AddedErrors.Select(d => $"{d.Path}:{d.Diagnostic.Line?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "-"}: {d.Diagnostic.RuleId}: {d.Diagnostic.Message}")));
         }
 
         return check;
@@ -2072,8 +2081,11 @@ public sealed partial class DenTools
         e.Key, e.Id, e.Name, e.Type, e.Status.ToKey(), e.Universe.Key, e.Scope.Kind.ToString().ToLowerInvariant(), e.Scope.Key, e.Path,
         e.File.Frontmatter?["from"] is YamlScalar { IsNull: false } f ? f.Text : null);
 
+    /// <remarks>Bad section comments the write left as they were come first, marked as errors: the save went ahead, but the writer should hear they're there.</remarks>
     private static List<DiagnosticView> Warnings(DenWriteCheckResult check) =>
-        check.Warnings.Select(d => new DiagnosticView(d.Path, d.Diagnostic.Line, "warning", d.Diagnostic.RuleId, d.Diagnostic.Message)).ToList();
+        check.KeptErrors.Select(d => new DiagnosticView(d.Path, d.Diagnostic.Line, "error", d.Diagnostic.RuleId, d.Diagnostic.Message))
+            .Concat(check.Warnings.Select(d => new DiagnosticView(d.Path, d.Diagnostic.Line, "warning", d.Diagnostic.RuleId, d.Diagnostic.Message)))
+            .ToList();
 
     /// <summary>The SHA-256 of a file's bytes in lowercase hex, as the index records it.</summary>
     private static string HashOf(byte[] bytes) => Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(bytes));

@@ -839,7 +839,7 @@ internal sealed partial class PackReader
         var errors = 0;
         foreach (var d in file.Diagnostics)
         {
-            Add(name, d);
+            Add(name, d.ForTemplate());
             errors += d.Severity == DiagnosticSeverity.Error ? 1 : 0;
         }
 

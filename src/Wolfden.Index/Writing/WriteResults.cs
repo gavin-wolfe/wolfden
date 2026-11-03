@@ -241,7 +241,8 @@ public sealed record SourceLead(int Line, string Text);
 /// <param name="Body">Its own text as written, after the heading and section comment, up to the next heading (subsections aren't included), with line breaks as LF and without the blank lines at either end. Other HTML comments in it are part of it.</param>
 /// <param name="Pinned">True if it's pinned canon (F-PIN-1), by its own comment or a parent's.</param>
 /// <param name="Parent">The index of the section that holds it, or null for a level-2 section.</param>
-public sealed record SourceSection(int Index, string Name, int Level, int Line, string? Comment, string Body, bool Pinned, int? Parent);
+/// <param name="LeftOut">Why an error leaves this section out (format.md F-GEN-2), or null if it isn't left out.</param>
+public sealed record SourceSection(int Index, string Name, int Level, int Line, string? Comment, string Body, bool Pinned, int? Parent, IReadOnlyList<SectionProblem>? LeftOut = null);
 
 /// <summary>A book's freeze status, for a page that offers to freeze or unfreeze it (#31).</summary>
 /// <param name="Version">The shape version.</param>

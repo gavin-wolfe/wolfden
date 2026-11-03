@@ -108,7 +108,7 @@ public static class ReadEndpoints
     /// </summary>
     internal static SearchPageResult SearchPage(SearchResult result) => new(
         result.Version, result.Query, result.Count, result.Truncated,
-        result.Hits.Select(h => new SearchPageHit(h.Entity, h.Section, h.Line, h.Snippet, h.Status, h.InCanon, h.InComment, h.Field, h.Text, h.Matches))
+        result.Hits.Select(h => new SearchPageHit(h.Entity, h.Section, h.Line, h.Snippet, h.Status, h.InCanon, h.InComment, h.Field, h.Text, h.Matches, h.LeftOut))
             .ToList());
 
     /// <summary>The longest part of a revision a message repeats.</summary>

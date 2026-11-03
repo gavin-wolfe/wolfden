@@ -94,6 +94,14 @@ public sealed class LinkOccurrence
     public bool IsBookkeeping { get; internal init; }
 
     /// <summary>
+    /// True for a link in a section an error leaves out (F-GEN-2). It has no
+    /// position and isn't in a canon fact, since what's written about them
+    /// may be what's wrong, so F-LINK-12 and F-LINK-13 skip it. It still
+    /// resolves, so broken links are reported, and a rename can rewrite it.
+    /// </summary>
+    public bool IsLeftOut { get; internal init; }
+
+    /// <summary>
     /// The link's positions for F-LINK-13: usually one, several for a link
     /// in <c>chapter_defaults</c> (one per chapter that inherits it), and
     /// none for a container body, outline notes, or a position that doesn't
@@ -106,7 +114,7 @@ public sealed class LinkOccurrence
     /// an in-canon status, or a chapter field, which is a fact about its
     /// chapter with no status of its own.
     /// </summary>
-    public bool IsInCanonFact => IsIgnoredValue ? false
+    public bool IsInCanonFact => IsIgnoredValue || IsLeftOut ? false
         : Site is LinkSite.ChapterField or LinkSite.ChapterDefault || Status?.IsInCanon() == true;
 
     /// <summary>

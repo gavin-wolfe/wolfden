@@ -88,9 +88,9 @@ Set things up in this order. Each step builds on the ones before it.
    the same. See [Adding series and books](#adding-series-and-books).
 5. **Run `wolfden check`.** In the den's folder, it checks every note
    and says what's wrong, file by file. It exits 0 when there are no
-   errors (warnings alone pass) and 1 when there are. A file with an
-   error is left out of Wolfden until it's fixed, so start from a clean
-   check.
+   errors (warnings alone pass) and 1 when there are. An error leaves out
+   the file it's in, or for a typo in a section comment that section, until
+   it's fixed, so start from a clean check.
 6. **Run `wolfden serve`.** It opens the den in your browser, on this
    computer only. From there you can [make notes](#making-a-new-note),
    [edit them](#editing-notes), [add series and
@@ -1134,6 +1134,10 @@ Freezing does three things, in order:
 Without history, step 1 is the whole freeze, and Wolfden says no
 snapshot was taken.
 
+**Fix any bad section comments first.** Wolfden won't freeze a book while a
+typo in a section comment hides text in it, since a frozen book can't be fixed
+without unfreezing. It names each one.
+
 **To change a frozen book,** unfreeze it: **Unfreeze…** on its page, or
 `wolfden unfreeze dracula`. Its `book.md` then says `status: draft`, and
 with history Wolfden makes a checkpoint, so the history shows when you
@@ -1245,10 +1249,30 @@ in it, which Wolfden calls a checkpoint.
   `.wolfden/write.lock`, which can stay there and is safe to leave;
   editors such as Obsidian don't take turns, so a save there is caught
   by the check above instead.
-- **A note with an error disappears.** A file with an error is left out
-  of Wolfden until it's fixed: its page, its links, and every view. An
-  error in a `book.md` leaves out the whole book. Run `wolfden check` to
-  find it.
+- **A note with an error in its frontmatter disappears.** Such a file is
+  left out of Wolfden until it's fixed: its page, its links, and every view.
+  An error in the frontmatter of a `book.md` leaves out the whole book. Run
+  `wolfden check` to find it.
+- **A typo in a section comment hides that section.** With `status=maybe`,
+  `from=dracula:5.2`, or `pin=yes` under a heading, Wolfden doesn't guess what
+  you meant, since a reveal showing early would be worse. That section and
+  its subsections are left out of every story view, pinned canon, and what
+  assistants get at a position. The rest of the note, or the book, is fine.
+  An earlier section of the same name, such as an older `## Appearance`, keeps
+  applying until the typo is fixed. Nothing is lost: in Everything mode the
+  section is in its place with a flag naming the line, and it can be searched
+  there. `wolfden check` still fails. Wolfden lets you keep editing the note,
+  but won't save a new typo, and a book can't be frozen until it's fixed.
+- **A comment that doesn't close is only a warning, and it does more harm
+  than a typo.** With a missing `-->`, the comment is ignored and everything up
+  to the next `-->` in the file, or to the end of the file, is swallowed with
+  it. That text, later headings included, stops being sections and becomes raw
+  text in the section the comment is under, with no position of its own. On
+  the page, that section's heading shows at every position where the note
+  does, and the text after it, plus any later sections it swallowed, disappears.
+  An assistant reading through the tools gets the raw text, so a reveal in it
+  can reach an assistant at an early position. `wolfden check` still passes, so
+  read its warnings: this one names the line where the swallowed text ends.
 - **Copying a note's file by hand makes a duplicate.** Both files have
   the same `id`, so Wolfden leaves both out of views, and links to them
   break, until one gets a new id. Copy with `wolfden copy`, or ask an AI

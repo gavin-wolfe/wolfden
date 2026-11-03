@@ -62,6 +62,13 @@ public abstract class DenFile
     public bool HasErrors => _diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error);
 
     /// <summary>
+    /// True if an error leaves out the whole file (format.md F-GEN-2): any
+    /// error but a bad value in a section comment, which leaves out only
+    /// that section (<see cref="Diagnostic.LeftOut"/>).
+    /// </summary>
+    public bool HasFileErrors => _diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error && d.LeftOut is null);
+
+    /// <summary>
     /// True if the file parsed well enough to edit: valid UTF-8, no lone CR,
     /// a body CommonMark can parse, and frontmatter or YAML that parses to a
     /// mapping with no repeated keys, anchors, aliases, or tags. Other errors

@@ -200,9 +200,13 @@ public sealed record FieldView(
 /// <param name="Line">The heading's line.</param>
 /// <param name="Body">The section's own text, up to the next heading.</param>
 /// <param name="Bookkeeping">In the full view, true for a bookkeeping section (a change log or to-do list), which canon views leave out.</param>
+/// <param name="LeftOut">
+/// In the full view, why an error leaves this section out (format.md F-GEN-2), or null if it isn't left out. Canon
+/// views leave such a section out and never say so: its heading could give away a reveal.
+/// </param>
 public sealed record SectionView(
     string Name, int Level, IReadOnlyList<string> HeadingPath, string Status, bool Pinned, string? From, string? Until, int Line, string Body,
-    bool? Bookkeeping = null);
+    bool? Bookkeeping = null, IReadOnlyList<SectionProblem>? LeftOut = null);
 
 /// <summary>The pinned facts of an entity.</summary>
 /// <param name="Fields">Pinned field values.</param>
@@ -288,8 +292,9 @@ public sealed record ListEntitiesResult(int Version, int Count, int Total, bool 
 /// <param name="InCanon">True if the match is canon text (draft or canon, not bookkeeping).</param>
 /// <param name="InComment">True if the match is in an HTML comment, such as a to-do note.</param>
 /// <param name="Field">The field the match is in (#179), or null for a match in the name, aliases, lead, or a section.</param>
+/// <param name="LeftOut">True for a match in a section an error leaves out (format.md F-GEN-2), found only without a position; otherwise null.</param>
 public sealed record SearchHitView(
-    EntitySummary Entity, string? Section, int? Line, string Snippet, string Status, bool InCanon, bool InComment, string? Field = null)
+    EntitySummary Entity, string? Section, int? Line, string Snippet, string Status, bool InCanon, bool InComment, string? Field = null, bool? LeftOut = null)
 {
     /// <summary>
     /// The excerpt without marks, for a surface that marks matches itself

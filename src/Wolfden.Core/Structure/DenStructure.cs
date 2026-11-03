@@ -134,7 +134,14 @@ public sealed class DenStructure
         ArgumentNullException.ThrowIfNull(source);
         var den = new DenStructure();
         new DenLoader(den, source).Load();
+
+        // In a container file another error leaves out, a bad section comment leaves out no more than that (F-GEN-2).
+        var excluded = den._diagnostics
+            .Where(d => d.Diagnostic.Severity == DiagnosticSeverity.Error && d.Diagnostic.LeftOut is null)
+            .Select(d => d.Path)
+            .ToHashSet(StringComparer.Ordinal);
         var sorted = den._diagnostics
+            .Select(d => excluded.Contains(d.Path) ? d with { Diagnostic = d.Diagnostic.InExcludedFile() } : d)
             .OrderBy(d => d.Path, StringComparer.Ordinal)
             .ThenBy(d => d.Diagnostic.Line ?? 0)
             .ToList();

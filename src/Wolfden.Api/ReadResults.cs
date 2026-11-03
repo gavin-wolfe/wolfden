@@ -146,7 +146,7 @@ public sealed record PageField(
 /// <param name="Links">The links in the section's own text, in file order.</param>
 public sealed record PageSection(
     string Name, int Level, IReadOnlyList<string> HeadingPath, string Status, bool Pinned, string? From, string? Until, int Line, string Body,
-    bool? Bookkeeping, IReadOnlyList<LinkView> Links);
+    bool? Bookkeeping, IReadOnlyList<LinkView> Links, IReadOnlyList<SectionProblem>? LeftOut = null);
 
 /// <summary>
 /// Where an entity enters canon (format.md F-ENT-6): its own <c>from</c>, or,
@@ -248,7 +248,7 @@ public sealed record HistoryDiffResult(int Version, EntitySummary Entity, string
 /// <param name="Matches">Where the matches are in <paramref name="Text"/>, in order, as offsets and lengths in UTF-16 code units (JavaScript string indexes).</param>
 public sealed record SearchPageHit(
     EntitySummary Entity, string? Section, int? Line, string Snippet, string Status, bool InCanon, bool InComment, string? Field, string Text,
-    IReadOnlyList<TextMatch> Matches);
+    IReadOnlyList<TextMatch> Matches, bool? LeftOut = null);
 
 /// <summary>A search's result as the search page gets it: the MCP tool's, with <see cref="SearchPageHit"/>s.</summary>
 /// <param name="Version">The shape version.</param>

@@ -4,6 +4,7 @@ import { useNavigate, useParams } from '@tanstack/react-router'
 import { ApiRequestError } from '../api'
 import { createContainer, worksQuery, type ContainerCreateResult } from '../containerApi'
 import { useAfterSave } from './Editing'
+import { ErrorMark } from './States'
 import { trapTab } from './NewEntity'
 import '../newEntity.css'
 
@@ -144,6 +145,7 @@ export function ContainerCreatedNotice() {
         <ul className="warnings">
           {result.warnings.map((w) => (
             <li key={`${w.path}:${w.rule}:${w.line ?? ''}:${w.message}`}>
+              <ErrorMark severity={w.severity} />
               {w.rule}: {w.message}
             </li>
           ))}

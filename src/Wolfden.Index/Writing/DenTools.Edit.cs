@@ -41,7 +41,7 @@ public sealed partial class DenTools
         var (path, _) = Locate(entity, universe);
         var den = Snapshot();
         var structure = DenStructure.Load(den);
-        var bytes = den.TryReadFile(path) ?? throw Gone(path);
+        var bytes = den.TryReadFile(path) ?? throw GoneOrUnreadable(den, path);
         var read = EntityCatalog.ReadEntityFile(structure, path, bytes);
         var e = read.Entity ?? throw new DenToolException(
             ToolErrorCodes.InvalidEdit, $"{path} has errors now, so the den leaves it out and it can't be edited here. {ToolWords.Cap(Words.CheckFile(path))} to see them.");
@@ -259,6 +259,9 @@ public sealed partial class DenTools
                 : index.Backlinks(record.Key).Where(l => l.Heading != null).Select(l => (Heading: l.Heading!, l.Path, l.Line)).ToList();
         });
 
+        // The index leaves out a file it can't read, so its links aren't in the list above (#284).
+        var unread = LoadTracked().Den.Unreadable;
+
         return EditEntity(entity, universe, hash, (file, _, pinned) =>
         {
             var target = SectionAt(file, index, name);
@@ -283,6 +286,11 @@ public sealed partial class DenTools
                     effects.Add(left.Sections.FirstOrDefault(s => LinkText.Matches(s.Name, group.Key)) is { } now
                         ? $"{group.Count()} link(s) to '{group.Key}' by heading now reach the section '{now.Name}' at line {now.Line} instead: {where}."
                         : $"{group.Count()} link(s) to '{group.Key}' by heading no longer reach a section, only the note: {where}.");
+                }
+
+                if (unread.Count > 0)
+                {
+                    effects.Add($"Couldn't read {Named(unread)}, so any links to this section there aren't counted here. {ToolWords.Cap(Words.CheckDen)} once it can be read.");
                 }
 
                 return effects;

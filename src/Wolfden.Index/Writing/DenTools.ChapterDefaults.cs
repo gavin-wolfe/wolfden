@@ -84,7 +84,7 @@ public sealed partial class DenTools
         var universeKey = LocateContainer(universe, series, book);
         using (EnterWrite())
         {
-            var den = Snapshot();
+            var den = new TrackingDenSource(Snapshot());
             var structure = DenStructure.Load(den);
             var target = FindContainer(structure, universeKey, series, book);
             var path = target.FilePath;
@@ -144,6 +144,9 @@ public sealed partial class DenTools
 
             // What the check below depends on, compared again just before the write.
             var below = FilesBelow(den, target).Where(f => f.Path != path).ToList();
+
+            // A book below that can't be read may be final, so its chapters mustn't inherit this (#284).
+            RefuseUnreadable(den);
             CheckFinalBooksBelow(edit, touched);
             var unloaded = CheckUnloadedBooksBelow(den, structure, target);
             BeforeDefaultsSave?.Invoke();

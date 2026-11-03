@@ -24,7 +24,10 @@ namespace Wolfden.Index.Writing;
 /// written exactly as it is on disk, with no folder or file link on the way,
 /// and in a pinned session it can't be in another universe, nor be
 /// <c>den.yaml</c>. Anything else gets the same <c>unknown_file</c>, whether it
-/// exists or not.
+/// exists or not. A file it may open that's there but can't be read says so, with
+/// <c>den_unreadable</c>, rather than seeming to have gone (#284). So does one
+/// left out only because <c>den.yaml</c>, a pack, or a container's file above it
+/// can't be read, rather than seeming to have an error.
 /// </para>
 /// <para>
 /// A file the den reads is saved by the usual rules. A file the den leaves out
@@ -78,8 +81,8 @@ public sealed partial class DenTools
     {
         var den = Snapshot();
         var structure = DenStructure.Load(den);
-        var kind = CheckEditable(den, structure, path);
-        var bytes = den.TryReadFile(path) ?? throw NoFile(path);
+        var kind = CheckEditable(den, structure, path, opening: true);
+        var bytes = den.TryReadFile(path) ?? throw UnreadableOrNoFile(den, path, opening: true);
         var file = Parsed(kind, bytes);
         var entity = kind == DenFileKinds.Note ? EntityCatalog.ReadEntityFile(structure, path, bytes).Entity : null;
         return new FileSourceResult(
@@ -97,7 +100,10 @@ public sealed partial class DenTools
     /// <paramref name="text"/>: its line breaks become the file's own, and a
     /// byte order mark it had is kept. It's refused on a stale hash, in a final
     /// book, or if it would add an error (see the remarks on this part of the
-    /// class). An id never changes (F-ID-4).
+    /// class). An id never changes (F-ID-4). Unless it's a note the den reads,
+    /// which is an ordinary note edit, it's refused while anything the save read
+    /// can't be read (<see cref="RefuseUnreadable"/>, #284): the den's own files
+    /// and outlines, though not other notes.
     /// </summary>
     public WriteResult ReplaceFileAt(string path, string text, string expectedHash)
     {
@@ -126,7 +132,8 @@ public sealed partial class DenTools
         var ids = hasId ? IdsInUse(look, path) : [];
         using (EnterWrite())
         {
-            var den = Snapshot();
+            var tracked = new TrackingDenSource(Snapshot());
+            IDenSource den = tracked;
             var structure = DenStructure.Load(den);
             CheckEditable(den, structure, path);
             if (kind == DenFileKinds.Den && structure.IsLoaded)
@@ -134,7 +141,7 @@ public sealed partial class DenTools
                 throw new DenToolException(ToolErrorCodes.UnsupportedEdit, DenYamlLoads);
             }
 
-            var original = den.TryReadFile(path) ?? throw Gone(path);
+            var original = den.TryReadFile(path) ?? throw GoneOrUnreadable(den, path);
             CheckHash(path, original, hash);
             var current = Parsed(kind, original);
             if (!current.IsReadable)
@@ -170,6 +177,7 @@ public sealed partial class DenTools
             {
                 // The den reads this file now, so a save may add no error (format.md §1.3).
                 var check = Check(den, structure, files);
+                RefuseUnreadable(tracked);
                 Save(files, new Dictionary<string, byte[]>(StringComparer.Ordinal) { [path] = original }, created: null);
                 return new WriteResult(DenReader.ResultVersion, true, path, HashOf(bytes), null, ["Saved the whole file."], [], Warnings(check));
             }
@@ -207,10 +215,11 @@ public sealed partial class DenTools
                 if (kind == DenFileKinds.Note)
                 {
                     entity = EntityCatalog.ReadEntityFile(check.Structure, path, bytes).Entity!;
-                    CheckWrittenPositions(null, entity);
+                    CheckWrittenPositions(null, entity, tracked);
                 }
             }
 
+            RefuseUnreadable(tracked);
             Save(files, new Dictionary<string, byte[]>(StringComparer.Ordinal) { [path] = original }, created: null);
 
             List<string> effects = [healed
@@ -233,8 +242,37 @@ public sealed partial class DenTools
         ToolErrorCodes.UnknownFile,
         $"Wolfden has no file to edit at '{(path is { Length: > 200 } ? path[..200] + "…" : path)}'. It may have been moved or deleted.");
 
-    /// <summary>What the path is, if it can be opened; otherwise <c>unknown_file</c>, or an error saying which file to fix first.</summary>
-    private string CheckEditable(IDenSource den, DenStructure structure, string? path)
+    /// <summary>What to say of a file that may be opened, but gave no bytes: there, it can't be read; gone, there's no file.</summary>
+    private DenToolException UnreadableOrNoFile(IDenSource den, string path, bool opening) =>
+        den.FileExists(path) ? CantRead([new UnreadablePath(path, IsFolder: false)], opening) : NoFile(path);
+
+    /// <summary>The refusal for what can't be read: of a save, or, when the writer has only opened a page, in words for that.</summary>
+    private DenToolException CantRead(IReadOnlyList<UnreadablePath> paths, bool opening) => !opening ? Unreadable(paths) : new(
+        ToolErrorCodes.DenUnreadable,
+        $"Couldn't read {Named(paths)}, so this can't be opened right now. " +
+        (paths.Any(p => !p.IsFolder)
+            ? "If another program has a file open, close it there, then reload this page. If none does, check the permissions."
+            : "Check the folder's permissions, then reload this page."));
+
+    /// <summary>
+    /// Refuses, naming it, if what stopped the path being read as the den would
+    /// is something that can't be read, not an error to fix. A second load of the
+    /// structure, only on the way to refusing anyway. Only what's above the path
+    /// counts when the den itself loaded: a sibling held has nothing to do with it.
+    /// </summary>
+    private void RefuseIfHeldAbove(IDenSource den, string path, bool denLoaded, bool opening)
+    {
+        var tracked = new TrackingDenSource(den);
+        _ = DenStructure.Load(tracked);
+        var why = tracked.Unreadable.Where(u => !denLoaded || IsAtOrUnder(path, u.IsFolder ? u.Path : DenPaths.Parent(u.Path))).ToList();
+        if (why.Count > 0)
+        {
+            throw CantRead(why, opening);
+        }
+    }
+
+    /// <summary>What the path is, if it can be opened; otherwise <c>unknown_file</c>, <c>den_unreadable</c>, or an error saying which file to fix first.</summary>
+    private string CheckEditable(IDenSource den, DenStructure structure, string? path, bool opening = false)
     {
         if (path is null || DenPaths.Problem(path) is not null)
         {
@@ -242,9 +280,14 @@ public sealed partial class DenTools
         }
 
         var kind = DenErrors.KindOf(path);
-        if (!DenErrors.CanEdit(kind, PinnedUniverse) || DenErrors.IsOutsidePin(path, PinnedUniverse) || !IsPlainFile(path) || den.TryReadFile(path) is null)
+        if (!DenErrors.CanEdit(kind, PinnedUniverse) || DenErrors.IsOutsidePin(path, PinnedUniverse) || !IsPlainFile(path))
         {
             throw NoFile(path);
+        }
+
+        if (den.TryReadFile(path) is null)
+        {
+            throw UnreadableOrNoFile(den, path, opening);
         }
 
         if (kind == DenFileKinds.Den)
@@ -254,6 +297,7 @@ public sealed partial class DenTools
 
         if (!structure.IsLoaded)
         {
+            RefuseIfHeldAbove(den, path, denLoaded: false, opening);
             throw new DenToolException(ToolErrorCodes.InvalidEdit, $"den.yaml doesn't load, so {path} can't be read as the den would. Fix den.yaml first.");
         }
 
@@ -266,9 +310,13 @@ public sealed partial class DenTools
             DenFileKinds.Outline => containers.Contains(DenPaths.Parent(path)),
             _ => EntityCatalog.EntityFileScope(structure, path) is not null,
         };
-        return loaded
-            ? kind
-            : throw new DenToolException(ToolErrorCodes.InvalidEdit, $"An error in what holds {path} leaves it out too, so it can't be read as the den would. Fix that first: it's in the list of problems.");
+        if (!loaded)
+        {
+            RefuseIfHeldAbove(den, path, denLoaded: true, opening);
+            throw new DenToolException(ToolErrorCodes.InvalidEdit, $"An error in what holds {path} leaves it out too, so it can't be read as the den would. Fix that first: it's in the list of problems.");
+        }
+
+        return kind;
     }
 
     /// <summary>

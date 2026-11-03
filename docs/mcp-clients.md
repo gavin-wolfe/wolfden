@@ -240,6 +240,17 @@ prompts. This list is for knowing what the assistant can do.
   have to rewrite a link in one is refused as a whole, and so is a change
   to a series' or universe's `chapter_defaults` that would change what a
   final book's chapters have.
+- **A file Wolfden can't read stops the writes that need it.** A rename,
+  move, copy, or create checks links across the whole den, a change to
+  `chapter_defaults` looks at every book below it, and a new book or
+  series writes the story order. If a note, `book.md`, or outline is there
+  but can't be read, because another program has it open for writing, or a
+  folder can't be listed, the write is refused as a whole with
+  `den_unreadable`, names the file, and writes nothing (format.md F-GEN-5).
+  So links in that file don't break, and a final book's refusal isn't
+  skipped. `check` lists such a file as an error. An error that a name or
+  position wasn't found keeps its own code, and adds that a file couldn't
+  be read and may be why.
 - **Effects, not just bytes.** Results say what an edit means for the
   story: a status that takes an entity out of canon views, a chapter left
   with no POV, the links a rename rewrote, and any link that would now
@@ -324,14 +335,20 @@ docs. The writer's own list is in
   yours was written; retry the same call. If it then comes back
   `stale_file`, read again as usual. If it keeps happening, ask the
   writer what's running.
+- **`den_unreadable` naming a file means ask the writer to close it.**
+  Another program has the file open, or its permissions don't let
+  Wolfden read it. Nothing was written. Tell the writer which file it is,
+  and retry the same call once they've closed it. Don't call it broken:
+  this isn't about what's in it. `check` reports the same thing as F-GEN-5, and until
+  it's closed, links to that file can show as broken.
 - **`den_notice` means some of the den is missing.** While the den has
   errors, every result but `check`'s has a short `den_notice`, such as
   `"This den has 2 errors, so some notes or sections may be missing from this
   answer. Call check with severity 'error' to see them."` It names no note or
   section, so it's the same at a story position. Tell the writer once, not with every
   result. In a pinned
-  session it counts that universe's errors and the den-level ones. Duplicate ids
-  are warnings, so they don't count. Asking for a note an error leaves out says
+  session it counts that universe's errors and the den-level ones. A file that
+  can't be read counts too. Duplicate ids are warnings, so they don't count. Asking for a note an error leaves out says
   so and names the line; with `as_of`, it says so only for a path or an id,
   and doesn't say which line or why.
 - **`allow_relinks` only with the writer's say-so.** A create, copy,

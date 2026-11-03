@@ -150,7 +150,7 @@ internal static class CheckCommand
         }
 
         // A den.yaml that doesn't load is reported below: it's what's wrong.
-        if (universe is not null && check.IsLoaded && check.Structure.FindUniverse(universe) is null)
+        if (universe is not null && check.IsLoaded && check.Structure.FindUniverse(universe) is null && !check.CouldntRead(universe))
         {
             var keys = check.Structure.Universes.Select(u => u.Key).Order(StringComparer.Ordinal).ToList();
             error.WriteLine(

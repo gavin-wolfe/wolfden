@@ -1212,9 +1212,18 @@ out and has no page. Fix it and save.
   it names sections even at an early chapter. Pages at a position stay
   spoiler-safe: a note left out says only that it's left out, with **Show
   everything** to see why.
-- **A note another program holds locked can't be read,** so Wolfden treats it as
-  absent, and its errors aren't listed. `wolfden check` doesn't see them either.
-  They show within a minute of it being let go.
+- **A file another program holds locked can't be read,** so it's listed as that,
+  with no **Edit file**, since this isn't about what's in it. Close it there,
+  and the entry clears within a minute. Any errors inside it can't be seen until
+  then, in the list or in `wolfden check`. A held `book.md`, `series.md`, or
+  `universe.md` is also listed by its folder, saying not to add a file, since it's
+  there. A held pack is also listed under `den.yaml` in the same way.
+- **While such a file is held,** a fix can be refused if its save had to read that
+  file: `den.yaml`, a pack, a book's, series', or universe's own file, or an
+  outline. Another note being held doesn't stop a fix. Close the file named, and
+  save again. Your text stays in the editor. If that file is above the one you
+  opened, the message names it there too, rather than the file seeming to have an
+  error: close it, then reload the page.
 - **With `--universe`,** the list has that universe's errors and the den-level
   ones, as `wolfden check --universe` does.
 
@@ -1403,6 +1412,24 @@ in it, which Wolfden calls a checkpoint.
   something the reader hasn't met yet only with `spoiler_checks: true`
   in `den.yaml` ([format.md F-DEN-7](format.md)). It sees links, not
   prose.
+
+### Files another program has open
+
+- **A note another program holds can stop a rename.** Wolfden can't read
+  a file while another program has it open for writing, even if that
+  program lets others read it too. While one does, Wolfden can't see
+  what's in that note, so it refuses a rename, a move, a copy, a new note,
+  a new book, or a freeze, says which file, and changes nothing. Otherwise
+  links in that note would break without a word. Close the file there,
+  then try again.
+- **`wolfden check` and the top bar's problems list it as an error** (F-GEN-5),
+  and links to that note can show as broken until it's closed. If no program has it open,
+  check the file's permissions. The same goes for a folder Wolfden isn't
+  allowed to look in.
+- **Pages still open.** A note that can't be read is left out of pages and
+  searches until it can be, so it can seem to have gone. Nothing happened
+  to it. A program that saves a file and lets go doesn't cause any of this,
+  and neither does one that has it open only to read and shares it.
 
 ### Images and other editors
 

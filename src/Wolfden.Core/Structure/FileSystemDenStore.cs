@@ -115,6 +115,9 @@ public sealed class FileSystemDenStore : IDenStore, IDenChangeFeed
     public bool FolderExists(string path) => Reads.FolderExists(path);
 
     /// <inheritdoc />
+    public bool CannotList(string path) => Reads.CannotList(path);
+
+    /// <inheritdoc />
     public IEnumerable<string> GetFolderLinks(string path) => Reads.GetFolderLinks(path);
 
     /// <inheritdoc />

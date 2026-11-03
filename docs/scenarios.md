@@ -1197,6 +1197,39 @@ Spec: format.md §1.3, F-GEN-2 (#50). Covered by:
 `SectionErrorTests.TheSameErrorIsKnownWhereverItMoved`,
 `SectionErrorTests.ANewBadValueIsRefused`.
 
+### SC-CHECK-63. Check lists what it couldn't read
+
+Another program has a note open for writing, or the writer's account may not
+list a `characters/` folder, while they run `wolfden check`.
+
+- The report has one more error for it, on its path with no line:
+  `F-GEN-5: This file couldn't be read, so it wasn't checked, and links to it
+  may show as broken.`, and what to do. `--json` and the MCP `check` tool have
+  it too. `check` exits 1, since it can't vouch for what it didn't see.
+- If it's `den.yaml`, or a `pack.yaml` that `den.yaml` lists, the den doesn't
+  load, so `check` exits 2, as it does when the den couldn't be checked. A
+  held `den.yaml` says that it couldn't be read and nothing else was checked,
+  not that it's missing.
+- `check --universe X` with X's own `universe.md` held reports that, rather
+  than that the den has no universe X.
+- Links to that note can still show as broken: the rest of the report is what
+  it would be if the note were deleted. Once it can be read, it's all gone.
+- A note deleted as the check runs isn't listed (SC-CLI-8).
+- A check of one universe lists only what's its own, or what every universe
+  shares.
+
+Spec: format.md F-GEN-1, F-GEN-5 (#284). Covered by:
+`LockedFileWriteTests.TheCheckToolListsALockedNoteAsAnError` (MCP),
+`LockedFileWriteTests.TheCheckToolListsAFolderThatCantBeListed` (MCP),
+`TrackingDenSourceTests.CheckReportsAFolderThatCantBeListed` (Core),
+`TrackingDenSourceTests.ACheckOfOneUniverseReportsOnlyItsOwnUnreadableFiles` (Core),
+`UnreadableFileTests.AHeldDenYamlSaysSoRatherThanThatItsMissing` (Core),
+`LockedFileWriteTests.TheCheckToolReportsAUniverseWhoseFileIsLockedRatherThanUnknown` (MCP),
+`UnreadableFileTests.CheckingAUniverseWhoseFileCantBeReadReportsThat` (CLI),
+`UnreadableFileTests.AFileThatCantBeReadIsCheckedAsIfItWerentThere` (Core),
+`UnreadableFileTests.ANoteThatCantBeReadIsLeftOutAndTheCommandsStillWork` (CLI),
+`UnlistableFolderTests.AFolderThatCantBeListedIsLeftOutAndTheCommandsStillWork` (CLI).
+
 ## RT: saving a note keeps what the writer wrote
 
 Background: the files are the writer's, and Wolfden is only one of the
@@ -1668,6 +1701,8 @@ its permissions don't let the writer read it.
   note weren't there, so links to it are reported as they would be if it
   were deleted. Once the note can be read again, the next query sees that
   the files changed and rebuilds the index with it.
+- If the note is still there, `check` also lists it (SC-CHECK-63). A note
+  that's gone, or a link that points nowhere, gets nothing more.
 
 Spec: design.md §7 (#112). Covered by:
 `UnreadableFileTests.AFileThatCantBeReadIsCheckedAsIfItWerentThere` (Core),
@@ -1691,6 +1726,7 @@ it. Another time, a sync tool deletes a series folder just as
   reported as they would be if it were deleted. Once the folder can be
   listed again, the next query sees that the files changed and rebuilds
   the index with what's in it.
+- If the folder is still there, `check` also lists it (SC-CHECK-63).
 
 Spec: design.md §7 (#116). Covered by:
 `UnlistableFolderTests.AFolderDeletedAfterItsParentWasListedIsCheckedAsIfItWerentThere` (Core),
@@ -3163,6 +3199,82 @@ Spec: F-GEN-2, F-RT-5 (#50). Covered by:
 `SectionErrorToolTests.RenamingANoteRewritesTheLinksInsideALeftOutSection`,
 `SectionErrorToolTests.MovingANoteWithALeftOutSectionKeepsItAsItIs`,
 `SectionErrorToolTests.ACopyOfANoteWithABadSectionIsRefusedSinceItWouldAddAnError`.
+
+### SC-MCP-38. A rename while another program holds a note
+
+The writer has a note open for writing in another program, and asks the
+assistant to rename Mr. Swales. That note links to him.
+
+- The rename is refused as a whole with `den_unreadable`. The error names
+  the file, says nothing was changed, and says to close it there and try
+  again. Nothing in the den is written, so the note's link doesn't break.
+- The same goes for `change_alias`, `rename_section`, `move_entity`,
+  `copy_entity`, `create_entity`, and an `add_idea` that makes a new note,
+  and if an outline is what's held. A folder Wolfden may not list is refused
+  the same way, naming the folder, and says to check its permissions. So is
+  a file that becomes unreadable between the first read and the save.
+- If the note held is the one being renamed, or the name is simply wrong,
+  the error is still `unknown_entity`, and adds that the file couldn't be
+  read and may be why, since Wolfden can't tell which it is.
+- A new book or series is refused while a sibling's `book.md` or `series.md`
+  is held, since writing the story order would drop that sibling from it.
+- A freeze or unfreeze that will checkpoint is refused before `book.md`
+  changes. Without history it writes only `book.md`, so a freeze goes ahead
+  unless what's held is in that book, which could hide a bad section comment
+  (SC-CHECK-59). Unfreezing a book that isn't final says so, and nothing more.
+- A position in a book whose `book.md` is held is still `bad_position`, and
+  adds the same thing. `remove_section` goes ahead, and says links in the
+  held file weren't counted.
+- A session pinned to a universe says "a file outside this universe" instead
+  of naming a file in another one. A wrong name there adds nothing about it,
+  since a file in another universe can't be why.
+- Once it's closed, the same call goes through and the note's links follow.
+- A write to one file, such as adding a chapter, isn't stopped by a note
+  held elsewhere: it doesn't depend on that note.
+- A note deleted just as the den is read isn't a failure. It's gone, so the
+  rename goes ahead.
+
+Spec: format.md F-GEN-5, F-RT-5 (#284). Covered by:
+`LockedFileWriteTests.ALockedNoteRefusesADenWideWriteAndNothingIsWritten`,
+`LockedFileWriteTests.TheLinksInALockedNoteFollowOnceItsClosedAndTheWriteIsRepeated`,
+`LockedFileWriteTests.AnOutlineIsNamedWhenItsTheOneLocked`,
+`LockedFileWriteTests.ANoteLockedItselfKeepsUnknownEntityAndIsNamed`,
+`LockedFileWriteTests.AWrongNameKeepsItsErrorAndAddsWhatCouldntBeRead`,
+`LockedFileWriteTests.AFileThatBecomesUnreadableBeforeTheSaveRefusesTheWrite`,
+`LockedFileWriteTests.ALockedSiblingRefusesANewBookOrSeries`,
+`LockedFileWriteTests.APinnedSessionDoesntNameAFileInAnotherUniverse`,
+`LockedFileWriteTests.APositionInABookWhoseFileIsLockedSaysItCouldntBeRead`,
+`LockedFileWriteTests.RemovingASectionSaysItsLinksInALockedNoteWerentCounted`,
+`FreezeBookTests.AFreezeThatWillCheckpointIsRefusedWhileANoteIsLocked`,
+`FreezeBookTests.AFreezeWithoutHistoryIsntStoppedByALockedNote`,
+`FreezeBookTests.UnfreezingADraftBookSaysSoEvenWhileANoteIsLocked`,
+`LockedFileWriteTests.ALockedNoteInTheBookStopsAFreezeWithoutHistory`,
+`LockedFileWriteTests.ALockedNoteRefusesAnIdeaThatMakesANewNote`,
+`LockedFileWriteTests.ALockedSeriesFileRefusesANewSeries`,
+`LockedFileWriteTests.AFolderThatCantBeListedRefusesADenWideWriteAndIsNamed`,
+`LockedFileWriteTests.AWriteToOneFileIsntStoppedByALockedNoteElsewhere`,
+`LockedFileWriteTests.AFileDeletedBetweenListingAndReadingIsntAFailure`.
+
+### SC-MCP-39. A locked file can't get a write past a frozen book
+
+A book is final. A note in it links to Mr. Swales, and another program holds
+that note, or the book's own `book.md`, open for writing. The assistant asks
+to rename Mr. Swales.
+
+- It's refused with `den_unreadable`, naming the file, and nothing is
+  written. With the file treated as absent, the rename would have seen no
+  link in a final book and gone ahead.
+- Once the file is closed, the same call gets the usual `frozen` refusal.
+- A note in that book whose `book.md` is held gets `unknown_entity`, which
+  names that `book.md` as what couldn't be read and may be why.
+- A change to a universe's `chapter_defaults` while a final book's `book.md`
+  below it is held is refused the same way, and is `frozen` once it's closed.
+
+Spec: format.md F-GEN-5, F-BOOK-1 (#284). Covered by:
+`LockedFileWriteTests.ALockedNoteInAFrozenBookCantSkipTheFrozenRefusal`,
+`LockedFileWriteTests.AFrozenBooksLockedBookFileCantSkipTheFrozenRefusal`,
+`LockedFileWriteTests.ANoteInAFrozenBookWhoseBookFileIsLockedSaysSoAsWellAsNotFound`,
+`LockedFileWriteTests.AChapterDefaultCantReachAFrozenBookWhoseBookFileIsLocked`.
 
 ### SC-MCP-40. My assistant hears that the den has errors
 
@@ -5638,13 +5750,13 @@ editor, I break a note's frontmatter.
 - A pack's file or a folder has no Edit file, and says to fix it outside Wolfden.
 - An unchanged den isn't hashed again however often it's asked.
 - Two notes with one id are a warning (F-ID-3), so they aren't listed.
-- A note another program holds open with no sharing is absent, as in
-  `wolfden check` (#112), so its errors aren't listed, and no problems doesn't
-  prove there are none. The list looks again at least every minute, so they come
-  back once it's let go, though its size and time didn't change.
+- A note another program holds open with no sharing is listed as one that can't
+  be read (SC-WEB-96), but what's wrong inside it can't be seen. The list looks
+  again at least every minute, so its own errors come back once it's let go,
+  though its size and time didn't change.
 
 Spec: F-GEN-2 (#280). Covered by:
-`SectionErrorIndexTests.ANoteHeldOpenIsMissingFromTheListAndComesBackWithNoChangeToSee`,
+`SectionErrorIndexTests.ANoteHeldOpenIsListedAsHeldAndItsOwnErrorsComeBackWithNoChangeToSee`,
 `DenErrorEndpointTests.AnOutsideChangeShowsInTheListAndClearsWhenFixed`,
 `DenErrorEndpointTests.TheListSaysHowFarEachErrorReaches`,
 `DenErrorEndpointTests.AnOutlineWithAnErrorIsListedAsCheckListsIt`,
@@ -5750,4 +5862,44 @@ Spec: F-GEN-2 (#280). Covered by:
 
 Spec: F-VIEW-1, F-GEN-2 (#280). Covered by:
 `DenErrorEndpointTests.NothingAtAPositionLeaksWhatsLeftOut`,
+`web/src/DenErrors.test.tsx`.
+
+### SC-WEB-96. Another program holds a file while I'm fixing problems
+
+I have a note open for writing in another program, with the den's page open.
+
+- Within a minute, the top bar counts it. Its entry is the same as in
+  `wolfden check` (F-GEN-5): it couldn't be read, and how to fix that. It has no
+  Edit file, and says it isn't about what's in the file, so there's nothing to
+  edit, and that it clears by itself.
+- A held `den.yaml` says it couldn't be read, and not also that it's missing. If
+  it really is gone, it says that.
+- A held `book.md`, `series.md`, or `universe.md` is listed, and so is its folder,
+  as in `wolfden check`. The folder's entry says not to add a file, since it's
+  there. A folder that really has no file still says to add it.
+- A held pack's `pack.yaml`, or its folder if Wolfden can't look in it, also lists
+  `den.yaml` as naming a pack that isn't there, with no Edit file, saying not to add
+  anything. Another pack named in `den.yaml` that really isn't there is unchanged.
+- A folder Wolfden can't look in is listed as a folder, whatever its name.
+- A server pinned to a universe doesn't list, or say anything of, a held file in
+  another one.
+- A link straight to a held file says it can't be read, not that it may have been
+  moved or deleted, and to reload the page once it's closed. So does saving it, in
+  a save's words.
+- Opening or saving a note below a held `den.yaml`, listed `pack.yaml`,
+  `universe.md`, `series.md`, or `book.md` names that file, rather than saying the
+  note or something above it has an error. A real error above it is still what's
+  blamed, even with a sibling book held.
+- Fixing a file from the list is refused, with the held file named and nothing
+  written, while a file that save had to read can't be read: `den.yaml`, a pack, a
+  container's file, or an outline. Another note being held doesn't stop it.
+- A save that brings a note back, with a position in a book whose `book.md` is
+  held, is `bad_position`, and says that file may be why.
+- The page of a note left out still says what's wrong with it, and adds the held
+  file.
+
+Spec: F-GEN-5, F-GEN-2 (#284, #280). Covered by:
+`HeldFileErrorTests`,
+`SectionErrorIndexTests.ANoteHeldOpenIsListedAsHeldAndItsOwnErrorsComeBackWithNoChangeToSee`,
+`SectionErrorIndexTests.TheDensOwnFolderReachesAsAFolder`,
 `web/src/DenErrors.test.tsx`.

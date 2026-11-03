@@ -123,8 +123,11 @@ public sealed partial class DenTools
         var (universeKey, ids) = PlaceFor(universe, series);
         using (EnterWrite())
         {
-            var den = Snapshot();
+            var den = new TrackingDenSource(Snapshot());
             var structure = DenStructure.Load(den);
+
+            // A sibling that can't be read would drop out of the story order written below (#284).
+            RefuseUnreadable(den);
             var holder = Holder(structure, universeKey, series);
             var u = holder.Universe;
             var original = holder.File.ToBytes();

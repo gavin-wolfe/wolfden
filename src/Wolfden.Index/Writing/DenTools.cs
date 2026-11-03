@@ -157,7 +157,7 @@ public sealed partial class DenTools
         }
 
         // A den.yaml that doesn't load is still reported: it's what's wrong.
-        if (scope is not null && check.IsLoaded && check.Structure.FindUniverse(scope) is null)
+        if (scope is not null && check.IsLoaded && check.Structure.FindUniverse(scope) is null && !check.CouldntRead(scope))
         {
             var keys = check.Structure.Universes.Select(u => u.Key).Order(StringComparer.Ordinal).ToList();
             throw new DenToolException(
@@ -202,7 +202,30 @@ public sealed partial class DenTools
     // The shared read helpers the write tools use too (DenReader).
 
     /// <summary>Brings the index up to date, opens it, and runs <paramref name="query"/>, turning failures into tool errors.</summary>
-    private T WithIndex<T>(Func<DenIndex, T> query) => Reader.WithIndex(query);
+    /// <remarks>
+    /// The write tools find what they write through this. A lookup can fail
+    /// because a file can't be read: a note, or the <c>book.md</c> of the book
+    /// it's in. It can also just be a wrong name, so the error keeps its code,
+    /// and adds that a file couldn't be read and may be why (#284).
+    /// </remarks>
+    private T WithIndex<T>(Func<DenIndex, T> query)
+    {
+        try
+        {
+            return Reader.WithIndex(query);
+        }
+        catch (DenToolException e) when (e.Code is ToolErrorCodes.UnknownEntity or ToolErrorCodes.UnknownScope or ToolErrorCodes.UnknownUniverse
+            or ToolErrorCodes.NoUniverse or ToolErrorCodes.DenNotLoaded)
+        {
+            var unreadable = InThisUniverse(LoadTracked().Den.Unreadable);
+            if (unreadable.Count == 0)
+            {
+                throw;
+            }
+
+            throw new DenToolException(e.Code, $"{e.Message} {MayBeWhy(unreadable)}", e.Candidates) { LeftOut = e.LeftOut };
+        }
+    }
 
     /// <summary>The universe a call is about. See <see cref="DenReader.ChooseUniverse"/>.</summary>
     private ContainerRecord? ChooseUniverse(IndexDbContext db, string? universe, string? position, bool allowAll) =>

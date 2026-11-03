@@ -2,7 +2,7 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { editorViewIn } from './components/MarkdownEditor'
-import { denErrorsQuery, DEN_ERRORS_POLL_MS, leavesOut, type DenErrors, type DenErrorView, type FileSource } from './denErrorsApi'
+import { denErrorsQuery, DEN_ERRORS_POLL_MS, fixElsewhere, leavesOut, type DenErrors, type DenErrorView, type FileSource } from './denErrorsApi'
 import { renderApp, stubApi } from './test/harness'
 
 beforeAll(() => {
@@ -33,6 +33,7 @@ function error(extra: Partial<DenErrorView> = {}): DenErrorView {
     section: null,
     sectionLine: null,
     canEdit: true,
+    heldFile: null,
     ...extra,
   }
 }
@@ -204,6 +205,37 @@ describe('the top bar’s problems', () => {
     expect(links[1]).toContain('path=universes')
     expect(links[1]).not.toContain('at=')
     expect(links[2]).toContain('at=dracula:1')
+  })
+
+  it('SC-WEB-96: a file that can’t be read has no Edit file, and a folder doesn’t ask for a file that’s there', async () => {
+    const book = 'universes/dracula/books/dracula'
+    stubApi({
+      override: (path) =>
+        path === '/api/den/errors'
+          ? list(
+              error({ path: book, kind: 'folder', reach: 'container', line: null, rule: 'F-LAY-4', message: "The book folder 'dracula' has no book.md, so it's skipped.", canEdit: false, heldFile: `${book}/book.md` }),
+              error({ path: `${book}/book.md`, kind: 'book', reach: 'container', line: null, rule: 'F-GEN-5', message: "This file couldn't be read.", canEdit: false }),
+              error({ path: 'universes/dracula/books/empty', kind: 'folder', reach: 'container', line: null, rule: 'F-LAY-4', message: "The book folder 'empty' has no book.md, so it's skipped.", canEdit: false }),
+            )
+          : undefined,
+    })
+    renderApp('/')
+
+    fireEvent.click(await screen.findByRole('button', { name: /3 problems/ }))
+
+    const dialog = await screen.findByRole('dialog', { name: '3 problems in this den' })
+    expect(within(dialog).queryByRole('link', { name: 'Edit file' })).toBeNull()
+    expect(within(dialog).getByText(/don’t add anything: book\.md is there/)).toBeTruthy()
+    expect(within(dialog).getByText(/This isn’t about what’s in it.*able to read it/)).toBeTruthy()
+
+    // A folder that really has no file still says to add it, and only that one does.
+    expect(within(dialog).getAllByText(/This folder is missing its file/)).toHaveLength(1)
+  })
+
+  it('SC-WEB-96: a folder that can’t be listed and a pack that can’t be read say so in their own words', () => {
+    expect(fixElsewhere({ kind: 'folder', path: 'universes/dracula/vol.2', rule: 'F-GEN-5', heldFile: null })).toMatch(/This isn’t about what’s in it.*able to look in it/)
+    expect(fixElsewhere({ kind: 'den', path: 'den.yaml', rule: 'F-DEN-4', heldFile: 'packs/mine' })).toContain('don’t add anything: mine is there')
+    expect(fixElsewhere({ kind: 'den', path: 'den.yaml', rule: 'F-DEN-4', heldFile: null })).toContain('Wolfden can’t edit den.yaml here')
   })
 
   it('SC-WEB-90: says what each reach leaves out', () => {

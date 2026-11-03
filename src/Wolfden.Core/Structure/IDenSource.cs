@@ -22,7 +22,8 @@ public interface IDenSource
     /// program, or one the user may not read. The den treats such a file as
     /// absent (#112), so one bad file never stops a load. The den's walks
     /// read files with this or <see cref="TryReadListedFile"/>, never with
-    /// <see cref="ReadFile"/> alone.
+    /// <see cref="ReadFile"/> alone. What has to tell "not there" from "there
+    /// but unreadable" reads through a <see cref="TrackingDenSource"/> (#284).
     /// </summary>
     byte[]? TryReadFile(string path)
     {
@@ -87,6 +88,15 @@ public interface IDenSource
     }
 
     /// <summary>
+    /// True if <paramref name="path"/> is a folder that's there but can't be
+    /// listed now, rather than one that isn't there, so a
+    /// <see cref="TrackingDenSource"/> can report it (#284). False for a
+    /// folder deleted meanwhile, and for a source that always can. A source
+    /// on disk answers from the disk, and a wrapper around one forwards it.
+    /// </summary>
+    bool CannotList(string path) => false;
+
+    /// <summary>
     /// The names of the folder links (symbolic links and junctions) directly
     /// in <paramref name="path"/>. <see cref="GetDirectories"/> leaves them
     /// out, so the den's walks never follow them; <c>wolfden check</c> lists
@@ -147,6 +157,18 @@ public sealed class FileSystemDenSource : IDenSource
     /// case, that isn't a folder link and can be listed now (<see cref="CanList"/>, #116).
     /// </summary>
     public bool FolderExists(string path) => path.Length > 0 && ExactPathExists(path, file: false) && CanList(Full(path));
+
+    /// <inheritdoc />
+    public bool CannotList(string path)
+    {
+        if (!ExactPathExists(path, file: false))
+        {
+            return false;
+        }
+
+        var full = Full(path);
+        return !CanList(full) && Directory.Exists(full);
+    }
 
     /// <inheritdoc />
     public IEnumerable<string> GetFolderLinks(string path) =>

@@ -93,7 +93,7 @@ public sealed class SectionErrorIndexTests : IDisposable
 
     [Fact]
     [Trait("Scenario", "SC-WEB-90")]
-    public void ANoteHeldOpenIsMissingFromTheListAndComesBackWithNoChangeToSee()
+    public void ANoteHeldOpenIsListedAsHeldAndItsOwnErrorsComeBackWithNoChangeToSee()
     {
         var torn = System.IO.Path.Combine(_den.Root, (Book + "/entities/characters/torn.md").Replace('/', System.IO.Path.DirectorySeparatorChar));
         var watch = new DenErrorWatch(_den.Root, TimeSpan.Zero, null, TimeSpan.Zero);
@@ -113,8 +113,10 @@ public sealed class SectionErrorIndexTests : IDisposable
 
             Assert.SkipUnless(held, "This file system doesn't stop reads of a file held open.");
 
-            // Not a clean bill of health: the note's own error isn't seen. check says the same until #284's F-GEN-5.
-            Assert.DoesNotContain(watch.Current().Errors, e => e.Path.EndsWith("torn.md", StringComparison.Ordinal));
+            // Its own error can't be seen, but that it can't be read can (F-GEN-5, #284), so this is no clean bill of health.
+            var listed = Assert.Single(watch.Current().Errors, e => e.Path.EndsWith("torn.md", StringComparison.Ordinal));
+            Assert.Equal("F-GEN-5", listed.Rule);
+            Assert.Equal(DenErrorReach.File, listed.Reach);
         }
 
         // Its size and time didn't change, so only the answer's age brings it back.
@@ -153,10 +155,15 @@ public sealed class SectionErrorIndexTests : IDisposable
     [InlineData("universes/vael/entities/notes/book.md", "note")]
     [InlineData("universes/vael/books/a1", "folder")]
     [InlineData("universes/vael", "folder")]
+    [InlineData(".", "folder")]
     [InlineData("universes/vael/readme.md", "other")]
     [InlineData("universes/vael/books/a1/notes.md", "other")]
     [InlineData("notes.md", "other")]
     public void APathsKindComesFromWhereItIs(string path, string kind) => Assert.Equal(kind, DenErrors.KindOf(path));
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-96")]
+    public void TheDensOwnFolderReachesAsAFolder() => Assert.Equal(DenErrorReach.Container, DenErrors.ReachOfFileError("."));
 
     private DenIndex Index()
     {

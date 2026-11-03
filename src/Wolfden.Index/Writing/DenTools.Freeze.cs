@@ -101,6 +101,7 @@ public sealed partial class DenTools
         var (universeKey, key) = BookArgument(book, universe);
         using (EnterWrite())
         {
+            RefuseUnreadableBeforeCheckpoint();
             RefuseLeftOutSections(universeKey, key);
             var (target, bytes, changed, idAdded, warnings) = SetStatus(universeKey, key, expectedHash, BookStatus.Final);
             var said = $"Book '{target.Name}'";
@@ -254,6 +255,12 @@ public sealed partial class DenTools
         var (universeKey, key) = BookArgument(book, universe);
         using (EnterWrite())
         {
+            // A book that isn't final isn't written or checkpointed, so nothing needs reading.
+            if (FindBook(DenStructure.Load(Snapshot()), universeKey, key).Status == BookStatus.Final)
+            {
+                RefuseUnreadableBeforeCheckpoint();
+            }
+
             var (target, bytes, changed, idAdded, warnings) = SetStatus(universeKey, key, expectedHash, BookStatus.Draft);
             var said = $"Book '{target.Name}'";
             var history = History();
@@ -306,6 +313,20 @@ public sealed partial class DenTools
     }
 
     /// <summary>
+    /// Refuses a freeze or an unfreeze that will checkpoint the den while a
+    /// den file can't be read (#284): git would fail on it, or leave it out,
+    /// after <c>book.md</c> had already changed. Without history, only
+    /// <c>book.md</c> is written, so nothing else needs reading.
+    /// </summary>
+    private void RefuseUnreadableBeforeCheckpoint()
+    {
+        if (History().CheckpointUnavailable is null)
+        {
+            LoadWholeDen();
+        }
+    }
+
+    /// <summary>
     /// Sets the book's <c>status</c> to <paramref name="status"/> in its
     /// <c>book.md</c>, in place, unless it already says so. Called under the
     /// write lock.
@@ -345,10 +366,18 @@ public sealed partial class DenTools
     /// </summary>
     private void RefuseLeftOutSections(string universeKey, string key)
     {
-        var den = Snapshot();
+        var den = new TrackingDenSource(Snapshot());
         var structure = DenStructure.Load(den);
         var target = FindBook(structure, universeKey, key);
-        var found = structure.Diagnostics.Concat(EntityCatalog.Load(structure, den).Diagnostics)
+        var diagnostics = structure.Diagnostics.Concat(EntityCatalog.Load(structure, den).Diagnostics).ToList();
+
+        // A note of this book that can't be read may have a bad section comment too (#284).
+        if (den.Unreadable.Where(u => IsAtOrUnder(u.Path, target.Path)).ToList() is { Count: > 0 } unread)
+        {
+            throw Unreadable(unread);
+        }
+
+        var found = diagnostics
             .Where(d => d.Diagnostic.LeftOut is not null && IsAtOrUnder(d.Path, target.Path))
             .OrderBy(d => d.Path, StringComparer.Ordinal).ThenBy(d => d.Diagnostic.Line ?? 0)
             .ToList();

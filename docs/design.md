@@ -760,12 +760,18 @@ from the files:
   deleted between listing and reading, one another program holds open,
   or one the user may not read is left out of `check`, the files hash,
   and the index, as if it weren't there, rather than stopping the
-  command. Nothing warns about it yet. A file the index left out isn't in
-  its files hash, so once the file can be read the index is stale and is
-  rebuilt. A folder that can't be listed (the user may not list it, or
-  it's deleted while it's read) is absent in the same way (#116): it isn't
-  even a folder to the den, so a book folder that can't be listed isn't
-  reported as one without its `book.md`.
+  command. A file the index left out isn't in its files hash, so once the
+  file can be read the index is stale and is rebuilt. A folder that can't
+  be listed (the user may not list it, or it's deleted while it's read) is
+  absent in the same way (#116): it isn't even a folder to the den, so a
+  book folder that can't be listed isn't reported as one without its
+  `book.md`. Views stay that way. What has to tell "not there" from "there
+  but unreadable" reads through a `TrackingDenSource`, which remembers each
+  failure on the same reads as the load (#284): `check` lists them as errors
+  (format.md F-GEN-5), and a write that depends on every file (rename, move,
+  section rename, alias change, copy, create, `chapter_defaults`, a new book
+  or series, and a freeze or unfreeze that will checkpoint) is refused as a
+  whole. A write to one file isn't stopped by another that can't be read.
 - **Watched** (#14; v0 behaviour, not a recorded decision). The file
   watcher collects a burst of saves (an editor's temporary file and
   rename, a git checkout) into one batch, and ignores hidden paths such as

@@ -8,6 +8,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Wolfden.Mcp.Tests\LockedFile.cs" Link="LockedFile.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Using Include="Wolfden.Index.Reading" />
     <Using Include="Wolfden.Index.Writing" />
   </ItemGroup>

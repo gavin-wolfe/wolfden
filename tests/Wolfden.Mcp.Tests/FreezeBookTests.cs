@@ -84,6 +84,66 @@ public sealed class FreezeBookTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "SC-MCP-38")]
+    public void AFreezeThatWillCheckpointIsRefusedWhileANoteIsLocked()
+    {
+        RunGit("init", "--quiet");
+        var start = Commit("Start the Dracula notes");
+        var tools = WithGit();
+        var book = _den.Read(BookFile);
+
+        using (LockedFile.Hold(Path.Combine(_den.Root, LucyFile.Replace('/', Path.DirectorySeparatorChar))))
+        {
+            var refused = Assert.Throws<DenToolException>(() => tools.FreezeBook("dracula", null));
+            Assert.Equal(ToolErrorCodes.DenUnreadable, refused.Code);
+            Assert.Contains(LucyFile, refused.Message, StringComparison.Ordinal);
+        }
+
+        Assert.Equal(book, _den.Read(BookFile));
+        Assert.Equal(start, RunGit("rev-parse", "HEAD").Trim());
+        Assert.Empty(RunGit("tag", "--list").Trim());
+
+        var frozen = tools.FreezeBook("dracula", null);
+        Assert.Equal(FreezeSnapshot.Tagged, frozen.Snapshot);
+
+        using (LockedFile.Hold(Path.Combine(_den.Root, PurfleetFile.Replace('/', Path.DirectorySeparatorChar))))
+        {
+            Assert.Equal(ToolErrorCodes.DenUnreadable, Assert.Throws<DenToolException>(() => tools.UnfreezeBook("dracula", null)).Code);
+        }
+
+        Assert.Contains("\nstatus: final\n", _den.Read(BookFile), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-38")]
+    public void UnfreezingADraftBookSaysSoEvenWhileANoteIsLocked()
+    {
+        RunGit("init", "--quiet");
+        Commit("Start the Dracula notes");
+        var tools = WithGit();
+
+        using (LockedFile.Hold(Path.Combine(_den.Root, LucyFile.Replace('/', Path.DirectorySeparatorChar))))
+        {
+            var unfrozen = tools.UnfreezeBook("dracula", null);
+
+            Assert.False(unfrozen.Changed);
+            Assert.Equal(FreezeSnapshot.NotFrozen, unfrozen.Snapshot);
+        }
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-38")]
+    public void AFreezeWithoutHistoryIsntStoppedByALockedNote()
+    {
+        var tools = new DenTools(_den.Root);
+
+        using (LockedFile.Hold(Path.Combine(_den.Root, PurfleetFile.Replace('/', Path.DirectorySeparatorChar))))
+        {
+            Assert.True(tools.FreezeBook("dracula", null).Changed);
+        }
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-HIST-12")]
     public void UnfreezingWritesStatusDraftRatherThanRemovingTheLine()
     {

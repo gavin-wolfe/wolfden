@@ -59,7 +59,8 @@ public static class WolfdenMcpServer
         get_chapter, get_chapter_defaults, or your last write), and is refused if the file has changed since (stale_file): the
         writer may be editing it, so read it again and redo the edit on what's there now. An edit that would leave an error is
         refused. Nothing in a final (frozen) book can be changed, and only the writer can unfreeze one: on frozen, ask them, and
-        don't work around it. A change that would send existing links to a different entity is refused unless allow_relinks:
+        don't work around it. den_unreadable naming a file means another program has it open or it can't be read: nothing was
+        written, so ask the writer to close it, then retry. A change that would send existing links to a different entity is refused unless allow_relinks:
         show the writer the links, and set it only if they agree. Edits to hard canon are allowed, but the result lists them:
         check them with the writer. Writes aren't committed: call checkpoint at a natural stopping point, such as the end of a
         notes pass or a planning session, with a message that says what the pass was ('Notes pass after drafting ch 12'), naming

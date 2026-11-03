@@ -206,9 +206,7 @@ public sealed partial class DenTools
         var (path, ids) = Locate(entity, universe);
         using (EnterWrite())
         {
-            var den = Snapshot();
-            var structure = DenStructure.Load(den);
-            var catalog = EntityCatalog.Load(structure, den);
+            var (den, structure, catalog, links) = LoadWholeDen();
             var target = catalog.FindByPath(path) ?? throw (den.FileExists(path)
                 ? new DenToolException(
                     ToolErrorCodes.InvalidEdit, $"{path} has errors now, so the den leaves it out and it can't be edited here. {ToolWords.Cap(Words.CheckFile(path))} to see them.")
@@ -222,7 +220,6 @@ public sealed partial class DenTools
             }
 
             var what = c.Kind == LinkMatchKind.Name ? "name" : "alias";
-            var links = LinkIndex.Build(catalog, den);
             EntityRenamePlan plan;
             try
             {
@@ -301,6 +298,7 @@ public sealed partial class DenTools
                     $"{string.Join("; ", frozenRelinks.Take(ListedLinkChanges).Select(l => $"{Where(l.After)} reaches {Reached(l.Before)}"))}. Nothing was changed. Choose other text.");
             }
 
+            RefuseUnreadable(den);
             Save(files, plan.Originals, created: null);
             var after = EntityCatalog.ReadEntityFile(check.Structure, path, files[path]).Entity!;
             var ownMoved = moved.Any(l => l.Before.Target?.Path == path);

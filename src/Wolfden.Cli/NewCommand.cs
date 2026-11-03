@@ -501,18 +501,39 @@ internal static class NewCommand
             return true;
         }
 
-        // A bare key that's no universe, in a den with several: say where it could go, naming universes and series only.
-        if (structure.IsLoaded && structure.Universes.Count > 1 && !value.Contains('/', StringComparison.Ordinal) && !value.Contains(':', StringComparison.Ordinal))
+        // No such universe: say what a series or a book can go in, which isn't what a note can.
+        var slash = value.IndexOf('/', StringComparison.Ordinal);
+        if (structure.IsLoaded && slash > 0 && structure.FindUniverse(value[..slash].Trim()) is null)
+        {
+            problem = $"the den has no universe '{value[..slash].Trim()}', so --in '{value}' doesn't name one.{ScopeOption.UniversesIn(structure)}" +
+                (series ? " A series goes in a universe: give --in '<universe>'." : " Give --in '<universe>' for a standalone book, or '<universe>/<series>'.");
+            return false;
+        }
+
+        // A universe's key and a name that's no series or book of it: a book can only go in a series, so say so.
+        if (structure.IsLoaded && slash > 0 && structure.FindUniverse(value[..slash].Trim()) is { } inUniverse)
+        {
+            var rest = value[(slash + 1)..].Trim();
+            if (rest.Length > 0 && !rest.Contains(':', StringComparison.Ordinal) && !inUniverse.Series.Any(s => s.Key == rest) && inUniverse.FindBook(rest) is null)
+            {
+                problem = series ? $"a series goes in a universe, so give --in '<universe>', not '{value}'." : NoSuchSeries(inUniverse, rest);
+                return false;
+            }
+        }
+
+        // A bare key that names nothing here, in a den with several universes or for a new series: say where it could go.
+        var nothing = structure.IsLoaded && structure.Universes.Count == 1 && !structure.Universes[0].Series.Any(s => s.Key == value) && structure.Universes[0].FindBook(value) is null;
+        if (structure.IsLoaded && (structure.Universes.Count != 1 || series || nothing) && !value.Contains('/', StringComparison.Ordinal) && !value.Contains(':', StringComparison.Ordinal))
         {
             var holders = structure.Universes.Where(x => x.Series.Any(s => s.Key == value)).Select(x => $"'{x.Key}/{value}'").ToList();
             var asBook = structure.Universes.Any(x => x.FindBook(value) is not null);
             problem = $"the den has no universe '{value}', so --in '{value}' doesn't name one." +
                 (series
-                    ? " A series goes in a universe: give --in '<universe>'."
+                    ? $" A series goes in a universe: give --in '<universe>'.{ScopeOption.UniversesIn(structure)}"
                     : (holders.Count > 0
                         ? $" To put the book in the series '{value}', give --in {string.Join(" or ", holders)}."
                         : asBook ? $" '{value}' is a book, and a book goes in a universe or a series." : "") +
-                      " Give --in '<universe>' for a standalone book, or '<universe>/<series>'.");
+                      ScopeOption.KeysIn(structure.Universes, books: false) + " Give --in '<universe>' for a standalone book, or '<universe>/<series>'.");
             return false;
         }
 
@@ -532,12 +553,15 @@ internal static class NewCommand
             var u = structure.FindUniverse(universe!);
             problem = u?.FindBook(book) is not null
                 ? $"'{book}' is a book, and a book goes in a universe or a series: give --in '{universe}' for a standalone book, or '{universe}/<series>'."
-                : $"universe '{universe}' has no series '{book}'." +
-                  (u is null || !u.Series.Any() ? "" : $" Its series: {string.Join(", ", u.Series.Select(s => s.Key))}.") +
-                  $" Give --in '{universe}' for a standalone book, or '{universe}/<series>'.";
+                : u is null ? $"universe '{universe}' has no series '{book}'." : NoSuchSeries(u, book);
             return false;
         }
 
         return true;
     }
+
+    private static string NoSuchSeries(Wolfden.Core.Structure.Universe u, string key) =>
+        $"universe '{u.Key}' has no series '{key}'." +
+        (u.Series.Any() ? $" Its series: {string.Join(", ", u.Series.Select(s => s.Key))}." : "") +
+        $" Give --in '{u.Key}' for a standalone book, or '{u.Key}/<series>'.";
 }

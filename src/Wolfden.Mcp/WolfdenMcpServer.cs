@@ -36,6 +36,9 @@ public static class WolfdenMcpServer
         universe '*', for every universe at once, and never with a position. check validates files, so it checks the whole
         den unless given a universe, and then checks that universe's files and the den-level ones.
 
+        If the den has errors, a result says so in 'den_notice': some notes or sections may be missing from it until they're fixed, and
+        check lists them. Tell the writer once, not with every result.
+
         Every entity, section, and field entry has a status: idea, undecided, or candidate (not decided yet), draft or canon (in
         canon; draft isn't settled), or retconned (replaced). Pinned facts are hard canon: check them before writing.
 
@@ -74,7 +77,7 @@ public static class WolfdenMcpServer
         {
             if (method.GetCustomAttribute<McpServerToolAttribute>() is not null)
             {
-                collection.Add(new BindingErrorsAsBadArgument(McpServerTool.Create(method, target)));
+                collection.Add(new WithDenNotice(new BindingErrorsAsBadArgument(McpServerTool.Create(method, target)), tools));
             }
         }
 
@@ -88,6 +91,22 @@ public static class WolfdenMcpServer
             ToolCollection = collection,
         };
         return options;
+    }
+
+    /// <summary>
+    /// A tool whose result says, in one short member, that the den has errors
+    /// (#280), so an assistant hears it without thinking to call check. It's
+    /// the same in a view at a story position, since it names nothing. <c>check</c>
+    /// lists them itself. The notice can't fail a call.
+    /// </summary>
+    private sealed class WithDenNotice(McpServerTool inner, DenTools tools) : DelegatingMcpServerTool(inner)
+    {
+        public override async ValueTask<CallToolResult> InvokeAsync(
+            RequestContext<CallToolRequestParams> request, CancellationToken cancellationToken = default)
+        {
+            var result = await base.InvokeAsync(request, cancellationToken).ConfigureAwait(false);
+            return ProtocolTool.Name == "check" || tools.ErrorNotice() is not { } notice ? result : WolfdenTools.WithNotice(result, notice);
+        }
     }
 
     /// <summary>

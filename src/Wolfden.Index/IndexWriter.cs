@@ -228,7 +228,8 @@ internal sealed class IndexWriter
         WriteEntities(catalog, new Bookkeeping(structure.BookkeepingSections));
         WriteLinks(links);
         WriteOutlines(outlines);
-        WriteDiagnostics(structure.Diagnostics.Concat(catalog.Diagnostics).Concat(links.Diagnostics));
+        WriteDiagnostics(structure.Diagnostics.Concat(catalog.Diagnostics).Concat(links.Diagnostics)
+            .Concat(outlines.SelectMany(o => o.Errors.Select(d => new DenDiagnostic(o.Path, d)))));
 
         return new IndexState
         {
@@ -634,7 +635,9 @@ internal sealed class IndexWriter
             if (source.TryReadFile(path) is { } bytes)
             {
                 var file = MarkdownFile.ParseOutline(bytes);
-                result.Add(new OutlineFile(book, path, OutlineReader.IsExcluded(file) ? null : OutlineReader.ReadRows(file)));
+                result.Add(new OutlineFile(
+                    book, path, OutlineReader.IsExcluded(file) ? null : OutlineReader.ReadRows(file),
+                    file.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ToList()));
             }
         }
 
@@ -643,7 +646,7 @@ internal sealed class IndexWriter
 
     private void WriteOutlines(IReadOnlyList<OutlineFile> outlines)
     {
-        foreach (var (book, path, rows) in outlines)
+        foreach (var (book, path, rows, _) in outlines)
         {
             var ordinal = 0;
             foreach (var row in rows ?? [])

@@ -341,6 +341,16 @@ docs. The writer's own list is in
   and retry the same call once they've closed it. Don't call it broken:
   the file is fine. `check` reports the same thing as F-GEN-5, and until
   it's closed, links to that file can show as broken.
+- **`den_notice` means some of the den is missing.** While the den has
+  errors, every result but `check`'s has a short `den_notice`, such as
+  `"This den has 2 errors, so some notes or sections may be missing from this
+  answer. Call check with severity 'error' to see them."` It names no note or
+  section, so it's the same at a story position. Tell the writer once, not with every
+  result. In a pinned
+  session it counts that universe's errors and the den-level ones. Duplicate ids
+  are warnings, so they don't count. Asking for a note an error leaves out says
+  so and names the line; with `as_of`, it says so only for a path or an id,
+  and doesn't say which line or why.
 - **`allow_relinks` only with the writer's say-so.** A create, copy,
   rename, or move that would send existing links to a different note is
   refused, with the links listed. Show them to the writer, and set
@@ -373,9 +383,11 @@ docs. The writer's own list is in
   view, ideas and later reveals included. To draft or review a chapter,
   use `canon_as_of` at that chapter, or `get_entity` with `as_of`.
   `search` and `get_history` have no position.
-- **Writes land at once; only `checkpoint` records them.** The writer
-  sees each write straight away, in the web UI and their editor, but it
-  isn't in the den's history until a checkpoint. Make one at the end of
+- **Writes land at once; only `checkpoint` records them.** An open page
+  in the web UI shows each write within about 5 seconds, or once the
+  writer closes an editor or form they have open there. If they save a
+  note you changed meanwhile, they're shown both versions. A write isn't
+  in the den's history until a checkpoint. Make one at the end of
   a pass, not after each edit, with a message that says what the pass
   was and the assistant as `co_author`. It records the whole den unless
   `paths` names some files, so tell the writer what's in

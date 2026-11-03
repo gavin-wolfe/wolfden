@@ -99,6 +99,9 @@ public static partial class WriteEndpoints
         // Images added from the editor (#187), through the same tools, so they take turns with the other writes and land in the ledger.
         ImageEndpoints.Map(api, tools);
 
+        // The den's errors and fixing them (#280), through the same tools.
+        FileEndpoints.Map(api, tools);
+
         api.MapGet("/entity/source", (HttpContext c) => ReadEndpoints.Answer(
             c, ["entity", "universe"], q => tools.GetSource(Entity(q.Text("entity")), q.Text("universe"))));
 
@@ -281,7 +284,7 @@ public static partial class WriteEndpoints
     }
 
     /// <summary>True for <c>application/json</c>, with or without parameters such as a charset.</summary>
-    private static bool IsJson(string? contentType) =>
+    internal static bool IsJson(string? contentType) =>
         MediaTypeHeaderValue.TryParse(contentType, out var type) && type.MediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>An edit's JSON body, checked against the members its endpoint takes.</summary>

@@ -187,7 +187,7 @@ public sealed class NewCommandTests : IDisposable
 
         var noBook = New("character", "Someone", "--in", "dracula/sequel");
         Assert.Equal(CliApp.ExitUsage, noBook.ExitCode);
-        Assert.Contains("has no book 'sequel'", noBook.Error, StringComparison.Ordinal);
+        Assert.Contains("has no series or book 'sequel'", noBook.Error, StringComparison.Ordinal);
 
         // A typo in --from would make a note no canon view shows (F-POS-4).
         foreach (var from in new[] { "dracul:5", "dracula:999" })

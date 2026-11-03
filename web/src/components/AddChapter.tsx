@@ -6,6 +6,8 @@ import { addChapter, bookChaptersQuery, type BookChapters, type ChapterAddResult
 import type { SourceFieldType } from '../editApi'
 import { fieldDraftOf, fieldProblems, jsonOfField, type FieldDraft, type Json, type Problem } from '../fieldModel'
 import { valueWords } from './ChapterFields'
+import { useHoldRefresh } from '../formHold'
+import { chapterLabel } from '../story'
 import { useAfterSave } from './Editing'
 import { ErrorMark } from './States'
 import { ValueEditor } from './FieldEditing'
@@ -30,8 +32,8 @@ import '../newEntity.css'
 const MAX_TITLE = 200
 
 /** A chapter as the Place list names it: its number and title, and its key. */
-function chapterLabel(c: BookChapters['chapters'][number]): string {
-  const name = c.title ?? `Chapter ${c.key}`
+function placeLabel(c: BookChapters['chapters'][number]): string {
+  const name = c.title ?? chapterLabel(c)
   return `${c.number !== null ? `${c.number}. ` : ''}${name} (key ${c.key})`
 }
 
@@ -146,6 +148,7 @@ function AddChapterDialog({
   const placeRef = useRef<HTMLSelectElement>(null)
   const afterSave = useAfterSave()
   const client = useQueryClient()
+  useHoldRefresh(true)
   const current = useQuery(bookChaptersQuery(universe, book))
 
   const [title, setTitle] = useState('')
@@ -300,10 +303,10 @@ function AddChapterDialog({
                   changed()
                 }}
               >
-                <option value="">At the end, after {chapterLabel(last)}</option>
+                <option value="">At the end, after {placeLabel(last)}</option>
                 {choices.map((c) => (
                   <option key={c.key} value={c.key}>
-                    After {chapterLabel(c)}
+                    After {placeLabel(c)}
                   </option>
                 ))}
               </select>

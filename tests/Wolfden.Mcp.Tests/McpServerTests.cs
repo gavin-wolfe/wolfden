@@ -197,6 +197,74 @@ public sealed class McpServerTests : IAsyncLifetime
         Assert.Contains("keeping its index up to date", _log.ToString(), StringComparison.Ordinal);
     }
 
+    [Fact]
+    [Trait("Scenario", "SC-MCP-40")]
+    public async Task AResultCarriesAShortNoticeWhileTheDenHasErrors()
+    {
+        const string Path = "universes/dracula/entities/notes/ember-vault.md";
+        const string Exact = "This den has 2 errors, so some notes or sections may be missing from this answer. Call check with severity 'error' to see them.";
+        using (var clean = JsonDocument.Parse(Text(await Call("list_entities", new()))))
+        {
+            Assert.False(clean.RootElement.TryGetProperty("den_notice", out _));
+        }
+
+        _den.Write(Path, "---\ntype: note\nname: Ember Vault\nstatus: maybe\n---\n\nA vault.\n");
+        const string Swales = "universes/dracula/books/dracula/entities/characters/mr-swales.md";
+        _den.Write(Swales, _den.Read(Swales) + "\n## The secret twin\n<!-- wolfden: status=maybe -->\nWhispers.\n");
+
+        // The same small line in every kind of answer, naming nothing, so it's safe at a position.
+        foreach (var (tool, args) in new (string, Dictionary<string, object?>)[]
+        {
+            ("list_entities", new()),
+            ("get_entity", new() { ["entity"] = "Mina Harker", ["as_of"] = "dracula:1" }),
+            ("canon_as_of", new() { ["position"] = "dracula:1", ["brief"] = true }),
+            ("search", new() { ["query"] = "Mina" }),
+        })
+        {
+            var result = await Call(tool, args);
+            using var json = JsonDocument.Parse(Text(result));
+            Assert.Equal(Exact, json.RootElement.GetProperty("den_notice").GetString());
+            Assert.Equal(Exact, result.StructuredContent!.Value.GetProperty("den_notice").GetString());
+        }
+
+        // An error result too, and it's still Wolfden's error.
+        var refused = await Call("get_entity", new() { ["entity"] = "Sherlock Holmes" });
+        Assert.True(refused.IsError);
+        using (var json = JsonDocument.Parse(Text(refused)))
+        {
+            Assert.Equal("unknown_entity", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+            Assert.Equal(Exact, json.RootElement.GetProperty("den_notice").GetString());
+        }
+
+        // check lists them itself.
+        using (var check = JsonDocument.Parse(Text(await Call("check", new() { ["severity"] = "error" }))))
+        {
+            Assert.False(check.RootElement.TryGetProperty("den_notice", out _));
+            Assert.Equal(2, check.RootElement.GetProperty("errors").GetInt32());
+        }
+
+        // It clears when they're fixed.
+        _den.Write(Path, "---\ntype: note\nname: Ember Vault\nstatus: canon\n---\n\nA vault.\n");
+        _den.Write(Swales, _den.Read(Swales).Replace("status=maybe", "status=canon", StringComparison.Ordinal));
+        using var after = JsonDocument.Parse(Text(await Call("list_entities", new())));
+        Assert.False(after.RootElement.TryGetProperty("den_notice", out _));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-40")]
+    public async Task ANoteLeftOutSaysWhyButNotAtAPosition()
+    {
+        const string Path = "universes/dracula/entities/notes/ember-vault.md";
+        _den.Write(Path, "---\ntype: note\nname: Ember Vault\nstatus: maybe\n---\n\nA vault.\n");
+
+        var full = Text(await Call("get_entity", new() { ["entity"] = "Ember Vault" }));
+        Assert.Contains("left out of the den by an error in " + Path + ", line 4", full, StringComparison.Ordinal);
+
+        var at = Text(await Call("get_entity", new() { ["entity"] = "Ember Vault", ["as_of"] = "dracula:1" }));
+        Assert.DoesNotContain("left out", at, StringComparison.Ordinal);
+        Assert.Contains("\"code\":\"unknown_entity\"", at, StringComparison.Ordinal);
+    }
+
     private async Task<CallToolResult> Call(string tool, Dictionary<string, object?> args) =>
         await Client.CallToolAsync(tool, args, cancellationToken: TestContext.Current.CancellationToken);
 

@@ -1929,6 +1929,10 @@ the-harker-papers`.
   one universe, and `<universe>/<series>` in any. With several universes,
   a bare key that's only a book (`--in ember`) is refused, and the hint
   names a universe or a series, never a book.
+- A key that names nothing (`--in long-dark`, when the series is
+  `the-long-dark`) is refused, and the message lists what's there: for a new
+  book each universe's series, for a note its series and books, and for a
+  new series, or a universe that isn't there, the universes.
 - A name that's missing, blank, or taken as a key (`Dracula`), an
   `--after` that isn't there, `--chapters` that isn't 1 to 1000 or is
   given for a series, `--from`, `--slug`, or `--allow-relinks` (for notes
@@ -3271,6 +3275,23 @@ Spec: format.md F-GEN-5, F-BOOK-1 (#284). Covered by:
 `LockedFileWriteTests.AFrozenBooksLockedBookFileCantSkipTheFrozenRefusal`,
 `LockedFileWriteTests.ANoteInAFrozenBookWhoseBookFileIsLockedSaysSoAsWellAsNotFound`,
 `LockedFileWriteTests.AChapterDefaultCantReachAFrozenBookWhoseBookFileIsLocked`.
+### SC-MCP-40. My assistant hears that the den has errors
+
+A note has `status: maybe`, and another has a typo in a section comment.
+
+- Every tool result, read or write, has one `den_notice`: "This den has 2
+  errors, so some notes or sections may be missing from this answer. Call check
+  with severity 'error' to see them." An error result has it too. `check`'s
+  doesn't, since it lists them.
+- It names no note or section, so a view at a story position says the same.
+- Once they're fixed, it's gone.
+- `get_entity` for the note left out says it's left out by an error, with the
+  file and line. With `as_of`, by name, it's `unknown_entity` as for any name the
+  reader hasn't met.
+
+Spec: F-GEN-2 (#280). Covered by:
+`McpServerTests.AResultCarriesAShortNoticeWhileTheDenHasErrors`,
+`McpServerTests.ANoteLeftOutSaysWhyButNotAtAPosition`.
 
 ## STORE: Wolfden saves, moves, and deletes notes
 
@@ -5635,9 +5656,209 @@ Mina's note has `status=maybe` under `## A rumor`, with a subsection.
 - A search with no position marks a hit in it **left out**.
 - At a story position, nothing shows it: no heading, no text, no badge, no
   search hit, no backlink from it (SC-WEB-6).
-- The den-wide list of problems is #280.
+- The den-wide list of problems is SC-WEB-90.
 
 Spec: F-GEN-2 (#50). Covered by:
 `SectionErrorEndpointTests`, `SpoilerTests.NothingAsOfAPositionNamesASectionLeftOutByAnError`,
 `SectionErrorToolTests.ALeftOutSectionCanBeRenamedAndRemoved`,
 `web/src/Editing.test.tsx`, `web/src/Search.test.tsx`.
+
+### SC-WEB-84. Untitled chapters read the same everywhere
+
+After `new book "Tide" --chapters 4` and `new chapter --in tide --after 1`,
+the book has five chapters, and the one with the key `3` is the fourth.
+
+- The book page, the contents tree, and Add chapter's Place list all call
+  it "Chapter 4". Add chapter's list also gives its key.
+- Its page is headed "Chapter 4", and the browser tab says "Chapter 4 · Tide".
+- Its previous and next links read "‹ Chapter 3" and "Chapter 5 ›". A titled
+  chapter's read "2. The Quiet Hour ›", as before.
+- A chapter with no number, such as a closing note, uses its key.
+- As of an earlier position the words don't change: a number was shown
+  already, and it says nothing about the story.
+
+Spec: #285. Covered by: `web/src/ChapterHeading.test.tsx`.
+
+### SC-WEB-85. An open page shows what an assistant just wrote
+
+The writer is reading a note. An AI assistant, or the writer in another
+editor, changes it.
+
+- Within about 5 seconds, the note shows the new text, without a reload, and
+  the contents tree and the checkpoint indicator catch up too.
+- A den that hasn't changed asks only for its files' fingerprint, and a tab
+  that's hidden doesn't ask until it's shown again.
+- If that question fails (the server was stopped, say), the page stays as it
+  is, including when the tab comes back. The History tab asks for itself on
+  coming back, and says if it can't.
+- With no network, as on a laptop with its Wi-Fi off, it all still works, reads
+  and writes: the server is on the same computer. A write goes at once, and
+  none waits to fire when the network comes back.
+- A refresh that fails shows the error, and is tried again every 15 seconds
+  while the server answers, so the page comes back by itself, however long
+  the answer takes.
+- As of a position, the new answer is still as of that position.
+
+Spec: #285. Covered by: `web/src/LiveRefresh.test.tsx`,
+`tests/Wolfden.Api.Tests/ApiTests.cs`.
+
+### SC-WEB-86. An outside write never touches an open editor
+
+The writer has a section open in the editor, with unsaved text, when another
+program adds lines above that section.
+
+- The editor stays, with the writer's text, however long it's open. So does
+  a chapter field's form, and the New note, New book, Add chapter, and freeze
+  forms.
+- Getting the window's focus back, or the network coming back, doesn't
+  refresh anything while one is open.
+- An answer that fails while one is open, even for a refresh that was already
+  on its way, or because the note was deleted or the server stopped, leaves
+  the page and the writer's text on screen, with Cancel and Save working. The
+  error shows when the form closes.
+- A form opened before the page's first answer about the files still catches
+  up on later writes when it closes.
+- An editor whose source can't be read when it opens shows the error with a
+  Close button, and Escape does the same. Nothing has been typed yet.
+- Saving is refused as stale, and the writer sees both versions, as ever
+  in the conflict dialog.
+- On Save or Cancel, the page shows the file as it is now.
+
+Spec: #285. Covered by: `web/src/LiveRefresh.test.tsx`.
+
+### SC-WEB-87. A final book offers nothing new in the contents tree
+
+A book marked final has no **New <type>** under its lists in the contents
+tree, as its page has no **New note ▾**. A book that isn't final has them.
+
+Spec: format.md F-BOOK-1 (#285). Covered by: `web/src/Freeze.test.tsx`.
+
+### SC-WEB-90. The top bar tells me the den has problems
+
+The page is open on a clean den, with no **problems** in the top bar. In another
+editor, I break a note's frontmatter.
+
+- Within a few seconds, without a reload, the top bar says **⚠ 1 problem**. When
+  I fix it there, it clears. It counts errors only.
+- If the page can't ask, it says **Can't check for problems**, even if the den
+  was clean a moment ago, and a count it knew says **can't check now** beside it.
+- Its list has each error's file, its note's name if the den read it, the line,
+  the message, and what's left out: a section by name, the whole note, the outline,
+  or a whole book, series, or universe.
+- The list has what `wolfden check` has, outlines included.
+- A pack's file or a folder has no Edit file, and says to fix it outside Wolfden.
+- An unchanged den isn't hashed again however often it's asked.
+- Two notes with one id are a warning (F-ID-3), so they aren't listed.
+- A note another program holds open with no sharing is absent, as in
+  `wolfden check` (#112), so its errors aren't listed, and no problems doesn't
+  prove there are none. The list looks again at least every minute, so they come
+  back once it's let go, though its size and time didn't change.
+
+Spec: F-GEN-2 (#280). Covered by:
+`SectionErrorIndexTests.ANoteHeldOpenIsMissingFromTheListAndComesBackWithNoChangeToSee`,
+`DenErrorEndpointTests.AnOutsideChangeShowsInTheListAndClearsWhenFixed`,
+`DenErrorEndpointTests.TheListSaysHowFarEachErrorReaches`,
+`DenErrorEndpointTests.AnOutlineWithAnErrorIsListedAsCheckListsIt`,
+`SectionErrorIndexTests.AnUnchangedDenIsNotReadAgainAndAChangedOneIs`,
+`SectionErrorIndexTests.TheListHasEveryErrorCheckHas`,
+`web/src/DenErrors.test.tsx`.
+
+### SC-WEB-91. I fix a problem from the list
+
+- **Edit file** opens the file by its path, even one left out, with its errors
+  above the editor. A note with no name and `status: maybe` has two: I fix one and
+  save, and the result says one is left. I fix the other, and it's back in the den
+  with its page.
+- A save with more errors than the file has is refused, with the text kept in the
+  editor. A note the den reads may gain no error at all.
+- Frontmatter that doesn't parse can be fixed, though that shows more errors.
+- If the file changed since I opened it, I see both versions and choose. While the
+  editor is open, the page doesn't refresh itself (SC-WEB-86), and a failed refresh
+  can't take the editor away. A read-only page keeps refreshing.
+- An id can't change, or copy another file's, and a file without one gets one.
+- A book, series, or universe left out comes back the same way. A note in it
+  asks me to fix that first.
+- The save that brings a note back is an ordinary write: a position that doesn't
+  resolve is `bad_position`, and a new bad section comment is refused. The result
+  lists the note's warnings.
+- A file in a final book shows, and can't be saved. Writing `status: final` is
+  refused however it's spelled: Freeze does that. A `book.md` that says it's final
+  goes to my own editor, as does one that doesn't parse with `final` or a backslash
+  in its frontmatter. Any other that doesn't parse can be fixed here.
+- A series or universe can be fixed above a final book, but while a book below says
+  final or can't be read, its `chapter_defaults`, `chapter_heading`, `books`, and
+  `order` can't change, so what a reader has met at the book's positions stays the
+  same. Removing a repeat is fine. A value that isn't a list, or frontmatter that
+  doesn't parse, goes to my own editor, and a save can't leave it not parsing.
+- An id another file uses, even one left out or under a container left out, is
+  refused however it's spelled.
+- Empty text is refused.
+
+Spec: F-GEN-2, format.md §1.3 (#280). Covered by:
+`DenErrorEndpointTests.AFileLeftOutOpensByPathAndTwoErrorsCanBeFixedOneAtATime`,
+`DenErrorEndpointTests.ASaveThatAddsAnErrorOrIsStaleIsRefused`,
+`DenErrorEndpointTests.FrontmatterThatDoesntParseCanBeFixedThoughThatRevealsMore`,
+`DenErrorEndpointTests.AnIdCantChangeAndCantCopyAnothersAndAMissingOneIsGiven`,
+`DenErrorEndpointTests.ANoteTheDenReadsKeepsEveryRuleOfEditFile`,
+`DenErrorEndpointTests.AContainerLeftOutCanBeFixedAndItsBookComesBack`,
+`DenErrorEndpointTests.AFinalBookStaysFrozenHere`,
+`DenErrorEndpointTests.AShortOrEmptySaveOfAFileLeftOutIsAnsweredAndAnIdStillHolds`,
+`DenErrorEndpointTests.AContainerThatLoadsKeepsTheUsualRules`,
+`DenErrorEndpointTests.AUniverseAboveAFinalBookKeepsItsFrontmatterButNotItsTypos`,
+`DenErrorSaveRuleTests`,
+`web/src/DenErrors.test.tsx`.
+
+### SC-WEB-92. Edit file by path can't reach anything else
+
+- A path outside the den, hidden (`.wolfden/`, `.git/`), with `..` or `\`, not a
+  file a writer edits, in another case, missing, or through a folder or file link
+  gets one answer, `unknown_file`, and nothing is read or written.
+- Pinned with `--universe`, the list has that universe's errors and the den-level
+  ones. Another universe's file gets the same `unknown_file` as one that isn't
+  there, and so does `den.yaml`.
+
+Spec: F-LAY-2 (#280). Covered by:
+`DenErrorEndpointTests.APathThatIsntAnEditableDenFileIsRefusedTheSameWay`,
+`DenErrorEndpointTests.AFileOrFolderLinkIsRefused`,
+`DenErrorEndpointTests.APinnedServerListsAndOpensOnlyItsUniverseAndTheDenLevelOnes`,
+`web/src/DenErrors.test.tsx`.
+
+### SC-WEB-93. My den.yaml doesn't load
+
+- The home page says it doesn't load, and the top bar says **⚠ 1 problem**. The
+  list says the whole den is left out, and Edit file opens `den.yaml`.
+- A note can't be opened until `den.yaml` is fixed.
+- Once it's saved and loads, here or outside Wolfden, the pages catch up by
+  themselves. Then Edit file shows `den.yaml` but won't change it.
+- A `den.yaml` that's gone has no Edit file, and says to restore it.
+
+Spec: F-GEN-2 (#280). Covered by:
+`DenErrorEndpointTests.ADenYamlThatDoesntLoadIsListedAndCanBeFixed`.
+
+### SC-WEB-94. I open a note that's left out
+
+- By its path, id, name, or file name, the page says **This note is left out**,
+  names the file and line, and offers Edit file. A note in a book left out names
+  the book's line.
+- When the error's fixed, here or elsewhere, the page becomes the note.
+- No message the page shows gives API advice. An unknown name says to use the
+  search box.
+
+Spec: F-GEN-2 (#280). Covered by:
+`DenErrorEndpointTests.ThePageOfANoteLeftOutSaysSoAndNamesTheLine`,
+`DenErrorEndpointTests.ThePageOfANoteInABookLeftOutNamesTheBooksLine`,
+`DenErrorEndpointTests.NoMessageSendsAWriterToTheApi`,
+`web/src/DenErrors.test.tsx`.
+
+### SC-WEB-95. Nothing at a story position leaks what's left out
+
+- `/api/den/errors` and `/api/file/source` refuse `asOf`: they're the writer's, and
+  aren't a view at a position.
+- As of a position, a note left out, asked for by path or id, says only that it's
+  left out at every position, with no file, line, or message, and offers **Show
+  everything**. By name, it's as if there's no such note.
+- A left-out section's name is in no view at a position (SC-WEB-83).
+
+Spec: F-VIEW-1, F-GEN-2 (#280). Covered by:
+`DenErrorEndpointTests.NothingAtAPositionLeaksWhatsLeftOut`,
+`web/src/DenErrors.test.tsx`.

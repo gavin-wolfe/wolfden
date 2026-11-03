@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using System.Text.Json.Serialization;
 using Microsoft.Data.Sqlite;
+using Wolfden.Core.History;
 using Wolfden.Index;
 
 namespace Wolfden.Api;
@@ -11,6 +12,11 @@ namespace Wolfden.Api;
 /// <param name="Status">Always <c>ok</c>: the server is up.</param>
 /// <param name="Wolfden">Wolfden's version.</param>
 public sealed record HealthResult(string Status, string Wolfden);
+
+/// <summary>Whether the den's files changed, from <c>GET /api/den/files</c> (#285).</summary>
+/// <param name="Version">The shape of this result, as for <c>--json</c> (design.md §7).</param>
+/// <param name="Fingerprint">A hash of each file's path, size, and time of last change. It changes when a file does, and means nothing else.</param>
+public sealed record DenFilesResult(int Version, string Fingerprint);
 
 /// <summary>The den and its universes, from <c>GET /api/den</c>.</summary>
 /// <param name="Version">The shape of this result, as for <c>--json</c> (design.md §7).</param>
@@ -44,12 +50,16 @@ public sealed record UniverseResult(string Key, string Name, string? Id, int Ser
 /// <param name="Relinks">For a create refused because links would move to the new note, those links, in words (#29); left out otherwise.</param>
 /// <param name="NeedsName">For a turn-on refused with <c>identity_needed</c>, true if git still needs a name that wasn't given (#207); left out otherwise.</param>
 /// <param name="NeedsEmail">For a turn-on refused with <c>identity_needed</c>, true if git still needs an email that wasn't given (#207); left out otherwise.</param>
+/// <param name="LeftOut">For an <c>unknown_entity</c> that's a note an error leaves out, what's known of it, with nothing in it as of a story position (#280); left out otherwise.</param>
+/// <param name="CurrentFile">For a save by path refused with <c>stale_file</c>, the file as it is now, if it can still be read (#280); left out otherwise.</param>
 public sealed record ApiError(
     string Code, string Message, [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<EntitySummary>? Candidates = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] EntitySourceResult? Current = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? Relinks = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? NeedsName = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? NeedsEmail = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? NeedsEmail = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] LeftOutNote? LeftOut = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] FileSourceResult? CurrentFile = null);
 
 /// <summary>
 /// The API's endpoints, under <c>/api</c> (#23). They read the index the
@@ -74,6 +84,7 @@ public static class DenEndpoints
         var api = endpoints.MapGroup("/api");
         api.MapGet("/health", () => new HealthResult("ok", options.Version));
         api.MapGet("/den", () => Den(options));
+        api.MapGet("/den/files", () => new DenFilesResult(DenResultVersion, AutoCheckpointer.FilesFingerprint(options.DenRoot)));
         ReadEndpoints.Map(api, options);
         WriteEndpoints.Map(api, options);
         CheckpointEndpoints.Map(api, options);
@@ -86,6 +97,7 @@ public static class DenEndpoints
             var method = CheckpointEndpoints.Paths.Contains(path, StringComparer.OrdinalIgnoreCase)
                     || FreezeEndpoints.GetPostPaths.Contains(path, StringComparer.OrdinalIgnoreCase) ? "GET, POST"
                 : GetPaths.Contains(path, StringComparer.OrdinalIgnoreCase) ? "GET"
+                : FileEndpoints.PostPaths.Contains(path, StringComparer.OrdinalIgnoreCase) ? "POST"
                 : WriteEndpoints.PostPaths.Contains(path, StringComparer.OrdinalIgnoreCase)
                     || FreezeEndpoints.PostPaths.Contains(path, StringComparer.OrdinalIgnoreCase)
                     || CreateEndpoints.PostPaths.Contains(path, StringComparer.OrdinalIgnoreCase)
@@ -108,7 +120,7 @@ public static class DenEndpoints
     }
 
     /// <summary>The paths under <c>/api</c> that answer GET.</summary>
-    private static readonly string[] GetPaths = ["health", "den", .. ReadEndpoints.Paths, .. WriteEndpoints.GetPaths, .. CreateEndpoints.GetPaths, .. ContainerEndpoints.GetPaths];
+    private static readonly string[] GetPaths = ["health", "den", "den/files", .. ReadEndpoints.Paths, .. WriteEndpoints.GetPaths, .. CreateEndpoints.GetPaths, .. ContainerEndpoints.GetPaths, .. FileEndpoints.GetPaths];
 
     /// <summary>The den's name and its universes, or the pinned one.</summary>
     internal static IResult Den(WolfdenApiOptions options)
@@ -124,7 +136,7 @@ public static class DenEndpoints
                 return Error(
                     StatusCodes.Status503ServiceUnavailable,
                     "den_not_loaded",
-                    "den.yaml doesn't load, so nothing in the den can be read. Run 'wolfden check' to see why.");
+                    "den.yaml doesn't load, so nothing in the den can be read. The problems in the top bar say why, as 'wolfden check' does.");
             }
 
             var containers = db.Containers.ToList();

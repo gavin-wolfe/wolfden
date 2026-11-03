@@ -66,6 +66,31 @@ public sealed record WriteResult(
     IReadOnlyList<DiagnosticView> Warnings, IReadOnlyList<WrittenFileView>? Files = null, ChapterView? Chapter = null, string? IdAdded = null,
     ChapterDefaultsView? ChapterDefaults = null);
 
+/// <summary>A file as Edit file needs it, named by its path, even one the den leaves out (#280).</summary>
+/// <param name="Version">The shape version.</param>
+/// <param name="Path">The file.</param>
+/// <param name="Kind">What it is: <c>note</c>, <c>outline</c>, <c>book</c>, <c>series</c>, <c>universe</c>, or <c>den</c>.</param>
+/// <param name="Universe">The universe it's in, or null for <c>den.yaml</c>.</param>
+/// <param name="Hash">The hash an edit of it is based on.</param>
+/// <param name="Text">The whole file, with LF line breaks, or null if it isn't valid UTF-8, so it can't be edited here.</param>
+/// <param name="LineEndings"><c>lf</c>, <c>crlf</c>, or <c>mixed</c>.</param>
+/// <param name="ByteOrderMark">True if the file starts with one.</param>
+/// <param name="Frozen">Why it can't be edited (a final book), or null.</param>
+/// <param name="Errors">The errors in it, read from the file now, by line.</param>
+/// <param name="Entity">The note, if the den reads it.</param>
+public sealed record FileSourceResult(
+    int Version, string Path, string Kind, string? Universe, string Hash, string? Text, string LineEndings, bool ByteOrderMark, string? Frozen,
+    IReadOnlyList<FileErrorView> Errors, EntitySummary? Entity);
+
+/// <summary>One error in <see cref="FileSourceResult"/>.</summary>
+/// <param name="Line">The line, or null.</param>
+/// <param name="Rule">The rule.</param>
+/// <param name="Message">The message.</param>
+/// <param name="Reach">What it leaves out: <c>section</c>, <c>file</c>, <c>container</c>, or <c>den</c>.</param>
+/// <param name="Section">For a section, its name.</param>
+/// <param name="SectionLine">For a section, its heading's line.</param>
+public sealed record FileErrorView(int? Line, string Rule, string Message, string Reach, string? Section, int? SectionLine);
+
 /// <summary>One chapter field of a chapter: its own value, and what it inherits (types.md F-CHAP-5).</summary>
 /// <param name="Name">The field name, such as <c>pov</c>.</param>
 /// <param name="Value">The effective value, as JSON, or null when nothing sets it.</param>

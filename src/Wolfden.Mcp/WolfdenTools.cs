@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
@@ -117,7 +118,7 @@ public sealed class WolfdenTools
         "Runs Wolfden's continuity checks on the den's files, as 'wolfden check' does, and returns the findings: broken or " +
         "ambiguous links, positions that don't resolve, missing required fields or sections, overlapping values, duplicate ids, " +
         "and (when the den turns them on) spoiler checks. Each finding has a path, a line, a severity (error or warning), a rule " +
-        "id from Wolfden's format spec, and a message. Errors keep a file out of the index; warnings don't. It never changes a file. " +
+        "id from Wolfden's format spec, and a message. Errors leave out what they reach (a section, a file, or a book); warnings don't. It never changes a file. " +
         "Unlike the other tools it checks the whole den by default, every universe included, since it validates files rather than " +
         "a story view; give a universe to check only that universe's files and the den-level ones (den.yaml and packs). Ids are " +
         "still compared with the other universes' notes, so a duplicate id across universes is found; if that comparison couldn't " +
@@ -493,6 +494,39 @@ public sealed class WolfdenTools
                 return false;
             }
         }
+    }
+
+    /// <summary>The result with a <c>den_notice</c> member added to its JSON (#280). A result that isn't a JSON object passes through.</summary>
+    internal static CallToolResult WithNotice(CallToolResult result, string notice)
+    {
+        if (result.Content is not [TextContentBlock { Text: var text }])
+        {
+            return result;
+        }
+
+        JsonObject? json;
+        try
+        {
+            json = JsonNode.Parse(text) as JsonObject;
+        }
+        catch (JsonException)
+        {
+            return result;
+        }
+
+        if (json is null)
+        {
+            return result;
+        }
+
+        json["den_notice"] = notice;
+        var element = JsonSerializer.SerializeToElement(json, ToolJson.Options);
+        return new CallToolResult
+        {
+            Content = [new TextContentBlock { Text = json.ToJsonString(ToolJson.Options) }],
+            StructuredContent = element,
+            IsError = result.IsError,
+        };
     }
 
     /// <summary>A <c>bad_argument</c> error result for arguments that didn't bind, keeping what the SDK said about them.</summary>

@@ -22,6 +22,25 @@ public class ApiTests
     }
 
     [Fact]
+    [Trait("Scenario", "SC-WEB-85")]
+    public async Task DenFilesChangesWhenAFileDoesAndOnlyThen()
+    {
+        using var den = TempDen.Dracula();
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+        async Task<string> Fingerprint() => (await server.GetJsonAsync("/api/den/files", HttpStatusCode.OK)).GetProperty("fingerprint").GetString()!;
+
+        var first = await Fingerprint();
+        Assert.Equal(first, await Fingerprint());
+
+        // Reading builds the index, in the hidden .wolfden folder: that's no change.
+        await server.GetJsonAsync("/api/hierarchy", HttpStatusCode.OK);
+        Assert.Equal(first, await Fingerprint());
+
+        den.Write("universes/dracula/entities/notes/new-note.md", "---\nname: New note\n---\n");
+        Assert.NotEqual(first, await Fingerprint());
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-WEB-1")]
     public async Task DenGivesItsNameAndUniversesInCamelCase()
     {

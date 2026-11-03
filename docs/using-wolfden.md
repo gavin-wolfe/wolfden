@@ -1183,12 +1183,15 @@ out and has no page. Fix it and save.
 - **If the file changed** since you opened it, you see both versions and choose.
 - **A final book stays frozen.** Unfreeze it on its page first. A broken `book.md`
   that says it's final can't be unfrozen, so fix that one in your own editor.
-  The same goes for a `book.md` whose frontmatter doesn't parse, since Wolfden
-  can't tell whether it's final.
-- **Above a final book,** a series or universe can be fixed, but its
-  `chapter_defaults` can't change while a book below says final or can't be read,
-  since that book would inherit them. If its frontmatter doesn't parse, use your
-  own editor. A series or universe that loads also keeps the rest of its
+  The same goes for a `book.md` whose frontmatter doesn't parse and has the word
+  `final` or a backslash in it, since it might be final. Any other `book.md` that
+  doesn't parse can be fixed here, and a save has to leave it parsing.
+- **Above a final book,** a series or universe can be fixed, but while a book below
+  says final or can't be read, its `chapter_defaults`, `chapter_heading`, `books`,
+  and `order` can't change, since those decide what the book inherits, how it's
+  headed, and what a reader has met by its chapters. Removing a repeat from a list
+  is fine. If one of those lists isn't a list, or the frontmatter doesn't parse, use
+  your own editor. A series or universe that loads also keeps the rest of its
   frontmatter while a final book that loads is below it.
 - **A file can't be saved empty** here, since that can't be undone without history.
 - **The id stays.** An id can't be changed here, and a file with none gets one

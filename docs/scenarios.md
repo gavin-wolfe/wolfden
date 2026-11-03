@@ -5595,12 +5595,16 @@ Spec: F-GEN-2 (#280). Covered by:
   resolve is `bad_position`, and a new bad section comment is refused. The result
   lists the note's warnings.
 - A file in a final book shows, and can't be saved. Writing `status: final` is
-  refused however it's spelled: Freeze does that. A `book.md` that says it's final,
-  or whose frontmatter doesn't parse, goes to my own editor.
-- A series or universe can be fixed above a final book, but can't change its
-  `chapter_defaults` while a book below says final or can't be read. If its
-  frontmatter doesn't parse then, it goes to my own editor.
-- An id another file uses, even one left out, is refused however it's spelled.
+  refused however it's spelled: Freeze does that. A `book.md` that says it's final
+  goes to my own editor, as does one that doesn't parse with `final` or a backslash
+  in its frontmatter. Any other that doesn't parse can be fixed here.
+- A series or universe can be fixed above a final book, but while a book below says
+  final or can't be read, its `chapter_defaults`, `chapter_heading`, `books`, and
+  `order` can't change, so what a reader has met at the book's positions stays the
+  same. Removing a repeat is fine. A value that isn't a list, or frontmatter that
+  doesn't parse, goes to my own editor, and a save can't leave it not parsing.
+- An id another file uses, even one left out or under a container left out, is
+  refused however it's spelled.
 - Empty text is refused.
 
 Spec: F-GEN-2, format.md §1.3 (#280). Covered by:

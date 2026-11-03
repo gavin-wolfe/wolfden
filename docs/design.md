@@ -1525,12 +1525,14 @@ docs/
   write, positions included. Status and id are read from the parsed frontmatter,
   so any spelling counts. An id can't change or copy another's, including one in a
   file left out. `status: final` can't be written (Freeze does that). A `book.md`
-  whose frontmatter doesn't parse, before or after, isn't saved here, since it might
-  be final. A loaded series or universe above a final book that loaded keeps its
-  frontmatter. No series or universe changes `chapter_defaults` while a `book.md`
-  below says final or can't be read (as `update_chapter_defaults`), and one whose
-  frontmatter doesn't parse is sent to the writer's own editor then. Empty text is
-  refused. `den.yaml` is saved only while it doesn't load.
+  whose unparsed frontmatter holds `final` in any case, or a backslash, isn't saved
+  here, since it might be final; any other that doesn't parse can be, and a save must
+  leave a `book.md` parsing. A loaded series or universe above a final book that
+  loaded keeps its frontmatter. While a `book.md` below says final or can't be read,
+  no series or universe changes `chapter_defaults`, `chapter_heading`, `books`, or
+  `order` (the lists compared with repeats removed) or saves frontmatter that doesn't
+  parse, and one that doesn't parse now, or has such a list that isn't one, is sent to
+  the writer's own editor. Empty text is refused, invisible characters included. `den.yaml` is saved only while it doesn't load.
 
   An `/api/entity` for a note left out is still 404 `unknown_entity`, with
   `leftOut` (`path`, `line`, `rule`, `message`), found by its path, a path under a

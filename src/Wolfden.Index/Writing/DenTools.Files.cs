@@ -35,9 +35,11 @@ namespace Wolfden.Index.Writing;
 /// save brings the file back: such a save is checked as any other write is.
 /// </para>
 /// <para>
-/// What's decided from the frontmatter (a book's status, an id, the defaults a
-/// final book inherits) is read from it parsed, so any way of writing it counts.
-/// A book whose frontmatter doesn't parse might be final, so it isn't saved here.
+/// What's decided from the frontmatter (a book's status, an id, what a final book
+/// depends on) is read from it parsed, so any way of writing it counts. A book
+/// whose unparsed frontmatter holds <c>final</c> or an escape might be final, so
+/// it isn't saved here. Without either it can't be, so it can be fixed, and a
+/// book's save must leave it parsing.
 /// </para>
 /// </remarks>
 public sealed partial class DenTools
@@ -115,7 +117,7 @@ public sealed partial class DenTools
             return ReplaceFile(path, text, hash, DenErrors.UniverseOf(path));
         }
 
-        if (string.IsNullOrWhiteSpace(text))
+        if (text.All(c => char.IsWhiteSpace(c) || char.GetUnicodeCategory(c) == UnicodeCategory.Format))
         {
             throw new DenToolException(ToolErrorCodes.InvalidEdit, $"That would leave {path} empty, and an empty file can't be put back without history. Nothing was written. To remove a file, delete it in your file manager.");
         }
@@ -352,7 +354,10 @@ public sealed partial class DenTools
         {
             if (ParsedFrontmatter(text) is not { } frontmatter)
             {
-                return $"{path} has frontmatter that doesn't parse, so Wolfden can't tell whether the book is final (frozen), and doesn't change it here. Open it in your own editor to fix it.";
+                // Without the word, or an escape that could spell it, it can't say final.
+                return Head(text).Contains("final", StringComparison.OrdinalIgnoreCase) || Head(text).Contains('\\', StringComparison.Ordinal)
+                    ? $"{path} has frontmatter that doesn't parse and might say the book is final (frozen), so Wolfden doesn't change it here. Open it in your own editor to fix it."
+                    : null;
             }
 
             if (SaysFinal(frontmatter))
@@ -374,10 +379,11 @@ public sealed partial class DenTools
     /// A book becomes final by Freeze, which checkpoints it, not by a word in
     /// its file, and its file must parse here, or the next save couldn't tell
     /// whether it's final. A series or universe that loads keeps its frontmatter
-    /// while a final book that loads is below it, since that decides what the book
-    /// inherits and where it comes. And none, loaded or not, changes its
-    /// <c>chapter_defaults</c> while a book below says final or can't be read, as
-    /// <c>update_chapter_defaults</c> refuses (<see cref="CheckUnloadedBooksBelow"/>).
+    /// while a final book that loads is below it. And none, loaded or not, changes
+    /// what such a book depends on (<see cref="WhatFinalBooksDependOn"/>) while a book
+    /// below says final or can't be read, as <c>update_chapter_defaults</c> refuses
+    /// (<see cref="CheckUnloadedBooksBelow"/>), or saves frontmatter that doesn't
+    /// parse, since the next save couldn't compare it.
     /// </summary>
     private void CheckFinalBooksAbove(string kind, string path, IDenSource den, DenStructure structure, string before, string after)
     {
@@ -413,16 +419,53 @@ public sealed partial class DenTools
                 $"{path} holds a final book, so its frontmatter can't change here, though the text below it can. {Unfreezing(finals)}");
         }
 
-        // Still broken, it sets nothing yet: the save that makes it parse is the one compared.
-        if (parsedAfter is not null && ParsedFrontmatter(before) is { } parsedBefore
-            && JsonOf(parsedBefore["chapter_defaults"]).GetRawText() != JsonOf(parsedAfter["chapter_defaults"]).GetRawText()
-            && SuspectBooksBelow(den, structure, kind, path) is { Count: > 0 } suspect)
+        var suspect = SuspectBooksBelow(den, structure, kind, path);
+        if (suspect.Count == 0)
+        {
+            return;
+        }
+
+        var books = string.Join(", ", suspect);
+        if (parsedAfter is null)
         {
             throw new DenToolException(
-                ToolErrorCodes.Frozen,
-                $"{path} would change the chapter_defaults that these books inherit, and they're final or can't be read: {string.Join(", ", suspect)}. Nothing was written. Put chapter_defaults back to save the rest (F-BOOK-1).");
+                ToolErrorCodes.UnsupportedEdit,
+                $"The frontmatter of {path} wouldn't parse, so nothing could tell what it changes for these books, which are final or can't be read: {books}. Nothing was written. Fix it, and save again.");
+        }
+
+        // FileFrozen has sent one that doesn't parse now to the writer's editor.
+        var parsedBefore = ParsedFrontmatter(before)!;
+        foreach (var key in WhatFinalBooksDependOn)
+        {
+            if (Compared(parsedBefore[key], key) != Compared(parsedAfter[key], key))
+            {
+                throw new DenToolException(
+                    ToolErrorCodes.Frozen,
+                    $"{path} would change its {key}, which decides what these books inherit, how they're headed, or where they come in the story, and they're final or can't be read: {books}. Nothing was written. Put {key} back to save the rest (F-BOOK-1).");
+            }
+        }
+
+        string Compared(Wolfden.Core.Yaml.YamlNode? node, string key)
+        {
+            if (key is not ("books" or "order"))
+            {
+                return JsonOf(node).GetRawText();
+            }
+
+            // The order is what counts, so fixing a repeated key (F-UNI-2) is no change.
+            return node switch
+            {
+                null or Wolfden.Core.Yaml.YamlScalar { IsNull: true } => "",
+                Wolfden.Core.Yaml.YamlSequence list => string.Join("\n", list.Items.Select(i => JsonOf(i).GetRawText()).Distinct(StringComparer.Ordinal)),
+                _ => throw new DenToolException(
+                    ToolErrorCodes.Frozen,
+                    $"{key} in {path} isn't a list, so Wolfden can't tell what a change means for these books, which are final or can't be read: {books}. Open it in your own editor to fix it."),
+            };
         }
     }
+
+    /// <summary>What a series' or universe's frontmatter decides for a book that's final: what it inherits, how its chapters are headed, and where it comes in the story, and so what a reader has met at its positions.</summary>
+    private static readonly string[] WhatFinalBooksDependOn = ["chapter_defaults", "chapter_heading", "books", "order"];
 
     /// <summary>The <c>book.md</c> files below a series or universe that are final, or say so, or can't be read to tell.</summary>
     private static List<string> SuspectBooksBelow(IDenSource den, DenStructure structure, string kind, string path)
@@ -453,20 +496,34 @@ public sealed partial class DenTools
 
     /// <summary>
     /// Every id in the den but <paramref name="path"/>'s (F-ID-3): those in the
-    /// index, and those written in the files it leaves out, which come back with them.
+    /// index, and those written in the notes and containers' files it doesn't have,
+    /// which come back with them, including those under a container left out.
     /// </summary>
     private HashSet<string> IdsInUse(IDenSource den, string path)
     {
-        var (ids, leftOut) = WithIndex(index => (
+        var (ids, known) = WithIndex(index => (
             index.Context.Entities.Where(e => e.Ulid != null).Select(e => e.Ulid!).ToList()
                 .Concat(index.Context.Containers.Where(c => c.Ulid != null).Select(c => c.Ulid!))
                 .ToHashSet(StringComparer.Ordinal),
-            index.Context.Files.Where(f => !f.IsLoaded && (f.Kind == "entity" || f.Kind == "container")).Select(f => f.Path).ToList()));
-        foreach (var other in leftOut.Where(p => p != path))
+            index.Context.Entities.Select(e => e.Path).ToList()
+                .Concat(index.Context.Files.Where(f => f.IsLoaded).Select(f => f.Path))
+                .ToHashSet(StringComparer.Ordinal)));
+        var folders = new Stack<string>(["universes"]);
+        while (folders.Count > 0)
         {
-            if (den.TryReadFile(other) is { } bytes && Parsed(DenErrors.KindOf(other), bytes) is { IsReadable: true } file && WrittenId(Lf(file.Text)) is { } id)
+            var folder = folders.Pop();
+            foreach (var name in den.GetDirectories(folder).Where(n => !n.StartsWith('.')))
             {
-                ids.Add(id);
+                folders.Push($"{folder}/{name}");
+            }
+
+            foreach (var other in den.GetFiles(folder).Where(n => !n.StartsWith('.')).Select(n => $"{folder}/{n}"))
+            {
+                if (other != path && !known.Contains(other) && DenErrors.CanEdit(DenErrors.KindOf(other), null) && DenErrors.KindOf(other) != DenFileKinds.Outline
+                    && den.TryReadFile(other) is { } bytes && Parsed(DenErrors.KindOf(other), bytes) is { IsReadable: true } file && WrittenId(Lf(file.Text)) is { } id)
+                {
+                    ids.Add(id);
+                }
             }
         }
 
@@ -502,7 +559,9 @@ public sealed partial class DenTools
             return frontmatter["id"] is Wolfden.Core.Yaml.YamlScalar { IsNull: false } id ? id.Text.Trim() : null;
         }
 
-        return WrittenIdLine().Match(Head(text)) is { Success: true } m ? m.Groups[1].Value : null;
+        // The top level's, if one is; broken YAML can leave it indented.
+        var lines = WrittenIdLine().Matches(Head(text));
+        return (lines.FirstOrDefault(m => m.Groups[1].Length == 0) ?? lines.FirstOrDefault())?.Groups[2].Value;
     }
 
     /// <summary>The text as far as the line that closes its frontmatter.</summary>
@@ -518,6 +577,6 @@ public sealed partial class DenTools
         return crlf > text.Count(c => c == '\n') - crlf;
     }
 
-    [GeneratedRegex(@"^[""']?id[""']?:[ \t]*[""']?([^\s""'#]+)", RegexOptions.Multiline | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^([ \t]*)[""']?id[""']?[ \t]*:[ \t]*[""']?([^\s""'#]+)", RegexOptions.Multiline | RegexOptions.CultureInvariant)]
     private static partial Regex WrittenIdLine();
 }

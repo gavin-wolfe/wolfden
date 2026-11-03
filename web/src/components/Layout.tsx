@@ -95,7 +95,7 @@ export function Layout() {
             {universe && <NewMenu universe={universe} />}
             <SearchBox universe={universe} />
             <PositionBar universe={universe} />
-            <DenErrorsIndicator />
+            <DenErrorsIndicator universe={universe} />
             <CheckpointIndicator />
           </header>
           <div className="body">

@@ -16,7 +16,7 @@ import '../denErrors.css'
  * It isn't affected by the story position: like editing, it's for the writer,
  * and shows everything.
  */
-export function DenErrorsIndicator() {
+export function DenErrorsIndicator({ universe }: { universe: string | undefined }) {
   const errors = useQuery(denErrorsQuery)
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -63,12 +63,12 @@ export function DenErrorsIndicator() {
         {count(data.count, 'problem', 'problems')}
         {stale && ' · can’t check now'}
       </button>
-      {open && <DenErrorsDialog errors={data} onClose={close} onLeave={() => setOpen(false)} />}
+      {open && <DenErrorsDialog errors={data} universe={universe} onClose={close} onLeave={() => setOpen(false)} />}
     </>
   )
 }
 
-function DenErrorsDialog({ errors, onClose, onLeave }: { errors: DenErrors; onClose: () => void; onLeave: () => void }) {
+function DenErrorsDialog({ errors, universe, onClose, onLeave }: { errors: DenErrors; universe: string | undefined; onClose: () => void; onLeave: () => void }) {
   const titleId = useId()
   const dialogRef = useRef<HTMLDivElement>(null)
   useEffect(() => dialogRef.current?.querySelector<HTMLElement>('a[href], button')?.focus(), [])
@@ -95,7 +95,7 @@ function DenErrorsDialog({ errors, onClose, onLeave }: { errors: DenErrors; onCl
         <ul className="den-errors-list">
           {errors.errors.map((error) => (
             <li key={`${error.path}:${error.line}:${error.rule}:${error.message}`}>
-              <ErrorEntry error={error} onLeave={onLeave} />
+              <ErrorEntry error={error} universe={universe} onLeave={onLeave} />
             </li>
           ))}
         </ul>
@@ -110,7 +110,9 @@ function DenErrorsDialog({ errors, onClose, onLeave }: { errors: DenErrors; onCl
   )
 }
 
-function ErrorEntry({ error, onLeave }: { error: DenErrorView; onLeave: () => void }) {
+function ErrorEntry({ error, universe, onLeave }: { error: DenErrorView; universe: string | undefined; onLeave: () => void }) {
+  // A story position belongs to one universe, so it doesn't follow a link into another.
+  const otherUniverse = error.universe !== null && error.universe !== universe
   return (
     <>
       <p className="den-errors-where">
@@ -126,7 +128,7 @@ function ErrorEntry({ error, onLeave }: { error: DenErrorView; onLeave: () => vo
       </p>
       {error.canEdit ? (
         <p>
-          <Link to="/file" search={{ path: error.path }} onClick={onLeave}>
+          <Link to="/file" search={(s) => ({ ...s, path: error.path, at: otherUniverse ? undefined : s.at })} onClick={onLeave}>
             Edit file
           </Link>
         </p>

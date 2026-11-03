@@ -188,6 +188,24 @@ describe('the top bar’s problems', () => {
     expect(calls.filter((c) => c.startsWith('/api/den/errors')).every((c) => c === '/api/den/errors')).toBe(true)
   })
 
+  it('SC-WEB-90: a story position doesn’t follow Edit file into another universe', async () => {
+    stubApi({
+      override: (path) =>
+        path === '/api/den/errors'
+          ? list(error(), error({ path: 'universes/frost/entities/notes/ice.md', universe: 'frost' }), error({ path: 'den.yaml', universe: null, kind: 'den' }))
+          : undefined,
+    })
+    renderApp('/u/dracula?at=dracula:1')
+
+    fireEvent.click(await screen.findByRole('button', { name: /3 problems/ }))
+
+    const links = within(await screen.findByRole('dialog')).getAllByRole('link', { name: 'Edit file' }).map((a) => a.getAttribute('href')!)
+    expect(links[0]).toContain('at=dracula:1')
+    expect(links[1]).toContain('path=universes')
+    expect(links[1]).not.toContain('at=')
+    expect(links[2]).toContain('at=dracula:1')
+  })
+
   it('SC-WEB-90: says what each reach leaves out', () => {
     expect(leavesOut({ reach: 'den', kind: 'den', section: null })).toContain('whole den')
     expect(leavesOut({ reach: 'container', kind: 'series', section: null })).toContain('whole series')
@@ -301,6 +319,36 @@ describe('Edit file by path', () => {
     await queryClient.invalidateQueries()
     await settle()
     expect(view.state.doc.toString()).toBe('my unsaved text')
+  })
+
+  it('SC-WEB-91: a good save whose reload fails keeps what the save said, and the next save is based on it', async () => {
+    const hashes: string[] = []
+    let reads = 0
+    stubApi({
+      override: (path, _params, init) => {
+        if (path === '/api/file/source') {
+          reads++
+          return reads === 1 ? source() : json({ code: 'den_unreadable', message: 'Gone for a moment.' }, 503)
+        }
+
+        if (path === '/api/file/edit') {
+          hashes.push((JSON.parse(String(init?.body)) as { expectedHash: string }).expectedHash)
+          return { version: 1, changed: true, path: VAULT, hash: `h${hashes.length + 1}`, entity: null, effects: ['Saved it.'], pinnedCanon: [], warnings: [], files: null, idAdded: null }
+        }
+
+        return undefined
+      },
+    })
+    renderApp(`/file?path=${encodeURIComponent(VAULT)}`)
+    await typeInFile('first')
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByText('Saved it.')).toBeTruthy()
+    expect(await screen.findByText('This file has no errors now.')).toBeTruthy()
+    await typeInFile('second')
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(hashes).toEqual(['h1', 'h2']))
   })
 
   it('SC-WEB-91: the tree and position bar follow the file’s universe', async () => {

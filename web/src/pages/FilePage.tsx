@@ -36,7 +36,8 @@ function FileEditor({ path }: { path: string }) {
 
   // Once the editor is open, nothing a refetch answers can replace it: a stale
   // hash at Save is how the writer learns the file changed. When #292 lands, add
-  // `useHoldRefresh(base !== null)` from '../formHold' above this line, as its other editors do.
+  // `useHoldRefresh(base !== null && !base.frozen && base.text !== null)` from
+  // '../formHold' above this line, as its other editors do, so a read-only page still refreshes.
   if (base === null) {
     return source.isError ? (
       <div className="page-body file-page">
@@ -105,10 +106,20 @@ function Editor({
     setSaved(null)
     try {
       const result = await saveFile(path, text, hash)
-      await afterSave()
-      await reload()
       setConflict(null)
       setSaved(result)
+      await afterSave()
+      try {
+        await reload()
+      } catch {
+        // It's saved, but can't be read back now: what the save said stands, so the next save is based on it.
+        setBase({
+          ...base,
+          hash: result.hash,
+          text,
+          errors: result.warnings.filter((w) => w.severity === 'error').map((w) => ({ line: w.line, rule: w.rule, message: w.message, reach: 'file', section: null, sectionLine: null })),
+        })
+      }
     } catch (e) {
       if (e instanceof FileEditError && e.code === 'stale_file' && e.currentFile) {
         setConflict(e.currentFile)

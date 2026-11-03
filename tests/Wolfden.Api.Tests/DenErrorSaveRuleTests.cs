@@ -251,26 +251,197 @@ public sealed class DenErrorSaveRuleTests
 
     [Fact]
     [Trait("Scenario", "SC-WEB-91")]
-    public async Task ABookWhoseFrontmatterDoesntParseFailsClosed()
+    public async Task ASaveCantLeaveABookNotParsing()
     {
         using var den = TempDen.Dracula();
         var good = den.Read(DraftBook).ReplaceLineEndings("\n");
+        den.Write(DraftBook, good.Replace("status: draft", "status: nope", StringComparison.Ordinal));
         await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
 
-        // Saving it that way: the next save couldn't tell.
-        den.Write(DraftBook, good.Replace("status: draft", "status: nope", StringComparison.Ordinal));
-        var (after, _) = await Save(server, DraftBook, "---\nbroken: [\n" + good[4..]);
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, after);
+        var (status, _) = await Save(server, DraftBook, "---\nbroken: [\n" + good[4..]);
 
-        // Already that way: it might be final. A repeated key doesn't parse either.
-        foreach (var text in new[] { "---\nbroken: [\n" + good[4..], good.Replace("status: draft", "status: draft\nstatus: final", StringComparison.Ordinal) })
-        {
-            den.Write(DraftBook, text);
-            var (before, json) = await Save(server, DraftBook, good);
-            Assert.Equal(HttpStatusCode.Conflict, before);
-            Assert.Contains("your own editor", json.GetProperty("message").GetString(), StringComparison.Ordinal);
-            Assert.Equal(text, den.Read(DraftBook));
-        }
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, status);
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-WEB-91")]
+    [InlineData("broken: [final")]
+    [InlineData("broken: [FINAL")]
+    [InlineData("status: draft\nstatus: final")]
+    [InlineData("status: \"fin\\x61l\"\nbroken: [")]
+    public async Task ABookThatDoesntParseAndMightBeFinalGoesToTheWritersEditor(string line)
+    {
+        using var den = TempDen.Dracula();
+        var good = den.Read(DraftBook).ReplaceLineEndings("\n");
+        var text = good.Replace("status: draft", line, StringComparison.Ordinal);
+        den.Write(DraftBook, text);
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+
+        var (status, json) = await Save(server, DraftBook, good);
+
+        Assert.Equal(HttpStatusCode.Conflict, status);
+        Assert.Contains("your own editor", json.GetProperty("message").GetString(), StringComparison.Ordinal);
+        Assert.Equal(text, den.Read(DraftBook));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-91")]
+    public async Task ABookThatDoesntParseAndCantBeFinalCanBeFixedButNotMadeFinal()
+    {
+        using var den = TempDen.Dracula();
+        var good = den.Read(DraftBook).ReplaceLineEndings("\n");
+        den.Write(DraftBook, good.Replace("name: Dracula", "name: Two: The Return", StringComparison.Ordinal));
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+
+        var source = await server.GetJsonAsync($"/api/file/source?path={Uri.EscapeDataString(DraftBook)}", HttpStatusCode.OK);
+        Assert.Equal(JsonValueKind.Null, source.GetProperty("frozen").ValueKind);
+
+        var (final, _) = await Save(server, DraftBook, good.Replace("status: draft", "status: final", StringComparison.Ordinal));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, final);
+
+        var (fixedUp, saved) = await Save(server, DraftBook, good);
+        Assert.Equal(HttpStatusCode.OK, fixedUp);
+        Assert.Contains("back in the den", saved.GetProperty("effects")[0].GetString(), StringComparison.Ordinal);
+    }
+
+    private static string Without(string text, string start) =>
+        string.Join('\n', text.ReplaceLineEndings("\n").Split('\n').Where(l => !l.StartsWith(start, StringComparison.Ordinal)));
+
+    private static async Task<List<string>> MetAt(Server server, string position) =>
+        (await server.GetJsonAsync($"/api/canon?universe=starfall&brief=true&asOf={position}", HttpStatusCode.OK)).GetProperty("entities").EnumerateArray()
+            .Select(e => e.GetProperty("name").GetString()!).Order(StringComparer.Ordinal).ToList();
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-91")]
+    public async Task AFixAboveAFinalBookCantChangeWhatAReaderHasMetAtItsPositions()
+    {
+        using var den = TempDen.Starfall();
+        den.Write(Ember, den.Read(Ember).Replace("status: draft", "status: final", StringComparison.Ordinal));
+        var good = den.Read(Series).ReplaceLineEndings("\n");
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+        var before = await MetAt(server, "ember:1");
+        Assert.DoesNotContain("Halden Pike", before);
+
+        // The series is left out, and the fix would put the other book first: the reader would meet its people here.
+        var broken = Without(good, "name:");
+        den.Write(Series, broken);
+        var (reordered, json) = await Save(server, Series, good.Replace("books: [ember, ash]", "books: [ash, ember]", StringComparison.Ordinal));
+        Assert.Equal(HttpStatusCode.Conflict, reordered);
+        Assert.Equal("frozen", json.GetProperty("code").GetString());
+        Assert.Equal(broken, den.Read(Series));
+
+        var (fixedUp, _) = await Save(server, Series, good);
+        Assert.Equal(HttpStatusCode.OK, fixedUp);
+        Assert.Equal(before, await MetAt(server, "ember:1"));
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-WEB-91")]
+    [InlineData(Series, "books: [ember, ash]", "books: [ash, ember]")]
+    [InlineData(Universe, "order: [long-dark, a-quiet-moon, drift-war]", "order: [a-quiet-moon, long-dark, drift-war]")]
+    [InlineData(Series, "books: [ember, ash]", "books: [ember, ash]\nchapter_heading: [narration]")]
+    [InlineData(Universe, "order: [long-dark, a-quiet-moon, drift-war]", "order: [long-dark, a-quiet-moon, drift-war]\nchapter_heading: [narration]")]
+    public async Task ALoadedSeriesOrUniverseCantChangeWhatABookLeftOutThatSaysFinalDependsOn(string path, string from, string to)
+    {
+        using var den = TempDen.Starfall();
+        den.Write(Ember, FinalAndLeftOut(den.Read(Ember)));
+        var good = den.Read(path).ReplaceLineEndings("\n");
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+
+        var (status, json) = await Save(server, path, good.Replace(from, to, StringComparison.Ordinal));
+
+        Assert.Equal(HttpStatusCode.Conflict, status);
+        Assert.Equal("frozen", json.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-91")]
+    public async Task FixingARepeatedKeyAboveAFinalBookIsNoChangeButReorderingIs()
+    {
+        using var den = TempDen.Starfall();
+        den.Write(Ember, FinalAndLeftOut(den.Read(Ember)));
+        var good = den.Read(Universe).ReplaceLineEndings("\n");
+        var repeated = good.Replace("order: [long-dark, a-quiet-moon, drift-war]", "order: [long-dark, long-dark, a-quiet-moon, drift-war]", StringComparison.Ordinal);
+        den.Write(Universe, repeated);
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+
+        var (reordered, _) = await Save(server, Universe, good.Replace("order: [long-dark, a-quiet-moon, drift-war]", "order: [a-quiet-moon, long-dark, drift-war]", StringComparison.Ordinal));
+        Assert.Equal(HttpStatusCode.Conflict, reordered);
+
+        var (fixedUp, _) = await Save(server, Universe, good);
+        Assert.Equal(HttpStatusCode.OK, fixedUp);
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-WEB-91")]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AnOrderThatIsntAListAboveAFinalBookGoesToTheWritersEditor(bool isNow)
+    {
+        using var den = TempDen.Starfall();
+        den.Write(Ember, FinalAndLeftOut(den.Read(Ember)));
+        var good = den.Read(Series).ReplaceLineEndings("\n");
+        var scalar = good.Replace("books: [ember, ash]", "books: ember", StringComparison.Ordinal);
+        den.Write(Series, isNow ? scalar : good);
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+
+        var (status, json) = await Save(server, Series, isNow ? good : scalar);
+
+        Assert.Equal(HttpStatusCode.Conflict, status);
+        Assert.Contains("your own editor", json.GetProperty("message").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-91")]
+    public async Task ASeriesAboveAFinalBookCantLockItself()
+    {
+        using var den = TempDen.Starfall();
+        den.Write(Ember, FinalAndLeftOut(den.Read(Ember)));
+        var good = den.Read(Series).ReplaceLineEndings("\n");
+        var broken = Without(good, "name:");
+        den.Write(Series, broken);
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+
+        // One error for one, but it wouldn't parse, so the next save couldn't compare it.
+        var (locked, _) = await Save(server, Series, broken.Replace("books:", "name: A\nname: B\nbooks:", StringComparison.Ordinal));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, locked);
+        Assert.Equal(broken, den.Read(Series));
+
+        var (fixedUp, _) = await Save(server, Series, good);
+        Assert.Equal(HttpStatusCode.OK, fixedUp);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-91")]
+    public async Task AnIdUnderABookLeftOutIsRefusedToo()
+    {
+        const string Used = "01M4TF5F0EKGGWD5FNVBAEZ903";
+        using var den = TempDen.Starfall();
+        den.Write("universes/starfall/series/long-dark/books/ash/entities/notes/hidden.md", $"---\nid: {Used}\ntype: note\nname: Hidden\nstatus: canon\n---\n\nText.\n");
+        const string Ash = "universes/starfall/series/long-dark/books/ash/book.md";
+        den.Write(Ash, Without(den.Read(Ash), "name:"));
+        den.Write(Note, LeftOut);
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+
+        var (status, _) = await Save(server, Note, Healthy.Replace("type: note", $"id: {Used}\ntype: note", StringComparison.Ordinal));
+
+        Assert.Equal(HttpStatusCode.Conflict, status);
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-WEB-91")]
+    [InlineData("id : 01M4TF5F0EKGGWD5FNVBAEZ904")]
+    [InlineData("  id: 01M4TF5F0EKGGWD5FNVBAEZ904")]
+    public async Task AnIdWrittenOddlyInBrokenFrontmatterStillCantChange(string line)
+    {
+        using var den = TempDen.Starfall();
+        den.Write(Note, $"---\n{line}\ntype: note\nname: [Ember Vault\nstatus: canon\n---\n\nA vault.\n");
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+
+        var (status, json) = await Save(server, Note, "---\nid: 01M4TF5F0EKGGWD5FNVBAEZ905\ntype: note\nname: Ember Vault\nstatus: canon\n---\n\nA vault.\n");
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, status);
+        Assert.Contains("an id never changes", json.GetProperty("message").GetString(), StringComparison.Ordinal);
     }
 
     [Theory]
@@ -312,6 +483,9 @@ public sealed class DenErrorSaveRuleTests
     [Trait("Scenario", "SC-WEB-91")]
     [InlineData("")]
     [InlineData("  \n\n")]
+    [InlineData("\uFEFF")]
+    [InlineData("\u200B")]
+    [InlineData(" \uFEFF\n\u200B ")]
     public async Task EmptyTextIsRefused(string text)
     {
         using var den = TempDen.Starfall();

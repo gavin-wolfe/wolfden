@@ -9,6 +9,7 @@ import { ContainerCreatedNotice, NewContainerProvider } from './NewContainer'
 import { CreatedNotice, NewEntityProvider, NewMenu } from './NewEntity'
 import { PositionBar } from './PositionBar'
 import { SearchBox } from './SearchBox'
+import { LiveRefresh } from '../liveRefresh'
 import { Sidebar } from './Sidebar'
 
 /**
@@ -97,6 +98,7 @@ export function Layout() {
             <PositionBar universe={universe} />
             <DenErrorsIndicator universe={universe} />
             <CheckpointIndicator />
+            <LiveRefresh />
           </header>
           <div className="body">
             <aside id="sidebar" className="sidebar" data-open={treeOpen} ref={sidebarRef} tabIndex={-1}>

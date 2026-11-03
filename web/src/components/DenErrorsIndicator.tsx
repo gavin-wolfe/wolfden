@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { count } from '../api'
+import { useRefreshHeld } from '../formHold'
 import { denErrorsQuery, fixElsewhere, leavesOut, type DenErrors, type DenErrorView } from '../denErrorsApi'
 import { trapTab } from './CheckpointIndicator'
 import '../denErrors.css'
@@ -31,13 +32,18 @@ export function DenErrorsIndicator({ universe }: { universe: string | undefined 
   const client = useQueryClient()
   const loaded = data?.denLoaded
   const wasLoaded = useRef(loaded)
+  const catchUp = useRef(false)
+  const held = useRefreshHeld()
   useEffect(() => {
-    if (wasLoaded.current === false && loaded === true) {
+    catchUp.current ||= wasLoaded.current === false && loaded === true
+    wasLoaded.current = loaded
+
+    // While an editor or form is open, it waits, as every refresh does (formHold.ts).
+    if (catchUp.current && !held) {
+      catchUp.current = false
       void client.invalidateQueries()
     }
-
-    wasLoaded.current = loaded
-  }, [loaded, client])
+  }, [loaded, held, client])
 
   // It can't ask now. Whatever it knew is old, so it says so rather than seem all clear.
   const stale = errors.isError

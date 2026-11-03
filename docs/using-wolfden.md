@@ -73,15 +73,16 @@ Set things up in this order. Each step builds on the ones before it.
 
    ```sh
    wolfden new series "The Long Dark"
-   wolfden new book "Ember" --in long-dark --chapters 24
+   wolfden new book "Ember" --in the-long-dark --chapters 24
    wolfden new book "A Quiet Moon" --chapters 18
    ```
 
    Each makes the folder and its `series.md` or `book.md`, with an id and
    the name, and adds it to the end of the reading order: `books` in the
-   series' `series.md`, or `order` in `universe.md`. The second book
-   above goes in the series; the third, without `--in`, is a standalone
-   book of the universe. Give the number of chapters now: a story
+   series' `series.md`, or `order` in `universe.md`. A series' key comes
+   from its whole name, so "The Long Dark" is `the-long-dark`. The first
+   book above goes in the series; the second, without `--in`, is a
+   standalone book of the universe. Give the number of chapters now: a story
    position, such as "this character enters at chapter 3", only works for
    a chapter the book lists. Once `wolfden serve` is running (step 6),
    **New series** and **New book** on the universe's and series' pages do
@@ -485,7 +486,7 @@ universe's page is a standalone book: one that isn't in a series. The form
 asks for:
 
 - **Name.** The series' or book's name. Its folder is named from it: "The
-  Long Dark" is `series/long-dark/`. That folder name is its *key*, which
+  Long Dark" is `series/the-long-dark/`. That folder name is its *key*, which
   story positions use (`ember:3`), so it never changes, but you can
   change the name in its `series.md` or `book.md` later.
 - **Place after…** Where it comes in reading order: at the end, at the
@@ -778,6 +779,11 @@ the pages don't have a form for it yet. The rules are in
   (copy yours, then edit the note as it is now).
 - **Saving isn't a checkpoint.** It saves the file; it doesn't record a
   version in the den's history. Make a checkpoint as you do now.
+- **Changes from outside show up by themselves.** When an AI assistant
+  or another editor changes the den, an open page shows it within about
+  5 seconds, longer on a very large den. While an editor or form is open
+  the page waits, so your text never changes under you; it catches up
+  when you save or cancel.
 
 Notes in a book marked final can't be edited until the book is
 unfrozen; their Edit controls are off, and the page says why. See

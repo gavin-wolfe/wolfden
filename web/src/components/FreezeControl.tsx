@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useHoldRefresh, useShownError } from '../formHold'
 import { ErrorMark } from './States'
 import { bookFreezeQuery, changeFreeze, FAILED_SNAPSHOTS, type BookFreeze, type FreezeResult } from '../freezeApi'
 
@@ -16,9 +17,11 @@ type Action = 'freeze' | 'finish' | 'unfreeze'
  */
 export function FreezeControl({ universe, book }: { universe: string; book: string }) {
   const status = useQuery(bookFreezeQuery(universe, book))
+  const failed = useShownError(status)
   const client = useQueryClient()
   const [confirming, setConfirming] = useState<Action | null>(null)
   const [outcome, setOutcome] = useState<FreezeResult | null>(null)
+  useHoldRefresh(confirming !== null)
   const promptId = useId()
   const triggerRef = useRef<HTMLButtonElement>(null)
   const outcomeRef = useRef<HTMLDivElement>(null)
@@ -53,12 +56,12 @@ export function FreezeControl({ universe, book }: { universe: string; book: stri
     return null
   }
 
-  if (status.isError) {
+  if (failed) {
     // The rest of the book page still works; only the control is missing.
-    return <p className="muted">Freezing isn't available: {status.error.message}</p>
+    return <p className="muted">Freezing isn't available: {failed.message}</p>
   }
 
-  const current = status.data
+  const current = status.data!
   const final = current.status === 'final'
   const busy = change.isPending
 

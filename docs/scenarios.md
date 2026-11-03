@@ -1893,6 +1893,10 @@ the-harker-papers`.
   one universe, and `<universe>/<series>` in any. With several universes,
   a bare key that's only a book (`--in ember`) is refused, and the hint
   names a universe or a series, never a book.
+- A key that names nothing (`--in long-dark`, when the series is
+  `the-long-dark`) is refused, and the message lists what's there: for a new
+  book each universe's series, for a note its series and books, and for a
+  new series, or a universe that isn't there, the universes.
 - A name that's missing, blank, or taken as a key (`Dracula`), an
   `--after` that isn't there, `--chapters` that isn't 1 to 1000 or is
   given for a series, `--from`, `--slug`, or `--allow-relinks` (for notes
@@ -5548,6 +5552,76 @@ Spec: F-GEN-2 (#50). Covered by:
 `SectionErrorToolTests.ALeftOutSectionCanBeRenamedAndRemoved`,
 `web/src/Editing.test.tsx`, `web/src/Search.test.tsx`.
 
+### SC-WEB-84. Untitled chapters read the same everywhere
+
+After `new book "Tide" --chapters 4` and `new chapter --in tide --after 1`,
+the book has five chapters, and the one with the key `3` is the fourth.
+
+- The book page, the contents tree, and Add chapter's Place list all call
+  it "Chapter 4". Add chapter's list also gives its key.
+- Its page is headed "Chapter 4", and the browser tab says "Chapter 4 · Tide".
+- Its previous and next links read "‹ Chapter 3" and "Chapter 5 ›". A titled
+  chapter's read "2. The Quiet Hour ›", as before.
+- A chapter with no number, such as a closing note, uses its key.
+- As of an earlier position the words don't change: a number was shown
+  already, and it says nothing about the story.
+
+Spec: #285. Covered by: `web/src/ChapterHeading.test.tsx`.
+
+### SC-WEB-85. An open page shows what an assistant just wrote
+
+The writer is reading a note. An AI assistant, or the writer in another
+editor, changes it.
+
+- Within about 5 seconds, the note shows the new text, without a reload, and
+  the contents tree and the checkpoint indicator catch up too.
+- A den that hasn't changed asks only for its files' fingerprint, and a tab
+  that's hidden doesn't ask until it's shown again.
+- If that question fails (the server was stopped, say), the page stays as it
+  is, including when the tab comes back. The History tab asks for itself on
+  coming back, and says if it can't.
+- With no network, as on a laptop with its Wi-Fi off, it all still works, reads
+  and writes: the server is on the same computer. A write goes at once, and
+  none waits to fire when the network comes back.
+- A refresh that fails shows the error, and is tried again every 15 seconds
+  while the server answers, so the page comes back by itself, however long
+  the answer takes.
+- As of a position, the new answer is still as of that position.
+
+Spec: #285. Covered by: `web/src/LiveRefresh.test.tsx`,
+`tests/Wolfden.Api.Tests/ApiTests.cs`.
+
+### SC-WEB-86. An outside write never touches an open editor
+
+The writer has a section open in the editor, with unsaved text, when another
+program adds lines above that section.
+
+- The editor stays, with the writer's text, however long it's open. So does
+  a chapter field's form, and the New note, New book, Add chapter, and freeze
+  forms.
+- Getting the window's focus back, or the network coming back, doesn't
+  refresh anything while one is open.
+- An answer that fails while one is open, even for a refresh that was already
+  on its way, or because the note was deleted or the server stopped, leaves
+  the page and the writer's text on screen, with Cancel and Save working. The
+  error shows when the form closes.
+- A form opened before the page's first answer about the files still catches
+  up on later writes when it closes.
+- An editor whose source can't be read when it opens shows the error with a
+  Close button, and Escape does the same. Nothing has been typed yet.
+- Saving is refused as stale, and the writer sees both versions, as ever
+  in the conflict dialog.
+- On Save or Cancel, the page shows the file as it is now.
+
+Spec: #285. Covered by: `web/src/LiveRefresh.test.tsx`.
+
+### SC-WEB-87. A final book offers nothing new in the contents tree
+
+A book marked final has no **New <type>** under its lists in the contents
+tree, as its page has no **New note ▾**. A book that isn't final has them.
+
+Spec: format.md F-BOOK-1 (#285). Covered by: `web/src/Freeze.test.tsx`.
+
 ### SC-WEB-90. The top bar tells me the den has problems
 
 The page is open on a clean den, with no **problems** in the top bar. In another
@@ -5587,7 +5661,9 @@ Spec: F-GEN-2 (#280). Covered by:
 - A save with more errors than the file has is refused, with the text kept in the
   editor. A note the den reads may gain no error at all.
 - Frontmatter that doesn't parse can be fixed, though that shows more errors.
-- If the file changed since I opened it, I see both versions and choose.
+- If the file changed since I opened it, I see both versions and choose. While the
+  editor is open, the page doesn't refresh itself (SC-WEB-86), and a failed refresh
+  can't take the editor away. A read-only page keeps refreshing.
 - An id can't change, or copy another file's, and a file without one gets one.
 - A book, series, or universe left out comes back the same way. A note in it
   asks me to fix that first.

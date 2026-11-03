@@ -321,6 +321,78 @@ describe('Edit file by path', () => {
     expect(view.state.doc.toString()).toBe('my unsaved text')
   })
 
+  it('SC-WEB-91: an open editor holds the page’s refreshes, and a read-only page doesn’t', async () => {
+    let fingerprint = 'a'
+    const { calls } = stubApi({
+      override: (path) => {
+        if (path === '/api/den/files') {
+          return { version: 1, fingerprint }
+        }
+
+        return path === '/api/file/source' ? source({ frozen: frozenAnswer }) : undefined
+      },
+    })
+    let frozenAnswer: string | null = null
+    const editing = renderApp(`/file?path=${encodeURIComponent(VAULT)}`)
+    await typeInFile('my unsaved text')
+    const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 30)))
+    await editing.queryClient.refetchQueries({ queryKey: ['den-files'] })
+    await settle()
+    const before = calls.filter((c) => c === '/api/den').length
+
+    fingerprint = 'b'
+    await editing.queryClient.refetchQueries({ queryKey: ['den-files'] })
+    await settle()
+    expect(calls.filter((c) => c === '/api/den').length).toBe(before)
+    cleanup()
+
+    frozenAnswer = 'It is final.'
+    const reading = renderApp(`/file?path=${encodeURIComponent(VAULT)}`)
+    await screen.findByText('It is final.')
+    await reading.queryClient.refetchQueries({ queryKey: ['den-files'] })
+    await settle()
+    const shown = calls.filter((c) => c === '/api/den').length
+
+    fingerprint = 'c'
+    await reading.queryClient.refetchQueries({ queryKey: ['den-files'] })
+    await waitFor(() => expect(calls.filter((c) => c === '/api/den').length).toBeGreaterThan(shown))
+  })
+
+  it('SC-WEB-93: the catch-up when den.yaml starts loading waits for an open editor', async () => {
+    let broken = true
+    const { calls } = stubApi({
+      override: (path) => {
+        if (path === '/api/den/errors') {
+          return broken ? { ...list(error({ path: 'den.yaml', universe: null, kind: 'den', reach: 'den' })), denLoaded: false } : list()
+        }
+
+        if (path === '/api/file/source') {
+          return source()
+        }
+
+        return path === '/api/den' && broken ? json({ code: 'den_not_loaded', message: "den.yaml doesn't load." }, 503) : undefined
+      },
+    })
+    const { queryClient } = renderApp(`/file?path=${encodeURIComponent(VAULT)}`)
+    const view = await typeInFile('my unsaved text')
+    await queryClient.refetchQueries({ queryKey: denErrorsQuery.queryKey })
+    const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 30)))
+    await settle()
+    const sources = calls.filter((c) => c.startsWith('/api/file/source')).length
+
+    broken = false
+    await queryClient.refetchQueries({ queryKey: denErrorsQuery.queryKey })
+    await settle()
+
+    expect(calls.filter((c) => c.startsWith('/api/file/source')).length).toBe(sources)
+    expect(view.state.doc.toString()).toBe('my unsaved text')
+
+    // Leaving the editor lets it through.
+    act(() => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: source().text! } }))
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(await screen.findByRole('link', { name: 'Dracula' })).toBeTruthy()
+  })
+
   it('SC-WEB-91: a good save whose reload fails keeps what the save said, and the next save is based on it', async () => {
     const hashes: string[] = []
     let reads = 0

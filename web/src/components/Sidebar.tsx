@@ -2,7 +2,9 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { denQuery, hierarchyQuery, type BookNode, type EntitySummary, type ScopeKind } from '../api'
+import { useShownError } from '../formHold'
 import { useEntitiesInView } from '../hooks'
+import { chapterLabel } from '../story'
 import { EntityList } from './EntityList'
 import { NewTypeButton } from './NewEntity'
 import { typePlural } from './Links'
@@ -48,6 +50,7 @@ export function Sidebar({ universe }: { universe: string | undefined }) {
 
 function UniverseTree({ universe }: { universe: string }) {
   const hierarchy = useQuery(hierarchyQuery(universe, undefined))
+  const failedHierarchy = useShownError(hierarchy)
   const view = useEntitiesInView(universe)
   const params = useParams({ strict: false }) as { book?: string; chapter?: string; _splat?: string }
 
@@ -55,7 +58,7 @@ function UniverseTree({ universe }: { universe: string }) {
     return <Loading what="the contents" />
   }
 
-  const error = hierarchy.error ?? view.error
+  const error = failedHierarchy ?? view.error
   if (error) {
     return <ErrorState error={error} />
   }
@@ -64,8 +67,8 @@ function UniverseTree({ universe }: { universe: string }) {
   const all = view.all!.entities
   const current = all.find((e) => e.key === params._splat || e.id === params._splat || e.path === params._splat)
   const byScope = groupByScope(all)
-  const scopeGroups = (kind: ScopeKind, key: string, name: string) => (
-    <TypeGroups universe={universe} scope={{ kind, key }} scopeName={name} entities={byScope.get(`${kind}:${key}`) ?? []} view={view} current={current} />
+  const scopeGroups = (kind: ScopeKind, key: string, name: string, final = false) => (
+    <TypeGroups universe={universe} scope={{ kind, key }} scopeName={name} entities={byScope.get(`${kind}:${key}`) ?? []} view={view} current={current} final={final} />
   )
   const book = (b: BookNode) => (
     <TreeNode
@@ -80,14 +83,14 @@ function UniverseTree({ universe }: { universe: string }) {
               <li key={c.key}>
                 <Link to="/u/$universe/b/$book/c/$chapter" params={{ universe, book: b.key, chapter: c.key }}>
                   {c.number !== null && `${c.number}. `}
-                  {c.title ?? `Chapter ${c.key}`}
+                  {c.title ?? chapterLabel(c)}
                 </Link>
               </li>
             ))}
           </ol>
         </TreeNode>
       )}
-      {scopeGroups('book', b.key, b.name)}
+      {scopeGroups('book', b.key, b.name, b.status === 'final')}
     </TreeNode>
   )
 
@@ -128,6 +131,7 @@ function TypeGroups({
   entities,
   view,
   current,
+  final,
 }: {
   universe: string
   scope: { kind: ScopeKind; key: string }
@@ -135,6 +139,8 @@ function TypeGroups({
   entities: readonly EntitySummary[]
   view: ReturnType<typeof useEntitiesInView>
   current: EntitySummary | undefined
+  /** A final book takes nothing new, so its lists have no New <type> (#285), as its page has no New note (#203). */
+  final: boolean
 }) {
   const { split } = view
   const types = [...new Set(entities.map((e) => e.type))].sort()
@@ -153,7 +159,7 @@ function TypeGroups({
             open={current !== undefined && current.type === type && entities.includes(current)}
           >
             <EntityList key={view.at ?? ''} universe={universe} shown={shown} hidden={hidden} current={current?.key} />
-            <NewTypeButton type={type} scope={scope} scopeName={scopeName} />
+            {!final && <NewTypeButton type={type} scope={scope} scopeName={scopeName} />}
           </TreeNode>
         )
       })}

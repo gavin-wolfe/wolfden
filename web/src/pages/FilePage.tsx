@@ -4,6 +4,7 @@ import { Link, getRouteApi, useBlocker, useNavigate } from '@tanstack/react-rout
 import { Conflict, LeftOutFlag, MarkdownEditor, SaveError, SaveResult, UnsavedPrompt, useAfterSave } from '../components/Editing'
 import { ErrorState, Loading } from '../components/States'
 import { FileEditError, fileSourceQuery, saveFile, type FileSource } from '../denErrorsApi'
+import { useHoldRefresh } from '../formHold'
 import { useDocumentTitle } from '../hooks'
 import type { WriteResult } from '../editApi'
 import '../denErrors.css'
@@ -34,10 +35,11 @@ function FileEditor({ path }: { path: string }) {
     }
   }, [fresh, source.data, base])
 
-  // Once the editor is open, nothing a refetch answers can replace it: a stale
-  // hash at Save is how the writer learns the file changed. When #292 lands, add
-  // `useHoldRefresh(base !== null && !base.frozen && base.text !== null)` from
-  // '../formHold' above this line, as its other editors do, so a read-only page still refreshes.
+  // While the editor is open the page doesn't refresh itself, as with the other
+  // editors; a read-only page does. And nothing a refetch answers can replace an open
+  // editor: a stale hash at Save is how the writer learns the file changed.
+  useHoldRefresh(base !== null && !base.frozen && base.text !== null)
+
   if (base === null) {
     return source.isError ? (
       <div className="page-body file-page">

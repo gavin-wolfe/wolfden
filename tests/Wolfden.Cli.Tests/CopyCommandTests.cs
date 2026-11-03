@@ -57,7 +57,7 @@ public sealed class CopyCommandTests : IDisposable
         Assert.True(_den.Exists("universes/dracula/books/aftermath/entities/characters/elder.md"));
         Assert.Equal(CliApp.ExitOk, Copy("Mr. Swales", "Swales of Whitby", "--to", "dracula/").ExitCode);
         Assert.True(_den.Exists("universes/dracula/entities/characters/swales-of-whitby.md"));
-        Assert.Contains("has no book 'sequel'", Copy("Mr. Swales", "Someone", "--to", "dracula/sequel").Error, StringComparison.Ordinal);
+        Assert.Contains("has no series or book 'sequel'", Copy("Mr. Swales", "Someone", "--to", "dracula/sequel").Error, StringComparison.Ordinal);
 
         // With one universe, a book key alone will do (#127).
         Assert.Equal(CliApp.ExitOk, Copy("Mr. Swales", "Swales the younger", "--to", "aftermath").ExitCode);

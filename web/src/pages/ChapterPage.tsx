@@ -4,6 +4,7 @@ import { hierarchyQuery, type ChapterNode } from '../api'
 import { ChapterFieldsSection } from '../components/ChapterFields'
 import { EntityList } from '../components/EntityList'
 import { ErrorState, Loading } from '../components/States'
+import { useShownError } from '../formHold'
 import { useDocumentTitle, useEntitiesInView, usePosition } from '../hooks'
 import { chapterLabel, entryOf } from '../story'
 import { findBook } from './BookPage'
@@ -18,6 +19,7 @@ export function ChapterPage() {
   const { universe, book, chapter } = route.useParams()
   const { at, setAt } = usePosition()
   const hierarchy = useQuery(hierarchyQuery(universe, undefined))
+  const failed = useShownError(hierarchy)
   // Headings as of the position (#227): the page's structure comes from the
   // full hierarchy, so a change of position doesn't reload it (or close a
   // field's form), but a heading names only what the reader has met (#26).
@@ -45,11 +47,11 @@ export function ChapterPage() {
     return <Loading what="the chapter" />
   }
 
-  if (hierarchy.isError) {
-    return <ErrorState error={hierarchy.error} />
+  if (failed) {
+    return <ErrorState error={failed} />
   }
 
-  const u = hierarchy.data.universe
+  const u = hierarchy.data!.universe
   const found = findBook(u, book)
   const index = found?.book.chapters.findIndex((c) => c.key === chapter) ?? -1
   if (!found || index < 0) {

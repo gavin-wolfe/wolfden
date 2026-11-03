@@ -38,7 +38,7 @@ internal sealed record ScopeOption(string Option, string Into, string Done)
         var found = structure.FindUniverse(u);
         if (found is null)
         {
-            problem = $"the den has no universe '{u}', so {Option} '{value}' doesn't name a scope. Give {Option} '<universe>' or '<universe>/<series or book>'.";
+            problem = $"the den has no universe '{u}', so {Option} '{value}' doesn't name a scope.{UniversesIn(structure)} Give {Option} '<universe>' or '<universe>/<series or book>'.";
             return false;
         }
 
@@ -85,14 +85,18 @@ internal sealed record ScopeOption(string Option, string Into, string Done)
         problem = $"the den has no universe '{key}'" + (only is null ? "" : $", and universe '{only.Key}' has no series or book '{key}'") +
             $", so {Option} '{key}' doesn't name a scope." +
             (holders.Count > 0 ? $" To {Into} the series or book '{key}', give {Option} {string.Join(" or ", holders)}." : "") +
-            KeysIn(structure) +
+            KeysIn(structure.Universes) +
             $" Give {Option} '<universe>' or '<universe>/<series or book>'.";
         return false;
     }
 
+    /// <summary>The den's universes, for a message, starting with a space.</summary>
+    internal static string UniversesIn(DenStructure structure) =>
+        structure.Universes.Count == 0 ? " The den has no universes yet." : $" The den's universes: {string.Join(", ", structure.Universes.Select(u => u.Key))}.";
+
     /// <summary>What's there to name, for a message: each universe's series keys, and its book keys if <paramref name="books"/>, starting with a space.</summary>
-    internal static string KeysIn(DenStructure structure, bool books = true) =>
-        string.Concat(structure.Universes.Select(u =>
+    internal static string KeysIn(IEnumerable<Universe> universes, bool books = true) =>
+        string.Concat(universes.Select(u =>
         {
             var series = u.Series.Select(s => s.Key).ToList();
             var bookKeys = books ? u.Books.Select(b => b.Key).ToList() : [];
@@ -128,10 +132,14 @@ internal sealed record ScopeOption(string Option, string Into, string Done)
         {
             series = key;
         }
+        else if (universe.FindBook(key) is not null)
+        {
+            book = key;
+        }
         else
         {
-            // A key that's neither: the write reports the unknown book, with the books it has.
-            book = key;
+            problem = $"universe '{universe.Key}' has no series or book '{key}'.{KeysIn([universe])} Give {Option} '{universe.Key}' or '{universe.Key}/<series or book>'.";
+            return false;
         }
 
         return true;

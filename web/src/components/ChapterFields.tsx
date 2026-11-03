@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiRequestError, positionsQuery, type PositionView } from '../api'
-import { useHoldRefresh } from '../formHold'
+import { useHoldRefresh, useShownError } from '../formHold'
 import {
   bookChapterFieldsQuery,
   chapterDefaultsQuery,
@@ -750,16 +750,17 @@ function InheritChoice({
 /** A chapter's fields on its page, with what each inherits, editable unless the book is final. */
 export function ChapterFieldsSection({ universe, book, chapter, label }: { universe: string; book: string; chapter: string; label: string }) {
   const fields = useQuery(bookChapterFieldsQuery(universe, book))
+  const failed = useShownError(fields)
   const client = useQueryClient()
   if (fields.isPending) {
     return <Loading what="the chapter's fields" />
   }
 
-  if (fields.isError) {
-    return <ErrorState error={fields.error} />
+  if (failed) {
+    return <ErrorState error={failed} />
   }
 
-  const data = fields.data
+  const data = fields.data!
   const c = data.chapters.find((x) => x.key === chapter)
   if (!c) {
     return null
@@ -790,17 +791,18 @@ export function ChapterFieldsSection({ universe, book, chapter, label }: { unive
 /** A universe's, series', or book's chapter_defaults: what the chapters below have unless they set their own. */
 export function ChapterDefaultsSection({ scope, name }: { scope: DefaultsScope; name: string }) {
   const defaults = useQuery(chapterDefaultsQuery(scope))
+  const failed = useShownError(defaults)
   const client = useQueryClient()
   const headingId = useId()
   if (defaults.isPending) {
     return null
   }
 
-  if (defaults.isError) {
-    return <p className="muted">Chapter defaults aren't available: {defaults.error.message}</p>
+  if (failed) {
+    return <p className="muted">Chapter defaults aren't available: {failed.message}</p>
   }
 
-  const data = defaults.data
+  const data = defaults.data!
   if (data.fieldTypes.length === 0 && data.fields.length === 0) {
     // The den's packs define no chapter fields.
     return null

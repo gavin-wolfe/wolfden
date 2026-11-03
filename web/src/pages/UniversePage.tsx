@@ -6,6 +6,7 @@ import { ChapterDefaultsSection } from '../components/ChapterFields'
 import { NewContainerButton } from '../components/NewContainer'
 import { NewMenu } from '../components/NewEntity'
 import { ErrorState, Loading } from '../components/States'
+import { useShownError } from '../formHold'
 import { useDocumentTitle, usePosition } from '../hooks'
 
 const route = getRouteApi('/u/$universe')
@@ -15,17 +16,18 @@ export function UniversePage() {
   const { universe } = route.useParams()
   const { at } = usePosition()
   const hierarchy = useQuery(hierarchyQuery(universe, at))
+  const failed = useShownError(hierarchy)
   useDocumentTitle(hierarchy.data?.universe.name)
 
   if (hierarchy.isPending) {
     return <Loading what="the universe" />
   }
 
-  if (hierarchy.isError) {
-    return <ErrorState error={hierarchy.error} />
+  if (failed) {
+    return <ErrorState error={failed} />
   }
 
-  const u = hierarchy.data.universe
+  const u = hierarchy.data!.universe
   return (
     <div className="page-body">
       <p className="eyebrow">Universe</p>

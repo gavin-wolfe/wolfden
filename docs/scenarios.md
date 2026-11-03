@@ -1894,9 +1894,9 @@ the-harker-papers`.
   a bare key that's only a book (`--in ember`) is refused, and the hint
   names a universe or a series, never a book.
 - A key that names nothing (`--in long-dark`, when the series is
-  `the-long-dark`) is refused, and the message lists what's there: in a den
-  with one universe its series and books, and with several, each one's
-  series. For a new series, it lists the universes.
+  `the-long-dark`) is refused, and the message lists what's there: for a new
+  book each universe's series, for a note its series and books, and for a
+  new series, or a universe that isn't there, the universes.
 - A name that's missing, blank, or taken as a key (`Dracula`), an
   `--after` that isn't there, `--chapters` that isn't 1 to 1000 or is
   given for a series, `--from`, `--slug`, or `--allow-relinks` (for notes
@@ -5560,7 +5560,12 @@ editor, changes it.
 - A den that hasn't changed asks only for its files' fingerprint, and a tab
   that's hidden doesn't ask until it's shown again.
 - If that question fails (the server was stopped, say), the page stays as it
-  is.
+  is, including when the tab comes back. The History tab asks for itself on
+  coming back, and says if it can't.
+- With no network, as on a laptop with its Wi-Fi off, it all still works: the
+  server is on the same computer.
+- A refresh that fails shows the error, and is tried again every 15 seconds
+  while the server answers, so the page comes back by itself.
 - As of a position, the new answer is still as of that position.
 
 Spec: #285. Covered by: `web/src/LiveRefresh.test.tsx`,
@@ -5574,8 +5579,14 @@ program adds lines above that section.
 - The editor stays, with the writer's text, however long it's open. So does
   a chapter field's form, and the New note, New book, Add chapter, and freeze
   forms.
-- Getting the window's focus back doesn't refresh anything while one is open,
-  and a failed answer doesn't replace the page.
+- Getting the window's focus back, or the network coming back, doesn't
+  refresh anything while one is open.
+- An answer that fails while one is open, even for a refresh that was already
+  on its way, or because the note was deleted or the server stopped, leaves
+  the page and the writer's text on screen, with Cancel and Save working. The
+  error shows when the form closes.
+- A form opened before the page's first answer about the files still catches
+  up on later writes when it closes.
 - Saving is refused as stale, and the writer sees both versions, as ever
   in the conflict dialog.
 - On Save or Cancel, the page shows the file as it is now.

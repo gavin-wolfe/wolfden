@@ -5,6 +5,7 @@ import { ChapterDefaultsSection } from '../components/ChapterFields'
 import { NewContainerButton } from '../components/NewContainer'
 import { NewMenu } from '../components/NewEntity'
 import { ErrorState, Loading } from '../components/States'
+import { useShownError } from '../formHold'
 import { useDocumentTitle, usePosition } from '../hooks'
 import { BookList, Counts } from './UniversePage'
 
@@ -15,17 +16,18 @@ export function SeriesPage() {
   const { universe, series } = route.useParams()
   const { at } = usePosition()
   const hierarchy = useQuery(hierarchyQuery(universe, at))
+  const failed = useShownError(hierarchy)
   useDocumentTitle(hierarchy.data?.universe.series.find((x) => x.key === series)?.name)
 
   if (hierarchy.isPending) {
     return <Loading what="the series" />
   }
 
-  if (hierarchy.isError) {
-    return <ErrorState error={hierarchy.error} />
+  if (failed) {
+    return <ErrorState error={failed} />
   }
 
-  const u = hierarchy.data.universe
+  const u = hierarchy.data!.universe
   const s = u.series.find((x) => x.key === series)
   if (!s) {
     return (

@@ -7,6 +7,7 @@ import { ChapterDefaultsSection, ChapterFieldSummary } from '../components/Chapt
 import { FreezeControl } from '../components/FreezeControl'
 import { NewMenu } from '../components/NewEntity'
 import { ErrorState, Loading } from '../components/States'
+import { useShownError } from '../formHold'
 import { useDocumentTitle, usePosition } from '../hooks'
 import { chapterLabel, ordinalOf } from '../story'
 import { Counts } from './UniversePage'
@@ -31,6 +32,7 @@ export function BookPage() {
   const { universe, book } = route.useParams()
   const { at } = usePosition()
   const hierarchy = useQuery(hierarchyQuery(universe, at))
+  const failed = useShownError(hierarchy)
   const positions = useQuery(positionsQuery(universe))
   const fields = useQuery(bookChapterFieldsQuery(universe, book))
   // As of a position, the notes the reader has met: field values link only to those (#26).
@@ -42,11 +44,11 @@ export function BookPage() {
     return <Loading what="the book" />
   }
 
-  if (hierarchy.isError) {
-    return <ErrorState error={hierarchy.error} />
+  if (failed) {
+    return <ErrorState error={failed} />
   }
 
-  const u = hierarchy.data.universe
+  const u = hierarchy.data!.universe
   const found = findBook(u, book)
   if (!found) {
     return (

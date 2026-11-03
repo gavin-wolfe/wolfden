@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { denQuery, hierarchyQuery, type BookNode, type EntitySummary, type ScopeKind } from '../api'
+import { useShownError } from '../formHold'
 import { useEntitiesInView } from '../hooks'
 import { chapterLabel } from '../story'
 import { EntityList } from './EntityList'
@@ -49,6 +50,7 @@ export function Sidebar({ universe }: { universe: string | undefined }) {
 
 function UniverseTree({ universe }: { universe: string }) {
   const hierarchy = useQuery(hierarchyQuery(universe, undefined))
+  const failedHierarchy = useShownError(hierarchy)
   const view = useEntitiesInView(universe)
   const params = useParams({ strict: false }) as { book?: string; chapter?: string; _splat?: string }
 
@@ -56,7 +58,7 @@ function UniverseTree({ universe }: { universe: string }) {
     return <Loading what="the contents" />
   }
 
-  const error = hierarchy.error ?? view.error
+  const error = failedHierarchy ?? view.error
   if (error) {
     return <ErrorState error={error} />
   }

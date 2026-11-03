@@ -464,7 +464,8 @@ export function PieceEditor({ target, what, file }: { target: TextTarget; what: 
   const cancel = editing.cancel
   const dirty = text !== piece?.text
 
-  if (source.isError) {
+  // Once it has opened, the editor stays whatever the file does: the writer's text is in it, and Save says what's wrong.
+  if (source.isError && piece === null) {
     return <ErrorState error={source.error} />
   }
 
@@ -964,7 +965,7 @@ export function AddSection({ file }: { file: string }) {
     }
   }
 
-  if (source.isError) {
+  if (source.isError && base === null) {
     return <ErrorState error={source.error} />
   }
 

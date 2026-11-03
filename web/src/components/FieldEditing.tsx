@@ -219,7 +219,7 @@ export function FieldEditor({ name, positions }: { name: string; positions: Posi
     }
   }, [firstId])
 
-  if (source.isError) {
+  if (source.isError && base === null) {
     return <ErrorState error={source.error} />
   }
 

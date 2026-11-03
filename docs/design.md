@@ -1908,9 +1908,14 @@ docs/
     with "Show it anyway". A write from outside refreshes an open page the
     same way: while it's visible the page asks for `/api/den/files` every 5
     seconds, and when the answer changes it refreshes every cached answer.
-    While an editor or form is open it waits, and the note's page stays as
-    the editor opened on it, so neither a new answer nor a failed one can
-    take the editor away (#285).
+    While an editor or form is open it waits, the note's page stays as the
+    editor opened on it, and an error waits for the form to close, so
+    neither a new answer nor a failed one can take the editor away. That
+    question is the one thing asked again by itself: other answers aren't
+    refetched on focus or when the network comes back, and queries ignore
+    the browser's online state, since the server is on this computer. A
+    failed answer is tried again every 15 seconds while the server answers
+    (#285).
   - **Adding images** (#187; v0 behaviour, not a recorded decision). The
     lead, section, Add section, and Edit file editors have **Add
     image…** under them, and take an image dropped or pasted into the

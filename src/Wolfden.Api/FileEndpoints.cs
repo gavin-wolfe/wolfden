@@ -74,7 +74,8 @@ internal static class FileEndpoints
                 var kind = DenErrors.KindOf(e.Path);
                 return new DenErrorView(
                     e.Path, DenErrors.UniverseOf(e.Path), list.Names.GetValueOrDefault(e.Path), kind, e.Line, e.Rule, e.Message, e.Reach.ToString().ToLowerInvariant(),
-                    e.Section, e.SectionLine, DenErrors.CanEdit(kind, tools.PinnedUniverse));
+                    e.Section, e.SectionLine,
+                    DenErrors.CanEdit(kind, tools.PinnedUniverse) && (kind != DenFileKinds.Den || File.Exists(Path.Combine(tools.Root, "den.yaml"))));
             }).ToList());
     }
 

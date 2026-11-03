@@ -5555,8 +5555,8 @@ editor, I break a note's frontmatter.
 
 - Within a few seconds, without a reload, the top bar says **⚠ 1 problem**. When
   I fix it there, it clears. It counts errors only.
-- If the page can't ask, it says **Can't check for problems**, rather than
-  seeming all clear.
+- If the page can't ask, it says **Can't check for problems**, even if the den
+  was clean a moment ago, and a count it knew says **can't check now** beside it.
 - Its list has each error's file, its note's name if the den read it, the line,
   the message, and what's left out: a section by name, the whole note, the outline,
   or a whole book, series, or universe.
@@ -5591,9 +5591,17 @@ Spec: F-GEN-2 (#280). Covered by:
 - An id can't change, or copy another file's, and a file without one gets one.
 - A book, series, or universe left out comes back the same way. A note in it
   asks me to fix that first.
+- The save that brings a note back is an ordinary write: a position that doesn't
+  resolve is `bad_position`, and a new bad section comment is refused. The result
+  lists the note's warnings.
 - A file in a final book shows, and can't be saved. Writing `status: final` is
-  refused: Freeze does that. A broken `book.md` that says it's final goes to my
-  own editor.
+  refused however it's spelled: Freeze does that. A `book.md` that says it's final,
+  or whose frontmatter doesn't parse, goes to my own editor.
+- A series or universe can be fixed above a final book, but can't change its
+  `chapter_defaults` while a book below says final or can't be read. If its
+  frontmatter doesn't parse then, it goes to my own editor.
+- An id another file uses, even one left out, is refused however it's spelled.
+- Empty text is refused.
 
 Spec: F-GEN-2, format.md §1.3 (#280). Covered by:
 `DenErrorEndpointTests.AFileLeftOutOpensByPathAndTwoErrorsCanBeFixedOneAtATime`,
@@ -5606,6 +5614,7 @@ Spec: F-GEN-2, format.md §1.3 (#280). Covered by:
 `DenErrorEndpointTests.AShortOrEmptySaveOfAFileLeftOutIsAnsweredAndAnIdStillHolds`,
 `DenErrorEndpointTests.AContainerThatLoadsKeepsTheUsualRules`,
 `DenErrorEndpointTests.AUniverseAboveAFinalBookKeepsItsFrontmatterButNotItsTypos`,
+`DenErrorSaveRuleTests`,
 `web/src/DenErrors.test.tsx`.
 
 ### SC-WEB-92. Edit file by path can't reach anything else
@@ -5628,8 +5637,9 @@ Spec: F-LAY-2 (#280). Covered by:
 - The home page says it doesn't load, and the top bar says **⚠ 1 problem**. The
   list says the whole den is left out, and Edit file opens `den.yaml`.
 - A note can't be opened until `den.yaml` is fixed.
-- Once it's saved and loads, the den is back. Then Edit file shows `den.yaml` but
-  won't change it.
+- Once it's saved and loads, here or outside Wolfden, the pages catch up by
+  themselves. Then Edit file shows `den.yaml` but won't change it.
+- A `den.yaml` that's gone has no Edit file, and says to restore it.
 
 Spec: F-GEN-2 (#280). Covered by:
 `DenErrorEndpointTests.ADenYamlThatDoesntLoadIsListedAndCanBeFixed`.

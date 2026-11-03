@@ -70,7 +70,7 @@ export function leavesOut(error: Pick<DenErrorView, 'reach' | 'kind' | 'section'
 export function fixElsewhere(error: Pick<DenErrorView, 'kind' | 'path'>): string {
   switch (error.kind) {
     case 'den':
-      return 'This server is pinned to one universe, and den.yaml is shared by all of them. Fix it in your own editor.'
+      return 'Wolfden can’t edit den.yaml here: it’s missing, or this server is pinned to one universe and every universe shares it. Fix it in your own editor, or restore it.'
     case 'folder':
       return 'This folder is missing its file. Add it or move the folder in your file manager.'
     default:

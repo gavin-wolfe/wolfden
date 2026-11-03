@@ -127,8 +127,9 @@ public static class DenWriteCheck
     /// <summary>
     /// True if <paramref name="path"/> is where a new series' or book's file
     /// goes (format.md §5.1, F-LAY-4): <c>series.md</c> in a folder directly
-    /// in a loaded universe's <c>series/</c>, or <c>book.md</c> in a folder
-    /// directly in a loaded universe's or series' <c>books/</c>.
+    /// in a loaded universe's <c>series/</c>, <c>book.md</c> in a folder
+    /// directly in a loaded universe's or series' <c>books/</c>, or
+    /// <c>universe.md</c> in a folder directly in <c>universes/</c>.
     /// </summary>
     private static bool IsNewContainerFile(DenStructure structure, string path)
     {
@@ -136,6 +137,12 @@ public static class DenWriteCheck
         if (folder.Length == 0 || !folder.Contains('/', StringComparison.Ordinal))
         {
             return false;
+        }
+
+        // A universe left out for an error: fixing its file is what brings it back (#280).
+        if (DenPaths.Name(path) == "universe.md")
+        {
+            return DenPaths.Parent(folder) == "universes";
         }
 
         var parent = DenPaths.Parent(folder);

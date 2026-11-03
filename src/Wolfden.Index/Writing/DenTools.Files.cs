@@ -31,7 +31,13 @@ namespace Wolfden.Index.Writing;
 /// whole can't get worse for the den, and fixing it can take more than one
 /// step, so its save is refused only if it would have more errors than it has
 /// now. Frontmatter that doesn't parse hides whatever is wrong below it, so a
-/// save of such a file is never refused for what it reveals.
+/// save of such a file is never refused for what it reveals. That ends when a
+/// save brings the file back: such a save is checked as any other write is.
+/// </para>
+/// <para>
+/// What's decided from the frontmatter (a book's status, an id, the defaults a
+/// final book inherits) is read from it parsed, so any way of writing it counts.
+/// A book whose frontmatter doesn't parse might be final, so it isn't saved here.
 /// </para>
 /// </remarks>
 public sealed partial class DenTools
@@ -79,7 +85,7 @@ public sealed partial class DenTools
             file.IsReadable ? Lf(file.Text) : null,
             file.LineEndings switch { LineEndingKind.CrLf => "crlf", LineEndingKind.Mixed => "mixed", _ => "lf" },
             file.HasByteOrderMark,
-            !file.IsReadable ? null : kind == DenFileKinds.Den && structure.IsLoaded ? DenYamlLoads : FileFrozen(kind, path, structure, Lf(file.Text)),
+            !file.IsReadable ? null : kind == DenFileKinds.Den && structure.IsLoaded ? DenYamlLoads : FileFrozen(kind, path, den, structure, Lf(file.Text)),
             Errors(path, DiagnosticsIn(kind, path, bytes, structure)),
             entity is null ? null : Summary(entity));
     }
@@ -109,12 +115,13 @@ public sealed partial class DenTools
             return ReplaceFile(path, text, hash, DenErrors.UniverseOf(path));
         }
 
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            throw new DenToolException(ToolErrorCodes.InvalidEdit, $"That would leave {path} empty, and an empty file can't be put back without history. Nothing was written. To remove a file, delete it in your file manager.");
+        }
+
         var hasId = kind is not (DenFileKinds.Den or DenFileKinds.Outline);
-        var ids = hasId
-            ? WithIndex(index => index.Context.Entities.Where(e => e.Ulid != null).Select(e => e.Ulid!).ToList()
-                .Concat(index.Context.Containers.Where(c => c.Ulid != null).Select(c => c.Ulid!))
-                .ToHashSet(StringComparer.Ordinal))
-            : [];
+        var ids = hasId ? IdsInUse(look, path) : [];
         using (EnterWrite())
         {
             var den = Snapshot();
@@ -139,12 +146,12 @@ public sealed partial class DenTools
                 return new WriteResult(DenReader.ResultVersion, false, path, hash, null, ["Nothing changed: the file already says that."], [], []);
             }
 
-            if (FileFrozen(kind, path, structure, before) is { } frozen)
+            if (FileFrozen(kind, path, den, structure, before) is { } frozen)
             {
                 throw new DenToolException(ToolErrorCodes.Frozen, frozen);
             }
 
-            CheckFinalBooksAbove(kind, path, structure, before, Lf(text));
+            CheckFinalBooksAbove(kind, path, den, structure, before, Lf(text));
             if (hasId)
             {
                 CheckId(path, before, Lf(text), ids);
@@ -187,9 +194,23 @@ public sealed partial class DenTools
                 files[path] = bytes;
             }
 
+            // A save that brings the file back is an ordinary write: the exception for a file left out ends here.
+            CatalogEntity? entity = null;
+            var warnings = diagnostics.OrderBy(d => d.Severity == DiagnosticSeverity.Error ? 0 : 1).ThenBy(d => d.Line ?? 0)
+                .Select(d => new DiagnosticView(path, d.Line, d.Severity == DiagnosticSeverity.Error ? "error" : "warning", d.RuleId, d.Message)).ToList();
+            if (healed && kind != DenFileKinds.Den)
+            {
+                var check = Check(den, structure, files);
+                warnings = Warnings(check);
+                if (kind == DenFileKinds.Note)
+                {
+                    entity = EntityCatalog.ReadEntityFile(check.Structure, path, bytes).Entity!;
+                    CheckWrittenPositions(null, entity);
+                }
+            }
+
             Save(files, new Dictionary<string, byte[]>(StringComparer.Ordinal) { [path] = original }, created: null);
 
-            var entity = kind == DenFileKinds.Note && healed ? EntityCatalog.ReadEntityFile(afterStructure, path, bytes).Entity : null;
             List<string> effects = [healed
                 ? kind == DenFileKinds.Den ? "Saved the whole file. The den loads now, so errors in its files can show too." : "Saved the whole file. It's back in the den."
                 : $"Saved the whole file. It still has {errorsAfter.Count.ToString(CultureInfo.InvariantCulture)} error{(errorsAfter.Count == 1 ? "" : "s")}, so the den still leaves it out."];
@@ -199,10 +220,7 @@ public sealed partial class DenTools
             }
 
             return new WriteResult(
-                DenReader.ResultVersion, true, path, HashOf(bytes), entity is null ? null : Summary(entity), effects, [],
-                diagnostics.OrderBy(d => d.Severity == DiagnosticSeverity.Error ? 0 : 1).ThenBy(d => d.Line ?? 0)
-                    .Select(d => new DiagnosticView(path, d.Line, d.Severity == DiagnosticSeverity.Error ? "error" : "warning", d.RuleId, d.Message)).ToList(),
-                IdAdded: idAdded);
+                DenReader.ResultVersion, true, path, HashOf(bytes), entity is null ? null : Summary(entity), effects, [], warnings, IdAdded: idAdded);
         }
     }
 
@@ -316,56 +334,146 @@ public sealed partial class DenTools
         errors.Any(d => d.RuleId is "F-ENC-1" or "F-ENC-3" or "F-FM-1" or "F-FM-2" || d.RuleId.StartsWith("F-YAML-", StringComparison.Ordinal));
 
     /// <summary>Why the file can't be changed because of a final book, and what to do, or null if it can be.</summary>
-    private string? FileFrozen(string kind, string path, DenStructure structure, string text)
+    private string? FileFrozen(string kind, string path, IDenSource den, DenStructure structure, string text)
     {
-        var finalBook = kind switch
+        var book = kind switch
         {
             DenFileKinds.Note => EntityCatalog.EntityFileScope(structure, path) as Book,
             DenFileKinds.Outline or DenFileKinds.Book => structure.Universes.SelectMany(u => u.Books).FirstOrDefault(b => b.Path == DenPaths.Parent(path)),
             _ => null,
         };
-        if (finalBook is { Status: BookStatus.Final })
+        if (book is { Status: BookStatus.Final })
         {
-            return $"{path} is in book '{finalBook.Key}', which is final (frozen), so it can't be edited until the book is unfrozen (F-BOOK-1). {Unfreezing(finalBook)}";
+            return $"{path} is in book '{book.Key}', which is final (frozen), so it can't be edited until the book is unfrozen (F-BOOK-1). {Unfreezing(book)}";
         }
 
         // Left out, so the book can't be unfrozen. A freeze promised this text won't change, and that's for the writer to break.
-        return kind == DenFileKinds.Book && finalBook is null && FinalStatus().IsMatch(Head(text))
-            ? $"{path} says the book is final (frozen), but has an error, so the book can't be unfrozen here. Open it in your own editor to fix it."
-            : null;
+        if (kind == DenFileKinds.Book && book is null)
+        {
+            if (ParsedFrontmatter(text) is not { } frontmatter)
+            {
+                return $"{path} has frontmatter that doesn't parse, so Wolfden can't tell whether the book is final (frozen), and doesn't change it here. Open it in your own editor to fix it.";
+            }
+
+            if (SaysFinal(frontmatter))
+            {
+                return $"{path} says the book is final (frozen), but has an error, so the book can't be unfrozen here. Open it in your own editor to fix it.";
+            }
+        }
+
+        // What it sets for the books below can't be compared, and a final book might inherit it.
+        if (kind is DenFileKinds.Series or DenFileKinds.Universe && ParsedFrontmatter(text) is null && SuspectBooksBelow(den, structure, kind, path) is { Count: > 0 } suspect)
+        {
+            return $"{path} has frontmatter that doesn't parse, so Wolfden can't tell what it changes for these books, which are final or can't be read: {string.Join(", ", suspect)}. Open it in your own editor to fix it.";
+        }
+
+        return null;
     }
 
     /// <summary>
     /// A book becomes final by Freeze, which checkpoints it, not by a word in
-    /// its file; and a series or universe that loads can't change what a final
-    /// book below it inherits or how it's ordered, so its frontmatter stays as
-    /// it is here while it has one.
+    /// its file, and its file must parse here, or the next save couldn't tell
+    /// whether it's final. A series or universe that loads keeps its frontmatter
+    /// while a final book that loads is below it, since that decides what the book
+    /// inherits and where it comes. And none, loaded or not, changes its
+    /// <c>chapter_defaults</c> while a book below says final or can't be read, as
+    /// <c>update_chapter_defaults</c> refuses (<see cref="CheckUnloadedBooksBelow"/>).
     /// </summary>
-    private void CheckFinalBooksAbove(string kind, string path, DenStructure structure, string before, string after)
+    private void CheckFinalBooksAbove(string kind, string path, IDenSource den, DenStructure structure, string before, string after)
     {
-        if (kind == DenFileKinds.Book && FinalStatus().IsMatch(Head(after)))
+        var parsedAfter = ParsedFrontmatter(after);
+        if (kind == DenFileKinds.Book)
         {
-            throw new DenToolException(
-                ToolErrorCodes.UnsupportedEdit,
-                $"{path} would mark the book final. Take 'status: final' out and save; Freeze… on the book's page makes it final, with a checkpoint.");
+            if (parsedAfter is null)
+            {
+                throw new DenToolException(
+                    ToolErrorCodes.UnsupportedEdit,
+                    $"The frontmatter of {path} wouldn't parse, so nothing could tell whether the book is final. Nothing was written. Fix it, and save again.");
+            }
+
+            if (SaysFinal(parsedAfter))
+            {
+                throw new DenToolException(
+                    ToolErrorCodes.UnsupportedEdit,
+                    $"{path} would mark the book final. Take 'status: final' out and save; Freeze… on the book's page makes it final, with a checkpoint.");
+            }
         }
 
-        if (kind is not (DenFileKinds.Series or DenFileKinds.Universe) || Head(before) == Head(after))
+        if (kind is not (DenFileKinds.Series or DenFileKinds.Universe))
         {
             return;
         }
 
         var folder = DenPaths.Parent(path) + "/";
         var finals = structure.Universes.SelectMany(u => u.Books).Where(b => b.Status == BookStatus.Final && b.Path.StartsWith(folder, StringComparison.Ordinal)).ToList();
-        if (finals.Count > 0 && structure.Universes.SelectMany(u => new Container[] { u }.Concat(u.Series)).Any(c => c.FilePath == path))
+        if (Head(before) != Head(after) && finals.Count > 0 && structure.Universes.SelectMany(u => new Container[] { u }.Concat(u.Series)).Any(c => c.FilePath == path))
         {
             throw new DenToolException(
                 ToolErrorCodes.Frozen,
                 $"{path} holds a final book, so its frontmatter can't change here, though the text below it can. {Unfreezing(finals)}");
         }
+
+        // Still broken, it sets nothing yet: the save that makes it parse is the one compared.
+        if (parsedAfter is not null && ParsedFrontmatter(before) is { } parsedBefore
+            && JsonOf(parsedBefore["chapter_defaults"]).GetRawText() != JsonOf(parsedAfter["chapter_defaults"]).GetRawText()
+            && SuspectBooksBelow(den, structure, kind, path) is { Count: > 0 } suspect)
+        {
+            throw new DenToolException(
+                ToolErrorCodes.Frozen,
+                $"{path} would change the chapter_defaults that these books inherit, and they're final or can't be read: {string.Join(", ", suspect)}. Nothing was written. Put chapter_defaults back to save the rest (F-BOOK-1).");
+        }
     }
 
-    /// <summary>An id never changes (F-ID-4), and two files can't share one (F-ID-3). The file may not parse, so its id is read as text.</summary>
+    /// <summary>The <c>book.md</c> files below a series or universe that are final, or say so, or can't be read to tell.</summary>
+    private static List<string> SuspectBooksBelow(IDenSource den, DenStructure structure, string kind, string path)
+    {
+        var folder = DenPaths.Parent(path);
+        var isUniverse = kind == DenFileKinds.Universe;
+        var (suspect, _) = UnloadedBooks(structure, FilesBelow(den, folder, isUniverse));
+        return structure.Universes.SelectMany(u => u.Books).Where(b => b.Status == BookStatus.Final && b.Path.StartsWith(folder + "/", StringComparison.Ordinal)).Select(b => b.FilePath)
+            .Concat(suspect)
+            .Concat(FoldersBelow(den, folder, isUniverse).Select(f => $"{f}/book.md").Where(p => den.FileExists(p) && den.TryReadFile(p) is null))
+            .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
+    }
+
+    /// <summary>True if the status isn't one that says draft: final in any spelling, or a value that isn't text. A typo stays a typo.</summary>
+    private static bool SaysFinal(Wolfden.Core.Yaml.YamlMapping frontmatter) => frontmatter["status"] switch
+    {
+        null or Wolfden.Core.Yaml.YamlScalar { IsNull: true } => false,
+        Wolfden.Core.Yaml.YamlScalar status => status.Text.Trim().Equals("final", StringComparison.OrdinalIgnoreCase),
+        _ => true,
+    };
+
+    /// <summary>The frontmatter as the den reads it, or null if it doesn't parse.</summary>
+    private static Wolfden.Core.Yaml.YamlMapping? ParsedFrontmatter(string text)
+    {
+        var file = MarkdownFile.Parse(Encoding.UTF8.GetBytes(text), requireFrontmatter: true);
+        return FrontmatterHid(file.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ToList()) ? null : file.Frontmatter;
+    }
+
+    /// <summary>
+    /// Every id in the den but <paramref name="path"/>'s (F-ID-3): those in the
+    /// index, and those written in the files it leaves out, which come back with them.
+    /// </summary>
+    private HashSet<string> IdsInUse(IDenSource den, string path)
+    {
+        var (ids, leftOut) = WithIndex(index => (
+            index.Context.Entities.Where(e => e.Ulid != null).Select(e => e.Ulid!).ToList()
+                .Concat(index.Context.Containers.Where(c => c.Ulid != null).Select(c => c.Ulid!))
+                .ToHashSet(StringComparer.Ordinal),
+            index.Context.Files.Where(f => !f.IsLoaded && (f.Kind == "entity" || f.Kind == "container")).Select(f => f.Path).ToList()));
+        foreach (var other in leftOut.Where(p => p != path))
+        {
+            if (den.TryReadFile(other) is { } bytes && Parsed(DenErrors.KindOf(other), bytes) is { IsReadable: true } file && WrittenId(Lf(file.Text)) is { } id)
+            {
+                ids.Add(id);
+            }
+        }
+
+        return ids;
+    }
+
+    /// <summary>An id never changes (F-ID-4), and two files can't share one (F-ID-3).</summary>
     private static void CheckId(string path, string before, string after, HashSet<string> used)
     {
         var old = WrittenId(before);
@@ -386,7 +494,16 @@ public sealed partial class DenTools
         }
     }
 
-    private static string? WrittenId(string text) => WrittenIdLine().Match(Head(text)) is { Success: true } m ? m.Groups[1].Value : null;
+    /// <summary>The file's id: from its frontmatter parsed, or if that doesn't parse, its line as text, so an id survives a file being broken.</summary>
+    private static string? WrittenId(string text)
+    {
+        if (ParsedFrontmatter(text) is { } frontmatter)
+        {
+            return frontmatter["id"] is Wolfden.Core.Yaml.YamlScalar { IsNull: false } id ? id.Text.Trim() : null;
+        }
+
+        return WrittenIdLine().Match(Head(text)) is { Success: true } m ? m.Groups[1].Value : null;
+    }
 
     /// <summary>The text as far as the line that closes its frontmatter.</summary>
     private static string Head(string text)
@@ -401,9 +518,6 @@ public sealed partial class DenTools
         return crlf > text.Count(c => c == '\n') - crlf;
     }
 
-    [GeneratedRegex(@"^id:[ \t]*[""']?([^\s""'#]+)", RegexOptions.Multiline | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^[""']?id[""']?:[ \t]*[""']?([^\s""'#]+)", RegexOptions.Multiline | RegexOptions.CultureInvariant)]
     private static partial Regex WrittenIdLine();
-
-    [GeneratedRegex(@"^status:[ \t]*[""']?final\b", RegexOptions.Multiline | RegexOptions.CultureInvariant)]
-    private static partial Regex FinalStatus();
 }

@@ -1176,15 +1176,25 @@ out and has no page. Fix it and save.
 - **One error at a time is fine.** A file that's already left out can be saved
   with errors still in it, as long as it doesn't have more than before. The
   result says how many are left. Fixing frontmatter that doesn't parse can show
-  errors it was hiding.
+  errors it was hiding. The save that brings the file back is checked like any
+  other, so a position that doesn't resolve, or a new typo in a section comment,
+  is refused then.
 - **A note the den reads** keeps the usual rules: a save can't add an error.
 - **If the file changed** since you opened it, you see both versions and choose.
 - **A final book stays frozen.** Unfreeze it on its page first. A broken `book.md`
   that says it's final can't be unfrozen, so fix that one in your own editor.
+  The same goes for a `book.md` whose frontmatter doesn't parse, since Wolfden
+  can't tell whether it's final.
+- **Above a final book,** a series or universe can be fixed, but its
+  `chapter_defaults` can't change while a book below says final or can't be read,
+  since that book would inherit them. If its frontmatter doesn't parse, use your
+  own editor. A series or universe that loads also keeps the rest of its
+  frontmatter while a final book that loads is below it.
+- **A file can't be saved empty** here, since that can't be undone without history.
 - **The id stays.** An id can't be changed here, and a file with none gets one
   once it's fixed.
 - **If `den.yaml` doesn't load,** nothing shows but the list, and Edit file opens
-  `den.yaml`. Once it loads, Edit file shows it but won't change it, since a change
+  `den.yaml`, unless it's gone, when you restore it yourself. Once it loads, Edit file shows it but won't change it, since a change
   there can change how every file reads. On a server pinned with `--universe`,
   fix it in your own editor, as it's shared by every universe.
 - **A pack's file, or a folder missing its `book.md` or `series.md`,** is listed,

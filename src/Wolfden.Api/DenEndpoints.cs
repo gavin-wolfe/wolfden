@@ -129,7 +129,7 @@ public static class DenEndpoints
                 return Error(
                     StatusCodes.Status503ServiceUnavailable,
                     "den_not_loaded",
-                    "den.yaml doesn't load, so nothing in the den can be read. Run 'wolfden check' to see why.");
+                    "den.yaml doesn't load, so nothing in the den can be read. The problems in the top bar say why, as 'wolfden check' does.");
             }
 
             var containers = db.Containers.ToList();

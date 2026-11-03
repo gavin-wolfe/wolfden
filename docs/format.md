@@ -58,8 +58,9 @@ A rule that a validator enforces ends with its severity.
   file the den already leaves out whole can't get worse for the den, so it may
   be saved with errors still in it, one fix at a time, as long as it doesn't
   have more of them than before. Frontmatter that doesn't parse hides what's
-  wrong below it, so fixing that may show more. The MCP tools have no such
-  exception.
+  wrong below it, so fixing that may show more. The exception ends when a save
+  brings the file back: that save is checked as any other write is. The MCP
+  tools have no such exception.
 - **[warning]**: the file is valid and indexed. `wolfden check` reports the
   warning.
 

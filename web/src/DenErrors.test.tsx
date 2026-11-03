@@ -107,6 +107,55 @@ describe('the top bar’s problems', () => {
     expect(await screen.findByText('Can’t check for problems')).toBeTruthy()
   })
 
+  it('SC-WEB-90: a failed poll doesn’t look all clear once the den was known to be clean', async () => {
+    let failing = false
+    stubApi({ override: (path) => (path === '/api/den/errors' && failing ? json({ code: 'den_unreadable', message: 'The index is locked.' }, 503) : path === '/api/den/errors' ? list() : undefined) })
+    const { queryClient } = renderApp('/u/dracula')
+    await screen.findAllByText('Dracula')
+    await queryClient.refetchQueries({ queryKey: denErrorsQuery.queryKey })
+    expect(screen.queryByText('Can’t check for problems')).toBeNull()
+
+    failing = true
+    await queryClient.refetchQueries({ queryKey: denErrorsQuery.queryKey })
+
+    expect(await screen.findByText('Can’t check for problems')).toBeTruthy()
+  })
+
+  it('SC-WEB-90: a count it knew says so when a poll fails, and still opens', async () => {
+    let failing = false
+    stubApi({ override: (path) => (path === '/api/den/errors' && failing ? json({ code: 'den_unreadable', message: 'The index is locked.' }, 503) : path === '/api/den/errors' ? list(error()) : undefined) })
+    const { queryClient } = renderApp('/u/dracula')
+    expect(await screen.findByRole('button', { name: '⚠ 1 problem' })).toBeTruthy()
+
+    failing = true
+    await queryClient.refetchQueries({ queryKey: denErrorsQuery.queryKey })
+
+    const button = await screen.findByRole('button', { name: /1 problem · can’t check now/ })
+    fireEvent.click(button)
+    expect(await screen.findByRole('dialog')).toBeTruthy()
+  })
+
+  it('SC-WEB-93: the pages catch up by themselves when den.yaml starts loading', async () => {
+    let broken = true
+    stubApi({
+      override: (path) => {
+        if (path === '/api/den/errors') {
+          return broken ? { ...list(error({ path: 'den.yaml', universe: null, kind: 'den', reach: 'den' })), denLoaded: false } : list()
+        }
+
+        return path === '/api/den' && broken ? json({ code: 'den_not_loaded', message: "den.yaml doesn't load." }, 503) : undefined
+      },
+    })
+    const { queryClient } = renderApp('/')
+    expect(await screen.findByText("den.yaml doesn't load.")).toBeTruthy()
+
+    broken = false
+    await queryClient.refetchQueries({ queryKey: denErrorsQuery.queryKey })
+
+    await waitFor(() => expect(screen.queryByText("den.yaml doesn't load.")).toBeNull())
+    expect(await screen.findByRole('link', { name: 'Dracula' })).toBeTruthy()
+  })
+
   it('SC-WEB-90: lists each error’s file, line, message, and what it leaves out, at any position', async () => {
     const { calls } = stubApi({
       override: (path) =>
@@ -232,6 +281,40 @@ describe('Edit file by path', () => {
 
     expect(await screen.findByText('Saved.')).toBeTruthy()
     expect(hashes).toEqual(['h1', 'h2'])
+  })
+
+  it('SC-WEB-91: a failed refetch can’t replace an open editor, and nothing refetched changes its text', async () => {
+    let answer: unknown = source()
+    stubApi({ override: (path) => (path === '/api/file/source' ? answer : undefined) })
+    const { queryClient } = renderApp(`/file?path=${encodeURIComponent(VAULT)}`)
+    const view = await typeInFile('my unsaved text')
+
+    answer = json({ code: 'den_unreadable', message: 'Gone for a moment.' }, 503)
+    await queryClient.invalidateQueries()
+    await queryClient.refetchQueries({ queryKey: ['file-source', VAULT] })
+    expect(screen.queryByText('Gone for a moment.')).toBeNull()
+    expect(screen.getByRole('group', { name: `Text of ${VAULT}` })).toBeTruthy()
+
+    answer = source({ hash: 'h9', text: 'changed outside' })
+    await queryClient.refetchQueries({ queryKey: ['file-source', VAULT] })
+    expect(view.state.doc.toString()).toBe('my unsaved text')
+  })
+
+  it('SC-WEB-91: the tree and position bar follow the file’s universe', async () => {
+    stubApi({ override: (path) => (path === '/api/file/source' ? source() : undefined) })
+    renderApp(`/file?path=${encodeURIComponent(VAULT)}`)
+
+    await screen.findByRole('heading', { name: 'Edit file' })
+    await waitFor(() => expect(screen.queryByText('Choose a universe to browse it.')).toBeNull())
+    expect(screen.queryByText('Choose a universe to pick a point in the story.')).toBeNull()
+  })
+
+  it('SC-WEB-93: a den-level file names no universe, so they still ask for one', async () => {
+    stubApi({ override: (path) => (path === '/api/file/source' ? source({ path: 'den.yaml', kind: 'den', universe: null }) : undefined) })
+    renderApp('/file?path=den.yaml')
+
+    await screen.findByRole('heading', { name: 'Edit file' })
+    expect(await screen.findByText('Choose a universe to browse it.')).toBeTruthy()
   })
 
   it('SC-WEB-91: a file in a final book shows, and can’t be edited here', async () => {

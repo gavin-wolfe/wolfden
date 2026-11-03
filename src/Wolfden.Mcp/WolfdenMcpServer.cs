@@ -37,7 +37,7 @@ public static class WolfdenMcpServer
         den unless given a universe, and then checks that universe's files and the den-level ones.
 
         If the den has errors, a result says so in 'den_notice': some notes or sections may be missing from it until they're fixed, and
-        check lists them. Tell the writer.
+        check lists them. Tell the writer once, not with every result.
 
         Every entity, section, and field entry has a status: idea, undecided, or candidate (not decided yet), draft or canon (in
         canon; draft isn't settled), or retconned (replaced). Pinned facts are hard canon: check them before writing.

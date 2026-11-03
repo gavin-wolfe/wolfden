@@ -218,24 +218,29 @@ public sealed partial class DenTools
     /// (format.md §6), loaded or not, with their bytes now: what decides
     /// which chapters below are final and what they inherit.
     /// </summary>
-    private static IEnumerable<(string Path, byte[] Bytes)> FilesBelow(IDenSource den, Container container)
+    private static IEnumerable<(string Path, byte[] Bytes)> FilesBelow(IDenSource den, Container container) =>
+        container is Universe or Series ? FilesBelow(den, container.Path, container is Universe) : [];
+
+    /// <summary>The folders of the series and books below a universe, or the books below a series, by its folder.</summary>
+    private static List<string> FoldersBelow(IDenSource den, string path, bool isUniverse)
     {
         var folders = new List<string>();
-        if (container is Universe)
+        if (isUniverse)
         {
-            foreach (var s in den.GetDirectories($"{container.Path}/series"))
+            foreach (var s in den.GetDirectories($"{path}/series"))
             {
-                folders.Add($"{container.Path}/series/{s}");
-                folders.AddRange(den.GetDirectories($"{container.Path}/series/{s}/books").Select(b => $"{container.Path}/series/{s}/books/{b}"));
+                folders.Add($"{path}/series/{s}");
+                folders.AddRange(den.GetDirectories($"{path}/series/{s}/books").Select(b => $"{path}/series/{s}/books/{b}"));
             }
-
-            folders.AddRange(den.GetDirectories($"{container.Path}/books").Select(b => $"{container.Path}/books/{b}"));
-        }
-        else if (container is Series)
-        {
-            folders.AddRange(den.GetDirectories($"{container.Path}/books").Select(b => $"{container.Path}/books/{b}"));
         }
 
+        folders.AddRange(den.GetDirectories($"{path}/books").Select(b => $"{path}/books/{b}"));
+        return folders;
+    }
+
+    private static IEnumerable<(string Path, byte[] Bytes)> FilesBelow(IDenSource den, string path, bool isUniverse)
+    {
+        var folders = FoldersBelow(den, path, isUniverse);
         foreach (var folder in folders)
         {
             foreach (var name in new[] { "book.md", "series.md" })
@@ -315,16 +320,7 @@ public sealed partial class DenTools
     /// </summary>
     private List<string> CheckUnloadedBooksBelow(IDenSource den, DenStructure structure, Container container)
     {
-        var loaded = structure.Universes.SelectMany(u => u.Books).Select(b => b.FilePath).ToHashSet(StringComparer.Ordinal);
-        var suspect = new List<string>();
-        var drafts = new List<string>();
-        foreach (var (path, bytes) in FilesBelow(den, container).Where(f => f.Path.EndsWith("/book.md", StringComparison.Ordinal) && !loaded.Contains(f.Path)))
-        {
-            // Parsing never throws; frontmatter that doesn't parse is null.
-            var frontmatter = MarkdownFile.Parse(bytes, requireFrontmatter: true).Frontmatter;
-            (frontmatter is null || frontmatter["status"] is not (null or YamlScalar { IsNull: true } or YamlScalar { Text: "draft" }) ? suspect : drafts).Add(path);
-        }
-
+        var (suspect, drafts) = UnloadedBooks(structure, FilesBelow(den, container));
         if (suspect.Count > 0)
         {
             throw new DenToolException(
@@ -335,6 +331,22 @@ public sealed partial class DenTools
         }
 
         return drafts;
+    }
+
+    /// <summary>Of <paramref name="files"/>, the <c>book.md</c> files the den didn't load: those marked final or whose status can't be read, and the drafts.</summary>
+    private static (List<string> Suspect, List<string> Drafts) UnloadedBooks(DenStructure structure, IEnumerable<(string Path, byte[] Bytes)> files)
+    {
+        var loaded = structure.Universes.SelectMany(u => u.Books).Select(b => b.FilePath).ToHashSet(StringComparer.Ordinal);
+        var suspect = new List<string>();
+        var drafts = new List<string>();
+        foreach (var (path, bytes) in files.Where(f => f.Path.EndsWith("/book.md", StringComparison.Ordinal) && !loaded.Contains(f.Path)))
+        {
+            // Parsing never throws; frontmatter that doesn't parse is null.
+            var frontmatter = MarkdownFile.Parse(bytes, requireFrontmatter: true).Frontmatter;
+            (frontmatter is null || frontmatter["status"] is not (null or YamlScalar { IsNull: true } or YamlScalar { Text: "draft" }) ? suspect : drafts).Add(path);
+        }
+
+        return (suspect, drafts);
     }
 
     /// <summary>What the edit means for the container and for each chapter below it, field by field.</summary>

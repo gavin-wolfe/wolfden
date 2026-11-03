@@ -1521,9 +1521,16 @@ docs/
   `frozen`). A note the den reads goes through `/api/edit/file`'s code. Other
   files that load are checked as their other writes are. A file left out whole
   may keep errors, if it has no more than before, or if its frontmatter didn't
-  parse (format.md §1.3). An id can't change, `status: final` can't be written
-  (Freeze does that), a loaded series or universe above a final book keeps its
-  frontmatter, and `den.yaml` is saved only while it doesn't load.
+  parse (format.md §1.3). A save that brings it back is checked as an ordinary
+  write, positions included. Status and id are read from the parsed frontmatter,
+  so any spelling counts. An id can't change or copy another's, including one in a
+  file left out. `status: final` can't be written (Freeze does that). A `book.md`
+  whose frontmatter doesn't parse, before or after, isn't saved here, since it might
+  be final. A loaded series or universe above a final book that loaded keeps its
+  frontmatter. No series or universe changes `chapter_defaults` while a `book.md`
+  below says final or can't be read (as `update_chapter_defaults`), and one whose
+  frontmatter doesn't parse is sent to the writer's own editor then. Empty text is
+  refused. `den.yaml` is saved only while it doesn't load.
 
   An `/api/entity` for a note left out is still 404 `unknown_entity`, with
   `leftOut` (`path`, `line`, `rule`, `message`), found by its path, a path under a

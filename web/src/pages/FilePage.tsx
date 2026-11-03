@@ -34,17 +34,18 @@ function FileEditor({ path }: { path: string }) {
     }
   }, [fresh, source.data, base])
 
-  if (source.isError) {
-    return (
+  // Once the editor is open, nothing a refetch answers can replace it: a stale
+  // hash at Save is how the writer learns the file changed. When #292 lands, add
+  // `useHoldRefresh(base !== null)` from '../formHold' above this line, as its other editors do.
+  if (base === null) {
+    return source.isError ? (
       <div className="page-body file-page">
         <h1>Edit file</h1>
         <ErrorState error={source.error} />
       </div>
+    ) : (
+      <Loading what="the file" />
     )
-  }
-
-  if (base === null) {
-    return <Loading what="the file" />
   }
 
   return <Editor path={path} base={base} setBase={setBase} text={text} setText={setText} />

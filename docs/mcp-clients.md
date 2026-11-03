@@ -328,7 +328,8 @@ docs. The writer's own list is in
   errors, every result but `check`'s has a short `den_notice`, such as
   `"This den has 2 errors, so some notes or sections may be missing from this
   answer. Call check with severity 'error' to see them."` It names no note or
-  section, so it's the same at a story position. Tell the writer. In a pinned
+  section, so it's the same at a story position. Tell the writer once, not with every
+  result. In a pinned
   session it counts that universe's errors and the den-level ones. Duplicate ids
   are warnings, so they don't count. Asking for a note an error leaves out says
   so and names the line; with `as_of`, it says so only for a path or an id,

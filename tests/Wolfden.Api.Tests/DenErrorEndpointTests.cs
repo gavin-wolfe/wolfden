@@ -317,7 +317,7 @@ public sealed class DenErrorEndpointTests
         await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
         var hash = await HashOf(server, Broken);
 
-        foreach (var text in new[] { "", "x", "ab" })
+        foreach (var text in new[] { "x", "ab" })
         {
             var (status, _) = await Save(server, Broken, text, hash);
             Assert.Equal(HttpStatusCode.UnprocessableEntity, status);

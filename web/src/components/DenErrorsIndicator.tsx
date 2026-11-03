@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { count } from '../api'
 import { denErrorsQuery, fixElsewhere, leavesOut, type DenErrors, type DenErrorView } from '../denErrorsApi'
@@ -26,24 +26,42 @@ export function DenErrorsIndicator() {
   }
 
   const data = errors.data
-  if (data === undefined) {
-    // Not known yet, or it couldn't be asked: say so quietly rather than seem all clear.
-    return errors.isError ? (
-      <span className="den-errors-unknown" title={errors.error.message}>
+
+  // A den that didn't load has just come back: what the pages said about it is out of date.
+  const client = useQueryClient()
+  const loaded = data?.denLoaded
+  const wasLoaded = useRef(loaded)
+  useEffect(() => {
+    if (wasLoaded.current === false && loaded === true) {
+      void client.invalidateQueries()
+    }
+
+    wasLoaded.current = loaded
+  }, [loaded, client])
+
+  // It can't ask now. Whatever it knew is old, so it says so rather than seem all clear.
+  const stale = errors.isError
+  if (data === undefined || data.count === 0) {
+    return stale ? (
+      <span className="den-errors-unknown" title={errors.error?.message}>
         Can’t check for problems
       </span>
     ) : null
   }
 
-  if (data.count === 0) {
-    return null
-  }
-
   return (
     <>
-      <button type="button" ref={triggerRef} className="den-errors-indicator" aria-haspopup="dialog" onClick={() => setOpen(true)}>
+      <button
+        type="button"
+        ref={triggerRef}
+        className="den-errors-indicator"
+        aria-haspopup="dialog"
+        title={stale ? errors.error?.message : undefined}
+        onClick={() => setOpen(true)}
+      >
         <span aria-hidden="true">⚠ </span>
         {count(data.count, 'problem', 'problems')}
+        {stale && ' · can’t check now'}
       </button>
       {open && <DenErrorsDialog errors={data} onClose={close} onLeave={() => setOpen(false)} />}
     </>

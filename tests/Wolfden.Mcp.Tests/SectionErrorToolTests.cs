@@ -249,6 +249,9 @@ public sealed class SectionErrorToolTests : IDisposable
         Assert.Contains("unfreeze it, fix these, and freeze it again", final, StringComparison.Ordinal);
         Assert.DoesNotContain("Fix these first", final, StringComparison.Ordinal);
 
+        // How to unfreeze comes last, on its own line, so a command in it can be copied cleanly.
+        Assert.EndsWith("\n" + ToolWords.Mcp.Unfreezing("ember", Universe), final, StringComparison.Ordinal);
+
         // It can be unfrozen, since that's how it gets fixed.
         Assert.Equal("draft", Tools.UnfreezeBook("ember", null, Universe).Status);
     }

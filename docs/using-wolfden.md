@@ -1267,10 +1267,12 @@ in it, which Wolfden calls a checkpoint.
   than a typo.** With a missing `-->`, the comment is ignored and everything up
   to the next `-->` in the file, or to the end of the file, is swallowed with
   it. That text, later headings included, stops being sections and becomes raw
-  text in the section above it, with no position of its own. So a reveal in it
-  can show at an early position, in the page and to an assistant. `wolfden
-  check` still passes, so read its warnings: this one names the line where the
-  swallowed text ends.
+  text in the section the comment is under, with no position of its own. On
+  the page, that section's heading shows at every position where the note
+  does, and the text after it, plus any later sections it swallowed, disappears.
+  An assistant reading through the tools gets the raw text, so a reveal in it
+  can reach an assistant at an early position. `wolfden check` still passes, so
+  read its warnings: this one names the line where the swallowed text ends.
 - **Copying a note's file by hand makes a duplicate.** Both files have
   the same `id`, so Wolfden leaves both out of views, and links to them
   break, until one gets a new id. Copy with `wolfden copy`, or ask an AI

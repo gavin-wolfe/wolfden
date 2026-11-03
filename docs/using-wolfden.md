@@ -91,7 +91,8 @@ Set things up in this order. Each step builds on the ones before it.
    and says what's wrong, file by file. It exits 0 when there are no
    errors (warnings alone pass) and 1 when there are. An error leaves out
    the file it's in, or for a typo in a section comment that section, until
-   it's fixed, so start from a clean check.
+   it's fixed, so start from a clean check. While `wolfden serve` runs, the
+   top bar shows the same errors (see [Fixing problems](#fixing-problems)).
 6. **Run `wolfden serve`.** It opens the den in your browser, on this
    computer only. From there you can [make notes](#making-a-new-note),
    [edit them](#editing-notes), [add series and
@@ -1164,6 +1165,61 @@ unfreeze it. When Wolfden refuses your own edit for the same reason, on
 the page or with `wolfden new` or `wolfden copy`, it says how to
 unfreeze the book: **Unfreeze…** on its page, or `wolfden unfreeze`.
 
+## Fixing problems
+
+When something in the den has an error, the top bar says so: **⚠ 3 problems**.
+It counts errors, not warnings, and updates by itself within a few seconds when
+a file changes outside Wolfden. It clears when they're fixed, and shows nothing
+when there are none. Warnings stay with `wolfden check`. That includes two notes
+with the same id: they drop out of views, but it's a warning, so it isn't listed
+here.
+
+Click it for the list. Each entry has the note or file, the line, the message,
+and what's left out because of it: one section, the whole note, or a whole book,
+series, or universe. **Edit file** opens the file as text, even one that's left
+out and has no page. Fix it and save.
+
+- **One error at a time is fine.** A file that's already left out can be saved
+  with errors still in it, as long as it doesn't have more than before. The
+  result says how many are left. Fixing frontmatter that doesn't parse can show
+  errors it was hiding. The save that brings the file back is checked like any
+  other, so a position that doesn't resolve, or a new typo in a section comment,
+  is refused then.
+- **A note the den reads** keeps the usual rules: a save can't add an error.
+- **If the file changed** since you opened it, you see both versions and choose.
+- **A final book stays frozen.** Unfreeze it on its page first. A broken `book.md`
+  that says it's final can't be unfrozen, so fix that one in your own editor.
+  The same goes for a `book.md` whose frontmatter doesn't parse and has the word
+  `final` or a backslash in it, since it might be final. Any other `book.md` that
+  doesn't parse can be fixed here, and a save has to leave it parsing.
+- **Above a final book,** a series or universe can be fixed, but while a book below
+  says final or can't be read, its `chapter_defaults`, `chapter_heading`, `books`,
+  and `order` can't change, since those decide what the book inherits, how it's
+  headed, and what a reader has met by its chapters. Removing a repeat from a list
+  is fine. If one of those lists isn't a list, or the frontmatter doesn't parse, use
+  your own editor. A series or universe that loads also keeps the rest of its
+  frontmatter while a final book that loads is below it.
+- **A file can't be saved empty** here, since that can't be undone without history.
+- **The id stays.** An id can't be changed here, and a file with none gets one
+  once it's fixed.
+- **If `den.yaml` doesn't load,** nothing shows but the list, and Edit file opens
+  `den.yaml`, unless it's gone, when you restore it yourself. Once it loads, Edit file shows it but won't change it, since a change
+  there can change how every file reads. On a server pinned with `--universe`,
+  fix it in your own editor, as it's shared by every universe.
+- **A pack's file, or a folder missing its `book.md` or `series.md`,** is listed,
+  and you fix it outside Wolfden.
+- **The story position doesn't change the list.** Like editing, it's for you, so
+  it names sections even at an early chapter. Pages at a position stay
+  spoiler-safe: a note left out says only that it's left out, with **Show
+  everything** to see why.
+- **A note another program holds locked can't be read,** so Wolfden treats it as
+  absent, and its errors aren't listed. `wolfden check` doesn't see them either.
+  They show within a minute of it being let go.
+- **With `--universe`,** the list has that universe's errors and the den-level
+  ones, as `wolfden check --universe` does.
+
+AI assistants hear about it too: see [the MCP guide](mcp-clients.md).
+
 ## Gotchas
 
 Things that surprise people, with what happens, why, and what to do.
@@ -1255,10 +1311,12 @@ in it, which Wolfden calls a checkpoint.
   `.wolfden/write.lock`, which can stay there and is safe to leave;
   editors such as Obsidian don't take turns, so a save there is caught
   by the check above instead.
-- **A note with an error in its frontmatter disappears.** Such a file is
-  left out of Wolfden until it's fixed: its page, its links, and every view.
-  An error in the frontmatter of a `book.md` leaves out the whole book. Run
-  `wolfden check` to find it.
+- **A note with an error in its frontmatter drops out of the den.** Such a
+  file is left out of Wolfden until it's fixed: its links, every view, and the
+  tree. An error in the frontmatter of a `book.md` leaves out the whole book.
+  The top bar says **⚠ 1 problem** within a few seconds, and its list opens the
+  file to fix (see [Fixing problems](#fixing-problems)). A link to the note says
+  it's left out and names the line. `wolfden check` lists the same errors.
 - **A typo in a section comment hides that section.** With `status=maybe`,
   `from=dracula:5.2`, or `pin=yes` under a heading, Wolfden doesn't guess what
   you meant, since a reveal showing early would be worse. That section and

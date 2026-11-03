@@ -14,6 +14,7 @@ import { BookPage } from './pages/BookPage'
 import { ChapterPage } from './pages/ChapterPage'
 import { EntityRoute } from './pages/EntityRoute'
 import { SearchPage } from './pages/SearchPage'
+import { FilePage } from './pages/FilePage'
 import { validateEntitySearch } from './entitySearch'
 import { NotFound } from './components/States'
 
@@ -128,7 +129,23 @@ const searchRoute = createRoute({
   component: SearchPage,
 })
 
-const routeTree = rootRoute.addChildren([homeRoute, universeRoute, seriesRoute, bookRoute, chapterRoute, entityRoute, searchRoute])
+/** Edit file by its path (#280), for a file with an error, even one the den leaves out. */
+export interface FilePageSearch extends StorySearch {
+  path?: string
+}
+
+export function validateFilePageSearch(search: Record<string, unknown>): FilePageSearch {
+  return { at: validateStorySearch(search).at, path: typeof search.path === 'string' ? search.path : undefined }
+}
+
+const fileRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/file',
+  validateSearch: validateFilePageSearch,
+  component: FilePage,
+})
+
+const routeTree = rootRoute.addChildren([homeRoute, universeRoute, seriesRoute, bookRoute, chapterRoute, entityRoute, searchRoute, fileRoute])
 
 const lastActions = new WeakMap<RouterHistory, string>()
 

@@ -4,6 +4,7 @@ import { Link, Outlet, useRouterState } from '@tanstack/react-router'
 import { denQuery } from '../api'
 import { useUniverseKey } from '../hooks'
 import { CheckpointIndicator } from './CheckpointIndicator'
+import { DenErrorsIndicator } from './DenErrorsIndicator'
 import { ContainerCreatedNotice, NewContainerProvider } from './NewContainer'
 import { CreatedNotice, NewEntityProvider, NewMenu } from './NewEntity'
 import { PositionBar } from './PositionBar'
@@ -22,9 +23,14 @@ import { Sidebar } from './Sidebar'
  */
 export function Layout() {
   const den = useQuery(denQuery)
-  const universe = useUniverseKey()
-  const [treeOpen, setTreeOpen] = useState(false)
   const pathname = useRouterState({ select: (s) => s.location.pathname })
+  // Edit file by path has no universe in its route; the file's own gives the tree and the position bar one, if it loaded.
+  const fileUniverse = useRouterState({
+    select: (s) => (s.location.pathname === '/file' ? /^universes\/([^/]+)\//.exec(String((s.location.search as { path?: unknown }).path ?? ''))?.[1] : undefined),
+  })
+  const routeUniverse = useUniverseKey()
+  const universe = routeUniverse ?? (den.data?.universes.some((u) => u.key === fileUniverse) ? fileUniverse : undefined)
+  const [treeOpen, setTreeOpen] = useState(false)
   const appRef = useRef<HTMLDivElement>(null)
   const headerRef = useRef<HTMLElement>(null)
   const sidebarRef = useRef<HTMLElement>(null)
@@ -90,6 +96,7 @@ export function Layout() {
             {universe && <NewMenu universe={universe} />}
             <SearchBox universe={universe} />
             <PositionBar universe={universe} />
+            <DenErrorsIndicator universe={universe} />
             <CheckpointIndicator />
             <LiveRefresh />
           </header>

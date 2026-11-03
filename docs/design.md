@@ -1471,7 +1471,7 @@ docs/
   and a message repeats at most 80 characters of one. Errors use the tools' codes, with 400 for
   `bad_argument`, `bad_position`, `universe_required`, and
   `unknown_type`; 404 for `unknown_universe`, `unknown_scope`,
-  `unknown_entity`, `unknown_checkpoint`, and `no_universe`; 409 for
+  `unknown_entity`, `unknown_checkpoint`, `unknown_file`, and `no_universe`; 409 for
   `ambiguous_entity` (with its `candidates`); 503 for `den_not_loaded`
   and `den_unreadable`; and 500 for `history_failed`.
 
@@ -1495,7 +1495,52 @@ docs/
   `from`. A checkpoint's own diff, and a compare, show a checkpoint
   that renamed the entity's file as a rename (§6). A note with errors
   has a history by its path, as with `get_history`, but no
-  `/api/entity` page.
+  `/api/entity` page: its `unknown_entity` carries `leftOut` (below).
+
+  **A den's errors** (#280). `GET /api/den/errors` takes no parameters, and
+  so refuses `asOf`: `count`, `denLoaded`, `truncated` (it lists at most 500),
+  and `errors`, each with `path`, `universe`, `name` (a note the index has),
+  `kind`, `line`, `rule`, `message`, `reach` (`section`, `file`, `container`, or
+  `den`), `section`, `sectionLine`, and `canEdit`. It's errors only, the same
+  ones `wolfden check` has, since the index keeps outlines' errors too (schema
+  9). A pinned server lists its universe's and the den-level ones. Unlike the
+  other endpoints, it brings the index up to date only if a stat walk of the
+  files (`AutoCheckpointer.FilesFingerprint`) changed, or the answer is a minute
+  old, since letting go of a file held open changes neither its size nor its time.
+  So polling it doesn't hash the den every time. An empty list doesn't prove
+  the den is clean: a note held open is absent from the index (#112). The top bar's indicator asks every 5 seconds while the page
+  shows. It shows everything at any position, like editing; it's the writer's.
+
+  `GET /api/file/source` (`path`) and `POST /api/file/edit` (`path`, `text`,
+  `expectedHash`) open and save a file by its path, including one the den leaves
+  out: the `/file?path=` page, "Edit file" in the list. A path must be a note, an
+  outline, a container's file, or `den.yaml`, exactly as written on disk, with no
+  link on the way, and for a pinned server in its universe and not `den.yaml`.
+  Anything else is 404 `unknown_file`, whether it exists or not. What holds it
+  must load (else `invalid_edit`, naming what to fix). A save is refused on a
+  stale hash (409 `stale_file` with `currentFile`), or in a final book (409
+  `frozen`). A note the den reads goes through `/api/edit/file`'s code. Other
+  files that load are checked as their other writes are. A file left out whole
+  may keep errors, if it has no more than before, or if its frontmatter didn't
+  parse (format.md §1.3). A save that brings it back is checked as an ordinary
+  write, positions included. Status and id are read from the parsed frontmatter,
+  so any spelling counts. An id can't change or copy another's, including one in a
+  file left out. `status: final` can't be written (Freeze does that). A `book.md`
+  whose unparsed frontmatter holds `final` in any case, or a backslash, isn't saved
+  here, since it might be final; any other that doesn't parse can be, and a save must
+  leave a `book.md` parsing. A loaded series or universe above a final book that
+  loaded keeps its frontmatter. While a `book.md` below says final or can't be read,
+  no series or universe changes `chapter_defaults`, `chapter_heading`, `books`, or
+  `order` (the lists compared with repeats removed) or saves frontmatter that doesn't
+  parse, and one that doesn't parse now, or has such a list that isn't one, is sent to
+  the writer's own editor. Empty text is refused, invisible characters included. `den.yaml` is saved only while it doesn't load.
+
+  An `/api/entity` for a note left out is still 404 `unknown_entity`, with
+  `leftOut` (`path`, `line`, `rule`, `message`), found by its path, a path under a
+  container left out, or the id, name, or file name written in the file. As of a
+  position, only a path or an id finds it, `leftOut`'s members are null, and the
+  message names neither. The MCP tools share the message. Each MCP result but
+  `check`'s adds `den_notice` while there are errors, a count that names nothing.
 
   **As of a position, nothing names what the reader hasn't met.** A
   link's `problem` is made again from what the reader has met: an

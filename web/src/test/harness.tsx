@@ -242,6 +242,9 @@ function answer(path: string, params: URLSearchParams, at: string | null, option
       return { version: 1, fingerprint: 'files-1' }
     case '/api/den':
       return options.den ?? den
+    case '/api/den/errors':
+      // The den has no errors, so the indicator is hidden.
+      return { version: 1, count: 0, truncated: false, denLoaded: true, errors: [] }
     case '/api/checkpoint':
       // Nothing changed since the last checkpoint, so the indicator is hidden.
       return {

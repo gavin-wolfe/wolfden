@@ -472,7 +472,7 @@ public class ReadEndpointTests
 
         // Advice names the API's endpoints, not the MCP tools (#175).
         var every = await server.GetJsonAsync("/api/entity?universe=*&entity=Ilse%20Tarrow", HttpStatusCode.BadRequest);
-        Assert.Contains("is only for /api/search and /api/entities;", every.GetProperty("message").GetString(), StringComparison.Ordinal);
+        Assert.Contains("is only for search and the lists of notes;", every.GetProperty("message").GetString(), StringComparison.Ordinal);
         Assert.DoesNotContain("list_entities", every.GetProperty("message").GetString(), StringComparison.Ordinal);
 
         // The reader hasn't met Halden Pike at ember:1: not an error, but not in the view.

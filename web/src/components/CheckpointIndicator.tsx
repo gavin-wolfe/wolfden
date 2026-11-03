@@ -81,7 +81,7 @@ export function CheckpointIndicator() {
 }
 
 /** Keeps Tab and Shift+Tab inside a dialog; with nothing to focus, on the dialog itself. */
-function trapTab(e: ReactKeyboardEvent<HTMLDivElement>, dialog: HTMLDivElement | null) {
+export function trapTab(e: ReactKeyboardEvent<HTMLDivElement>, dialog: HTMLDivElement | null) {
   const focusable = [...(dialog?.querySelectorAll<HTMLElement>('button, textarea, a[href], input') ?? [])].filter((el) => !el.hasAttribute('disabled'))
   if (focusable.length === 0) {
     e.preventDefault()

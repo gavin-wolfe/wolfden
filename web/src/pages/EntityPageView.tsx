@@ -3,7 +3,9 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Link, getRouteApi, useRouter, useRouterState } from '@tanstack/react-router'
 import { wasHistoryStep } from '../router'
 import {
+  ApiRequestError,
   entityQuery,
+  type LeftOutNote,
   type BacklinkView,
   type ContainerRef,
   type EntityPage,
@@ -30,6 +32,7 @@ import {
   type EditTarget,
 } from '../components/Editing'
 import { AddField, FieldEditor, FieldTools } from '../components/FieldEditing'
+import { denErrorsQuery } from '../denErrorsApi'
 import { sourceQuery, type EntitySource } from '../editApi'
 import { ErrorState, Loading, StatusBadge } from '../components/States'
 import { useDocumentTitle, useEntitiesInView, usePosition } from '../hooks'
@@ -65,7 +68,11 @@ export function EntityPageView() {
   useDocumentTitle(data ? (data.entity?.name ?? 'Not met yet') : undefined)
 
   if (opened.current === undefined && live.isError) {
-    return <ErrorState error={live.error} />
+    return live.error instanceof ApiRequestError && live.error.leftOut ? (
+      <LeftOutPage message={live.error.message} note={live.error.leftOut} at={at} onErrorsChanged={() => void live.refetch()} />
+    ) : (
+      <ErrorState error={live.error} />
+    )
   }
 
   if (!data) {
@@ -93,6 +100,52 @@ export function EntityPageView() {
     <EditingProvider universe={universe} entityKey={key} frozen={entity.frozen ?? null} target={target} setTarget={setTarget}>
       <EntityArticle universe={universe} entity={entity} positions={view.positions ?? []} />
     </EditingProvider>
+  )
+}
+
+/**
+ * The page of a note an error leaves out of the den (#280): it says so and
+ * names the line, with a way to fix it. As of a story position it says only
+ * that it's left out, since the file's name and the error could say what the
+ * reader hasn't met. It looks again whenever the den's errors change, so it
+ * becomes the note once that's fixed, wherever it was fixed.
+ */
+function LeftOutPage({ message, note, at, onErrorsChanged }: { message: string; note: LeftOutNote; at: string | undefined; onErrorsChanged: () => void }) {
+  const { setAt } = usePosition()
+  const errors = useQuery(denErrorsQuery)
+  const signature = errors.data ? errors.data.errors.map((e) => `${e.path}:${e.line}:${e.rule}`).join('|') : null
+  const [seen, setSeen] = useState(signature)
+  useEffect(() => {
+    if (signature !== seen) {
+      setSeen(signature)
+      if (seen !== null) {
+        onErrorsChanged()
+      }
+    }
+  }, [signature, seen, onErrorsChanged])
+  return (
+    <div className="page-body">
+      <h1>This note is left out</h1>
+      <div className="left-out-flag" role="alert">
+        <p>{message}</p>
+      </div>
+      {note.path ? (
+        <p>
+          <Link to="/file" search={{ path: note.path }}>
+            Edit file
+          </Link>
+        </p>
+      ) : (
+        at !== undefined && (
+          <p>
+            <button type="button" onClick={() => setAt(undefined)}>
+              Show everything
+            </button>
+          </p>
+        )
+      )}
+      <p className="muted">Nothing is lost: the text stays in the file. The ⚠ in the top bar lists every problem in the den.</p>
+    </div>
   )
 }
 

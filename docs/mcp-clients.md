@@ -324,6 +324,16 @@ docs. The writer's own list is in
   yours was written; retry the same call. If it then comes back
   `stale_file`, read again as usual. If it keeps happening, ask the
   writer what's running.
+- **`den_notice` means some of the den is missing.** While the den has
+  errors, every result but `check`'s has a short `den_notice`, such as
+  `"This den has 2 errors, so some notes or sections may be missing from this
+  answer. Call check with severity 'error' to see them."` It names no note or
+  section, so it's the same at a story position. Tell the writer once, not with every
+  result. In a pinned
+  session it counts that universe's errors and the den-level ones. Duplicate ids
+  are warnings, so they don't count. Asking for a note an error leaves out says
+  so and names the line; with `as_of`, it says so only for a path or an id,
+  and doesn't say which line or why.
 - **`allow_relinks` only with the writer's say-so.** A create, copy,
   rename, or move that would send existing links to a different note is
   refused, with the links listed. Show them to the writer, and set

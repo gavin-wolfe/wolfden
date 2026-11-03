@@ -37,16 +37,15 @@ public static class ReadEndpoints
     /// <summary>The paths under <c>/api</c> this maps, all GET.</summary>
     public static readonly IReadOnlyList<string> Paths = ["hierarchy", "positions", "entities", "entities/lookup", "entity", "canon", "search", "fields", "history", "history/diff"];
 
-    /// <summary>The words the API's messages use for what to do next (<see cref="ToolWords"/>).</summary>
+    /// <summary>
+    /// The words the API's messages use for what to do next (<see cref="ToolWords"/>).
+    /// The pages show these messages to the writer, so they name what a writer
+    /// can do, never an API path (#280). The edits' own words are <see cref="WriteEndpoints.Words"/>.
+    /// </summary>
     public static readonly ToolWords Words = new(
-        "add allowRelinks=true", "in 'newName'", "slug", "in 'universe'", "use /api/search or /api/entities", "run 'wolfden check'",
+        "add allowRelinks=true", "in 'newName'", "slug", "in 'universe'", "use the search box", "run 'wolfden check'",
         "run 'wolfden check'", "run 'wolfden check' and look at '{0}'", "This server is pinned to universe '{0}' (wolfden serve --universe)",
-        "/api/search and /api/entities", "Ask again with one of the candidates' keys.")
-    {
-        Unfreeze = "POST /api/book/unfreeze opens book '{0}' for editing again.",
-        ItemsListed = "GET {1} lists its items; name one by its number from 0 in 'item'.",
-        NotWritten = "It inherits '{0}' from {1}: to change it there, POST /api/chapter-defaults/edit; to give it a value of its own here, send a 'set' change with the whole value.",
-    };
+        "search and the lists of notes", "Ask again with one of the candidates' keys.");
 
     /// <summary>Maps the read endpoints onto <paramref name="api"/>.</summary>
     public static void Map(RouteGroupBuilder api, WolfdenApiOptions options)
@@ -151,7 +150,7 @@ public static class ReadEndpoints
     {
         ToolErrorCodes.DenNotLoaded or ToolErrorCodes.DenUnreadable or ToolErrorCodes.DenBusy => StatusCodes.Status503ServiceUnavailable,
         ToolErrorCodes.NoUniverse or ToolErrorCodes.UnknownUniverse or ToolErrorCodes.UnknownScope or ToolErrorCodes.UnknownEntity
-            or ToolErrorCodes.UnknownCheckpoint => StatusCodes.Status404NotFound,
+            or ToolErrorCodes.UnknownCheckpoint or ToolErrorCodes.UnknownFile => StatusCodes.Status404NotFound,
         ToolErrorCodes.UnknownSection => StatusCodes.Status404NotFound,
         ToolErrorCodes.AmbiguousEntity or ToolErrorCodes.AmbiguousSection or ToolErrorCodes.StaleFile or ToolErrorCodes.Frozen
             or ToolErrorCodes.AlreadyExists => StatusCodes.Status409Conflict,
@@ -170,7 +169,7 @@ public static class ReadEndpoints
         catch (DenToolException e)
         {
             // The reader's messages are in the API's own words (Words).
-            return Results.Json(new ApiError(e.Code, e.Message, e.Candidates), statusCode: StatusOf(e.Code));
+            return Results.Json(new ApiError(e.Code, e.Message, e.Candidates, LeftOut: e.LeftOut), statusCode: StatusOf(e.Code));
         }
     }
 

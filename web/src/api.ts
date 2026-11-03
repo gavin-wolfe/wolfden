@@ -1,4 +1,5 @@
 import { QueryClient, queryOptions } from '@tanstack/react-query'
+import { refreshDefaults, writeDefaults } from './formHold'
 import type { TextMatch } from './snippet'
 
 // The shapes of Wolfden's API (src/Wolfden.Api/DenEndpoints.cs,
@@ -305,7 +306,9 @@ export function createQueryClient(): QueryClient {
     defaultOptions: {
       queries: {
         retry: (failures, error) => !(error instanceof ApiRequestError) && failures < 3,
+        ...refreshDefaults,
       },
+      mutations: writeDefaults,
     },
   })
 }

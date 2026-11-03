@@ -38,7 +38,7 @@ internal sealed record ScopeOption(string Option, string Into, string Done)
         var found = structure.FindUniverse(u);
         if (found is null)
         {
-            problem = $"the den has no universe '{u}', so {Option} '{value}' doesn't name a scope. Give {Option} '<universe>' or '<universe>/<series or book>'.";
+            problem = $"the den has no universe '{u}', so {Option} '{value}' doesn't name a scope.{UniversesIn(structure)} Give {Option} '<universe>' or '<universe>/<series or book>'.";
             return false;
         }
 
@@ -85,9 +85,24 @@ internal sealed record ScopeOption(string Option, string Into, string Done)
         problem = $"the den has no universe '{key}'" + (only is null ? "" : $", and universe '{only.Key}' has no series or book '{key}'") +
             $", so {Option} '{key}' doesn't name a scope." +
             (holders.Count > 0 ? $" To {Into} the series or book '{key}', give {Option} {string.Join(" or ", holders)}." : "") +
+            KeysIn(structure.Universes) +
             $" Give {Option} '<universe>' or '<universe>/<series or book>'.";
         return false;
     }
+
+    /// <summary>The den's universes, for a message, starting with a space.</summary>
+    internal static string UniversesIn(DenStructure structure) =>
+        structure.Universes.Count == 0 ? " The den has no universes yet." : $" The den's universes: {string.Join(", ", structure.Universes.Select(u => u.Key))}.";
+
+    /// <summary>What's there to name, for a message: each universe's series keys, and its book keys if <paramref name="books"/>, starting with a space.</summary>
+    internal static string KeysIn(IEnumerable<Universe> universes, bool books = true) =>
+        string.Concat(universes.Select(u =>
+        {
+            var series = u.Series.Select(s => s.Key).ToList();
+            var bookKeys = books ? u.Books.Select(b => b.Key).ToList() : [];
+            var parts = new[] { series.Count > 0 ? $"series: {string.Join(", ", series)}" : null, bookKeys.Count > 0 ? $"books: {string.Join(", ", bookKeys)}" : null }.OfType<string>().ToList();
+            return parts.Count > 0 ? $" Universe '{u.Key}' has {string.Join("; ", parts)}." : $" Universe '{u.Key}' has no {(books ? "series or books" : "series")} yet.";
+        }));
 
     /// <summary>A series or book key of <paramref name="universe"/>, with <c>series:</c> or <c>book:</c> before it to say which.</summary>
     private bool TryWork(Universe universe, string key, out string? series, out string? book, out string problem)
@@ -96,14 +111,28 @@ internal sealed record ScopeOption(string Option, string Into, string Done)
         problem = "";
         if (key.StartsWith("series:", StringComparison.Ordinal))
         {
-            series = key["series:".Length..].Trim();
-            return true;
+            var named = key["series:".Length..].Trim();
+            if (universe.Series.Any(s => s.Key == named))
+            {
+                series = named;
+                return true;
+            }
+
+            problem = $"universe '{universe.Key}' has no series '{named}'.{KeysIn([universe])}";
+            return false;
         }
 
         if (key.StartsWith("book:", StringComparison.Ordinal))
         {
-            book = key["book:".Length..].Trim();
-            return true;
+            var named = key["book:".Length..].Trim();
+            if (universe.FindBook(named) is not null)
+            {
+                book = named;
+                return true;
+            }
+
+            problem = $"universe '{universe.Key}' has no book '{named}'.{KeysIn([universe])}";
+            return false;
         }
 
         var isSeries = universe.Series.Any(s => s.Key == key);
@@ -117,10 +146,14 @@ internal sealed record ScopeOption(string Option, string Into, string Done)
         {
             series = key;
         }
+        else if (universe.FindBook(key) is not null)
+        {
+            book = key;
+        }
         else
         {
-            // A key that's neither: the write reports the unknown book, with the books it has.
-            book = key;
+            problem = $"universe '{universe.Key}' has no series or book '{key}'.{KeysIn([universe])} Give {Option} '{universe.Key}' or '{universe.Key}/<series or book>'.";
+            return false;
         }
 
         return true;

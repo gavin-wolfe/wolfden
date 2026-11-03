@@ -4,8 +4,9 @@ import { hierarchyQuery, type ChapterNode } from '../api'
 import { ChapterFieldsSection } from '../components/ChapterFields'
 import { EntityList } from '../components/EntityList'
 import { ErrorState, Loading } from '../components/States'
+import { useShownError } from '../formHold'
 import { useDocumentTitle, useEntitiesInView, usePosition } from '../hooks'
-import { entryOf } from '../story'
+import { chapterLabel, entryOf } from '../story'
 import { findBook } from './BookPage'
 
 const route = getRouteApi('/u/$universe/b/$book/c/$chapter')
@@ -18,6 +19,7 @@ export function ChapterPage() {
   const { universe, book, chapter } = route.useParams()
   const { at, setAt } = usePosition()
   const hierarchy = useQuery(hierarchyQuery(universe, undefined))
+  const failed = useShownError(hierarchy)
   // Headings as of the position (#227): the page's structure comes from the
   // full hierarchy, so a change of position doesn't reload it (or close a
   // field's form), but a heading names only what the reader has met (#26).
@@ -34,17 +36,22 @@ export function ChapterPage() {
   const view = useEntitiesInView(universe)
   const titled = hierarchy.data ? findBook(hierarchy.data.universe, book) : null
   const titledChapter = titled?.book.chapters.find((x) => x.key === chapter)
-  useDocumentTitle(titled && titledChapter ? `${headingOf(titledChapter) ?? `Chapter ${titledChapter.key}`} · ${titled.book.name}` : undefined)
+  useDocumentTitle(titled && titledChapter ? `${headingOf(titledChapter) ?? chapterLabel(titledChapter)} · ${titled.book.name}` : undefined)
+  // In prev and next: "3. The Quiet Hour", or for an untitled chapter what its own page is headed.
+  const stepLabel = (ch: ChapterNode): string => {
+    const heading = headingOf(ch)
+    return heading === null ? chapterLabel(ch) : `${ch.number ?? ch.key}. ${heading}`
+  }
 
   if (hierarchy.isPending) {
     return <Loading what="the chapter" />
   }
 
-  if (hierarchy.isError) {
-    return <ErrorState error={hierarchy.error} />
+  if (failed) {
+    return <ErrorState error={failed} />
   }
 
-  const u = hierarchy.data.universe
+  const u = hierarchy.data!.universe
   const found = findBook(u, book)
   const index = found?.book.chapters.findIndex((c) => c.key === chapter) ?? -1
   if (!found || index < 0) {
@@ -77,7 +84,7 @@ export function ChapterPage() {
         </Link>
       </nav>
       <p className="eyebrow">Chapter {c.number ?? c.key}</p>
-      <h1>{headingOf(c) ?? `Chapter ${c.number ?? c.key}`}</h1>
+      <h1>{headingOf(c) ?? chapterLabel(c)}</h1>
       <p>
         {at === c.position ? (
           <span className="badge">You are reading as of this chapter</span>
@@ -106,14 +113,14 @@ export function ChapterPage() {
       <nav className="prev-next" aria-label="Chapters">
         {prev ? (
           <Link to="/u/$universe/b/$book/c/$chapter" params={{ universe, book: b.key, chapter: prev.key }} rel="prev">
-            ‹ {prev.number ?? prev.key}. {headingOf(prev)}
+            ‹ {stepLabel(prev)}
           </Link>
         ) : (
           <span />
         )}
         {next && (
           <Link to="/u/$universe/b/$book/c/$chapter" params={{ universe, book: b.key, chapter: next.key }} rel="next">
-            {next.number ?? next.key}. {headingOf(next)} ›
+            {stepLabel(next)} ›
           </Link>
         )}
       </nav>

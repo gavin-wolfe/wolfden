@@ -12,6 +12,7 @@ import {
   type ReactNode,
 } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
+import { useHoldRefresh } from '../formHold'
 import { useNavigate, useParams } from '@tanstack/react-router'
 import { entitiesQuery, hierarchyQuery, positionsQuery, type PositionView, type UniverseNode } from '../api'
 import { CreateError, createEntity, typesQuery, type NewScope, type TypeView } from '../createApi'
@@ -441,6 +442,7 @@ function NewEntityDialog({
   const afterSave = useAfterSave()
   const navigate = useNavigate()
   const { at } = usePosition()
+  useHoldRefresh(true)
   const types = useQuery(typesQuery)
   const hierarchy = useQuery(hierarchyQuery(universe, undefined))
   const positions = useQuery(positionsQuery(universe))

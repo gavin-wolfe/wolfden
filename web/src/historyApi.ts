@@ -59,6 +59,8 @@ export function historyQuery(universe: string, entity: string) {
       getJson<HistoryResult>(apiPath('/api/history', { entity, universe, limit: HISTORY_PAGE, before: pageParam ?? undefined })),
     initialPageParam: null as string | null,
     getNextPageParam: (last) => (last.available && last.truncated ? last.nextBefore : null),
+    // A checkpoint made elsewhere changes no file the page watches (the history is hidden), so look on coming back.
+    refetchOnWindowFocus: true,
   })
 }
 
@@ -93,5 +95,6 @@ export function historyDiffQuery(universe: string, entity: string, selection: Di
     queryKey: ['history-diff', universe, entity, checkpoint ?? null, from ?? null, to ?? null],
     queryFn: () => getJson<HistoryDiffResult>(apiPath('/api/history/diff', { entity, universe, checkpoint, from, to })),
     staleTime: fixed ? Infinity : UNCOMMITTED_STALE_MS,
+    refetchOnWindowFocus: true,
   })
 }

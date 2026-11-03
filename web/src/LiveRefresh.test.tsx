@@ -83,7 +83,7 @@ async function askAgain(client: QueryClient) {
 
 const FAILED = () => new Response(JSON.stringify({ code: 'den_unreadable', message: "Couldn't read the den." }), { status: 500 })
 
-describe('SC-WEB-84: an open page shows what an assistant just wrote', () => {
+describe('SC-WEB-85: an open page shows what an assistant just wrote', () => {
   it('a change to the files refreshes the note without a reload', async () => {
     const { now } = stubDen()
     const { queryClient } = renderApp('/u/dracula/e/E-MINA')
@@ -159,7 +159,7 @@ describe('SC-WEB-84: an open page shows what an assistant just wrote', () => {
   })
 })
 
-describe('SC-WEB-85: an outside write never touches an open editor', () => {
+describe('SC-WEB-86: an outside write never touches an open editor', () => {
   async function openAndType(client: QueryClient) {
     await waitFor(() => expect(client.getQueryData(denFilesQuery.queryKey)).toBeDefined())
     fireEvent.click(await screen.findByRole('button', { name: 'Edit “Overview”' }))

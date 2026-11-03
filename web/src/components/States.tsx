@@ -49,3 +49,13 @@ export function StatusBadge({ status }: { status: string | null | undefined }) {
 
   return <span className={`badge status-${status}`}>{status}</span>
 }
+
+/** Marks an error in a save's list of what's in the file: a bad section comment the save kept, listed with the warnings. */
+export function ErrorMark({ severity }: { severity: string }) {
+  return severity === 'error' ? <strong className="kept-error">Error: </strong> : null
+}
+
+/** The heading of that list. */
+export function fileProblemsHeading(problems: readonly { severity: string }[]): string {
+  return problems.some((p) => p.severity === 'error') ? 'Errors and warnings in the file:' : 'Warnings in the file:'
+}

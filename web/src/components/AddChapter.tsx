@@ -9,6 +9,7 @@ import { valueWords } from './ChapterFields'
 import { useHoldRefresh } from '../formHold'
 import { chapterLabel } from '../story'
 import { useAfterSave } from './Editing'
+import { ErrorMark } from './States'
 import { ValueEditor } from './FieldEditing'
 import { trapTab } from './NewEntity'
 import '../newEntity.css'
@@ -77,6 +78,7 @@ export function AddChapter({ universe, book, bookName, chapters, final }: { univ
             <ul className="warnings">
               {added.warnings.map((w) => (
                 <li key={`${w.path}:${w.rule}:${w.line ?? ''}:${w.message}`}>
+                  <ErrorMark severity={w.severity} />
                   {w.rule}: {w.message}
                 </li>
               ))}

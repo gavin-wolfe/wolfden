@@ -41,6 +41,7 @@ public sealed class SectionComment
 public sealed class Section
 {
     private readonly List<Section> _subsections = [];
+    private readonly List<Diagnostic> _problems = [];
 
     internal Section(MarkdownFile owner, int index)
     {
@@ -85,6 +86,20 @@ public sealed class Section
     /// a valid one (format.md F-SEC-6).</summary>
     public SectionComment? Comment { get; internal set; }
 
+    /// <summary>The errors in this section's own comment: bad values and repeated attributes (format.md F-SEC-10).</summary>
+    public IReadOnlyList<Diagnostic> Problems => _problems;
+
+    /// <summary>
+    /// True if the den leaves this section out, because its comment or the
+    /// comment of a section holding it has an error (format.md F-GEN-2). It
+    /// isn't live (F-SEC-8) and no view at a position shows it, but its text
+    /// is still in the file.
+    /// </summary>
+    public bool IsLeftOut => _problems.Count > 0 || Parent?.IsLeftOut == true;
+
+    /// <summary>Why it's left out: its own comment's errors, or else those of the nearest section holding it that has some. Empty if it isn't.</summary>
+    public IReadOnlyList<Diagnostic> LeftOutBecause => _problems.Count > 0 ? _problems : Parent?.LeftOutBecause ?? [];
+
     /// <summary>The section that holds this one, or null for a level-2 section.</summary>
     public Section? Parent { get; internal set; }
 
@@ -125,6 +140,8 @@ public sealed class Section
     internal int End { get; set; }
 
     internal void AddSubsection(Section section) => _subsections.Add(section);
+
+    internal void AddProblem(Diagnostic problem) => _problems.Add(problem);
 
     /// <inheritdoc />
     public override string ToString() => $"{new string('#', Level)} {Name}";

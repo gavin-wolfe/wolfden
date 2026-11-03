@@ -72,7 +72,7 @@ interface Post {
  * The test den's API, with Mina's page as `sections`, her source, and the
  * edit endpoints, which answer `onPost` (by default, a change saved).
  */
-function stubEditing(options: { onPost?: (post: Post, n: number) => Response | WriteResult; frozen?: string | null; entityKey?: string } = {}) {
+function stubEditing(options: { onPost?: (post: Post, n: number) => Response | WriteResult; frozen?: string | null; entityKey?: string; sections?: PageSection[] } = {}) {
   const pages = (key: string, at: string | null): EntityPageResult => {
     const summary = key === 'E-SWALES' ? swales : entities.find((e) => e.key === key)!
     return {
@@ -81,7 +81,7 @@ function stubEditing(options: { onPost?: (post: Post, n: number) => Response | W
       position: at,
       inView: true,
       note: null,
-      entity: page(summary, { lead: `# ${summary.name}\n\nA schoolmistress.`, sections, frozen: key === 'E-SWALES' ? (options.frozen ?? null) : null }),
+      entity: page(summary, { lead: `# ${summary.name}\n\nA schoolmistress.`, sections: options.sections ?? sections, frozen: key === 'E-SWALES' ? (options.frozen ?? null) : null }),
     }
   }
 
@@ -253,6 +253,67 @@ describe('SC-WEB-40: editing a section or the opening in place', () => {
 
     expect(view.state.doc.toString()).toBe('Later.')
     expect(screen.getByText('<!-- wolfden: from=dracula:5 -->').closest('p')!.textContent).toContain('change it with Edit file')
+  })
+
+  it('SC-WEB-83: flags a section an error leaves out, in place, by its line, and still edits it', async () => {
+    const problem = { line: 13, rule: 'F-STAT-1', message: "'maybe' isn't a status. 'Arc' is left out until this is fixed." }
+    const flagged = sections.map((s) => (s.name === 'Overview' ? s : { ...s, leftOut: [problem] }))
+    const data = source()
+    data.sections = data.sections.map((s) => (s.name === 'Overview' ? s : { ...s, leftOut: [problem] }))
+    const { file } = stubEditing({ sections: flagged })
+    file.source = data
+    renderApp('/u/dracula/e/E-MINA')
+
+    const arc = (await screen.findByRole('heading', { name: /^Arc/ })).closest('section')!
+    expect(within(arc).getByText('left out')).toBeTruthy()
+    const flag = within(arc).getByRole('note')
+    expect(flag.textContent).toContain('Left out of every story view')
+    expect(flag.textContent).toContain("Line 13: 'maybe' isn't a status.")
+    expect(flag.textContent).toContain('F-STAT-1')
+    expect(flag.textContent).toContain('Edit file')
+
+    // Its subsection shows too, naming the same line. The rest of the page has no flag.
+    expect(within(screen.getByRole('heading', { name: /^Late arc/ }).closest('section')!).getByRole('note').textContent).toContain('Line 13')
+    expect(within(screen.getByRole('heading', { name: /^Overview/ }).closest('section')!).queryByRole('note')).toBeNull()
+
+    // It keeps its Rename and Remove buttons (the edits themselves: SectionErrorToolTests).
+    for (const label of ['Rename “Arc”', 'Remove “Arc”']) expect(within(arc).getByRole('button', { name: label })).toBeTruthy()
+
+    // Its Edit button still opens it, with the flag still there.
+    await openSectionEditor('Arc')
+    expect(screen.getByRole('heading', { name: /^Arc/ }).closest('section')!.querySelector('.left-out-flag')).not.toBeNull()
+  })
+
+  it('SC-WEB-83: a save that kept an error marks it as an error, not a warning', async () => {
+    const warnings = [
+      { path: mina.path, line: 13, severity: 'error', rule: 'F-STAT-1', message: "'maybe' isn't a status." },
+      { path: mina.path, line: 3, severity: 'warning', rule: 'F-FLD-2', message: 'A field the type lacks.' },
+    ]
+    stubEditing({ onPost: () => written({ warnings }) })
+    renderApp('/u/dracula/e/E-MINA')
+
+    const { view } = await openSectionEditor()
+    replaceText(view, 'New text.')
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByText('Errors and warnings in the file:')).toBeTruthy()
+    const items = screen.getByText('Errors and warnings in the file:').closest('.warnings')!.querySelectorAll('li')
+    expect(items[0].textContent).toContain('Error: Line 13')
+    expect(items[1].textContent).not.toContain('Error:')
+  })
+
+  it('SC-WEB-83: Edit file lists what an error leaves out, once for each error', async () => {
+    const problem = { line: 13, rule: 'F-STAT-1', message: "'maybe' isn't a status. 'Arc' is left out until this is fixed." }
+    const data = source()
+    data.sections = data.sections.map((s) => (s.name === 'Overview' ? s : { ...s, leftOut: [problem] }))
+    const { file } = stubEditing()
+    file.source = data
+    renderApp('/u/dracula/e/E-MINA')
+
+    fireEvent.click(await screen.findByRole('button', { name: "Edit file: the note's whole source, frontmatter included" }))
+    const panel = (await screen.findByText('Fix the comment here.', { exact: false })).closest('.left-out-flag') as HTMLElement
+    expect(within(panel).getAllByRole('listitem')).toHaveLength(1)
+    expect(panel.textContent).toContain('Line 13')
   })
 
   it('shows everything while editing, with a badge, and the position view again after', async () => {

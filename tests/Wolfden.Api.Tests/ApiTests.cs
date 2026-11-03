@@ -22,7 +22,7 @@ public class ApiTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-WEB-84")]
+    [Trait("Scenario", "SC-WEB-85")]
     public async Task DenFilesChangesWhenAFileDoesAndOnlyThen()
     {
         using var den = TempDen.Dracula();

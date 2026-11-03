@@ -63,7 +63,7 @@ function stubUntitled() {
   return stubApi({ override: (path, params) => (path === '/api/hierarchy' ? { ...untitled(), position: params.get('asOf') } : undefined) })
 }
 
-describe('SC-WEB-83: untitled chapters read the same everywhere', () => {
+describe('SC-WEB-84: untitled chapters read the same everywhere', () => {
   it('the book page and the contents tree call a chapter by its number, not its key', async () => {
     stubUntitled()
     renderApp('/u/dracula/b/dracula')

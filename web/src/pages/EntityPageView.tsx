@@ -22,6 +22,7 @@ import {
   EditingProvider,
   EditingStatus,
   FrozenNotice,
+  LeftOutFlag,
   PieceEditor,
   RemoveSection,
   RenameSection,
@@ -531,7 +532,7 @@ function Section({
   const here = target !== null && 'line' in target && target.line === section.line && target.name === section.name ? target : null
   const { line, name } = section
   return (
-    <section className={`section level-${section.level}${section.bookkeeping ? ' bookkeeping' : ''}`}>
+    <section className={`section level-${section.level}${section.bookkeeping ? ' bookkeeping' : ''}${section.leftOut ? ' left-out' : ''}`}>
       {here?.kind === 'rename' ? (
         <RenameSection target={here} />
       ) : (
@@ -540,8 +541,10 @@ function Section({
           <Span from={section.from} until={section.until} positions={positions} />
           {section.pinned && <span className="badge">pinned</span>}
           {section.bookkeeping && <span className="badge">bookkeeping</span>}
+          {section.leftOut && <span className="badge problem">left out</span>}
         </Heading>
       )}
+      {section.leftOut && <LeftOutFlag problems={section.leftOut} hint="The text is safe in the file. Change the comment with Edit file." />}
       {here?.kind !== 'rename' && (
         <p className="piece-tools section-tools">
           <EditButton target={{ kind: 'section', line, name }} label={`Edit “${name}”`}>

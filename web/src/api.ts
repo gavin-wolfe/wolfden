@@ -176,6 +176,15 @@ export interface PageSection {
   body: string
   bookkeeping: boolean | null
   links: LinkView[]
+  /** Why an error leaves this section out of every story view, in the full view only; otherwise null or missing. */
+  leftOut?: SectionProblem[] | null
+}
+
+/** An error that leaves a section out: a bad value in its comment, or in the comment of a section holding it. */
+export interface SectionProblem {
+  line: number | null
+  rule: string
+  message: string
 }
 
 export interface EntryView {
@@ -373,6 +382,8 @@ export interface SearchHit {
   line: number | null
   /** The field the match is in (#179), or null (or left out) for the name, aliases, lead, or a section. */
   field?: string | null
+  /** True for a match in a section an error leaves out of every story view. */
+  leftOut?: boolean | null
   /** An excerpt with each match in square brackets, as the MCP tool gives it. The page marks matches from `text` and `matches`. */
   snippet: string
   /** The excerpt without marks. The API always gives it (#179); the page falls back to `snippet` unmarked. */

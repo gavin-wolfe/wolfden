@@ -214,6 +214,15 @@ describe('SC-WEB-18: a search waiting on a pause in typing', () => {
 })
 
 describe('SC-WEB-19: search filters and results', () => {
+  it('SC-WEB-83: marks a hit in a section an error leaves out, and not as bookkeeping', async () => {
+    stubSearch(() => ({ version: 1, query: 'blood', count: 1, truncated: false, hits: [hit('E-LUCY', 'Illness', '…[blood]…', { inCanon: false, status: 'draft', leftOut: true })] }))
+    renderApp('/u/dracula/search?q=blood')
+
+    const place = (await screen.findByRole('link', { name: 'Illness' })).closest('p')!
+    expect(place.textContent).toContain('left out')
+    expect(place.textContent).not.toContain('bookkeeping')
+  })
+
   it('lists hits by note with type, scope, section links, and marked snippets', async () => {
     stubSearch()
     renderApp('/u/dracula/search?q=blood')

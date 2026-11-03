@@ -11,7 +11,7 @@ afterEach(() => {
 
 const TAG = 'book/dracula/dracula/final'
 
-describe('SC-WEB-86: a final book offers nothing new in the contents tree', () => {
+describe('SC-WEB-87: a final book offers nothing new in the contents tree', () => {
   /** A book with one chapter-less character list, marked `status`, as the tree shows it. */
   async function treeOf(status: string) {
     const [book] = hierarchy.universe.books

@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useHoldRefresh } from '../formHold'
+import { ErrorMark } from './States'
 import { bookFreezeQuery, changeFreeze, FAILED_SNAPSHOTS, type BookFreeze, type FreezeResult } from '../freezeApi'
 
 type Action = 'freeze' | 'finish' | 'unfreeze'
@@ -89,6 +90,7 @@ export function FreezeControl({ universe, book }: { universe: string; book: stri
             <ul className="warnings">
               {outcome.warnings.map((w) => (
                 <li key={`${w.rule}:${w.line ?? ''}:${w.message}`}>
+                  <ErrorMark severity={w.severity} />
                   {w.rule}: {w.message}
                 </li>
               ))}

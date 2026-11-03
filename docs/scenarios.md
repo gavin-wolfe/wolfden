@@ -200,6 +200,22 @@ Spec: design.md §11, F-VIEW-1, F-OUT-6, types.md F-TYPE-13 (#34). Covered by:
 `StarfallSampleCanonViewTests`, `StarfallSampleTests`,
 `CheckCommandTests.TheStarfallSampleIsClean`.
 
+### SC-CANON-11. A typo in a section comment hides a reveal, and nothing else
+
+Orrin Fell has an `## Appearance`, and a later one from `a1:2` whose comment
+says `status=caonn`.
+
+- At every position, and at the end of the story, the second `## Appearance`,
+  its subsections, and any other section with a bad comment are out of the
+  canon-as-of view, pinned canon, and search. The rest of Orrin's note is in.
+- The first `## Appearance` doesn't hand over to it, so it keeps applying,
+  past `a1:2`, until the typo is fixed. Then it hands over as usual.
+
+Spec: F-GEN-2, F-SEC-8, F-SEC-10, F-VIEW-1, F-VIEW-2 (#50). Covered by:
+`SectionErrorTests.AnEarlierStandardSectionDoesntHandOverToALeftOutOne`,
+`SectionErrorIndexTests.ItsInNoCanonViewAtAnyPositionAndTheEarlierSectionKeepsApplying`,
+`SectionErrorIndexTests.ItsSearchableMarkedAndNeverCountsAsCanon`.
+
 ## CHECK: what `wolfden check` reports
 
 Background: `wolfden check` (design.md §7) lists every error and warning
@@ -1123,6 +1139,64 @@ Spec: types.md §9, F-TYPE-4, F-PACK-11 (#33). Covered by:
 `EpicFantasyPackTests.ADensTypeInSpeciesFolderWarnsOnThePacksThatNameTheCoreOne`,
 `EpicFantasyPackTests.ADensTypeWithAnotherFolderAndKindOfSpeciesClearsEveryWarning`.
 
+### SC-CHECK-59. A bad value in a section comment leaves out that section
+
+Under a heading, a note has `status=maybe`, `from=a1:2.1`, `until=A1:2`,
+`pin=yes`, `canon=x`, or a repeated attribute.
+
+- It's still an error, with the file and the comment's line, and `check`
+  exits 1. The message names the section and says it's left out.
+- The note stays, with the rest of its sections. The section's subsections go
+  with it. A bad subsection takes only itself and what's under it.
+- An error in the frontmatter still leaves out the whole file, whatever
+  else it has. A bad section comment there is still reported, but doesn't say
+  a section is left out, since the whole note is.
+
+Spec: F-GEN-1, F-GEN-2, F-SEC-7, F-SEC-10, F-STAT-1, F-POS-2, F-POS-3, F-PIN-1
+(#50). Covered by: `SectionErrorTests`, `CheckCommandTests.ABadSectionCommentFailsTheCheckAndTheNoteIsStillChecked`.
+
+### SC-CHECK-60. A bad section comment in a book.md keeps the book
+
+`universe.md`, `series.md`, or `book.md` has a bad value in a section
+comment.
+
+- It's an error on that file and `check` exits 1, but the container and
+  everything under it stay. An error in its frontmatter still leaves them all
+  out.
+
+Spec: F-GEN-2 (#50). Covered by:
+`SectionErrorTests.ABadSectionInAContainerFileKeepsTheContainer`,
+`SectionErrorTests.ABadSectionInASeriesFileKeepsTheSeriesAndAFrontmatterErrorDoesnt`.
+
+### SC-CHECK-61. Links in a section that's left out
+
+A section with a bad comment links to a note that isn't there, a note from
+a later book, and an `idea`.
+
+- The link that's broken is reported (F-LINK-8), and an ambiguous one too. A
+  heading link to a left-out section finds it. There's no F-LINK-12 or
+  F-LINK-13, since its status and position aren't known until the error is
+  fixed.
+
+Spec: F-GEN-2, F-LINK-12, F-LINK-13 (#50). Covered by:
+`SectionErrorTests.LinksInALeftOutSectionAreCheckedOnlyForWhatDoesntDependOnPositionOrStatus`.
+
+### SC-CHECK-62. A save is refused only if it adds an error
+
+A note has `status=maybe` under `## Secret`.
+
+- A save that keeps it goes ahead, wherever it now is: text added above it,
+  sections reordered, the heading renamed, or the comment's spacing or quotes
+  changed. Fixing it goes ahead too.
+- A save with a different bad value, a second `status=maybe`, or any other
+  new bad value is refused, and names only what's new. So is a frontmatter
+  error, and a new file with any error.
+
+Spec: format.md §1.3, F-GEN-2 (#50). Covered by:
+`SectionErrorTests.AnEditElsewhereKeepsAnErrorThatWasThereAndIsAllowed`,
+`SectionErrorTests.TheSameErrorIsKnownWhereverItMoved`,
+`SectionErrorTests.ANewBadValueIsRefused`.
+
 ## RT: saving a note keeps what the writer wrote
 
 Background: the files are the writer's, and Wolfden is only one of the
@@ -1464,6 +1538,16 @@ Spec: format.md F-RT-7, F-TMP-7, F-RT-1, F-RT-2 (#197). Covered by:
 `FieldEditEndpointTests.ListItemsAreAddedRemovedAndReorderedInTheListsOwnStyle`,
 `ChapterFieldEndpointTests.MovingOrReplacingAnItemKeepsItsComments` (API),
 `ListItemToolTests` (MCP).
+
+### SC-RT-18. A note with a bad section comment keeps every byte
+
+- A file with a bad section comment writes back exactly as it was read,
+  the comment as written. An edit elsewhere changes only what it's for, and
+  a rename rewrites links in the left-out section (SC-MCP-37).
+
+Spec: F-GEN-2, F-RT-3 (#50). Covered by:
+`SectionErrorTests.AFileWithABadSectionRoundTripsExactly`,
+`SectionErrorTests.AnEditElsewhereChangesOnlyThatTextAndKeepsTheBadComment`.
 
 ## CLI: working with a den from the command line
 
@@ -2014,6 +2098,14 @@ Spec: design.md §7 (#116). Covered by:
 `UnlistableFolderTests.TheWatcherLeavesOutAnEntitiesFolderItCantList`,
 `UnlistableFolderTests.TheWatcherRebuildsWithoutAContainerFolderItCantList`,
 `UnlistableFolderTests.TheWatcherLeavesOutAFolderItCantListWhenAFileInItChanges`.
+
+### SC-WATCH-9. I fix a typo in a section comment in my text editor
+
+- With `wolfden serve` running, the section comes back at once, and goes
+  again if the typo does. The index is the same as a full rebuild's.
+
+Spec: F-GEN-2 (#14, #50). Covered by:
+`SectionErrorIndexTests.TheWatcherPicksUpABadSectionAndItsFixInPlace`.
 
 ## MCP: an AI assistant reads the den
 
@@ -3032,6 +3124,46 @@ Spec: types.md F-CHAP-3, F-CHAP-5 (#233). Covered by:
 `WriteToolTests.ARefusalNamesAChapterByItsTitleOnOneLine`,
 `ChapterDefaultsToolTests.AnAddToADefaultThatIsntAListNamesTheContainerAndSaysWhatToDo` (MCP).
 
+### SC-MCP-35. My assistant reads a note with a section that's left out
+
+- `get_entity` with no position gives the section in its place, with
+  `left_out`: each error's line, rule, and message. Pinned facts don't have it.
+- With `as_of`, at any position, and in `canon_as_of`, it isn't there and
+  nothing says it was. A heading can give away a reveal.
+- `search` finds it with no position, with `left_out: true` and `in_canon:
+  false`. `canon_only` leaves it out. The MCP `search` tool takes no position;
+  a search at a position through `/api/search` doesn't find it (SC-WEB-83).
+
+Spec: F-GEN-2, F-VIEW-1, F-VIEW-2 (#50). Covered by:
+`SectionErrorToolTests.TheFullViewFlagsItInPlaceAndAViewAtAPositionDoesntNameIt`,
+`SectionErrorToolTests.SearchFindsItWithoutAPositionMarkedAndCanonOnlyLeavesItOut`.
+
+### SC-MCP-36. My assistant edits a note with a typo in a section comment
+
+- An edit of another section, of the left-out section's text, or a new
+  section goes ahead. The result lists the error that's still there, marked
+  `error`, with the warnings.
+- Replacing the file with the typo fixed brings the section back. Adding a
+  new bad value is refused with `invalid_edit`, naming only what's new, and
+  nothing is written.
+
+Spec: format.md §1.3, F-GEN-2 (#50). Covered by:
+`SectionErrorToolTests.AnEditElsewhereIsAllowedAndTheResultSaysTheErrorIsStillThere`,
+`SectionErrorToolTests.EditingTheFileToFixItWorksAndBringsTheSectionBack`,
+`SectionErrorToolTests.ANewBadValueIsRefusedAndNothingIsWritten`.
+
+### SC-MCP-37. Rename, move, and copy around a section that's left out
+
+- Renaming a note rewrites links to it in a left-out section, as anywhere.
+  Moving a note with one keeps it as it is.
+- Copying such a note is refused until the typo is fixed: the copy would
+  add an error.
+
+Spec: F-GEN-2, F-RT-5 (#50). Covered by:
+`SectionErrorToolTests.RenamingANoteRewritesTheLinksInsideALeftOutSection`,
+`SectionErrorToolTests.MovingANoteWithALeftOutSectionKeepsItAsItIs`,
+`SectionErrorToolTests.ACopyOfANoteWithABadSectionIsRefusedSinceItWouldAddAnError`.
+
 ## STORE: Wolfden saves, moves, and deletes notes
 
 Background: the den store (design.md §6, #121) is how Wolfden writes a
@@ -3632,6 +3764,19 @@ Spec: design.md §11 (#34). Covered by:
 `StarfallReplayTests.WithoutAFolderItPrintsHowToUseIt`,
 `StarfallReplayTests.GitSettingsInTheEnvironmentCantPointItAtAnotherRepository`,
 `StarfallReplayTests.TheScriptRunsNoGitCommandThatCouldReachTheNetwork`.
+
+### SC-HIST-20. I try to freeze a book with a typo in a section comment
+
+- Freezing is refused before anything changes, naming each file, line, and
+  error, in the book's `book.md` or a note filed in it. Other books aren't
+  held up. Once it's fixed, the freeze goes ahead.
+- A book already marked final by hand with such a typo isn't snapshotted.
+  The refusal says to unfreeze it, fix it, and freeze it again, since a final
+  book can't be edited.
+
+Spec: F-BOOK-1, F-GEN-2 (#50). Covered by:
+`SectionErrorToolTests.ABookWithALeftOutSectionCantBeFrozenUntilItsFixed`,
+`SectionErrorToolTests.ABadSectionInBookMdRefusesTooAndABookMarkedFinalByHandIsntSnapshotted`.
 
 ## WEB: the den in a browser
 
@@ -5368,7 +5513,28 @@ the universe page list the writer's notes by type.
 Spec: types.md F-SPACE-1, F-FANTASY-1 (#32, #33). Covered by:
 `web/src/typePlural.test.ts`.
 
-### SC-WEB-83. Untitled chapters read the same everywhere
+### SC-WEB-83. A section with a typo in its comment shows where it is, flagged
+
+Mina's note has `status=maybe` under `## A rumor`, with a subsection.
+
+- In Everything mode, and while editing, the section and its subsection are
+  in place, each with a **left out** badge and a flag that names the line and
+  the problem. Its Edit, Rename, and Remove buttons still work.
+- Edit file lists the same errors above the editor, once each. Fixing it
+  there brings the section back at every position.
+- A save that keeps such an error lists it marked **Error**, with the file's
+  warnings.
+- A search with no position marks a hit in it **left out**.
+- At a story position, nothing shows it: no heading, no text, no badge, no
+  search hit, no backlink from it (SC-WEB-6).
+- The den-wide list of problems is #280.
+
+Spec: F-GEN-2 (#50). Covered by:
+`SectionErrorEndpointTests`, `SpoilerTests.NothingAsOfAPositionNamesASectionLeftOutByAnError`,
+`SectionErrorToolTests.ALeftOutSectionCanBeRenamedAndRemoved`,
+`web/src/Editing.test.tsx`, `web/src/Search.test.tsx`.
+
+### SC-WEB-84. Untitled chapters read the same everywhere
 
 After `new book "Tide" --chapters 4` and `new chapter --in tide --after 1`,
 the book has five chapters, and the one with the key `3` is the fourth.
@@ -5384,7 +5550,7 @@ the book has five chapters, and the one with the key `3` is the fourth.
 
 Spec: #285. Covered by: `web/src/ChapterHeading.test.tsx`.
 
-### SC-WEB-84. An open page shows what an assistant just wrote
+### SC-WEB-85. An open page shows what an assistant just wrote
 
 The writer is reading a note. An AI assistant, or the writer in another
 editor, changes it.
@@ -5400,7 +5566,7 @@ editor, changes it.
 Spec: #285. Covered by: `web/src/LiveRefresh.test.tsx`,
 `tests/Wolfden.Api.Tests/ApiTests.cs`.
 
-### SC-WEB-85. An outside write never touches an open editor
+### SC-WEB-86. An outside write never touches an open editor
 
 The writer has a section open in the editor, with unsaved text, when another
 program adds lines above that section.
@@ -5416,7 +5582,7 @@ program adds lines above that section.
 
 Spec: #285. Covered by: `web/src/LiveRefresh.test.tsx`.
 
-### SC-WEB-86. A final book offers nothing new in the contents tree
+### SC-WEB-87. A final book offers nothing new in the contents tree
 
 A book marked final has no **New <type>** under its lists in the contents
 tree, as its page has no **New note ▾**. A book that isn't final has them.

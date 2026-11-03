@@ -303,7 +303,7 @@ public sealed class DenReader
                     .Take(limit + 1)
                     .Select(x => new SearchHitView(
                         Summary(x.Entity, universes, scopes), x.Hit.SectionName, x.Hit.SectionLine, x.Hit.Snippet, x.Hit.Status, x.Hit.IsInCanon,
-                        x.Hit.InComment)
+                        x.Hit.InComment, LeftOut: x.Hit.IsLeftOut ? true : null)
                     {
                         Text = x.Hit.Text,
                         Matches = x.Hit.Matches,
@@ -964,6 +964,8 @@ public sealed class DenReader
         return new(e.Key, e.Ulid, e.Name, e.Type, e.Status, universes[e.UniverseId], scopes[e.ScopeId].Kind, scopes[e.ScopeId].Key, e.Path, e.FromText);
     }
 
+    private static readonly JsonSerializerOptions SectionProblemJson = new(JsonSerializerDefaults.Web);
+
     /// <summary>The author's full view of an entity: every field entry and section, whatever its status or range.</summary>
     private static EntityView FullView(
         IndexDbContext db, EntityRecord e, Dictionary<int, string> universes, Dictionary<int, ContainerRecord> scopes)
@@ -978,7 +980,8 @@ public sealed class DenReader
             .OrderBy(s => s.Index)
             .Select(s => new SectionView(
                 s.Name, s.Level, JsonSerializer.Deserialize<string[]>(s.HeadingPathJson) ?? [], s.Status, s.Pinned, s.FromText, s.UntilText, s.Line,
-                Text(s.Body), s.IsBookkeeping))
+                Text(s.Body), s.IsBookkeeping,
+                s.LeftOutJson is { } leftOut ? JsonSerializer.Deserialize<SectionProblem[]>(leftOut, SectionProblemJson) : null))
             .ToList();
 
         // Pinned canon: pinned facts in canon (F-PIN-3 warns about the others), first.

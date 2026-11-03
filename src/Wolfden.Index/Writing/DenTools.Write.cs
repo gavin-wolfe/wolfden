@@ -1128,10 +1128,10 @@ public sealed partial class DenTools
             {
                 CheckWrittenPositions(before, after);
             }
-            catch (DenToolException e) when (e.Code == ToolErrorCodes.BadPosition && tracked.Unreadable.Count > 0)
+            catch (DenToolException e) when (e.Code == ToolErrorCodes.BadPosition && InThisUniverse(tracked.Unreadable).Count > 0)
             {
                 // A book.md that can't be read has no book or chapters to the den: say so, not only that there's no such place.
-                throw new DenToolException(e.Code, $"{e.Message} {MayBeWhy(tracked.Unreadable)}");
+                throw new DenToolException(e.Code, $"{e.Message} {MayBeWhy(InThisUniverse(tracked.Unreadable))}");
             }
 
             Save(files, new Dictionary<string, byte[]>(StringComparer.Ordinal) { [path] = original }, created: null);
@@ -1243,6 +1243,9 @@ public sealed partial class DenTools
     /// <summary>What to add to another error when something couldn't be read, since that may be its real cause.</summary>
     private string MayBeWhy(IReadOnlyList<UnreadablePath> paths) =>
         $"Couldn't read {Named(paths)} right now, which may be why. {UnreadablePath.WhatToDo(paths)}";
+
+    /// <summary>The paths a pinned session may name: a file in another universe can't be why something in this one wasn't found.</summary>
+    private List<UnreadablePath> InThisUniverse(IEnumerable<UnreadablePath> paths) => paths.Where(p => !IsInAnotherUniverse(p.Path)).ToList();
 
     /// <summary>
     /// The paths for a message, the first few by name. A session pinned to a

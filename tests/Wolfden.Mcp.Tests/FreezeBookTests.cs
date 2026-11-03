@@ -116,6 +116,23 @@ public sealed class FreezeBookTests : IDisposable
 
     [Fact]
     [Trait("Scenario", "SC-MCP-38")]
+    public void UnfreezingADraftBookSaysSoEvenWhileANoteIsLocked()
+    {
+        RunGit("init", "--quiet");
+        Commit("Start the Dracula notes");
+        var tools = WithGit();
+
+        using (LockedFile.Hold(Path.Combine(_den.Root, LucyFile.Replace('/', Path.DirectorySeparatorChar))))
+        {
+            var unfrozen = tools.UnfreezeBook("dracula", null);
+
+            Assert.False(unfrozen.Changed);
+            Assert.Equal(FreezeSnapshot.NotFrozen, unfrozen.Snapshot);
+        }
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-38")]
     public void AFreezeWithoutHistoryIsntStoppedByALockedNote()
     {
         var tools = new DenTools(_den.Root);

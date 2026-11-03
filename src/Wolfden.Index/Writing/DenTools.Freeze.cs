@@ -255,7 +255,12 @@ public sealed partial class DenTools
         var (universeKey, key) = BookArgument(book, universe);
         using (EnterWrite())
         {
-            RefuseUnreadableBeforeCheckpoint();
+            // A book that isn't final isn't written or checkpointed, so nothing needs reading.
+            if (FindBook(DenStructure.Load(Snapshot()), universeKey, key).Status == BookStatus.Final)
+            {
+                RefuseUnreadableBeforeCheckpoint();
+            }
+
             var (target, bytes, changed, idAdded, warnings) = SetStatus(universeKey, key, expectedHash, BookStatus.Draft);
             var said = $"Book '{target.Name}'";
             var history = History();
@@ -361,10 +366,18 @@ public sealed partial class DenTools
     /// </summary>
     private void RefuseLeftOutSections(string universeKey, string key)
     {
-        var den = Snapshot();
+        var den = new TrackingDenSource(Snapshot());
         var structure = DenStructure.Load(den);
         var target = FindBook(structure, universeKey, key);
-        var found = structure.Diagnostics.Concat(EntityCatalog.Load(structure, den).Diagnostics)
+        var diagnostics = structure.Diagnostics.Concat(EntityCatalog.Load(structure, den).Diagnostics).ToList();
+
+        // A note of this book that can't be read may have a bad section comment too (#284).
+        if (den.Unreadable.Where(u => IsAtOrUnder(u.Path, target.Path)).ToList() is { Count: > 0 } unread)
+        {
+            throw Unreadable(unread);
+        }
+
+        var found = diagnostics
             .Where(d => d.Diagnostic.LeftOut is not null && IsAtOrUnder(d.Path, target.Path))
             .OrderBy(d => d.Path, StringComparer.Ordinal).ThenBy(d => d.Diagnostic.Line ?? 0)
             .ToList();

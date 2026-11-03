@@ -290,7 +290,7 @@ public sealed partial class DenTools
 
                 if (unread.Count > 0)
                 {
-                    effects.Add($"Couldn't read {Named(unread)}, so any links to this section there aren't counted here. Run check once it can be read.");
+                    effects.Add($"Couldn't read {Named(unread)}, so any links to this section there aren't counted here. {ToolWords.Cap(Words.CheckDen)} once it can be read.");
                 }
 
                 return effects;

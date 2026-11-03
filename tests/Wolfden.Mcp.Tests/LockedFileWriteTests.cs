@@ -100,6 +100,76 @@ public sealed class LockedFileWriteTests : IDisposable
 
     [Fact]
     [Trait("Scenario", "SC-MCP-38")]
+    public void ALockedNoteInTheBookStopsAFreezeWithoutHistory()
+    {
+        // A bad section comment stops a freeze (#290). Held, the den can't see it.
+        _den.Write(AftermathFile, "---\nid: 01M4TF5F0EKGGWD5FNVBAEY8Z2\nname: Aftermath\nstatus: draft\nchapters: [1, 2]\n---\n");
+        _den.Write(Memories,
+            "---\nid: 01M4TF5F0EKGGWD5FNVBAEY8Z3\ntype: note\nname: Memories\nstatus: draft\n---\n\n## Secret\n<!-- wolfden: status=maybe -->\nAn unsettled idea.\n");
+        var before = Files();
+
+        var notHeld = Assert.Throws<DenToolException>(() => Tools.FreezeBook("aftermath", null));
+        Assert.Equal(ToolErrorCodes.InvalidEdit, notHeld.Code);
+        Assert.Contains("can't be frozen yet", notHeld.Message, StringComparison.Ordinal);
+        Assert.Equal(before, Files());
+
+        DenToolException held;
+        using (LockedFile.Hold(Full(Memories)))
+        {
+            held = Assert.Throws<DenToolException>(() => Tools.FreezeBook("aftermath", null));
+        }
+
+        Assert.Equal(ToolErrorCodes.DenUnreadable, held.Code);
+        Assert.Contains(Memories, held.Message, StringComparison.Ordinal);
+        Assert.Contains("status: draft", _den.Read(AftermathFile), StringComparison.Ordinal);
+        Assert.Equal(before, Files());
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-38")]
+    public void ALockedNoteRefusesAnIdeaThatMakesANewNote()
+    {
+        var before = Files();
+
+        DenToolException refused;
+        using (LockedFile.Hold(Full(Note)))
+        {
+            refused = Assert.Throws<DenToolException>(() => Tools.AddIdea("Renfield as a recurring figure.", name: "Renfield's return"));
+        }
+
+        Assert.Equal(ToolErrorCodes.DenUnreadable, refused.Code);
+        Assert.Contains(Note, refused.Message, StringComparison.Ordinal);
+        Assert.Equal(before, Files());
+
+        Assert.True(Tools.AddIdea("Renfield as a recurring figure.", name: "Renfield's return").Changed);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-38")]
+    public void ALockedSeriesFileRefusesANewSeries()
+    {
+        using var den = TempDen.Starfall();
+        const string sibling = "universes/starfall/series/long-dark/series.md";
+        var tools = new DenTools(den.Root);
+        var universe = den.Read("universes/starfall/universe.md");
+
+        DenToolException refused;
+        using (LockedFile.Hold(Path.Combine(den.Root, sibling.Replace('/', Path.DirectorySeparatorChar))))
+        {
+            refused = Assert.Throws<DenToolException>(() => tools.CreateSeries("Fresh Series", "starfall"));
+        }
+
+        Assert.Equal(ToolErrorCodes.DenUnreadable, refused.Code);
+        Assert.Contains(sibling, refused.Message, StringComparison.Ordinal);
+        Assert.Equal(universe, den.Read("universes/starfall/universe.md"));
+        Assert.False(Directory.Exists(Path.Combine(den.Root, "universes", "starfall", "series", "fresh-series")));
+
+        tools.CreateSeries("Fresh Series", "starfall");
+        Assert.Contains("long-dark", den.Read("universes/starfall/universe.md"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-38")]
     public void AnOutlineIsNamedWhenItsTheOneLocked()
     {
         var hash = Tools.GetEntity("Mr. Swales").Entity!.Hash!;
@@ -234,6 +304,11 @@ public sealed class LockedFileWriteTests : IDisposable
 
             var unpinned = Assert.Throws<DenToolException>(() => new DenTools(den.Root).RenameEntity("Ilse Tarrow", "Ilse Marrow", hash, universe: "starfall"));
             Assert.Contains(drift, unpinned.Message, StringComparison.Ordinal);
+
+            // A wrong name: a file in another universe can't be why, so it isn't brought up.
+            var typo = Assert.Throws<DenToolException>(() => pinned.RenameEntity("No Such Note", "Anything", hash));
+            Assert.Equal(ToolErrorCodes.UnknownEntity, typo.Code);
+            Assert.DoesNotContain("Couldn't read", typo.Message, StringComparison.Ordinal);
         }
     }
 
@@ -268,7 +343,7 @@ public sealed class LockedFileWriteTests : IDisposable
             var result = Tools.RemoveSection("Mr. Swales", 1, "Voice", hash);
 
             Assert.True(result.Changed);
-            Assert.Contains(result.Effects, e => e.StartsWith($"Couldn't read {Note}, so any links to this section", StringComparison.Ordinal));
+            Assert.Contains(result.Effects, e => e.StartsWith($"Couldn't read {Note}, so any links to this section", StringComparison.Ordinal) && e.EndsWith("Call check once it can be read.", StringComparison.Ordinal));
         }
     }
 

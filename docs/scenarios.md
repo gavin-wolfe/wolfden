@@ -1199,7 +1199,7 @@ Spec: format.md §1.3, F-GEN-2 (#50). Covered by:
 
 ### SC-CHECK-63. Check lists what it couldn't read
 
-Another program holds a note with no sharing, or the writer's account may not
+Another program has a note open for writing, or the writer's account may not
 list a `characters/` folder, while they run `wolfden check`.
 
 - The report has one more error for it, on its path with no line:
@@ -3198,8 +3198,8 @@ Spec: F-GEN-2, F-RT-5 (#50). Covered by:
 
 ### SC-MCP-38. A rename while another program holds a note
 
-The writer has a note open in a program that keeps it to itself, and asks
-the assistant to rename Mr. Swales. That note links to him.
+The writer has a note open for writing in another program, and asks the
+assistant to rename Mr. Swales. That note links to him.
 
 - The rename is refused as a whole with `den_unreadable`. The error names
   the file, says nothing was changed, and says to close it there and try
@@ -3215,12 +3215,15 @@ the assistant to rename Mr. Swales. That note links to him.
 - A new book or series is refused while a sibling's `book.md` or `series.md`
   is held, since writing the story order would drop that sibling from it.
 - A freeze or unfreeze that will checkpoint is refused before `book.md`
-  changes. Without history it writes only `book.md`, and goes ahead.
+  changes. Without history it writes only `book.md`, so a freeze goes ahead
+  unless what's held is in that book, which could hide a bad section comment
+  (SC-CHECK-59). Unfreezing a book that isn't final says so, and nothing more.
 - A position in a book whose `book.md` is held is still `bad_position`, and
   adds the same thing. `remove_section` goes ahead, and says links in the
   held file weren't counted.
 - A session pinned to a universe says "a file outside this universe" instead
-  of naming a file in another one.
+  of naming a file in another one. A wrong name there adds nothing about it,
+  since a file in another universe can't be why.
 - Once it's closed, the same call goes through and the note's links follow.
 - A write to one file, such as adding a chapter, isn't stopped by a note
   held elsewhere: it doesn't depend on that note.
@@ -3240,6 +3243,10 @@ Spec: format.md F-GEN-5, F-RT-5 (#284). Covered by:
 `LockedFileWriteTests.RemovingASectionSaysItsLinksInALockedNoteWerentCounted`,
 `FreezeBookTests.AFreezeThatWillCheckpointIsRefusedWhileANoteIsLocked`,
 `FreezeBookTests.AFreezeWithoutHistoryIsntStoppedByALockedNote`,
+`FreezeBookTests.UnfreezingADraftBookSaysSoEvenWhileANoteIsLocked`,
+`LockedFileWriteTests.ALockedNoteInTheBookStopsAFreezeWithoutHistory`,
+`LockedFileWriteTests.ALockedNoteRefusesAnIdeaThatMakesANewNote`,
+`LockedFileWriteTests.ALockedSeriesFileRefusesANewSeries`,
 `LockedFileWriteTests.AFolderThatCantBeListedRefusesADenWideWriteAndIsNamed`,
 `LockedFileWriteTests.AWriteToOneFileIsntStoppedByALockedNoteElsewhere`,
 `LockedFileWriteTests.AFileDeletedBetweenListingAndReadingIsntAFailure`.
@@ -3247,7 +3254,7 @@ Spec: format.md F-GEN-5, F-RT-5 (#284). Covered by:
 ### SC-MCP-39. A locked file can't get a write past a frozen book
 
 A book is final. A note in it links to Mr. Swales, and another program holds
-that note, or the book's own `book.md`, with no sharing. The assistant asks
+that note, or the book's own `book.md`, open for writing. The assistant asks
 to rename Mr. Swales.
 
 - It's refused with `den_unreadable`, naming the file, and nothing is

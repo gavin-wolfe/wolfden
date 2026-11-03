@@ -131,7 +131,7 @@ public sealed partial class DenTools
             }
 
             var files = plan.Files.ToDictionary(p => p.Key, p => p.Value, StringComparer.Ordinal);
-            var check = Check(den, structure, files);
+            var check = Check(den, structure, files, new Dictionary<string, string>(StringComparer.Ordinal) { [plan.To] = path });
 
             // The file is rewritten in place before it moves, so that state must load too.
             Check(den, structure, new Dictionary<string, byte[]>(StringComparer.Ordinal) { [path] = plan.Interim });

@@ -71,6 +71,7 @@ internal sealed class LinkScanner(Bookkeeping bookkeeping, List<LinkOccurrence> 
                 Section = section,
                 Status = fact.Status,
                 IsBookkeeping = fact.IsBookkeeping,
+                IsLeftOut = fact.IsLeftOut,
                 Positions = Single(fact.EffectiveFrom is { } from ? new LinkPosition(from.Point, from.Description) : null),
             });
         }

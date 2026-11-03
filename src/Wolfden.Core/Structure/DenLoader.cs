@@ -792,7 +792,7 @@ internal sealed partial class DenLoader(DenStructure den, IDenSource source)
     /// <summary>A container file being read, and whether it has errors so far.</summary>
     private sealed class ContainerRead(DenStructure den, string filePath, MarkdownFile file)
     {
-        private bool _hasErrors = file.HasErrors;
+        private bool _hasErrors = file.HasFileErrors;
 
         public string FilePath => filePath;
 

@@ -48,10 +48,11 @@ internal static class CanonQuery
             .ToList()
             .ToLookup(v => v.EntityId);
 
-        // F-SEC-8, F-SEC-9, F-SEC-12: in-canon, non-bookkeeping sections in effect at p.
+        // F-SEC-8, F-SEC-9, F-SEC-12: in-canon, non-bookkeeping sections in effect at p. One an error
+        // leaves out (F-GEN-2) has no range, so it's never in effect; it's left out here all the same.
         var sections = db.Sections
             .Where(s => s.UniverseId == universe.Id && entityIds.Contains(s.EntityId)
-                && (s.Status == Draft || s.Status == Canon) && !s.IsBookkeeping)
+                && (s.Status == Draft || s.Status == Canon) && !s.IsBookkeeping && s.LeftOutJson == null)
             .InEffectAt(point)
             .ToList()
             .ToLookup(s => s.EntityId);

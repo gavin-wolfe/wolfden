@@ -435,7 +435,7 @@ public sealed partial class EntityCatalog
                 $"The file name '{fileName}.md' isn't a valid slug (lowercase letters and digits, with single hyphens between words), so links reach this entity only by id, name, or alias."));
         }
 
-        if (file.HasErrors || errors.Count > 0)
+        if (file.HasFileErrors || errors.Count > 0)
         {
             // Kept only so a broken link can say the file it would reach has errors.
             var keys = new List<string>();

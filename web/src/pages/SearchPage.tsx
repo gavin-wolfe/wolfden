@@ -322,7 +322,7 @@ function Results({
 }
 
 function Hit({ universe, hit }: { universe: string; hit: SearchHit }) {
-  const bookkeeping = !hit.inCanon && !hit.inComment && !hit.field && (hit.status === 'canon' || hit.status === 'draft')
+  const bookkeeping = !hit.inCanon && !hit.inComment && !hit.field && !hit.leftOut && (hit.status === 'canon' || hit.status === 'draft')
   return (
     <li>
       <p className="hit-place">
@@ -335,6 +335,7 @@ function Hit({ universe, hit }: { universe: string; hit: SearchHit }) {
         </Link>
         {hit.status !== hit.entity.status && <StatusBadge status={hit.status} />}
         {bookkeeping && <span className="badge">bookkeeping</span>}
+        {hit.leftOut && <span className="badge problem">left out</span>}
         {hit.inComment && <span className="badge">in a comment</span>}
       </p>
       <p className="snippet">

@@ -18,9 +18,11 @@ public static class IndexSchema
     /// rows explicit rowids, so a file watcher can update the index in place.
     /// Version 6 (#179) keeps control characters out of the search table, so
     /// a snippet's match marks can't clash with a note's text. Version 7
-    /// (#227) keeps what each chapter's heading is built from.
+    /// (#227) keeps what each chapter's heading is built from. Version 8 (#50)
+    /// indexes a file with a bad section comment, and keeps which sections
+    /// that leaves out, and which section each diagnostic leaves out.
     /// </summary>
-    public const int Version = 7;
+    public const int Version = 8;
 
     /// <summary>The <c>meta</c> key for <see cref="Version"/>.</summary>
     public const string SchemaVersionKey = "schema_version";

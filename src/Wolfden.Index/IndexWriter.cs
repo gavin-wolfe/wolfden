@@ -499,6 +499,9 @@ internal sealed class IndexWriter
                 Status = fact.Status.ToKey(),
                 Pinned = fact.Pinned,
                 IsBookkeeping = fact.IsBookkeeping,
+                LeftOutJson = fact.IsLeftOut
+                    ? JsonSerializer.Serialize(section.LeftOutBecause.Select(p => new SectionProblem(p.Line, p.RuleId, p.Message)), JsonOptions)
+                    : null,
                 FromText = fact.FromText,
                 UntilText = fact.UntilText,
                 FromOrdinal = fact.EffectiveFrom?.Point.Ordinal,
@@ -683,6 +686,8 @@ internal sealed class IndexWriter
                 Severity = d.Diagnostic.Severity.ToString().ToLowerInvariant(),
                 Line = d.Diagnostic.Line,
                 Message = d.Diagnostic.Message,
+                LeftOutSection = d.Diagnostic.LeftOut?.Name,
+                LeftOutSectionLine = d.Diagnostic.LeftOut?.Line,
             });
         }
     }

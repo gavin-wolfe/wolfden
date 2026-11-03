@@ -226,11 +226,24 @@ internal static partial class BodyParser
 
         var line = candidate + 1;
         var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        // A bad value leaves out this section, not the file (F-GEN-2, F-SEC-10).
+        void Bad(SectionAttribute attr, Diagnostic problem)
+        {
+            problem = problem with
+            {
+                Message = problem.Message + Diagnostic.LeftOutSentence(section.Name),
+                LeftOut = new LeftOutSection(section.Name, section.Line, attr.Name, attr.Value),
+            };
+            diagnostics.Add(problem);
+            section.AddProblem(problem);
+        }
+
         foreach (var attr in attributes)
         {
             if (!seen.Add(attr.Name))
             {
-                diagnostics.Add(new Diagnostic("F-SEC-7", DiagnosticSeverity.Error, line,
+                Bad(attr, new Diagnostic("F-SEC-7", DiagnosticSeverity.Error, line,
                     $"The attribute '{attr.Name}' is repeated."));
                 continue;
             }
@@ -240,18 +253,18 @@ internal static partial class BodyParser
                 case "from" or "until" when !PositionScanner.IsEmptyBound(attr.Value)
                                             && !StoryPosition.TryParse(attr.Value, out _, out var positionError):
                     // A bad value in a well-formed comment is an error (F-SEC-10).
-                    diagnostics.Add(positionError.ToDiagnostic(DiagnosticSeverity.Error, line));
+                    Bad(attr, positionError.ToDiagnostic(DiagnosticSeverity.Error, line));
                     break;
                 case "status" when !Statuses.Contains(attr.Value):
-                    diagnostics.Add(new Diagnostic("F-STAT-1", DiagnosticSeverity.Error, line,
+                    Bad(attr, new Diagnostic("F-STAT-1", DiagnosticSeverity.Error, line,
                         $"'{attr.Value}' isn't a status. Use idea, undecided, candidate, draft, canon, or retconned."));
                     break;
                 case "pin" when attr.Value is not ("true" or "false"):
-                    diagnostics.Add(new Diagnostic("F-PIN-1", DiagnosticSeverity.Error, line,
+                    Bad(attr, new Diagnostic("F-PIN-1", DiagnosticSeverity.Error, line,
                         $"pin must be true or false, not '{attr.Value}'."));
                     break;
                 case "canon" when attr.Value is not ("true" or "false"):
-                    diagnostics.Add(new Diagnostic("F-SEC-7", DiagnosticSeverity.Error, line,
+                    Bad(attr, new Diagnostic("F-SEC-7", DiagnosticSeverity.Error, line,
                         $"canon must be true or false, not '{attr.Value}'."));
                     break;
                 case var name when !KnownAttributes.Contains(name):

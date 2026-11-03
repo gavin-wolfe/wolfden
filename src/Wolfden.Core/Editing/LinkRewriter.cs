@@ -108,7 +108,7 @@ internal static partial class LinkRewriter
     {
         var universe = $"{entity.Universe.Path}/";
         var broken = links.Catalog.Diagnostics.Concat(links.Catalog.Structure.Diagnostics)
-            .Where(d => d.Diagnostic.Severity == DiagnosticSeverity.Error && d.Path.StartsWith(universe, StringComparison.Ordinal) && d.Path.EndsWith(".md", StringComparison.Ordinal))
+            .Where(d => d.Diagnostic.Severity == DiagnosticSeverity.Error && d.Diagnostic.LeftOut is null && d.Path.StartsWith(universe, StringComparison.Ordinal) && d.Path.EndsWith(".md", StringComparison.Ordinal))
             .Select(d => d.Path)
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal);

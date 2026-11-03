@@ -14,6 +14,14 @@ namespace Wolfden.Core.Editing;
 /// Errors depend only on the file itself, <c>den.yaml</c>, and the enabled
 /// types (F-GEN-4), so the rest of the den needn't be read again.
 /// </summary>
+/// <remarks>
+/// A bad value in a section comment that's already in a file doesn't block a
+/// save of it (format.md §1.3). Such an error is known across the edit by its
+/// rule, its attribute, and its value as written, never by its line or its
+/// section's name, so text added above it, a renamed heading, or a moved
+/// section keeps it the same error, and a new value is a new one. They're
+/// counted, so a second <c>status=maybe</c> is new even if one is already there.
+/// </remarks>
 public static class DenWriteCheck
 {
     /// <summary>
@@ -25,8 +33,10 @@ public static class DenWriteCheck
     /// <param name="den">The den as it is now.</param>
     /// <param name="structure">The den's structure as it is now.</param>
     /// <param name="files">The files to check, by den-relative path.</param>
+    /// <param name="movedFrom">For a file that moves, its new path to its path now, so the errors it has now count as already there. A new file has none.</param>
     /// <exception cref="ArgumentException">A path isn't a container file, an outline, or an entity file of the den: writers don't edit anything else.</exception>
-    public static DenWriteCheckResult Check(IDenSource den, DenStructure structure, IReadOnlyDictionary<string, byte[]> files)
+    public static DenWriteCheckResult Check(
+        IDenSource den, DenStructure structure, IReadOnlyDictionary<string, byte[]> files, IReadOnlyDictionary<string, string>? movedFrom = null)
     {
         ArgumentNullException.ThrowIfNull(den);
         ArgumentNullException.ThrowIfNull(structure);
@@ -80,7 +90,38 @@ public static class DenWriteCheck
             }
         }
 
-        return new DenWriteCheckResult(after, result);
+        return new DenWriteCheckResult(after, result)
+        {
+            Kept = result.ToDictionary(p => p.Key, p => Kept(den, movedFrom?.GetValueOrDefault(p.Key) ?? p.Key, p.Value), StringComparer.Ordinal),
+        };
+    }
+
+    /// <summary>The errors of <paramref name="after"/> that the file at <paramref name="path"/> already has (see the remarks on this class).</summary>
+    private static IReadOnlyList<Diagnostic> Kept(IDenSource den, string path, IReadOnlyList<Diagnostic> after)
+    {
+        var candidates = after.Where(d => d is { Severity: DiagnosticSeverity.Error, LeftOut: not null }).ToList();
+        if (candidates.Count == 0 || den.TryReadFile(path) is not { } bytes)
+        {
+            return [];
+        }
+
+        var before = MarkdownFile.Parse(bytes, requireFrontmatter: true).Diagnostics
+            .Where(d => d.LeftOut is not null)
+            .GroupBy(Key)
+            .ToDictionary(g => g.Key, g => g.Count());
+        var kept = new List<Diagnostic>();
+        foreach (var error in candidates)
+        {
+            if (before.TryGetValue(Key(error), out var left) && left > 0)
+            {
+                before[Key(error)] = left - 1;
+                kept.Add(error);
+            }
+        }
+
+        return kept;
+
+        static (string, string, string) Key(Diagnostic d) => (d.RuleId, d.LeftOut!.Attribute, d.LeftOut.Value);
     }
 
     /// <summary>
@@ -115,14 +156,32 @@ public static class DenWriteCheck
 /// <param name="Diagnostics">Each file's diagnostics as it would be read, by path.</param>
 public sealed record DenWriteCheckResult(DenStructure Structure, IReadOnlyDictionary<string, IReadOnlyList<Diagnostic>> Diagnostics)
 {
-    /// <summary>True if any file would have an error, so it mustn't be written.</summary>
+    /// <summary>
+    /// The bad section comments each file already had, by path, which don't
+    /// block a save of it (format.md §1.3). They're in <see cref="Diagnostics"/> too.
+    /// </summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<Diagnostic>> Kept { get; init; } = new Dictionary<string, IReadOnlyList<Diagnostic>>();
+
+    /// <summary>True if any file would have an error.</summary>
     public bool HasErrors => Diagnostics.Values.Any(list => list.Any(d => d.Severity == DiagnosticSeverity.Error));
+
+    /// <summary>True if the write would add an error, so it mustn't be made.</summary>
+    public bool AddsErrors => AddedErrors.Count > 0;
 
     /// <summary>Every error, with its file's path, by path and line.</summary>
     public IReadOnlyList<DenDiagnostic> Errors => All(DiagnosticSeverity.Error);
 
+    /// <summary>The errors that aren't <see cref="Kept"/>: what refuses the write, with its file's path, by path and line.</summary>
+    public IReadOnlyList<DenDiagnostic> AddedErrors => Errors.Where(d => !IsKept(d)).ToList();
+
+    /// <summary>The bad section comments the write leaves as they were, with their file's path, by path and line.</summary>
+    public IReadOnlyList<DenDiagnostic> KeptErrors => Errors.Where(IsKept).ToList();
+
     /// <summary>Every warning, with its file's path, by path and line.</summary>
     public IReadOnlyList<DenDiagnostic> Warnings => All(DiagnosticSeverity.Warning);
+
+    private bool IsKept(DenDiagnostic d) =>
+        Kept.TryGetValue(d.Path, out var kept) && kept.Any(k => ReferenceEquals(k, d.Diagnostic));
 
     private List<DenDiagnostic> All(DiagnosticSeverity severity) =>
         Diagnostics.OrderBy(p => p.Key, StringComparer.Ordinal)

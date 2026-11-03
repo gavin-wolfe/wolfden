@@ -54,6 +54,12 @@ A rule that a validator enforces ends with its severity.
   tools MUST refuse a write that would add an error. A bad section comment
   that's already in the file doesn't block a save of it, so the rest of a
   note can still be edited, and any other error must be gone once it's saved.
+  One exception, for the app's Edit file reached from its list of problems: a
+  file the den already leaves out whole can't get worse for the den, so it may
+  be saved with errors still in it, one fix at a time, as long as it doesn't
+  have more of them than before. Frontmatter that doesn't parse hides what's
+  wrong below it, so fixing that may show more. The MCP tools have no such
+  exception.
 - **[warning]**: the file is valid and indexed. `wolfden check` reports the
   warning.
 

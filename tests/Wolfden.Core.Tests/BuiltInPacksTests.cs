@@ -132,6 +132,24 @@ public class BuiltInPacksTests
         Assert.Equal(($"packs/mine/types/{key}.yaml", "F-TYPE-4", DiagnosticSeverity.Warning), (clash.Path, clash.Diagnostic.RuleId, clash.Diagnostic.Severity));
     }
 
+    [Theory]
+    [Trait("Scenario", "SC-CHECK-58")]
+    [InlineData("alien", "species")]
+    [InlineData("society", "cultures")]
+    public void ADensTypeInTheNewFolderUnderAnotherKeyReplacesTheCoreOne(string key, string plural)
+    {
+        // F-TYPE-5: the folder decides, so the core type is ignored, and the warning names the way out.
+        var den = DenStructure.Load(new MemoryDenSource()
+            .With("den.yaml", "format: 1\npacks: [mine]\n")
+            .With("packs/mine/pack.yaml", "name: Mine\n")
+            .With($"packs/mine/types/{key}.yaml", $"name: My Own\nplural: {plural}\n"));
+
+        Assert.NotNull(den.Types.Find(key));
+        Assert.Null(den.Types.Find(plural == "species" ? "species" : "culture"));
+        var clash = Assert.Single(den.Diagnostics);
+        Assert.Equal(($"packs/mine/types/{key}.yaml", "F-TYPE-5"), (clash.Path, clash.Diagnostic.RuleId));
+    }
+
     [Fact]
     public void TheThreadIsTheCoreThread()
     {

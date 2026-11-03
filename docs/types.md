@@ -1416,7 +1416,7 @@ common with `space-opera`, so a den can enable both.
 | `realm` | `realms` | `part_of`\*, `kind`, `controlled_by`\*, `seat`\*, `borders`\*, `population`\* | Overview, Land, Society, Rule, Neighbors, History |
 | `magic-system` | `magic-systems` | `kind`, `source`\*, `practiced_by`\* | Overview, How it works, Costs, Limits, Who can use it, Consequences, History, Open questions |
 | `creature` | `creatures` | `kind`, `habitat`\*, `diet`, `danger`, `lifespan`, `population`\* | Overview, Body, Habits, Lore, History |
-| `deity` | `deities` | `species`, `factions`\*, `domains`, `worshippers`\*, `condition`\* | Overview, Powers, Worship, Myths, History, Open questions |
+| `deity` | `deities` | `gender`\*, `pronouns`\*, `species`, `factions`\*, `domains`, `worshippers`\*, `condition`\* | Overview, Want, Powers, Worship, Myths, History, Open questions |
 | `artifact` | `artifacts` | `kind`, `owner`\*, `location`\*, `created_by`, `powered_by`, `condition`\* | Overview, Description, Powers, Price, History, Open questions |
 | `order` | `orders` | `kind`, `leader`\*, `base`\*, `part_of`, `patron`\* | Overview, Creed, Ranks, Goals, Methods, Members, History |
 
@@ -1435,14 +1435,15 @@ a realm is not a kind of faction, unlike the space opera pack's `polity`, and
 a core field that links to `faction`, such as a location's `controlled_by` or
 a character's `factions`, gets the F-LINK-11 warning if it links to a realm.
 
-A `creature` is a kind of being with no culture of its own, and a core
-`species` is one with a culture. One named individual is a `character`, whose
-`species` field can link to either.
+A `creature` is a kind of being with no culture of its own. With the pack on, a
+core `species` note is for one that has a culture. One named individual is a
+`character`, whose `species` field can link to either.
 
 A `deity` is one named god. A kind of god is a `species`, a pantheon is a
 `faction`, and worshippers can be a `culture`. Since `kind_of` passes on no
-fields, `deity` defines its own `species` and `factions`, with the same field
-types as `character`'s.
+fields, `deity` defines its own `gender`, `pronouns`, `species`, `factions`, and
+`Want` section, as `character` does. It leaves out the rest, which a den's
+extension can add.
 
 | Field | Type | On |
 |---|---|---|
@@ -1455,6 +1456,7 @@ types as `character`'s.
 | `practiced_by` | list of `ref` to `culture`, `species`, `order`, `faction`, or `character` | magic-system |
 | `habitat` | `ref` to `location` | creature |
 | `diet`, `danger`, `lifespan` | `text` | creature |
+| `gender`, `pronouns` | `text` | deity |
 | `species` | `text` | deity: in words, or a link to a species note |
 | `factions` | list of `ref` to `faction` | deity |
 | `domains` | list of `text` | deity |

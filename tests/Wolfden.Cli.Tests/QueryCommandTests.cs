@@ -233,10 +233,10 @@ public sealed class QueryCommandTests : IDisposable
     public void ATypeFilterFindsTheFantasyPacksKinds()
     {
         _den.Write("den.yaml", _den.Read("den.yaml") + "packs: [epic-fantasy]\n");
-        _den.Write("universes/dracula/entities/realms/orrowmere.md", "---\ntype: realm\nname: Orrowmere\nstatus: canon\n---\n# Orrowmere\n");
+        _den.Write("universes/dracula/entities/realms/vaskerrow.md", "---\ntype: realm\nname: Vaskerrow\nstatus: canon\n---\n# Vaskerrow\n");
         _den.Write("universes/dracula/entities/orders/banked-flame.md", "---\ntype: order\nname: The Banked Flame\nstatus: canon\n---\n# The Banked Flame\n");
         _den.Write("universes/dracula/entities/artifacts/widows-wick.md", "---\ntype: artifact\nname: The Widow's Wick\nstatus: canon\n---\n# The Widow's Wick\n");
-        _den.Write("universes/dracula/entities/deities/sennowe.md", "---\ntype: deity\nname: Sennowe\nstatus: canon\n---\n# Sennowe\n");
+        _den.Write("universes/dracula/entities/deities/oshelleth.md", "---\ntype: deity\nname: Oshelleth\nstatus: canon\n---\n# Oshelleth\n");
 
         var (_, locations, _) = Query("--brief", "--type", "location");
         var (_, realms, _) = Query("--brief", "--type", "realm");
@@ -244,13 +244,13 @@ public sealed class QueryCommandTests : IDisposable
         var (_, items, _) = Query("--brief", "--type", "item");
         var (_, characters, _) = Query("--brief", "--type", "character");
 
-        Assert.Contains("- Orrowmere (realm, canon,", locations, StringComparison.Ordinal);
+        Assert.Contains("- Vaskerrow (realm, canon,", locations, StringComparison.Ordinal);
         Assert.Contains("(location, canon,", locations, StringComparison.Ordinal);
-        Assert.Contains("- Orrowmere (realm, canon,", realms, StringComparison.Ordinal);
+        Assert.Contains("- Vaskerrow (realm, canon,", realms, StringComparison.Ordinal);
         Assert.DoesNotContain("(location, canon,", realms, StringComparison.Ordinal);
         Assert.Contains("- The Banked Flame (order, canon,", factions, StringComparison.Ordinal);
         Assert.Contains("- The Widow's Wick (artifact, canon,", items, StringComparison.Ordinal);
-        Assert.Contains("- Sennowe (deity, canon,", characters, StringComparison.Ordinal);
+        Assert.Contains("- Oshelleth (deity, canon,", characters, StringComparison.Ordinal);
     }
 
     [Fact]

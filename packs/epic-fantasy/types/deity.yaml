@@ -6,6 +6,14 @@ description: >-
   kind of god is a species, and a pantheon is a faction.
 kind_of: character
 fields:
+  gender:
+    type: text
+    temporal: true
+    description: Their gender, in the story's own terms.
+  pronouns:
+    type: text
+    temporal: true
+    description: The pronouns used for them, such as she/her or they/them.
   species:
     type: text
     description: >-
@@ -33,6 +41,8 @@ fields:
 sections:
   - name: Overview
     description: Who it is, in a paragraph.
+  - name: Want
+    description: What they want most.
   - name: Powers
     description: What it can really do, and what it can't.
   - name: Worship

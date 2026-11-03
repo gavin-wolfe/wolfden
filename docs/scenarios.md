@@ -997,7 +997,7 @@ filtering by it includes its kinds" (web).
 ### SC-CHECK-53. I write epic fantasy and turn on the pack
 
 The writer adds `packs: [epic-fantasy]` to `den.yaml`, then makes a kingdom
-with `wolfden new realm "Orrowmere"`, and notes for its magic, a beast, a god,
+with `wolfden new realm "Vaskerrow"`, and notes for its magic, a beast, a god,
 an artifact, and an order. Another writer's story has both starships and
 dragons, and lists both packs.
 
@@ -1055,13 +1055,18 @@ By mistake, a fort's `controlled_by` links to the realm itself.
 - A location's `kind` is a core field, so `kind: continent` gets no warning, in
   a den with or without a pack. New locations get a line for it.
 - The nesting gets no warnings, and each place's page lists what links to it.
-- The fort gets the F-LINK-11 warning: `controlled_by` is a ref to faction. A
-  realm is the land, and whoever rules it is a faction.
+- The fort gets the F-LINK-11 warning, which says `controlled_by` is a ref to
+  faction or a kind of it. The usage guide says what to do: make a note for the
+  faction that rules the realm, and link to that.
+- If the realm becomes a location later, its links still work. `wolfden check`
+  warns about the folder, about a field a location doesn't have, and about a timed
+  `part_of`, which a location's isn't.
 
 Spec: types.md F-FANTASY-1, §9 (#33). Covered by:
 `EpicFantasyPackTests.ALocationCanSayWhatSortOfPlaceItIs`,
 `EpicFantasyPackTests.AWholeStackOfPlacesNestsThroughPartOf`,
-`EpicFantasyPackTests.TheRealmsRulersAreAFactionSoAPlaceHeldByARealmWarns`.
+`EpicFantasyPackTests.TheRealmsRulersAreAFactionSoAPlaceHeldByARealmWarns`,
+`EpicFantasyPackTests.ARealmChangedToALocationKeepsItsLinksAndSaysWhatToFix`.
 
 ### SC-CHECK-56. One dragon, and the kind of being it is
 
@@ -1071,7 +1076,8 @@ whose `species` links to that note. A deity's `worshippers` links to a creature.
 - The character's link gets no warning, since `species` is core's text field,
   and the creature's page lists the character.
 - A creature is a kind of species, so a field that asks for a species takes one.
-  It goes one way: a field that asks for a creature takes no other species.
+  It goes one way: a field that asks for a creature gets the F-LINK-11 warning
+  if it links to any other species.
 
 Spec: types.md F-FANTASY-1, F-TYPE-13 (#33). Covered by:
 `EpicFantasyPackTests.OneNamedBeastsSpeciesLinksToItsCreature`,
@@ -1083,8 +1089,8 @@ The writer's deity has a `species` that links to a kind of god, `factions` that
 links to its pantheon, and `worshippers` that links to a culture.
 
 - None of these gets a warning. `kind_of: character` passes on no fields, so
-  the deity defines its own `species` and `factions`, with the same field types
-  as a character's.
+  the deity defines its own `gender`, `pronouns`, `species`, and `factions`, and
+  a `Want` section, as a character's.
 
 Spec: types.md F-FANTASY-1, F-TYPE-13 (#33). Covered by:
 `EpicFantasyPackTests.ADeityDeclaresItsOwnSpeciesAndFactionsSinceKindOfPassesNoFields`.
@@ -1101,11 +1107,14 @@ core had one.
   a link.
 - The den's own type is used, with the F-TYPE-4 warning on its own file, and its
   notes mean what they meant.
+- A den's type under another key that uses the same folder, such as an `alien`
+  with `plural: species`, replaces core's type, with the F-TYPE-5 warning.
 
 Spec: types.md §9, F-TYPE-4, F-PACK-11 (#33). Covered by:
 `BuiltInPacksTests.SpeciesAndCultureAreCoreAndKindsOfNothing`,
 `BuiltInPacksTests.ACharactersSpeciesAndHeritageAreTextThatCanHoldALink`,
-`BuiltInPacksTests.ADensOwnTypeWinsOverTheNewCoreOne`.
+`BuiltInPacksTests.ADensOwnTypeWinsOverTheNewCoreOne`,
+`BuiltInPacksTests.ADensTypeInTheNewFolderUnderAnotherKeyReplacesTheCoreOne`.
 
 ## RT: saving a note keeps what the writer wrote
 

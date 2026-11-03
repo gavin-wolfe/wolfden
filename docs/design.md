@@ -329,14 +329,20 @@ that eats sheep is a creature, and one named dragon is a character, whose
 `species` field says which. A `culture` is new in core: a group sharing ancestry,
 language, or customs. It's a kind of nothing, not of faction, since it has no
 leaders or members list. A character's `heritage` stays text that can link to
-one. Every den now has these two types. A den that already defined its own is
-unchanged, apart from the F-TYPE-4 warning on its file.
+one. Every den now has these two types. A den that already defined its own, under
+the same key, is unchanged, apart from the F-TYPE-4 warning on its file. A den's
+type that uses the folder under another key, such as an `alien` with
+`plural: species`, replaces the core type instead (types.md F-TYPE-5), with that
+warning on its file. With the fantasy pack on as well, the pack's references to
+the core type then warn too, and links there to the den's type get F-LINK-11,
+until the den adds `kind_of` or renames its folder.
 
 **Decided (#33): rulers are factions, and a god is a character.** There's no
 fantasy government type: a realm names its rulers in `controlled_by`, as space
 opera places do. A `polity` stays separate, and is a faction that governs
 territory, at any size. A `deity` is `kind_of: character`, and declares its own
-`species` and `factions`, since `kind_of` passes on no fields. A kind of god is
+`gender`, `pronouns`, `species`, `factions`, and `Want` section, since `kind_of`
+passes on no fields. A kind of god is
 a species, a pantheon is a faction, and worshippers can be a culture.
 
 **Decided (#6): your writing is yours.** Wolfden's licenses place no

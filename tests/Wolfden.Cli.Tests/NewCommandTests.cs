@@ -43,16 +43,16 @@ public sealed class NewCommandTests : IDisposable
     [Trait("Scenario", "SC-CHECK-53")]
     public void ARealmNeedsTheEpicFantasyPackAndThenComesFromItsTemplate()
     {
-        Assert.NotEqual(CliApp.ExitOk, New("realm", "Orrowmere").ExitCode);
+        Assert.NotEqual(CliApp.ExitOk, New("realm", "Vaskerrow").ExitCode);
 
         _den.Write("den.yaml", _den.Read("den.yaml") + "packs: [epic-fantasy]\n");
-        var (exitCode, _, error) = New("realm", "Orrowmere");
+        var (exitCode, _, error) = New("realm", "Vaskerrow");
 
         Assert.Equal(CliApp.ExitOk, exitCode);
         Assert.Empty(error);
-        var text = _den.Read("universes/dracula/entities/realms/orrowmere.md");
-        Assert.Contains("type: realm\nname: Orrowmere\nstatus: draft\nfields:\n  part_of:\n  kind:\n  controlled_by:\n  seat:\n  borders:\n  population:\n", text, StringComparison.Ordinal);
-        Assert.Contains("# Orrowmere\n\n## Overview\n", text, StringComparison.Ordinal);
+        var text = _den.Read("universes/dracula/entities/realms/vaskerrow.md");
+        Assert.Contains("type: realm\nname: Vaskerrow\nstatus: draft\nfields:\n  part_of:\n  kind:\n  controlled_by:\n  seat:\n  borders:\n  population:\n", text, StringComparison.Ordinal);
+        Assert.Contains("# Vaskerrow\n\n## Overview\n", text, StringComparison.Ordinal);
 
         // Every type's template makes a note that check passes, in its own folder.
         foreach (var (type, folder) in new[]
@@ -60,14 +60,14 @@ public sealed class NewCommandTests : IDisposable
             ("magic-system", "magic-systems"), ("creature", "creatures"), ("deity", "deities"), ("artifact", "artifacts"), ("order", "orders"),
         })
         {
-            Assert.Equal(CliApp.ExitOk, New(type, "Sennowe").ExitCode);
-            Assert.True(_den.Exists($"universes/dracula/entities/{folder}/sennowe.md"), type);
+            Assert.Equal(CliApp.ExitOk, New(type, "Oshelleth").ExitCode);
+            Assert.True(_den.Exists($"universes/dracula/entities/{folder}/oshelleth.md"), type);
         }
 
         var check = Cli.Run(["check", "--den", _den.Root]);
         Assert.Equal(CliApp.ExitOk, check.ExitCode);
         Assert.DoesNotContain("entities/realms/", check.Output, StringComparison.Ordinal);
-        Assert.DoesNotContain("sennowe", check.Output, StringComparison.Ordinal);
+        Assert.DoesNotContain("oshelleth", check.Output, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -1,9 +1,8 @@
 name: Species
 plural: species
 description: >-
-  A kind of being with a culture of its own, human or otherwise. A
-  character's `species` field can link here. A pack can add kinds of it, such
-  as epic fantasy's creature for beings with no culture.
+  A kind of being, human or otherwise. A character's `species` field can
+  link here.
 fields:
   kind:
     type: text

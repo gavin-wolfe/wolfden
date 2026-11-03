@@ -2,6 +2,8 @@
 type: deity
 status: draft
 fields:
+  gender:
+  pronouns:
   species:
   factions: []
   domains: []
@@ -13,6 +15,9 @@ fields:
 
 ## Overview
 <!-- Who is it, as the reader first meets it? Put later reveals in a ### subsection with its own from=. -->
+
+## Want
+<!-- What do they want most? -->
 
 ## Powers
 <!-- What can it really do, and what can't it? -->

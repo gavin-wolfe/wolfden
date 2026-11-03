@@ -19,6 +19,14 @@ public sealed class StarfallSampleCanonViewTests : IClassFixture<StarfallSampleC
 
     [Fact]
     [Trait("Scenario", "SC-CANON-10")]
+    public void TheVelariGainTheirOriginAtEmberTwentySeven()
+    {
+        Assert.DoesNotContain(Entity("ember:26", "Velari").Fields, f => f.Name == "origin");
+        Assert.Contains("velari-prime", Field(Entity("ember:27", "Velari"), "origin"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-CANON-10")]
     public void TheVelariAreExtinctAtEmberFourteen()
     {
         var view = View("ember:14");

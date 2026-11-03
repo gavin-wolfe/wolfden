@@ -205,8 +205,10 @@ your den's own pack
 **If you pick a type and change your mind,** nothing breaks. Change the note's
 `type:` line, and its links still lead to it. `wolfden check` then warns that
 the file belongs in the new type's folder, and names any field the new type
-doesn't have, whose value stays in the note. A link gets a warning only if
-the field it's in doesn't accept the new type.
+doesn't have, whose value stays in the note. It also warns about a field with a
+value for each stretch of the story, if the new type's field has only one, as a
+realm's `part_of` does when the note becomes a location. A link gets a warning
+only if the field it's in doesn't accept the new type.
 
 The examples below come from history, astronomy, and old myth, because you
 already know them. They show how to file things, not what your own story's
@@ -349,7 +351,7 @@ The full list is in [types.md §11](types.md#11-the-space-opera-pack).
 | Realm | A land defined by who rules it, or a plane of existence | The Kingdom of France | `part_of`, `kind`, `controlled_by`, `seat`, `borders`, `population` | `realms` |
 | Magic System | A kind of magic with rules the story has to keep | Alchemy | `kind`, `source`, `practiced_by` | `magic-systems` |
 | Creature | A kind of being with no culture of its own | Griffins | `kind`, `habitat`, `diet`, `danger`, `lifespan`, `population` | `creatures` |
-| Deity | One named god or other worshipped power | Zeus | `species`, `factions`, `domains`, `worshippers`, `condition` | `deities` |
+| Deity | One named god or other worshipped power | Zeus | `gender`, `pronouns`, `species`, `factions`, `domains`, `worshippers`, `condition` | `deities` |
 | Artifact | An object of power with rules of its own | Excalibur | `kind`, `owner`, `location`, `created_by`, `powered_by`, `condition` | `artifacts` |
 | Order | A group bound by a creed and ranks | The Knights Templar | `kind`, `leader`, `base`, `part_of`, `patron` | `orders` |
 
@@ -410,7 +412,9 @@ and a pantheon is a faction.
 
 A deity is a kind of character, so it can lead a faction or be a chapter's
 `pov`. Being a kind of character passes on no fields, so a deity has its own
-`species` and `factions`, which work as a character's do.
+`gender`, `pronouns`, `species`, and `factions`, and a `Want` section, which work
+as a character's do. For anything else a character has, such as `Voice`, extend
+the type from your den's own pack.
 
 **A worked example.** Each line's `part_of` links to the line it's indented
 under:

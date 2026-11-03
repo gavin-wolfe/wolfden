@@ -5,7 +5,7 @@ import { EditError, postEdit, sourceQuery, type EditPath, type EntitySource, typ
 import type { SectionProblem } from '../api'
 import { addImage, type AddedImage } from '../imageApi'
 import { Markdown } from './Markdown'
-import { ErrorState, Loading } from './States'
+import { ErrorMark, ErrorState, Loading, fileProblemsHeading } from './States'
 
 // Editing a note in place (#28; maintainer decisions on #28, 2026-10-27):
 // one piece at a time (the lead, a section, or the whole file), as Markdown
@@ -275,10 +275,11 @@ function SaveResult({ saved, onDismiss }: { saved: Saved; onDismiss: () => void 
       )}
       {result.warnings.length > 0 && (
         <div className="warnings">
-          <p>Warnings in the file:</p>
+          <p>{fileProblemsHeading(result.warnings)}</p>
           <ul>
             {result.warnings.map((w) => (
               <li key={`${w.line}:${w.rule}:${w.message}`}>
+                <ErrorMark severity={w.severity} />
                 {w.line !== null && `Line ${w.line}: `}
                 {w.message} <span className="muted">({w.rule})</span>
               </li>

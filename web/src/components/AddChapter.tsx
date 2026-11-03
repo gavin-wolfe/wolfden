@@ -7,6 +7,7 @@ import type { SourceFieldType } from '../editApi'
 import { fieldDraftOf, fieldProblems, jsonOfField, type FieldDraft, type Json, type Problem } from '../fieldModel'
 import { valueWords } from './ChapterFields'
 import { useAfterSave } from './Editing'
+import { ErrorMark } from './States'
 import { ValueEditor } from './FieldEditing'
 import { trapTab } from './NewEntity'
 import '../newEntity.css'
@@ -75,6 +76,7 @@ export function AddChapter({ universe, book, bookName, chapters, final }: { univ
             <ul className="warnings">
               {added.warnings.map((w) => (
                 <li key={`${w.path}:${w.rule}:${w.line ?? ''}:${w.message}`}>
+                  <ErrorMark severity={w.severity} />
                   {w.rule}: {w.message}
                 </li>
               ))}

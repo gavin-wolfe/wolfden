@@ -210,7 +210,20 @@ public sealed partial class EntityCatalog
         var scope = EntityFileScope(structure, path) ?? throw new ArgumentException($"'{path}' isn't under the entities folder of a container that loaded.", nameof(path));
         var diagnostics = new List<Diagnostic>();
         var entity = Read(path, bytes, scope, diagnostics, []);
+        MarkExcluded(entity, diagnostics);
         return new EntityFileRead(entity, diagnostics.OrderBy(d => d.Line ?? 0).ToList());
+    }
+
+    /// <summary>In a file left out whole, a bad section comment leaves out no more than the file (format.md F-GEN-2).</summary>
+    private static void MarkExcluded(CatalogEntity? entity, List<Diagnostic> diagnostics)
+    {
+        if (entity is null)
+        {
+            for (var i = 0; i < diagnostics.Count; i++)
+            {
+                diagnostics[i] = diagnostics[i].InExcludedFile();
+            }
+        }
     }
 
     private void LoadEntities(IDenSource source)
@@ -241,6 +254,7 @@ public sealed partial class EntityCatalog
         var diagnostics = new List<Diagnostic>();
         var excluded = new List<ExcludedEntity>();
         var entity = Read(path, bytes, scope, diagnostics, excluded);
+        MarkExcluded(entity, diagnostics);
         return new FileResult(containerOrder, entity, diagnostics, excluded.Count > 0 ? excluded[0] : null);
     }
 

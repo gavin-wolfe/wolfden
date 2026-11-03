@@ -30,7 +30,7 @@ import {
 import { FieldValue } from '../pages/EntityPageView'
 import { Conflict, useAfterSave } from './Editing'
 import { ValueEditor, typeWords } from './FieldEditing'
-import { ErrorState, Loading } from './States'
+import { ErrorMark, ErrorState, Loading, fileProblemsHeading } from './States'
 
 // Chapter fields in the web UI (#225; types.md §8): each chapter's fields,
 // and the chapter_defaults of a universe, series, or book, shown with where
@@ -263,10 +263,11 @@ function ChapterValues({
           )}
           {saved.result.warnings.length > 0 && (
             <div className="warnings">
-              <p>Warnings in the file:</p>
+              <p>{fileProblemsHeading(saved.result.warnings)}</p>
               <ul>
                 {saved.result.warnings.map((w) => (
                   <li key={`${w.line}:${w.rule}:${w.message}`}>
+                    <ErrorMark severity={w.severity} />
                     {w.line !== null && `Line ${w.line}: `}
                     {w.message} <span className="muted">({w.rule})</span>
                   </li>

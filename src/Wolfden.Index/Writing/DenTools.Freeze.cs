@@ -354,9 +354,13 @@ public sealed partial class DenTools
             .ToList();
         if (found.Count > 0)
         {
+            // A book already final can't be edited (F-BOOK-1), so fixing comes after unfreezing.
+            var next = target.Status == BookStatus.Final
+                ? $"It's already marked final, and a final book can't be edited, so unfreeze it, fix these, and freeze it again. {Unfreezing(target)} To fix: "
+                : "Fix these first: ";
             throw new DenToolException(
                 ToolErrorCodes.InvalidEdit,
-                $"Book '{target.Key}' can't be frozen yet: a bad section comment leaves text out of it, and a frozen book can't be fixed without unfreezing. Fix these first: " +
+                $"Book '{target.Key}' can't be frozen yet: a bad section comment leaves text out of it, and a frozen book can't be fixed without unfreezing. {next}" +
                 string.Join("; ", found.Select(d => $"{d.Path}:{d.Diagnostic.Line?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "-"}: {d.Diagnostic.RuleId}: {d.Diagnostic.Message}")));
         }
     }

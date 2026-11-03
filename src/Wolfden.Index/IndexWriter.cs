@@ -686,8 +686,8 @@ internal sealed class IndexWriter
                 Severity = d.Diagnostic.Severity.ToString().ToLowerInvariant(),
                 Line = d.Diagnostic.Line,
                 Message = d.Diagnostic.Message,
-                LeftOutSection = d.Diagnostic.LeftOut?.Name,
-                LeftOutSectionLine = d.Diagnostic.LeftOut?.Line,
+                LeftOutSection = d.Diagnostic.LeavesOutOnly?.Name,
+                LeftOutSectionLine = d.Diagnostic.LeavesOutOnly?.Line,
             });
         }
     }

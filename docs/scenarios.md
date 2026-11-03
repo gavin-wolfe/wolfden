@@ -1149,7 +1149,8 @@ Under a heading, a note has `status=maybe`, `from=a1:2.1`, `until=A1:2`,
 - The note stays, with the rest of its sections. The section's subsections go
   with it. A bad subsection takes only itself and what's under it.
 - An error in the frontmatter still leaves out the whole file, whatever
-  else it has.
+  else it has. A bad section comment there is still reported, but doesn't say
+  a section is left out, since the whole note is.
 
 Spec: F-GEN-1, F-GEN-2, F-SEC-7, F-SEC-10, F-STAT-1, F-POS-2, F-POS-3, F-PIN-1
 (#50). Covered by: `SectionErrorTests`, `CheckCommandTests.ABadSectionCommentFailsTheCheckAndTheNoteIsStillChecked`.
@@ -1545,7 +1546,8 @@ Spec: format.md F-RT-7, F-TMP-7, F-RT-1, F-RT-2 (#197). Covered by:
   a rename rewrites links in the left-out section (SC-MCP-37).
 
 Spec: F-GEN-2, F-RT-3 (#50). Covered by:
-`SectionErrorTests.AFileWithABadSectionRoundTripsAndAnEditTouchesOnlyWhatItMeans`.
+`SectionErrorTests.AFileWithABadSectionRoundTripsExactly`,
+`SectionErrorTests.AnEditElsewhereChangesOnlyThatTextAndKeepsTheBadComment`.
 
 ## CLI: working with a den from the command line
 
@@ -3125,7 +3127,8 @@ Spec: types.md F-CHAP-3, F-CHAP-5 (#233). Covered by:
 - With `as_of`, at any position, and in `canon_as_of`, it isn't there and
   nothing says it was. A heading can give away a reveal.
 - `search` finds it with no position, with `left_out: true` and `in_canon:
-  false`. `canon_only` leaves it out, and so does any search at a position.
+  false`. `canon_only` leaves it out. The MCP `search` tool takes no position;
+  a search at a position through `/api/search` doesn't find it (SC-WEB-83).
 
 Spec: F-GEN-2, F-VIEW-1, F-VIEW-2 (#50). Covered by:
 `SectionErrorToolTests.TheFullViewFlagsItInPlaceAndAViewAtAPositionDoesntNameIt`,
@@ -3763,8 +3766,9 @@ Spec: design.md §11 (#34). Covered by:
 - Freezing is refused before anything changes, naming each file, line, and
   error, in the book's `book.md` or a note filed in it. Other books aren't
   held up. Once it's fixed, the freeze goes ahead.
-- A book already marked final by hand with such a typo isn't snapshotted,
-  and can be unfrozen, which is how it gets fixed.
+- A book already marked final by hand with such a typo isn't snapshotted.
+  The refusal says to unfreeze it, fix it, and freeze it again, since a final
+  book can't be edited.
 
 Spec: F-BOOK-1, F-GEN-2 (#50). Covered by:
 `SectionErrorToolTests.ABookWithALeftOutSectionCantBeFrozenUntilItsFixed`,
@@ -5514,6 +5518,8 @@ Mina's note has `status=maybe` under `## A rumor`, with a subsection.
   the problem. Its Edit, Rename, and Remove buttons still work.
 - Edit file lists the same errors above the editor, once each. Fixing it
   there brings the section back at every position.
+- A save that keeps such an error lists it marked **Error**, with the file's
+  warnings.
 - A search with no position marks a hit in it **left out**.
 - At a story position, nothing shows it: no heading, no text, no badge, no
   search hit, no backlink from it (SC-WEB-6).
@@ -5521,4 +5527,5 @@ Mina's note has `status=maybe` under `## A rumor`, with a subsection.
 
 Spec: F-GEN-2 (#50). Covered by:
 `SectionErrorEndpointTests`, `SpoilerTests.NothingAsOfAPositionNamesASectionLeftOutByAnError`,
+`SectionErrorToolTests.ALeftOutSectionCanBeRenamedAndRemoved`,
 `web/src/Editing.test.tsx`, `web/src/Search.test.tsx`.

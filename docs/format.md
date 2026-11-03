@@ -72,6 +72,9 @@ an entity file or `outline.md` excludes that file. An error in `universe.md`,
 since scopes and positions there can't be interpreted. An error in `den.yaml`
 means the den can't be loaded.
 
+A file or container that another error leaves out is left out whole, and a
+bad section comment in it is still reported as an [error].
+
 A section left out this way isn't live (F-SEC-8), has no range or pin, and no
 view at a story position shows it or says it's there, since a heading can
 give away a reveal (F-VIEW-1, F-VIEW-2). It isn't lost: its text stays in the

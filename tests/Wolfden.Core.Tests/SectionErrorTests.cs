@@ -128,6 +128,12 @@ public class SectionErrorTests
 
         Assert.Empty(check.Catalog.Entities);
         Assert.Equal(["F-ENT-5", "F-PIN-1"], check.Diagnostics.Where(d => d.Diagnostic.Severity == DiagnosticSeverity.Error).Select(d => d.Diagnostic.RuleId).Order(StringComparer.Ordinal));
+
+        // The whole note is out, so the comment's error doesn't say a section is.
+        var comment = check.Diagnostics.Single(d => d.Diagnostic.RuleId == "F-PIN-1").Diagnostic;
+        Assert.Equal("pin must be true or false, not 'yes'.", comment.Message);
+        Assert.Null(comment.LeavesOutOnly);
+        Assert.True(comment.LeftOut!.FileLeftOutToo);
     }
 
     [Theory]
@@ -164,6 +170,20 @@ public class SectionErrorTests
 
         var gone = DenStructure.Load(With("---\nid: 01JC5CK1000000000000000002\nbooks: [b]\n---\n"));
         Assert.Null(gone.FindUniverse("vael")!.FindBook("b"));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-CHECK-60")]
+    public void AContainerLeftOutWholeDoesntSayASectionIs()
+    {
+        var den = Den().With(Book + "/book.md", "---\nid: 01JC5CK1000000000000000003\nchapters: [1]\n---\n\n## Plan\n<!-- wolfden: status=maybe -->\nLater.\n");
+
+        var structure = DenStructure.Load(den);
+
+        Assert.Null(structure.FindUniverse("vael")!.FindBook("a1"));
+        var comment = structure.Diagnostics.Single(d => d.Diagnostic.RuleId == "F-STAT-1").Diagnostic;
+        Assert.Null(comment.LeavesOutOnly);
+        Assert.DoesNotContain("left out", comment.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -284,7 +304,7 @@ public class SectionErrorTests
 
     [Fact]
     [Trait("Scenario", "SC-RT-18")]
-    public void AFileWithABadSectionRoundTripsAndAnEditTouchesOnlyWhatItMeans()
+    public void AFileWithABadSectionRoundTripsExactly()
     {
         var text = Front + "## Overview\r\nA deckhand.\r\n\r\n## Secret\r\n<!--  wolfden:  status=maybe   pin=yes -->\r\nHe's the heir.   \r\n";
         var bytes = Encoding.UTF8.GetBytes(text);
@@ -297,6 +317,18 @@ public class SectionErrorTests
         // The bad comment is kept exactly, and is still there to fix.
         Assert.Equal("<!--  wolfden:  status=maybe   pin=yes -->", file.Sections[1].Comment!.Text);
         Assert.Equal("He's the heir.   \r\n", file.Sections[1].Body);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-RT-18")]
+    public void AnEditElsewhereChangesOnlyThatTextAndKeepsTheBadComment()
+    {
+        var text = Front + "## Overview\nA deckhand.\n\n## Secret\n<!--  wolfden:  status=maybe   pin=yes -->\nHe's the heir.   \n";
+        var file = MarkdownFile.Parse(Encoding.UTF8.GetBytes(text), requireFrontmatter: true);
+
+        var edited = file.WithSectionBody(file.Sections[0], "A sailor.\n");
+
+        Assert.Equal(Encoding.UTF8.GetBytes(text.Replace("A deckhand.", "A sailor.", StringComparison.Ordinal)), edited.ToBytes());
     }
 
     [Fact]

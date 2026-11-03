@@ -139,6 +139,37 @@ public sealed class SectionErrorIndexTests : IDisposable
         Assert.Null(torn.Section);
     }
 
+    [Fact]
+    public void AFileOrContainerLeftOutWholeReachesThatFarWhateverItsSectionsHave()
+    {
+        const string Torn = Book + "/entities/characters/torn.md";
+        _den.Write(Torn, "---\nid: 01JC5CK1000000000000000006\ntype: character\nname: Torn\nstatus: maybe\n---\n\n## Secret\n<!-- wolfden: pin=yes -->\nText.\n");
+        _den.Write("universes/vael/books/a2/book.md", "---\nid: 01JC5CK1000000000000000004\nchapters: [1]\n---\n\n## Plan\n<!-- wolfden: canon=x -->\nLater.\n");
+        using var index = Index();
+
+        var errors = index.Errors();
+
+        var inNote = errors.Where(e => e.Path == Torn).ToList();
+        Assert.Equal(["F-ENT-5", "F-PIN-1"], inNote.Select(e => e.Rule).Order(StringComparer.Ordinal));
+        Assert.All(inNote, e =>
+        {
+            Assert.Equal(DenErrorReach.File, e.Reach);
+            Assert.Null(e.Section);
+            Assert.Null(e.SectionLine);
+            Assert.DoesNotContain("left out", e.Message, StringComparison.Ordinal);
+        });
+        var inBook = errors.Where(e => e.Path == "universes/vael/books/a2/book.md").ToList();
+        Assert.Equal(2, inBook.Count);
+        Assert.All(inBook, e =>
+        {
+            Assert.Equal(DenErrorReach.Container, e.Reach);
+            Assert.Null(e.Section);
+        });
+
+        // A note with only a bad section stays at section reach.
+        Assert.All(errors.Where(e => e.Path == Orrin), e => Assert.Equal(DenErrorReach.Section, e.Reach));
+    }
+
     [Theory]
     [InlineData("den.yaml", DenErrorReach.Den)]
     [InlineData("universes/vael/universe.md", DenErrorReach.Container)]

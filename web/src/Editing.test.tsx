@@ -276,9 +276,30 @@ describe('SC-WEB-40: editing a section or the opening in place', () => {
     expect(within(screen.getByRole('heading', { name: /^Late arc/ }).closest('section')!).getByRole('note').textContent).toContain('Line 13')
     expect(within(screen.getByRole('heading', { name: /^Overview/ }).closest('section')!).queryByRole('note')).toBeNull()
 
+    // It keeps its Rename and Remove buttons (the edits themselves: SectionErrorToolTests).
+    for (const label of ['Rename “Arc”', 'Remove “Arc”']) expect(within(arc).getByRole('button', { name: label })).toBeTruthy()
+
     // Its Edit button still opens it, with the flag still there.
     await openSectionEditor('Arc')
     expect(screen.getByRole('heading', { name: /^Arc/ }).closest('section')!.querySelector('.left-out-flag')).not.toBeNull()
+  })
+
+  it('SC-WEB-83: a save that kept an error marks it as an error, not a warning', async () => {
+    const warnings = [
+      { path: mina.path, line: 13, severity: 'error', rule: 'F-STAT-1', message: "'maybe' isn't a status." },
+      { path: mina.path, line: 3, severity: 'warning', rule: 'F-FLD-2', message: 'A field the type lacks.' },
+    ]
+    stubEditing({ onPost: () => written({ warnings }) })
+    renderApp('/u/dracula/e/E-MINA')
+
+    const { view } = await openSectionEditor()
+    replaceText(view, 'New text.')
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByText('Errors and warnings in the file:')).toBeTruthy()
+    const items = screen.getByText('Errors and warnings in the file:').closest('.warnings')!.querySelectorAll('li')
+    expect(items[0].textContent).toContain('Error: Line 13')
+    expect(items[1].textContent).not.toContain('Error:')
   })
 
   it('SC-WEB-83: Edit file lists what an error leaves out, once for each error', async () => {

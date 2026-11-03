@@ -159,6 +159,18 @@ public sealed class SectionErrorToolTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "SC-WEB-83")]
+    public void ALeftOutSectionCanBeRenamedAndRemoved()
+    {
+        Assert.True(Tools.RenameSectionAt("Greta Brandt", 1, "Quorlax reveal", "Quorlax truth", Hash(), Universe).Changed);
+        Assert.Contains("## Quorlax truth\n<!-- wolfden: status=maybe -->", _den.Read(Note), StringComparison.Ordinal);
+
+        Assert.True(Tools.RemoveSection("Greta Brandt", 1, "Quorlax truth", Hash(), Universe).Changed);
+        Assert.DoesNotContain("Quorlax", _den.Read(Note), StringComparison.Ordinal);
+        Assert.Equal(0, Tools.Check(path: Note).Errors);
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-MCP-37")]
     public void RenamingANoteRewritesTheLinksInsideALeftOutSection()
     {
@@ -230,7 +242,12 @@ public sealed class SectionErrorToolTests : IDisposable
         Assert.Contains(BookFile, refused.Message, StringComparison.Ordinal);
 
         _den.Write(BookFile, book.Replace("status: draft", "status: final", StringComparison.Ordinal) + "\n## Plan\n<!-- wolfden: canon=x -->\nLater.\n");
-        Assert.Contains(BookFile, Assert.Throws<DenToolException>(() => Tools.FreezeBook("ember", null, Universe)).Message, StringComparison.Ordinal);
+        var final = Assert.Throws<DenToolException>(() => Tools.FreezeBook("ember", null, Universe)).Message;
+        Assert.Contains(BookFile, final, StringComparison.Ordinal);
+
+        // Edits to a final book are refused, so the way out starts with unfreezing.
+        Assert.Contains("unfreeze it, fix these, and freeze it again", final, StringComparison.Ordinal);
+        Assert.DoesNotContain("Fix these first", final, StringComparison.Ordinal);
 
         // It can be unfrozen, since that's how it gets fixed.
         Assert.Equal("draft", Tools.UnfreezeBook("ember", null, Universe).Status);

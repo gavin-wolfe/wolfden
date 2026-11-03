@@ -579,7 +579,7 @@ public sealed class DiagnosticRecord
     /// <summary>The message.</summary>
     public string Message { get; set; } = "";
 
-    /// <summary>For an error that leaves out one section (format.md F-GEN-2), the section's name. Null for any other diagnostic.</summary>
+    /// <summary>For an error that leaves out one section and no more (format.md F-GEN-2), the section's name. Null for any other diagnostic, including a bad section comment in a file another error leaves out whole.</summary>
     public string? LeftOutSection { get; set; }
 
     /// <summary>The 1-based line of <see cref="LeftOutSection"/>'s heading, or null.</summary>

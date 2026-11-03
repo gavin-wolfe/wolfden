@@ -72,7 +72,7 @@ public class IndexCommandTests
         Assert.Equal(CliApp.ExitOk, exitCode);
         Assert.Equal(
             "Rebuilt .wolfden/index.db: 1 universe, 1 entity, and 0 links from 4 files.\n" +
-            "Loading found 1 error and 0 warnings; files with errors are left out. Run 'wolfden check' for details.\n",
+            "Loading found 1 error and 0 warnings; what they affect is left out. Run 'wolfden check' for details.\n",
             output);
     }
 

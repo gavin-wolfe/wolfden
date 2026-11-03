@@ -21,7 +21,15 @@ public enum DiagnosticSeverity
 /// <param name="Line">The 1-based line of the section's heading.</param>
 /// <param name="Attribute">The attribute with the bad value, as written.</param>
 /// <param name="Value">The value, as written.</param>
-public sealed record LeftOutSection(string Name, int Line, string Attribute, string Value);
+public sealed record LeftOutSection(string Name, int Line, string Attribute, string Value)
+{
+    /// <summary>
+    /// True if another error leaves out the whole file or container too, so the
+    /// comment's error reaches no further than that error does. It's still
+    /// reported, and still known across a save by its attribute and value.
+    /// </summary>
+    public bool FileLeftOutToo { get; init; }
+}
 
 /// <summary>
 /// A problem found while parsing a file, cited by its format.md rule id
@@ -40,6 +48,9 @@ public sealed record Diagnostic(string RuleId, DiagnosticSeverity Severity, int?
     /// </summary>
     public LeftOutSection? LeftOut { get; init; }
 
+    /// <summary>The section this error alone leaves out: <see cref="LeftOut"/>, unless another error leaves out the whole file too. Null otherwise.</summary>
+    public LeftOutSection? LeavesOutOnly => LeftOut is { FileLeftOutToo: false } section ? section : null;
+
     /// <summary>The sentence a section's error ends with, naming what it leaves out.</summary>
     internal static string LeftOutSentence(string sectionName) =>
         $" {(sectionName.Length > 0 ? $"'{sectionName}'" : "This section")} is left out until this is fixed.";
@@ -51,6 +62,14 @@ public sealed record Diagnostic(string RuleId, DiagnosticSeverity Severity, int?
     /// </summary>
     internal Diagnostic ForTemplate() => LeftOut is { } section
         ? this with { LeftOut = null, Message = Message[..^LeftOutSentence(section.Name).Length] }
+        : this;
+
+    /// <summary>
+    /// This error in a file another error leaves out whole (format.md F-GEN-2):
+    /// it no longer says a section is left out, since the whole file is.
+    /// </summary>
+    internal Diagnostic InExcludedFile() => LeftOut is { FileLeftOutToo: false } section
+        ? this with { LeftOut = section with { FileLeftOutToo = true }, Message = Message[..^LeftOutSentence(section.Name).Length] }
         : this;
 
     /// <inheritdoc />

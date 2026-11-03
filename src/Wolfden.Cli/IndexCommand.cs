@@ -114,7 +114,7 @@ internal static class IndexCommand
             {
                 output.WriteLine(
                     $"Loading found {CheckCommand.Count(report.Errors, "error")} and {CheckCommand.Count(report.Warnings, "warning")}; " +
-                    "files with errors are left out. Run 'wolfden check' for details.");
+                    "what they affect is left out. Run 'wolfden check' for details.");
             }
         }
 

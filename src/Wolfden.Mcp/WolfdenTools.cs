@@ -73,7 +73,10 @@ public sealed class WolfdenTools
         "would know it then: the name is matched only among the entities the reader has met by then, " +
         "and if the reader hasn't met the entity yet, in_view is false and nothing about it is returned. A fact's 'until' is left out " +
         "with as_of, and so are a position field's values later than as_of (such as a thread's paid_off), since when a fact stops holding " +
-        "or a thread pays off is something the reader doesn't know yet: to plan ahead, read without as_of. " +
+        "or a thread pays off is something the reader doesn't know yet: to plan ahead, read without as_of. The writer's HTML comments are left out " +
+        "of the lead and sections with as_of too, and nothing says so: read without as_of to see them, and any guidance the writer left in them. " +
+        "As with canon_as_of, that's as far as positions go: text the writer put in a section or lead, or a field the note's type doesn't define, or a ref " +
+        "field's value, can still mention later events. " +
         PositionHelp)]
     public CallToolResult GetEntity(
         [Description("The entity: its name, an alias, its file name, its id, its key, or its path.")] string entity,
@@ -82,7 +85,7 @@ public sealed class WolfdenTools
         Respond(() =>
         {
             var result = _tools.GetEntity(entity, universe, as_of, out var horizon);
-            return AsOfReads.ForAssistant(result, horizon);
+            return AsOfReads.ForReaders(result, horizon);
         });
 
     /// <summary>The <c>list_entities</c> tool.</summary>
@@ -107,10 +110,11 @@ public sealed class WolfdenTools
         "What's canon at a point in the story: every entity the reader has met by then, at any scope of the universe, with the " +
         "field values and sections in effect there. Ideas, undecided questions, retconned material, and bookkeeping sections are " +
         "left out, and draft material is marked draft. Nothing the reader meets later is included, going by its position, so it's safe for " +
-        "drafting a chapter as far as positions go; text the writer put in a section or lead, or a field the note's type doesn't define, can " +
-        "still mention later events. At a position a fact's 'until' is left out, and so are a position field's values later than the position " +
+        "drafting a chapter as far as positions go; text the writer put in a section or lead, or a field the note's type doesn't define, or a ref " +
+        "field's value, can still mention later events. At a position a fact's 'until' is left out, and so are a position field's values later than the position " +
         "(such as a thread's paid_off), since when a fact stops holding or a thread pays off is something the reader " +
-        "doesn't know yet: to plan ahead, use get_entity without as_of. Pinned canon (the hard facts) comes first, under 'pinned', and is also listed in place. " +
+        "doesn't know yet: to plan ahead, use get_entity without as_of. The writer's HTML comments are left out of the lead and sections at a position too, and nothing " +
+        "says so; get_entity without as_of has them. Pinned canon (the hard facts) comes first, under 'pinned', and is also listed in place. " +
         "Without position, the view is the end of the story: all canon so far. " + PositionHelp)]
     public CallToolResult CanonAsOf(
         [Description("A story position, such as 'dracula:5'. Leave it out for the end of the story.")] string? position = null,
@@ -122,7 +126,7 @@ public sealed class WolfdenTools
         Respond(() =>
         {
             var result = _tools.CanonAsOf(universe, position, series, book, type, brief, out var horizon);
-            return AsOfReads.ForAssistant(result, horizon);
+            return AsOfReads.ForReaders(result, horizon);
         });
 
     /// <summary>The <c>check</c> tool.</summary>
@@ -173,7 +177,7 @@ public sealed class WolfdenTools
     private const string HashHelp =
         "The hash of the file your edit is based on: 'hash' from get_entity, or from your last write's result. If the file has changed " +
         "since (say, the writer edited it), the write is refused with stale_file: read it again. A read with as_of gives the same hash, but it can " +
-        "leave values out, so it doesn't show all of what a change to a field replaces: read without as_of before changing a field.";
+        "leave values and HTML comments out, so it doesn't show all of what a change replaces: read without as_of before changing a note.";
 
     /// <summary>The <c>create_entity</c> tool.</summary>
     [McpServerTool(Name = "create_entity", Title = "Create an entity", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
@@ -229,7 +233,7 @@ public sealed class WolfdenTools
     [McpServerTool(Name = "append_section", Title = "Add to a section", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
     [Description(
         "Adds text to the end of an entity's section's own text, after what's there and before any subsections it has (template prompts " +
-        "in HTML comments stay), or adds the section " +
+        "and the writer's other HTML comments stay, including any a read with as_of left out), or adds the section " +
         "if the entity has none of that name. With new_section true it adds another section of that name even if there is one, such as a " +
         "new 'Appearance' from a later chapter: give it a 'from' where it takes over. A new section can carry 'from', 'until', 'status', " +
         "and 'pin', written as its section comment; a standard section of the type goes in the type's order, any other at the end, " +

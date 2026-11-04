@@ -331,6 +331,10 @@ public sealed record SearchHitView(
     /// <summary>Where the matches are in <see cref="Text"/>, in order.</summary>
     [JsonIgnore]
     public IReadOnlyList<TextMatch> Matches { get; init; } = [];
+
+    /// <summary>For a match in a field's entry, the entry's place in its field, since entries can share a line. It's for the web API, which marks the entry.</summary>
+    [JsonIgnore]
+    public int? EntryIndex { get; init; }
 }
 
 /// <summary>The result of <c>search</c>.</summary>

@@ -223,6 +223,27 @@ public sealed partial class DenReader
         string query, string? universe = null, string? type = null, bool canonOnly = false, int limit = 20,
         string? status = null, string? series = null, string? book = null, string? asOf = null, string? field = null)
     {
+        var filter = CheckSearch(query, limit, status, series, book);
+        return WithIndex(index => RunSearch(index, query, universe, type, canonOnly, limit, status, filter, asOf, field));
+    }
+
+    /// <summary>
+    /// <see cref="Search(string, string?, string?, bool, int, string?, string?, string?, string?, string?)"/>
+    /// over an index already brought up to date and opened, for a caller that
+    /// reads something else from the same index.
+    /// </summary>
+    public SearchResult Search(
+        DenIndex index, string query, string? universe = null, string? type = null, bool canonOnly = false, int limit = 20,
+        string? status = null, string? series = null, string? book = null, string? asOf = null, string? field = null)
+    {
+        ArgumentNullException.ThrowIfNull(index);
+        var filter = CheckSearch(query, limit, status, series, book);
+        return RunSearch(index, query, universe, type, canonOnly, limit, status, filter, asOf, field);
+    }
+
+    /// <summary>Refuses a search's arguments that are wrong whatever the den holds, and gives its series or book filter.</summary>
+    private static CanonFilter? CheckSearch(string query, int limit, string? status, string? series, string? book)
+    {
         if (string.IsNullOrWhiteSpace(query))
         {
             throw new DenToolException(ToolErrorCodes.BadArgument, "Give some words to search for in 'query'.");
@@ -230,114 +251,117 @@ public sealed partial class DenReader
 
         CheckLimit(limit, 200);
         CheckStatus(status);
-        var filter = Filter(series, book);
+        return Filter(series, book);
+    }
+
+    private SearchResult RunSearch(
+        DenIndex index, string query, string? universe, string? type, bool canonOnly, int limit, string? status, CanonFilter? filter, string? asOf, string? field)
+    {
         var fieldName = string.IsNullOrWhiteSpace(field) ? null : field.Trim();
-        return WithIndex(index =>
+        var db = index.Context;
+        var universes = db.Containers.Where(c => c.Kind == "universe").ToDictionary(c => c.Id, c => c.Key);
+        var one = ChooseUniverse(db, universe, asOf, allowAll: true);
+        var universeId = one?.Id;
+        if (one is null && filter is not null)
         {
-            var db = index.Context;
-            var universes = db.Containers.Where(c => c.Kind == "universe").ToDictionary(c => c.Id, c => c.Key);
-            var one = ChooseUniverse(db, universe, asOf, allowAll: true);
-            var universeId = one?.Id;
-            if (one is null && filter is not null)
-            {
-                throw new DenToolException(
-                    ToolErrorCodes.BadArgument, $"A series or book belongs to one universe, so it doesn't go with '{AllUniverses}'; name the universe.");
-            }
+            throw new DenToolException(
+                ToolErrorCodes.BadArgument, $"A series or book belongs to one universe, so it doesn't go with '{AllUniverses}'; name the universe.");
+        }
 
-            if (type is not null)
-            {
-                CheckTypes(db, universeId, [type], listUsed: asOf is null);
-            }
+        if (type is not null)
+        {
+            CheckTypes(db, universeId, [type], listUsed: asOf is null);
+        }
 
-            var types = TypesMatching(type);
+        var types = TypesMatching(type);
 
-            // The entities (by path) a filter or position keeps, and for a
-            // position the lines of the sections in effect there, and the
-            // whole universe's view (whatever the filter), for what's met.
-            HashSet<string>? kept = null;
-            Dictionary<string, HashSet<int>>? sectionsInView = null;
-            CanonView? view = null;
-            CanonView? metView = null;
-            if (asOf is not null)
-            {
-                view = CanonView(index, one!.Key, asOf, filter);
-                metView = filter is null ? view : CanonView(index, one!.Key, asOf, null);
-                kept = view.Entities.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
-                sectionsInView = view.Entities.ToDictionary(e => e.Path, e => e.Sections.Select(s => s.Line).ToHashSet(), StringComparer.Ordinal);
-            }
-            else if (filter is not null)
-            {
-                CheckFilter(db, one!, filter, Words);
-                kept = index.Entities(one!.Key, filter).Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
-            }
+        // The entities (by path) a filter or position keeps, and for a
+        // position the lines of the sections in effect there, and the
+        // whole universe's view (whatever the filter), for what's met.
+        HashSet<string>? kept = null;
+        Dictionary<string, HashSet<int>>? sectionsInView = null;
+        CanonView? view = null;
+        CanonView? metView = null;
+        if (asOf is not null)
+        {
+            view = CanonView(index, one!.Key, asOf, filter);
+            metView = filter is null ? view : CanonView(index, one!.Key, asOf, null);
+            kept = view.Entities.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
+            sectionsInView = view.Entities.ToDictionary(e => e.Path, e => e.Sections.Select(s => s.Line).ToHashSet(), StringComparer.Ordinal);
+        }
+        else if (filter is not null)
+        {
+            CheckFilter(db, one!, filter, Words);
+            kept = index.Entities(one!.Key, filter).Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
+        }
 
-            if (fieldName is not null)
-            {
-                CheckField(db, universeId, fieldName, metView, asOf);
-            }
+        if (fieldName is not null)
+        {
+            CheckField(db, universeId, fieldName, metView, asOf);
+        }
 
-            var scopes = Scopes(db);
-            var views = new List<SearchHitView>();
+        var scopes = Scopes(db);
+        var views = new List<SearchHitView>();
 
-            // Filters apply after the search, so ask for more when there are
-            // any; one more than the cap says whether the raw hits were cut off,
-            // and one more than the limit whether the filtered ones were.
-            var filtered = (universeId is not null && universes.Count > 1) || type is not null || canonOnly || status is not null || kept is not null;
-            var cap = filtered ? Math.Max(limit * 20, 1000) : limit;
-            var cutOff = false;
-            if (fieldName is null)
-            {
-                var hits = index.Search(query, cap + 1);
-                cutOff = hits.Count > cap;
-                var paths = hits.Select(h => h.EntityPath).Distinct().ToList();
-                var entities = db.Entities.Where(e => paths.Contains(e.Path)).ToList().ToDictionary(e => e.Path, StringComparer.Ordinal);
-                views.AddRange(hits
-                    .Where(h => entities.ContainsKey(h.EntityPath))
-                    .Select(h => (Hit: h, Entity: entities[h.EntityPath]))
-                    .Where(x => universeId is null || x.Entity.UniverseId == universeId)
-                    .Where(x => types is null || types.Contains(x.Entity.Type))
-                    .Where(x => !canonOnly || x.Hit.IsInCanon)
-                    .Where(x => status is null || x.Entity.Status == status)
-                    .Where(x => kept is null || kept.Contains(x.Entity.Path))
-                    .Where(x => sectionsInView is null || x.Hit.SectionLine is not { } line || sectionsInView[x.Entity.Path].Contains(line))
-                    .Take(limit + 1)
-                    .Select(x => new SearchHitView(
-                        Summary(x.Entity, universes, scopes), x.Hit.SectionName, x.Hit.SectionLine, x.Hit.Snippet, x.Hit.Status, x.Hit.IsInCanon,
-                        x.Hit.InComment, LeftOut: x.Hit.IsLeftOut ? true : null)
-                    {
-                        Text = x.Hit.Text,
-                        Matches = x.Hit.Matches,
-                    }));
-            }
+        // Filters apply after the search, so ask for more when there are
+        // any; one more than the cap says whether the raw hits were cut off,
+        // and one more than the limit whether the filtered ones were.
+        var filtered = (universeId is not null && universes.Count > 1) || type is not null || canonOnly || status is not null || kept is not null;
+        var cap = filtered ? Math.Max(limit * 20, 1000) : limit;
+        var cutOff = false;
+        if (fieldName is null)
+        {
+            var hits = index.Search(query, cap + 1);
+            cutOff = hits.Count > cap;
+            var paths = hits.Select(h => h.EntityPath).Distinct().ToList();
+            var entities = db.Entities.Where(e => paths.Contains(e.Path)).ToList().ToDictionary(e => e.Path, StringComparer.Ordinal);
+            views.AddRange(hits
+                .Where(h => entities.ContainsKey(h.EntityPath))
+                .Select(h => (Hit: h, Entity: entities[h.EntityPath]))
+                .Where(x => universeId is null || x.Entity.UniverseId == universeId)
+                .Where(x => types is null || types.Contains(x.Entity.Type))
+                .Where(x => !canonOnly || x.Hit.IsInCanon)
+                .Where(x => status is null || x.Entity.Status == status)
+                .Where(x => kept is null || kept.Contains(x.Entity.Path))
+                .Where(x => sectionsInView is null || x.Hit.SectionLine is not { } line || sectionsInView[x.Entity.Path].Contains(line))
+                .Take(limit + 1)
+                .Select(x => new SearchHitView(
+                    Summary(x.Entity, universes, scopes), x.Hit.SectionName, x.Hit.SectionLine, x.Hit.Snippet, x.Hit.Status, x.Hit.IsInCanon,
+                    x.Hit.InComment, LeftOut: x.Hit.IsLeftOut ? true : null)
+                {
+                    Text = x.Hit.Text,
+                    Matches = x.Hit.Matches,
+                }));
+        }
 
-            // Field values come after the text hits, so they're only worth
-            // matching while there's room, and while no text hit past the
-            // cap could still come before them (the result is truncated then).
-            if (views.Count <= limit && !cutOff)
-            {
-                var met = metView?.Entities.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
-                var search = new FieldSearch(index, SearchWords.Parse(query), universeId, fieldName, met);
-                var candidates = view is null
-                    ? search.AllValues(e => (types is null || types.Contains(e.Type)) && (status is null || e.Status == status) && (kept is null || kept.Contains(e.Path)))
-                    : search.ValuesIn(view, e => (types is null || types.Contains(e.Type)) && (status is null || e.Status == status));
-                views.AddRange(candidates
-                    .Where(c => !canonOnly || c.Status is "draft" or "canon")
-                    .Select(search.Match)
-                    .OfType<FieldHit>()
-                    .Take(limit + 1 - views.Count)
-                    .Select(h => new SearchHitView(
-                        Summary(h.Entity, universes, scopes), null, h.Line, h.Snippet.Bracketed(), h.Status, h.Status is "draft" or "canon", false, h.Field)
-                    {
-                        Text = h.Snippet.Text,
-                        Matches = h.Snippet.Matches,
-                    }));
-            }
+        // Field values come after the text hits, so they're only worth
+        // matching while there's room, and while no text hit past the
+        // cap could still come before them (the result is truncated then).
+        if (views.Count <= limit && !cutOff)
+        {
+            var met = metView?.Entities.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
+            var search = new FieldSearch(index, SearchWords.Parse(query), universeId, fieldName, met);
+            var candidates = view is null
+                ? search.AllValues(e => (types is null || types.Contains(e.Type)) && (status is null || e.Status == status) && (kept is null || kept.Contains(e.Path)))
+                : search.ValuesIn(view, e => (types is null || types.Contains(e.Type)) && (status is null || e.Status == status));
+            views.AddRange(candidates
+                .Where(c => !canonOnly || c.Status is "draft" or "canon")
+                .Select(search.Match)
+                .OfType<FieldHit>()
+                .Take(limit + 1 - views.Count)
+                .Select(h => new SearchHitView(
+                    Summary(h.Entity, universes, scopes), null, h.Line, h.Snippet.Bracketed(), h.Status, h.Status is "draft" or "canon", false, h.Field)
+                {
+                    Text = h.Snippet.Text,
+                    Matches = h.Snippet.Matches,
+                    EntryIndex = h.EntryIndex,
+                }));
+        }
 
-            // Raw hits past the cap may hold more that pass the filters.
-            var truncated = views.Count > limit || cutOff;
-            views = views.Take(limit).ToList();
-            return new SearchResult(ResultVersion, query, views.Count, truncated, views);
-        });
+        // Raw hits past the cap may hold more that pass the filters.
+        var truncated = views.Count > limit || cutOff;
+        views = views.Take(limit).ToList();
+        return new SearchResult(ResultVersion, query, views.Count, truncated, views);
     }
 
     /// <summary>
@@ -421,7 +445,7 @@ public sealed partial class DenReader
     }
 
     /// <summary>What a reader at <paramref name="position"/> has reached, in universe <paramref name="universeKey"/>.</summary>
-    private static StoryHorizon Horizon(DenIndex index, string universeKey, string position)
+    public static StoryHorizon Horizon(DenIndex index, string universeKey, string position)
     {
         var db = index.Context;
         return new StoryHorizon(

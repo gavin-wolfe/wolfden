@@ -3334,6 +3334,9 @@ until `ash:3`. My assistant is drafting a chapter.
   a fact, so a change doesn't drop a date it wasn't shown.
 - A field of my own that's a mapping with a key named `until`, and no `value`,
   isn't a dated fact (F-TMP-1), so it comes through as I wrote it.
+- A field that was an entry or a list item only to hold its `until` reads as
+  `plain`, so `kind` doesn't hint at it. One with a `from`, a `pin`, or its own
+  status keeps its kind.
 - The web API gives the date at the same position, for me (SC-WEB-97).
 
 Spec: F-VIEW-4 (#288). Covered by: `FutureUntilTests`.
@@ -3574,12 +3577,13 @@ The web UI is going to show me everything and tag what readers don't know yet
   `pinned`, or `brief`, with or without a filter. Neither is a pinned fact that
   enters later.
 - As Wolfden sets them, no `until` and no later value of a position field is in
-  the answer. That doesn't cover what I wrote myself: a lead or section comes
-  through as written, with its HTML comments and `[[links]]`, and so does a field
-  the type doesn't define, a `ref` field's value, and a mapping with its own
-  `until` key. `line` numbers leave gaps where something's hidden, `kind: temporal`
-  shows that a field changes over time, and `in_view: false`, unlike
-  `unknown_entity`, confirms a note exists.
+  the answer, and neither are the HTML comments in a lead or section, misplaced
+  wolfden ones included (SC-MCP-48). That doesn't cover the rest of what I wrote
+  myself: a lead or section comes through with its `[[links]]` and any comment
+  shown as code, and so does a field the type doesn't define, a `ref` field's value,
+  and a mapping with its own `until` key. `line` numbers leave gaps where something's
+  hidden, `kind: temporal` shows that a dated field changes over time, and
+  `in_view: false`, unlike `unknown_entity`, confirms a note exists.
 - No tag such as `ahead of readers` is in the answer or its `_meta`, and the answer
   has only the members it has today. A new one fails a test, so showing an assistant
   more is a decision and not a side effect. The server offers no prompts or resources.
@@ -3591,8 +3595,43 @@ The web UI is going to show me everything and tag what readers don't know yet
   someone has checked that.
 - Wolfden.Mcp can't reach the web API's project, so it can't use its marks.
 
-Spec: F-GEN-2, F-VIEW-1, F-VIEW-2, F-VIEW-4, F-VIEW-5 (#300). Covered by:
+Spec: F-GEN-2, F-VIEW-1, F-VIEW-2, F-VIEW-4, F-VIEW-5, F-VIEW-6 (#300). Covered by:
 `McpStaysStrictTests`.
+
+### SC-MCP-48. My comments stay away from an assistant drafting a chapter
+
+I keep notes to myself in HTML comments, such as `<!-- She dies at ash:4 -->`.
+My assistant is drafting `ember:3`, and reads at that position.
+
+- `get_entity` and `canon_as_of` have no comment in any lead or section, in place,
+  in `pinned`, or in `brief`, and nothing says one was there. A wolfden comment two
+  blank lines under its heading, mid-section, or in the lead goes the same way, so
+  its date doesn't show. So does a comment in the middle of a heading.
+- The text reads as if I'd never written one: no stray blank lines, no doubled
+  spaces. A section with only a comment reads like an empty one, and stays listed.
+  A lead with only a comment reads like no lead. `line` numbers are still the file's.
+- A comment I show in a code span or code block stays, and so does one I escape with a
+  backslash, outside an HTML block. A `<!--` in a field's value is text too. One in a
+  fence's info string goes, and the code stays. Text that only looks like a list marker,
+  such as `1999.` right before a comment, stays.
+- If I forget the `-->`, what follows doesn't reach the assistant, up to the end of the
+  block: the rest of the text for a comment on its own line, and the rest of the
+  paragraph for one inside it. Closed in a later paragraph with no other comment on the
+  way, all of it goes. With one on the way, that `-->` is the other comment's, so the
+  paragraphs between reach the assistant. A comment that looks nested goes up to the
+  `-->` that balances it only if no blank line comes first, so one stray marker can't
+  take the paragraphs after it. The guide says what's left, since nothing warns of it.
+- A section that isn't found on a write lists the note's headings without their comments.
+- With no position, `get_entity` and `canon_as_of` keep every comment, and so does the
+  code the web UI reads from.
+- `append_section` after a read at a position leaves my comments where they are, and no
+  tool can replace a section's text. If the assistant can edit the file another way, its
+  instructions tell it to read with no position first, or it deletes comments it never saw.
+- To get guidance to the assistant while it drafts, I write visible text, or ask it to
+  read with no position.
+
+Spec: F-SEC-11, F-VIEW-6 (#306). Covered by: `CommentsAtAPositionTests`,
+`MarkdownCommentsTests`, `McpStaysStrictTests`.
 
 ## STORE: Wolfden saves, moves, and deletes notes
 
@@ -4676,12 +4715,12 @@ Spec: design.md §9 (#24, #26, maintainer decision). Covered by:
 The writer, at Dracula chapter 3, opens Quincey Morris's page from a
 bookmark.
 
-- The page shows only a banner: "Readers first meet Quincey P. Morris in
-  Dracula chapter 5." Nothing else of the note is shown or fetched. A
-  button moves the position to chapter 5, and the page appears there.
-- "Show it anyway" fetches the note's full view and shows it below the
-  banner, greyed, still at chapter 3. Another position, another page,
-  or a reload hides it again.
+- By default, it's the Author's view: the whole note, with a small
+  `enters at chapter 5` by its type, still at chapter 3 (SC-WEB-102).
+- In the Reader's view, the page shows only a banner: "Readers first meet
+  Quincey P. Morris in Dracula chapter 5." Nothing else of the note is shown
+  or fetched. A button moves the position to chapter 5, and the page appears
+  there. Another switches to the Author's view.
 
 Spec: design.md §9 (#24, #26, maintainer decision). Covered by:
 `Browse.test.tsx` (web).
@@ -4691,7 +4730,7 @@ Spec: design.md §9 (#24, #26, maintainer decision). Covered by:
 - A resolved `[[...]]` link in a section or a field value is a link to
   that note's page, showing its label or the note's name. A broken link
   is marked as broken, with why. An ambiguous link is marked, and its
-  tooltip lists the notes it matches. As of a position, a link to a
+  tooltip lists the notes it matches. In the Reader's view, a link to a
   note the reader hasn't met is plain text that doesn't say what it
   reaches. "Linked from" groups backlinks by the note or book they're
   in, and says where each one is.
@@ -5073,10 +5112,10 @@ Mina's note is open. I click Edit under "Overview".
   use Add section or Edit file; text that would leave the note with an
   error is refused with the errors (`invalid_edit`), and the editor stays
   open.
-- While anything is being edited, the page shows the full note, whatever
-  the story position, with an "Editing shows everything" badge. A note
-  the reader hasn't met can be edited once shown with "Show it anyway".
-  When the editor closes, the position view comes back.
+- While anything is being edited, the page shows the full note, with an
+  "Editing shows everything" badge. At a story position, that's the Author's
+  view, tags and all, and a note the reader hasn't met can be edited there.
+  The Reader's view has no way to edit.
 
 Spec: design.md §9 (maintainer decisions on #28, 2026-10-27). Covered
 by: `WriteEndpointTests.TheSourceGivesTheFilesHashAndEachSectionsTextAsWritten`,
@@ -6161,8 +6200,11 @@ Mina's note has `status=maybe` under `## A rumor`, with a subsection.
 - A save that keeps such an error lists it marked **Error**, with the file's
   warnings.
 - A search with no position marks a hit in it **left out**.
-- At a story position, nothing shows it: no heading, no text, no badge, no
-  search hit, no backlink from it (SC-WEB-6).
+- At a story position, the Author's view shows it just as Everything mode does,
+  with its badge, its flag, and no reader tags. In the Reader's view, and to an AI
+  assistant, nothing shows it: no heading, no text, no badge, no backlink from it
+  (SC-WEB-6). A search as of a position finds nothing in it, until search has the
+  two views.
 - The den-wide list of problems is SC-WEB-90.
 
 Spec: F-GEN-2 (#50). Covered by:
@@ -6361,10 +6403,12 @@ Spec: F-GEN-2 (#280). Covered by:
 
 - `/api/den/errors` and `/api/file/source` refuse `asOf`: they're the writer's, and
   aren't a view at a position.
-- As of a position, a note left out, asked for by path or id, says only that it's
-  left out at every position, with no file, line, or message, and offers **Show
-  everything**. By name, it's as if there's no such note.
-- A left-out section's name is in no view at a position (SC-WEB-83).
+- In the Reader's view, a note left out, asked for by path or id, says only that
+  it's left out at every position, with no file, line, or message, and offers **Show
+  everything**. By name, it's as if there's no such note. The Author's view is for
+  the writer, so it says what Everything mode says, with **Edit file**.
+- A left-out section's name is in no canon view at a position, which the Reader's
+  view and an AI assistant read (SC-WEB-83).
 
 Spec: F-VIEW-1, F-GEN-2 (#280). Covered by:
 `DenErrorEndpointTests.NothingAtAPositionLeaksWhatsLeftOut`,
@@ -6412,20 +6456,21 @@ Spec: F-GEN-5, F-GEN-2 (#284, #280). Covered by:
 
 ### SC-WEB-97. A date on a fact is ahead of the position I'm reading at
 
-A section of a note holds until chapter 5, and I'm reading at chapter 3.
+A section of a note holds until chapter 5, and I'm reading at chapter 3, in the
+Author's view.
 
 - The heading keeps the date, `until ch. 5` (`until Ash ch. 5` in a universe with
   several books), with the words `ahead of readers` in a small muted tag beside it. Hovering says
   "Readers at this point in the story don't know this yet." Clicking it, or pressing
   Enter on it, shows the same sentence beside it. A field's entry is the same.
 - With no position, there's no tag.
-- At chapter 5 or after, there's no tag. A fact past its date is only shown at
-  that position in a full view: while editing, or with "Show it anyway".
+- At chapter 5 or after, it isn't ahead of readers: it says `no longer true here`
+  (SC-WEB-102).
 - At a bare book, a date of that book's first chapter has no tag, since they're
   the same point (F-POS-7), and a date of its second chapter has one.
 - A date that isn't a chapter or book the universe has gets no tag.
-- `/api/entity` and `/api/canon` give the `until` at a position, which MCP leaves
-  out (SC-MCP-41).
+- `/api/entity` with `marksAt` or a plain `asOf`, and `/api/canon`, give the `until`
+  at a position, which MCP and the Reader's view leave out (SC-MCP-41, SC-WEB-101).
 
 Spec: F-VIEW-4 (#288). Covered by: `ReadEndpointTests.AFactsFutureUntilStaysForTheWriter`,
 `web/src/AheadOfReaders.test.tsx`.
@@ -6496,3 +6541,117 @@ a picker of the den's authors, waits for #311. Covered by:
 `HistorySetupEndpointTests.ADifferentNameIsRefusedInADenWithCheckpointsOrInALargerRepositoryWithNothingChanged`,
 `HistorySetupEndpointTests.ADifferentNameThatStopsPartWayIsKeptOnARetryFromTheDialog`,
 `Checkpoint.test.tsx` (web).
+
+### SC-WEB-100. The page gets everything, with what readers don't know marked
+
+I'm checking a note at chapter 3, and a page asks `/api/entity` or `/api/search`
+with `marksAt` for that position (#300). A note's tabs ask for it (SC-WEB-102), and
+the search page doesn't yet.
+
+- I get the whole note, or every hit a search with no position finds in that
+  universe. Nothing is hidden.
+- A note readers meet later has `readerMark`, `ahead`, at where it enters. A
+  field's entry or a section that starts later has its own, at its effective
+  start: a thread's `## Payoff` starts at `paid_off`, though it has no `from`.
+- A fact whose end is at or before chapter 3 has `readerMark`, `ended`. An entry
+  or section that hands over ends where the next starts, though it has no `until`.
+- A position field's values later than chapter 3 are in `aheadValues`, and the
+  field still gives all of them. A value at chapter 3 isn't later, and a bare book
+  is the same point as its first chapter.
+- A fact in effect with a later `until` has no mark, and keeps its `until`: the
+  page's `ahead of readers` tag is for that (SC-WEB-97).
+- An idea, undecided, candidate, or retconned note, section, or entry, a
+  bookkeeping section, and a section an error leaves out keep their badges and get
+  no reader marks.
+- A note or fact with a position that doesn't resolve, such as a thread paid off
+  in a book I haven't outlined yet, has `readerMark`, `unplaced`, at that position,
+  at every chapter. A position field's value that can't be compared is in
+  `unplacedValues`.
+- A fact whose range holds nothing (`from=ash:3 until=ash:1`, or a subsection that
+  starts after its parent ends) has `readerMark`, `never`, at every chapter.
+- At every position, what has no mark and no badge is what a reader sees.
+  An entry that loses an overlap is the one exception (F-TMP-5).
+- A position that can't be read is `bad_position`, as `asOf` refuses it. An empty
+  `marksAt`, or `asOf` and `marksAt` together, is `bad_argument`.
+- Without `marksAt`, every answer is as it was, and `asOf` is as strict as it was.
+- An AI assistant's same read through MCP stays strict, and no tool can ask for
+  marks (SC-MCP-47).
+
+Spec: F-VIEW-1, F-VIEW-4, F-VIEW-5, F-GEN-2 (#300). Covered by: `MarksAtTests`.
+
+### SC-WEB-101. The Reader's view is what an assistant reads
+
+A page asks `/api/entity` with `asOf` and `readers=true` (#300).
+
+- At every position, its lead, fields, sections, and `pinned` are what MCP's
+  `get_entity` gives there: no later `until`, no later position value, no comment,
+  and no section an error leaves out. Neither says anything's gone.
+- A note the reader hasn't met is `inView: false`, and nothing of it.
+- A link or backlink in text the filter takes for a comment is gone too, and a
+  comment in a heading isn't in a backlink's section name or a link's section.
+- A plain `asOf` still has the `until`s and later values, for the writer.
+- `readers=true` without `asOf`, or with `marksAt`, is `bad_argument`, as is any
+  value but true or false. `readers=false` is the same as leaving it out.
+- `/api/canon`, `/api/search`, and `/api/entities` don't take it.
+- `Wolfden.Api` doesn't reference `Wolfden.Mcp`, as the two share `AsOfReads` from
+  `Wolfden.Index`, and `McpStaysStrictTests` didn't change for it.
+
+Spec: F-VIEW-4, F-VIEW-5, F-VIEW-6, F-GEN-2 (#300). Covered by: `ReadersViewTests`.
+
+### SC-WEB-102. In the Author's view, what readers don't know is tagged
+
+I'm at chapter 3 in the Author's view, on a note's page.
+
+- Nothing is hidden, and a note I'd have been told isn't met yet shows, with
+  `enters at chapter 5` (`enters at Ash chapter 5` in a universe with several books)
+  by its type, on its Note and History tabs.
+- A section or entry that starts later says `ahead of readers`, whether its date is
+  written on it or not. So does a date or value of a position field that's later.
+- One whose end has come says `no longer true here`.
+- One with a position the universe doesn't have says `not placed in the story yet`,
+  at every chapter. One whose range holds nothing says `never true (its dates don't
+  overlap)`.
+- Hovering says why, and where. Clicking or pressing Enter says so in place. The
+  tag is 24 pixels tall, and has a dotted underline.
+- Nothing has two tags: a fact with a mark and a later `until` has only the mark's.
+- A note, section, or entry out of canon, a bookkeeping section, and a section an
+  error leaves out keep their badges and get no tags. In a note no position places,
+  only the note has a tag.
+- "Linked from" says the same of what holds each link, in plain text with a tooltip
+  rather than a button, with one line above the list to say what they are. A link in
+  a section an error leaves out has the **left out** badge. A link in a universe's,
+  series', or book's own text has no tag, since that text isn't in story order.
+- A type's field defaults aren't listed, as in Everything mode, since they aren't
+  in the note. The Reader's view lists them, with their `type default` badge.
+- I can edit from here. The save goes to the real note, the page reads the same way
+  after it, and a file changed underneath still offers both versions (SC-WEB-43).
+- Inline `[[links]]` to later notes are ordinary links, with no tag.
+
+Spec: F-VIEW-4, F-VIEW-5, design.md §9 (#300). Covered by: `web/src/ReaderViews.test.tsx`,
+`web/src/AheadOfReaders.test.tsx`, `web/src/Editing.test.tsx`,
+`ReadersViewTests.ABacklinkHeldBySomethingLaterIsMarked`,
+`ReadersViewTests.AtEveryPositionABacklinkWithNoMarkIsOneAReaderSees`.
+
+### SC-WEB-103. I switch between the Author's view and the Reader's view
+
+- With no position, there's only the full view, and no control.
+- Once I pick a position on a note's page, a two-way control in the position bar
+  says `Author's view` and `Reader's view`, with the current one pressed. It opens
+  on the Author's view.
+- The Reader's view is in the URL (`?readers=1`), so a reload or a shared link keeps
+  it, and following a link, changing the chapter, or changing tab does too. A fresh
+  start opens the Author's view, and nothing is remembered.
+- **Show everything** ends it, and `?readers=1` with no position means nothing.
+- The Reader's view of a note's page shows only what readers know (SC-WEB-101), with
+  no tags, and has no way to edit: no Edit buttons, and it says so. It also says the
+  sidebar, search, and other pages aren't part of it yet.
+- The ⚠ list's **Edit file** leaves the Reader's view behind and keeps the position,
+  since it's the whole source, for the writer.
+- A note readers haven't met there has only the banner (SC-WEB-13), and the History
+  tab fetches no saved version, since one can hold anything. It says so.
+- With an unsaved edit open, switching asks first, as moving the position does.
+- Lists, search, and the book page have one view until later steps of #300, so the
+  control isn't there.
+
+Spec: design.md §9 (#300). Covered by: `web/src/ReaderViews.test.tsx`,
+`web/src/History.test.tsx`, `web/src/Browse.test.tsx`, `web/src/Editing.test.tsx`.

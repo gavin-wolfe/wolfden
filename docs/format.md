@@ -83,8 +83,10 @@ A file or container that another error leaves out is left out whole, and a
 bad section comment in it is still reported as an [error].
 
 A section left out this way isn't live (F-SEC-8), has no range or pin, and no
-view at a story position shows it or says it's there, since a heading can
-give away a reveal (F-VIEW-1, F-VIEW-2). It isn't lost: its text stays in the
+canon view at a story position, which is what an AI assistant and the web UI's
+Reader's view read, shows it or says it's there, since a heading can give away
+a reveal (F-VIEW-1, F-VIEW-2). A view for the writer shows it, and says it's
+left out and why (design.md §9). It isn't lost: its text stays in the
 file, and links in it still resolve, so a rename or a move rewrites them.
 
 **F-GEN-3.** Validators MUST report every diagnostic they find, not just the
@@ -1212,7 +1214,8 @@ the warning says to move it to the next line, and any in `outline.md`.
 
 **F-SEC-11.** All other HTML comments are kept and ignored, wherever they
 are, including directly under a heading. A comment inside a code block or
-code span is just text.
+code span is just text. An AI assistant's read at a position leaves out every
+comment (F-VIEW-6).
 
 **F-SEC-12.** A **bookkeeping** section records work on the notes rather
 than the story: a change log or session notes. A section is bookkeeping if
@@ -1360,24 +1363,65 @@ order.
 **F-VIEW-4.** A fact past its `until` isn't in a view at that position
 (F-TMP-3, F-SEC-8), so every `until` in a canon-as-of view at `p` is later
 than `p`. It says when the fact stops holding, which a reader at `p`
-doesn't know yet. An AI assistant's read at a position (design.md §8) MUST
-leave it out, and doesn't say it did, since saying so would hint that the
-fact ends. The assistant reads it without a position. A view for the writer,
-who may be checking their own plan, keeps it, and the web UI marks it (design.md §9).
+doesn't know yet. An AI assistant's read at a position (design.md §8) and the
+web UI's Reader's view (§9) MUST leave it out, and don't say they did, since
+saying so would hint that the fact ends. For the same reason, a field that was
+an entry or a list item only to hold its `until`, with no `from`, `pin`, or
+status of its own, reads as `plain`. The assistant reads it without a position.
+A view for the writer, who may be checking their own plan, such as the web UI's
+Author's view, keeps it and marks it (design.md §9).
 The view at the end of the story has no `until` to leave out: it holds only
 the facts still in effect when the story ends.
 
 **F-VIEW-5.** The value of a `position` field (types.md F-FT-10), such as a
 thread's `paid_off`, can point past `p`, and that says what a reader at `p`
-doesn't know yet. An AI assistant's read at a position MUST leave out each
-such value that's later than `p` in story order (F-ORD-2), and doesn't say
-it did. This covers every field the entity's type defines as `position`,
+doesn't know yet. An AI assistant's read at a position and the web UI's
+Reader's view MUST leave out each such value that's later than `p` in story
+order (F-ORD-2), and don't say they did. This covers every field the entity's type defines as `position`,
 written plain or as an entry (F-TMP-1). A value at `p` isn't later, and a bare
 book is the same point as its first chapter (F-POS-7). In a list, only the
 later items go, a list that had items and has none left goes entirely, and a
 list written empty stays. A value that can't be compared (not a position, or a
 position that doesn't resolve, F-POS-4) goes too. A view without a position,
 and a view for the writer, leave out nothing under this rule.
+
+**F-VIEW-6.** An HTML comment can say anything, including what a reader at `p`
+doesn't know yet. An AI assistant's read at a position and the web UI's Reader's
+view MUST leave every HTML comment out of a lead, and out of a section's text and
+heading, and don't say they did. That covers the writer's own comments and wolfden comments that do
+nothing (F-SEC-10). A view without a position, and a view for the writer, leave
+out nothing under this rule. Since a badly formed comment may still be meant to
+hide what it holds, this rule reads comments more widely than CommonMark does:
+
+- `<!--` starts a comment anywhere in the text, in any block, except in a code
+  span or code block (F-SEC-11), or after a backslash that escapes it. Both
+  show as text, and stay. A backslash escapes nothing in an HTML block. A fence's
+  info string isn't code, so a comment in it goes, ending with the line at the latest.
+- A comment ends at its first `-->`, however far on, unless another `<!--` opens
+  on the way. Then, if a later `-->` balances the two with no blank line after the
+  first `-->`, the comment ends there. If there's a blank line before the first
+  `-->`, and the comment doesn't start a comment block on a line of its own,
+  nothing closes it and the next rule applies, since that `-->` belongs to the
+  later comment. So a stray `<!--` or `-->` can't take the paragraphs after it
+  unless no other comment comes between. A `-->` with no comment open is text.
+- A comment that nothing closes runs to the end of its block. On a line of its
+  own that's an HTML block, which has no end (F-SEC-10), so the rest of the text
+  goes with it. In a paragraph or heading, where CommonMark shows it as text, the
+  next block stays. Each lead and section's own text is read alone, so a comment
+  doesn't run on into the next section unless F-SEC-10 has already made it part
+  of this one.
+- The text reads as if no comment was there. A line it leaves empty goes, and a
+  comment between two lines leaves one blank line, as it was a block of its own.
+  A list item or block quote holding only a comment goes too. Nothing else
+  changes, in code or elsewhere, and neither do `line` numbers, which are the file's.
+- A lead or section with only comments reads as one with no text. The section
+  stays listed, since its heading isn't a comment. A heading with only a comment
+  has an empty name in every view (F-SEC-3), and its subsections' `heading_path`
+  has the same.
+
+A field's value isn't markdown, so a `<!--` in one is text. YAML comments aren't
+in any view. A write based on such a read isn't refused, since the file's hash is
+the same, so an assistant MUST read without a position before replacing text.
 
 ### 9.5 Keeping reveals in place
 

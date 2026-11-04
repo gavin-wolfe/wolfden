@@ -4,10 +4,10 @@ using System.Text.Json;
 namespace Wolfden.Index.Reading;
 
 /// <summary>A field value a search can match: its entity, field, line, value as JSON, and effective status.</summary>
-internal sealed record FieldCandidate(EntityRecord Entity, string Field, int Line, string ValueJson, string Status);
+internal sealed record FieldCandidate(EntityRecord Entity, string Field, int Line, string ValueJson, string Status, int? EntryIndex);
 
 /// <summary>A field value a search matched, with its snippet.</summary>
-internal sealed record FieldHit(EntityRecord Entity, string Field, int Line, string Status, MarkedText Snippet);
+internal sealed record FieldHit(EntityRecord Entity, string Field, int Line, string Status, MarkedText Snippet, int? EntryIndex);
 
 /// <summary>
 /// Search in field values (#179, maintainer decision 2026-10-26). A value's
@@ -61,7 +61,7 @@ internal sealed class FieldSearch
         return values
             .Where(v => entities.ContainsKey(v.EntityId))
             .OrderBy(v => entities[v.EntityId].Path, StringComparer.Ordinal).ThenBy(v => v.FieldOrder).ThenBy(v => v.EntryIndex ?? -1)
-            .Select(v => new FieldCandidate(entities[v.EntityId], v.Field, v.Line, v.ValueJson, v.Status))
+            .Select(v => new FieldCandidate(entities[v.EntityId], v.Field, v.Line, v.ValueJson, v.Status, v.EntryIndex))
             .ToList();
     }
 
@@ -74,7 +74,7 @@ internal sealed class FieldSearch
             .Where(e => entities.ContainsKey(e.Path))
             .SelectMany(e => e.Fields
                 .Where(f => !f.IsDefault && (_field is null || f.Name == _field))
-                .Select(f => new FieldCandidate(entities[e.Path], f.Name, f.Line, f.ValueJson, f.Status ?? e.Status)))
+                .Select(f => new FieldCandidate(entities[e.Path], f.Name, f.Line, f.ValueJson, f.Status ?? e.Status, f.EntryIndex)))
             .ToList();
     }
 
@@ -118,7 +118,7 @@ internal sealed class FieldSearch
             matches.AddRange(found.SelectMany(f => f).Select(m => m with { Start = m.Start + at }));
         }
 
-        return new FieldHit(value.Entity, value.Field, value.Line, value.Status, new MarkedText(text.ToString(), MarkedText.Merge(matches)));
+        return new FieldHit(value.Entity, value.Field, value.Line, value.Status, new MarkedText(text.ToString(), MarkedText.Merge(matches)), value.EntryIndex);
     }
 
     /// <summary>A field value as one line of text: a list's items and a mapping's keys and values joined with commas.</summary>

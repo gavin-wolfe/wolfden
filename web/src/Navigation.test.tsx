@@ -119,7 +119,7 @@ describe('SC-WEB-11: each position is cached on its own', () => {
           return undefined
         }
 
-        if (params.get('asOf') === 'dracula:1') {
+        if (params.get('marksAt') === 'dracula:1') {
           await held
           return jonathan('Only what chapter 1 shows.')
         }
@@ -224,9 +224,9 @@ describe('SC-WEB-14: repeated links, code spans, and link look-alikes', () => {
 })
 
 describe('Page titles name only what the reader has met', () => {
-  it('names a note in view, and not one met later', async () => {
+  it('in the Reader’s view, names a note in view, and not one met later', async () => {
     stubApi()
-    renderApp('/u/dracula/e/E-QUINCEY?at=dracula:3')
+    renderApp('/u/dracula/e/E-QUINCEY?at=dracula:3&readers=1')
 
     await screen.findByText(/Readers first meet/)
     expect(document.title).toBe('Not met yet · Wolfden')

@@ -29,7 +29,9 @@ public static class WolfdenMcpServer
         book. Facts can carry the position where the reader learns them (from) and where they stop holding (until), so canon
         changes as the story goes on. A read at a position leaves out each fact's until, and a position field's values later than it
         (such as a thread's paid_off), which the reader doesn't know yet; a read without one (get_entity without as_of) has them, for
-        planning ahead. Read without as_of before changing a fact, so a change doesn't drop an until or a value you weren't shown. Chapter keys come from get_chapter. A read at a position the universe doesn't
+        planning ahead. It leaves out the writer's HTML comments too, since they can say anything; a read without a position has them, and any guidance they hold for you.
+        Read without as_of before changing a fact, so a change doesn't drop an until or a value you weren't shown. No tool here replaces a section's text. If you can edit a note's file
+        another way, read it without as_of first, or rewriting text you read at a position deletes comments you never saw. Chapter keys come from get_chapter. A read at a position the universe doesn't
         have, or a write (create_entity, update_fields, append_section) that sets one as a from or until, or as a position field's
         value (such as a thread's planted), is refused (bad_position), and nothing is written.
 

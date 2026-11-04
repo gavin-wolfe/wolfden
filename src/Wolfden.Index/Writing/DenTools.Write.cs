@@ -1094,7 +1094,8 @@ public sealed partial class DenTools
             0 => throw new DenToolException(
                 ToolErrorCodes.UnknownSection,
                 $"The entity has no section '{name}'{(line is null ? "" : $" at line {line}")}. Its sections: " +
-                (file.Sections.Count == 0 ? "none." : string.Join(", ", file.Sections.Select(s => $"'{s.Name}' (line {s.Line})")) + ".")),
+                // Without a heading's comments, since whoever gets this may have read the note at a position (F-VIEW-6).
+                (file.Sections.Count == 0 ? "none." : string.Join(", ", file.Sections.Select(s => $"'{MarkdownComments.Strip(s.Name)}' (line {s.Line})")) + ".")),
             1 => matches[0],
             _ => throw AmbiguousSection(name, matches),
         };

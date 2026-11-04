@@ -391,65 +391,50 @@ describe('SC-WEB-23: I look at a note’s history in the browser', () => {
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
-  it('keeps a note the reader hasn’t met hidden, until the writer asks', async () => {
+  it('shows a later note’s history in the Author’s view, tagged with where it enters', async () => {
     const { calls } = stubApi({ override: historyApi() })
     renderApp('/u/dracula/e/E-QUINCEY?view=history&at=dracula:3')
+
+    await screen.findByRole('heading', { name: 'Checkpoints' })
+    expect(calls).toContain('/api/history?entity=E-QUINCEY&universe=dracula&limit=20')
+    expect(calls).toContain('/api/entity?entity=E-QUINCEY&universe=dracula&marksAt=dracula%3A3')
+    expect(screen.getByRole('button', { name: 'enters at chapter 5' })).toBeTruthy()
+    expect(screen.queryByText(/Readers first meet/)).toBeNull()
+    await screen.findByRole('navigation', { name: 'Where this is filed' })
+  })
+
+  it('has no tag on a note’s history once readers have met it', async () => {
+    stubApi({ override: historyApi() })
+    renderApp('/u/dracula/e/E-QUINCEY?view=history&at=dracula:5')
+
+    await screen.findByRole('heading', { name: 'Checkpoints' })
+    expect(screen.queryByText(/enters at/)).toBeNull()
+  })
+
+  it('fetches no history in the Reader’s view, and keeps a note not met yet behind the banner', async () => {
+    const { calls } = stubApi({ override: historyApi() })
+    const { history } = renderApp('/u/dracula/e/E-QUINCEY?view=history&at=dracula:3&readers=1')
 
     const banner = await screen.findByText(/Readers first meet/)
     expect(banner.textContent).toBe('Readers first meet Quincey P. Morris in Dracula chapter 5.')
     expect(calls.some((c) => c.startsWith('/api/history'))).toBe(false)
+    expect(screen.queryByRole('heading', { name: 'Checkpoints' })).toBeNull()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show it anyway' }))
-    const heading = await screen.findByRole('heading', { name: 'Checkpoints' })
-    expect(calls).toContain('/api/history?entity=E-QUINCEY&universe=dracula&limit=20')
-    // Greyed as a note shown anyway is, with the breadcrumb and tabs from the full view.
-    const revealed = heading.closest('.revealed')!
-    expect(revealed).toBeTruthy()
-    expect(revealed.querySelector('.page-body')).toBeNull()
-    await within(revealed as HTMLElement).findByRole('navigation', { name: 'Where this is filed' })
-  })
-
-  it('shares "Show it anyway" between the Note and History tabs', async () => {
-    stubApi({ override: historyApi() })
-    const { history } = renderApp('/u/dracula/e/E-QUINCEY?at=dracula:3')
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Show it anyway' }))
-    const tabs = await screen.findByRole('navigation', { name: 'Note views' })
-    fireEvent.click(within(tabs).getByRole('link', { name: 'History' }))
-
+    // Switching shows it, on the same tab.
+    fireEvent.click(within(await screen.findByRole('main')).getByRole('button', { name: "Author's view" }))
     await screen.findByRole('heading', { name: 'Checkpoints' })
     expect(search(history).get('view')).toBe('history')
-    expect(screen.getByText(/Readers first meet/)).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Show it anyway' })).toBeNull()
-
-    // And back: the note is still shown anyway.
-    fireEvent.click(within(await screen.findByRole('navigation', { name: 'Note views' })).getByRole('link', { name: 'Note' }))
-    await screen.findByRole('heading', { level: 1, name: 'Quincey P. Morris' })
-    expect(screen.queryByRole('button', { name: 'Show it anyway' })).toBeNull()
+    expect(search(history).get('readers')).toBeNull()
   })
 
-  it('hides a revealed history again after leaving the note and coming Back, or changing the position', async () => {
+  it('says history isn’t part of the Reader’s view for a note readers have met, and fetches none of it', async () => {
     const { calls } = stubApi({ override: historyApi() })
-    const { history } = renderApp('/u/dracula/e/E-QUINCEY?view=history&at=dracula:3')
+    renderApp('/u/dracula/e/E-MINA?view=history&at=dracula:3&readers=1')
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Show it anyway' }))
-    await screen.findByRole('heading', { name: 'Checkpoints' })
-
-    history.push('/u/dracula/e/E-LUCY?view=history&at=dracula:3')
-    await screen.findByText('Lucy Westenra')
+    await screen.findByRole('heading', { level: 1, name: 'Mina Harker' })
+    expect(screen.getByText(/History isn't part of the Reader's view/)).toBeTruthy()
     expect(screen.queryByRole('heading', { name: 'Checkpoints' })).toBeNull()
-
-    history.back()
-    await screen.findByText('Quincey P. Morris')
-    expect(screen.queryByRole('heading', { name: 'Checkpoints' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Show it anyway' })).toBeTruthy()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Show it anyway' }))
-    await screen.findByRole('heading', { name: 'Checkpoints' })
-    history.replace('/u/dracula/e/E-QUINCEY?view=history&at=dracula:4')
-    await screen.findByRole('button', { name: 'Show it anyway' })
-    expect(screen.queryByRole('heading', { name: 'Checkpoints' })).toBeNull()
-    expect(calls.filter((c) => c.startsWith('/api/history?entity=E-LUCY'))).toEqual([])
+    expect(calls.some((c) => c.startsWith('/api/history'))).toBe(false)
   })
 
   it('doesn’t carry a compare tick over to another note', async () => {

@@ -212,7 +212,8 @@ export type Responder = (path: string, params: URLSearchParams, init?: RequestIn
 /**
  * Stubs fetch with the test den's API. `entityPage` answers /api/entity;
  * by default, the entity's bare page, or not in view as of a position
- * before it enters. `override` answers anything first, if it returns a value.
+ * before it enters, or with `marksAt`, marked if it enters later.
+ * `override` answers anything first, if it returns a value.
  */
 export function stubApi(options: { entityPage?: (key: string, at: string | null) => EntityPageResult; override?: Responder; den?: DenSummary } = {}) {
   const calls: string[] = []
@@ -235,6 +236,11 @@ export function stubApi(options: { entityPage?: (key: string, at: string | null)
 function answer(path: string, params: URLSearchParams, at: string | null, options: Parameters<typeof stubApi>[0] = {}): unknown {
   if (at === '') {
     return new Response(JSON.stringify({ code: 'bad_argument', message: "'asOf' is empty. Leave it out for the full view." }), { status: 400 })
+  }
+
+  const marksAt = params.get('marksAt')
+  if (marksAt === '') {
+    return new Response(JSON.stringify({ code: 'bad_argument', message: "'marksAt' is empty. Leave it out for the full view." }), { status: 400 })
   }
 
   switch (path) {
@@ -303,6 +309,12 @@ function answer(path: string, params: URLSearchParams, at: string | null, option
       }
 
       const summary = entities.find((e) => e.key === key)!
+      if (marksAt) {
+        const later = ['canon', 'draft'].includes(summary.status) && !inViewAt(marksAt).includes(summary)
+        const extra = later ? { readerMark: { kind: 'ahead' as const, at: summary.from } } : {}
+        return { version: 1, view: 'full', position: null, inView: true, note: null, entity: page(summary, extra), marksAt } satisfies EntityPageResult
+      }
+
       const inView = !at || inViewAt(at).includes(summary)
       return {
         version: 1,

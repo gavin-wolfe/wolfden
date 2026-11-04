@@ -36,11 +36,12 @@ namespace Wolfden.Mcp.Tests;
 /// </para>
 /// <para>
 /// <b>What a read at a position doesn't keep out,</b> as designed (format.md
-/// §9.5): text the writer put in a lead or section, including their HTML comments
-/// and <c>[[links]]</c> to notes the reader hasn't met; a field the type doesn't
-/// define, a <c>ref</c> field's value, and a mapping with its own <c>until</c>
-/// key; <c>line</c> numbers, which leave gaps where something's hidden; and
-/// <c>kind: temporal</c>, which shows that a field changes over time. And
+/// §9.5): text the writer put in a lead or section, including <c>[[links]]</c> to
+/// notes the reader hasn't met, though not their HTML comments (F-VIEW-6) unless
+/// shown as code; a field the type doesn't define, a <c>ref</c> field's value, any
+/// field's value with a comment written in it, and a mapping with its own
+/// <c>until</c> key; <c>line</c> numbers, which leave gaps where something's hidden;
+/// and <c>kind: temporal</c>, which shows that a dated field changes over time. And
 /// <c>in_view: false</c>, unlike <c>unknown_entity</c>, confirms a note exists.
 /// </para>
 /// <para>
@@ -102,10 +103,10 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
 
         # The salt tithe
 
-        Every ship pays it at the Reach.
+        Every ship pays it at the Reach. <!-- Nightquill seizes the Reach. -->
 
         ## Overview
-        A toll in salt, until the ambush. The fleet enters at dawn, and what she says is no longer true.
+        A toll in salt, until the ambush. The fleet enters at dawn, and what she says is no longer true. <!-- Nightquill ends it. -->
 
         ### The audit
         <!-- wolfden: from=ash:2 -->
@@ -153,6 +154,7 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
     /// <summary>Every word a reader at <c>ember:3</c> hasn't met, each from one place above or below.</summary>
     private static readonly string[] LaterWords =
     [
+        "Nightquill", // A writer's comment in a lead and a section.
         "Morvane", // A later entry of a field.
         "Sablewick", "The audit", // A later subsection.
         "Drennick", // A thread's Payoff, which enters at paid_off.
@@ -285,7 +287,7 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
     {
         var full = await Call("get_entity", new() { ["entity"] = Tithe });
 
-        foreach (var word in new[] { "Morvane", "Sablewick", "Drennick", "Cinderlace", "Larkspire", "Quillfeather", "Brackwater", "Fenwraith", "Wyrmsedge", "Elderwane", "Gallowmere", "Tamsin", "Zanthic", "Vespergale", "Ostrelline", "Pellucid", "ash:2", "ash:3", "ash:4" })
+        foreach (var word in new[] { "Nightquill", "Morvane", "Sablewick", "Drennick", "Cinderlace", "Larkspire", "Quillfeather", "Brackwater", "Fenwraith", "Wyrmsedge", "Elderwane", "Gallowmere", "Tamsin", "Zanthic", "Vespergale", "Ostrelline", "Pellucid", "ash:2", "ash:3", "ash:4" })
         {
             Assert.Contains(word, full.Whole, StringComparison.Ordinal);
         }
@@ -503,7 +505,7 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
 
         foreach (var reply in new[] { entity, canon, brief })
         {
-            foreach (var later in new[] { "ash:3", "ash:4", "ash:epilogue", "a-quiet-moon:", "Drennick", "Ysmerine", "The salt heir", "Brackwater", "The reckoning", "Fenwraith", "Zanthic", "Vespergale", "Ostrelline", "Pellucid", "Tamsin", "Hallowmere", "Cinderlace" })
+            foreach (var later in new[] { "Nightquill", "ash:3", "ash:4", "ash:epilogue", "a-quiet-moon:", "Drennick", "Ysmerine", "The salt heir", "Brackwater", "The reckoning", "Fenwraith", "Zanthic", "Vespergale", "Ostrelline", "Pellucid", "Tamsin", "Hallowmere", "Cinderlace" })
             {
                 Assert.DoesNotContain(later, reply.Whole, StringComparison.Ordinal);
             }
@@ -536,6 +538,74 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
             AssertNoMarks(reply);
             AssertOnlyKeys(ErrorResultKeys, reply);
         }
+    }
+
+    // --- The writer's comments. ---
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-47")]
+    public async Task AMisplacedWolfdenCommentSaysNothingAtAPosition()
+    {
+        // Two blank lines put a section comment out of place (F-SEC-10), so the fact has no until, and its date is only text.
+        _den.Write(
+            "universes/starfall/entities/notes/the-tally.md",
+            """
+            ---
+            type: note
+            name: The tally
+            status: canon
+            ---
+
+            <!-- wolfden: from=ash:3 -->
+            Counted yearly.
+
+            ## Terms
+
+
+            <!-- wolfden: until=ash:2 -->
+            Body after two blanks.
+
+            <!-- wolfden: from=ash:4 -->
+            And mid-body.
+            """);
+
+        var entity = await Call("get_entity", new() { ["entity"] = "The tally", ["as_of"] = "ember:3" });
+        var canon = await Call("canon_as_of", new() { ["position"] = "ember:3", ["type"] = "note" });
+
+        var note = entity.Json.GetProperty("entity");
+        Assert.Equal("Counted yearly.", note.GetProperty("lead").GetString());
+        Assert.Equal("Body after two blanks.\n\nAnd mid-body.", note.GetProperty("sections")[0].GetProperty("body").GetString());
+        foreach (var reply in new[] { entity, canon })
+        {
+            AssertNothingLater(reply);
+            AssertNoMarks(reply);
+            Assert.DoesNotContain("wolfden:", reply.Whole, StringComparison.Ordinal);
+        }
+
+        var full = await Call("get_entity", new() { ["entity"] = "The tally" });
+        Assert.Contains("wolfden: until=ash:2", full.Whole, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-47")]
+    public async Task ACommentShownAsCodeStaysAtAPosition()
+    {
+        _den.Write(
+            "universes/starfall/entities/notes/the-tally.md",
+            """
+            ---
+            type: note
+            name: The tally
+            status: canon
+            ---
+
+            ## Terms
+            Write `<!-- a count -->` in the margin.
+            """);
+
+        var reply = await Call("get_entity", new() { ["entity"] = "The tally", ["as_of"] = "ember:3" });
+
+        Assert.Equal("Write `<!-- a count -->` in the margin.", reply.Json.GetProperty("entity").GetProperty("sections")[0].GetProperty("body").GetString());
     }
 
     // --- A note that's left out reads as not there. ---
@@ -744,7 +814,10 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
         Assert.True(leftOut.Json.GetProperty("hits")[0].GetProperty("left_out").GetBoolean());
         Assert.Contains("Vespergale", leftOut.Json.GetProperty("hits")[0].GetProperty("snippet").GetString(), StringComparison.Ordinal);
 
-        foreach (var reply in new[] { later, note, idea, leftOut })
+        var comment = await Call("search", new() { ["query"] = "Nightquill" });
+        Assert.True(comment.Json.GetProperty("hits")[0].GetProperty("in_comment").GetBoolean());
+
+        foreach (var reply in new[] { later, note, idea, leftOut, comment })
         {
             AssertNoMarks(reply);
             AssertOnlyKeys(SearchResultKeys, reply);
@@ -786,7 +859,7 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
         Assert.True(reply.Json.GetProperty("available").GetBoolean());
         Assert.Equal("Add the salt tithe", reply.Json.GetProperty("entries")[0].GetProperty("message").GetString()!.Trim());
         var patch = reply.Json.GetProperty("diff").GetProperty("files")[0].GetProperty("patch").GetString();
-        foreach (var written in new[] { "until=ash:2", "paid_off", "ash:3", "Morvane", "Zanthic reveal", "Vespergale", "Hallowmere", "Pellucid" })
+        foreach (var written in new[] { "Nightquill", "until=ash:2", "paid_off", "ash:3", "Morvane", "Zanthic reveal", "Vespergale", "Hallowmere", "Pellucid" })
         {
             Assert.Contains(written, patch, StringComparison.Ordinal);
         }
@@ -857,7 +930,7 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
             }
             else if (type.Namespace?.StartsWith("Wolfden", StringComparison.Ordinal) == true && !seen.ContainsKey(type.Name))
             {
-                var properties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => !p.IsDefined(typeof(JsonIgnoreAttribute))).ToList();
+                var properties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => p.GetCustomAttribute<JsonIgnoreAttribute>()?.Condition != JsonIgnoreCondition.Always).ToList();
                 seen[type.Name] = string.Join(", ", properties.Select(p => p.Name).Order(StringComparer.Ordinal));
                 foreach (var property in properties)
                 {

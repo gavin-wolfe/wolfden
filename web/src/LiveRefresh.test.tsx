@@ -208,7 +208,7 @@ describe('SC-WEB-85: an open page shows what an assistant just wrote', () => {
     await screen.findByText('After the write.')
     const asked = calls.filter((c) => c.startsWith('/api/entity?') && c.includes('E-MINA'))
     expect(asked.length).toBeGreaterThan(1)
-    expect(asked.every((c) => c.includes('asOf=dracula%3A3'))).toBe(true)
+    expect(asked.every((c) => c.includes('marksAt=dracula%3A3'))).toBe(true)
   })
 })
 

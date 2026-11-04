@@ -232,10 +232,27 @@ code {
   color: var(--text);
 }
 
+/* An action, plainly not one of the two views beside it: text, where the pressed view is filled. */
 .position-bar .reset {
+  background: none;
+  border-color: transparent;
+  color: var(--link);
+  text-decoration: underline;
+}
+
+.view-switch {
+  display: inline-flex;
+}
+
+.view-switch button + button {
+  margin-left: -1px;
+}
+
+.view-switch button[aria-pressed='true'] {
   background: var(--accent);
   color: var(--accent-text);
   border-color: var(--accent);
+  font-weight: 600;
 }
 
 /* The tree. */
@@ -415,7 +432,7 @@ button.peek {
   font-variant-numeric: tabular-nums;
 }
 
-button.ahead-of-readers,
+.ahead-of-readers,
 .ahead-of-readers-why {
   font-family: var(--font-ui);
   font-size: 0.72rem;
@@ -426,11 +443,15 @@ button.ahead-of-readers,
   vertical-align: middle;
 }
 
+/* The note-page tag is a button: tall enough to touch (WCAG 2.5.8), and underlined so a touch user can tell it opens. */
 button.ahead-of-readers {
-  padding: 0;
+  min-height: 24px;
+  padding: 0 0.15rem;
   border: none;
   background: none;
   cursor: help;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
 }
 
 .status-idea,
@@ -667,22 +688,6 @@ button.ahead-of-readers {
   padding-left: 1.2rem;
   font-size: 0.875rem;
   color: var(--text-muted);
-}
-
-.revealed {
-  color: var(--later);
-  border-top: 1px dashed var(--border);
-  margin-top: 1rem;
-}
-
-.revealed a,
-.revealed .markdown,
-.revealed .fields dt {
-  color: var(--later);
-}
-
-.revealed .page-body {
-  max-width: none;
 }
 
 .banner {

@@ -72,52 +72,36 @@ describe('SC-WEB-12: the tree shows what the reader has met, with a peek at the 
 })
 
 describe('SC-WEB-13: opening a note the reader hasn’t met', () => {
-  it('shows a banner saying where readers first meet it, and nothing else of it', async () => {
+  it('in the Reader’s view, shows a banner saying where readers first meet it, and nothing else of it', async () => {
     const { calls } = stubApi()
-    const { history } = renderApp('/u/dracula/e/E-QUINCEY?at=dracula:3')
+    const { history } = renderApp('/u/dracula/e/E-QUINCEY?at=dracula:3&readers=1')
 
     const banner = await within(await screen.findByRole('main')).findByText(/Readers first meet/)
     expect(banner.textContent).toBe('Readers first meet Quincey P. Morris in Dracula chapter 5.')
     expect(screen.queryByRole('heading', { name: 'Linked from' })).toBeNull()
     expect(screen.queryByRole('heading', { level: 1 })).toBeNull()
-    expect(calls).toContain('/api/entity?entity=E-QUINCEY&universe=dracula&asOf=dracula%3A3')
+    expect(calls).toContain('/api/entity?entity=E-QUINCEY&universe=dracula&asOf=dracula%3A3&readers=true')
+    expect(calls.some((c) => c.startsWith('/api/entity?') && !c.includes('readers=true'))).toBe(false)
 
     fireEvent.click(screen.getByRole('button', { name: 'Go to Dracula chapter 5' }))
     await waitFor(() => expect(atOf(history)).toBe('dracula:5'))
     expect(await screen.findByRole('heading', { level: 1, name: 'Quincey P. Morris' })).toBeTruthy()
+    expect(new URLSearchParams(history.location.search).get('readers')).toBe('1')
   })
 
-  it('"Show it anyway" fetches the full view only on the click, shows it greyed in place, and resets on navigation', async () => {
-    const { calls } = stubApi()
-    const { history } = renderApp('/u/dracula/e/E-QUINCEY?at=dracula:3')
+  it('the banner’s Author’s view shows the note, tagged with where it enters', async () => {
+    stubApi()
+    const { history } = renderApp('/u/dracula/e/E-QUINCEY?at=dracula:3&readers=1')
     const main = await screen.findByRole('main')
     await within(main).findByText(/Readers first meet/)
-    const fullView = '/api/entity?entity=E-QUINCEY&universe=dracula'
-    expect(calls).not.toContain(fullView)
 
-    fireEvent.click(within(main).getByRole('button', { name: 'Show it anyway' }))
-    const heading = await within(main).findByRole('heading', { level: 1, name: 'Quincey P. Morris' })
-    expect(heading.closest('.revealed')).not.toBeNull()
-    expect(calls).toContain(fullView)
-    expect(within(main).getByText(/Readers first meet/)).toBeTruthy()
-    expect(atOf(history)).toBe('dracula:3')
-    expect(within(main).queryByRole('button', { name: 'Show it anyway' })).toBeNull()
+    fireEvent.click(within(main).getByRole('button', { name: "Author's view" }))
 
-    // Another position starts hidden again.
-    fireEvent.keyDown(screen.getByRole('slider', { name: 'Story position' }), { key: 'ArrowLeft' })
-    await waitFor(() => expect(atOf(history)).toBe('dracula:2'))
-    expect(await within(main).findByRole('button', { name: 'Show it anyway' })).toBeTruthy()
-    expect(within(main).queryByRole('heading', { level: 1 })).toBeNull()
-
-    // So does another page, and coming back to this one.
-    fireEvent.click(within(main).getByRole('button', { name: 'Show it anyway' }))
     await within(main).findByRole('heading', { level: 1, name: 'Quincey P. Morris' })
-    fireEvent.click(within(await screen.findByRole('navigation', { name: 'Contents' })).getAllByRole('link', { name: 'Dracula' })[0])
-    await waitFor(() => expect(history.location.pathname).toBe('/u/dracula'))
-    history.back()
-    await waitFor(() => expect(history.location.pathname).toBe('/u/dracula/e/E-QUINCEY'))
-    expect(await within(await screen.findByRole('main')).findByRole('button', { name: 'Show it anyway' })).toBeTruthy()
-    expect(within(await screen.findByRole('main')).queryByRole('heading', { level: 1, name: 'Quincey P. Morris' })).toBeNull()
+    expect(within(main).getByRole('button', { name: 'enters at chapter 5' })).toBeTruthy()
+    expect(within(main).queryByText(/Readers first meet/)).toBeNull()
+    expect(atOf(history)).toBe('dracula:3')
+    expect(new URLSearchParams(history.location.search).get('readers')).toBeNull()
   })
 
   it('shows the page itself once the reader has met it', async () => {

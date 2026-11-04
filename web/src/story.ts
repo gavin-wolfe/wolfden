@@ -51,6 +51,20 @@ export function describePosition(position: string, positions: readonly PositionV
 }
 
 /**
+ * A position as a tag names it: "chapter 11", or "Ash chapter 11" in a
+ * universe with several books, or "the start of Ash" for a bare book. One the
+ * list doesn't have is given as written.
+ */
+export function placeWords(position: string, positions: readonly PositionView[]): string {
+  const exact = positions.find((p) => p.position === position)
+  if (!exact || exact.chapter === null) {
+    return describePosition(position, positions)
+  }
+
+  return positions.every((p) => p.book === exact.book) ? chapterWords(exact) : `${exact.bookName} ${chapterWords(exact)}`
+}
+
+/**
  * Where a position falls in story order, as an index into `positions`: a
  * chapter's own index, or just before a book's first chapter for its bare
  * key. Null when the list doesn't have it.

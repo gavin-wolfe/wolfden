@@ -729,7 +729,7 @@ Chapter 3 is headed "Ardent — Vesta Yards, 2350-04-12", and chapter 4
   headings from fields off for that book (or series), even if the
   universe sets one.
 - **Reading as of a chapter.** A chapter after the reading position
-  shows only its title. Wolfden never supplies the name of a note the
+  shows only its title. In the Reader's view, Wolfden never supplies the name of a note the
   reader hasn't met yet: a link to one shows as you wrote it, its label
   if it has one, or else its target.
 - **Tip: label a link to a note the reader meets later.** A POV
@@ -777,8 +777,8 @@ the pages don't have a form for it yet. The rules are in
   the other controls don't do, such as a section's
   `<!-- wolfden: ... -->` comment.
 - **While you edit, you see everything.** The page shows the whole note,
-  whatever the story position, and says "Editing shows everything". The
-  position view comes back when you save or cancel.
+  and says "Editing shows everything". With a story position picked, that's the
+  Author's view, tags included. The Reader's view can't be edited.
 - **If something else changed the note meanwhile,** such as an AI
   assistant working through Wolfden, or you in another editor, the save
   is refused and you see both versions. Choose **Keep mine** (save yours
@@ -816,19 +816,68 @@ entry** gives a field a new value from a later chapter; the one before
 it holds until then. A fact that doesn't change can still have a
 **Known from**, for a reveal the reader only learns later.
 
-When you read a note at a story position, a value or section that stops
-holding later still shows its date, with a small **ahead of readers** beside
-it: `until Ash ch. 5` is your plan, and readers at this point don't know it
-yet. Hover over it or click it to see that said in full. A date the position has reached
-has no tag. An AI assistant reading at that position isn't told the date at
-all, so it can't write toward it. When you're planning with one, ask it to
-read the note with no position, and it sees every date. A thread's `planted`
+**The Author's view and the Reader's view.** Once you pick a story position, a
+note's page has a two-way switch in the position bar: **Author's view** and
+**Reader's view**. The one you're in is always highlighted.
+
+- **The Author's view** is the default. You wrote the book, so nothing is hidden,
+  and small tags say what readers at this point don't know. Hover over a tag or
+  click it to see why. You can edit from here, and it's always the real note.
+  - **ahead of readers:** a value, section, or date they haven't reached:
+    `until Ash ch. 5` is your plan, and they don't know it yet.
+  - **no longer true here:** a value or section that has already ended.
+  - **enters at chapter 11:** a whole note they haven't met yet.
+  - **not placed in the story yet:** it names a chapter or book your universe
+    doesn't have yet, so no chapter reaches it. List the chapter, or fix the name.
+  - **never true (its dates don't overlap):** it ends before it starts. Fix its
+    dates.
+
+  Ideas, bookkeeping, and sections with an error keep their own badges instead.
+  **Linked from** has the same tags, as plain words, for a link in something later,
+  and a **left out** badge for a link in a section with an error. A link in a universe,
+  series, or book's own text has no tag, as that text isn't at a point in the story.
+- **The Reader's view** shows what a reader at that chapter knows, and nothing else:
+  no tags, no later dates, no comments, and no sections with an error. A note they
+  haven't met says where they first meet it. It's read-only, and it has no history,
+  since old versions can say anything. It also shows a type's default values, with a
+  **type default** badge, which the Author's view leaves out because they aren't in
+  your note. It's the same as an AI assistant gets at that position, so it's a good
+  check of what one can see.
+
+The Reader's view stays while you follow links and change chapters, and its link
+keeps it (`?readers=1`), but Wolfden doesn't remember it: opening Wolfden fresh starts
+in the Author's view.
+
+**What the Reader's view doesn't cover yet.** It's about one note's Note and History
+tabs, and says so on the page. The rest of the screen isn't filtered the same way,
+so don't take it as what a reader would see: the sidebar's "more appear later" names
+later notes, search finds comments and later values, and the book page and the position
+bar's chapter menu list later chapters' titles. "Read-only" also means only that
+page: the **New** buttons, checkpoints, the ⚠ list's **Edit file**, and the book and
+chapter pages' controls still work. Edit file shows the whole source, so it's the
+Author's view whichever you came from, and it keeps your position.
+
+An AI assistant reading at a position gets the Reader's view of a note, so it isn't
+told a later date at all, and can't write toward it. When you're planning with one,
+ask it to read the note with no position, and it sees every date. A thread's `planted`
 and `paid_off`, and any other field that holds a story position, work the same
 way for it: at a position, it isn't told a value later than that, or one that
-isn't a chapter or book your universe has. You still see them all. This goes by
-positions only: text you put in a section or lead, or a field the note's type
-doesn't define, reaches the assistant as written, so it can still mention later
-events. Its instructions also
+isn't a chapter or book your universe has.
+
+**Comments don't reach an assistant drafting at a position.** An HTML comment in
+a lead or section (`<!-- She dies at ash:4 -->`) is safe for notes to yourself:
+at a position, an assistant doesn't get it, and isn't told it was there. That
+also means a comment can't carry guidance to it. For guidance it should follow
+while drafting, such as "keep her limp out of this chapter", write it as visible
+text, in a section of its own if you like, or ask the assistant to read the note
+with no position, where it gets every comment. A comment shown as code, in
+backticks or a code block, stays. You still see them all, and so does an assistant
+with no position. If it edits a note's file some way other than Wolfden's tools,
+it's told to read that way first, so it doesn't rewrite your comments away.
+
+Apart from that, this goes by positions only: text you put in a section or lead,
+a field the note's type doesn't define, or a `ref` field's value reaches the
+assistant as written, so it can still mention later events. Its instructions also
 tell it to read ahead for planning, foreshadowing, and reviewing continuity
 across chapters, and when writing a character who knows more than the reader,
 without letting later facts reach the prose. It can still tell you anything you
@@ -1316,8 +1365,8 @@ out and has no page. Fix it and save.
 - **A pack's file, or a folder missing its `book.md` or `series.md`,** is listed,
   and you fix it outside Wolfden.
 - **The story position doesn't change the list.** Like editing, it's for you, so
-  it names sections even at an early chapter. Pages at a position stay
-  spoiler-safe: a note left out says only that it's left out, with **Show
+  it names sections even at an early chapter. So does a note's Author's view. The
+  Reader's view doesn't: a note left out says only that it's left out, with **Show
   everything** to see why.
 - **A file another program has locked against reading can't be read,** so it's listed as that,
   with no **Edit file**, since this isn't about what's in it. Close it there,
@@ -1451,9 +1500,22 @@ in it, which Wolfden calls a checkpoint.
   text in the section the comment is under, with no position of its own. On
   the page, that section's heading shows at every position where the note
   does, and the text after it, plus any later sections it swallowed, disappears.
-  An assistant reading through the tools gets the raw text, so a reveal in it
-  can reach an assistant at an early position. `wolfden check` still passes, so
+  An assistant reading at a position doesn't get the swallowed text either, but
+  it does get whatever comes after that `-->`, with no position of its own, so a
+  reveal there can reach it early. `wolfden check` still passes, so
   read its warnings: this one names the line where the swallowed text ends.
+- **A stray comment marker can keep your text from an assistant, with no
+  warning.** At a position, an assistant doesn't get what a comment hides, and
+  Wolfden reads a badly formed comment on the side of hiding. If you write
+  `<!-- to do` in a paragraph and forget the `-->`, and a `-->` comes later in the
+  section with no other comment on the way, the assistant gets nothing between
+  them, however long that is, while the page shows it all with the stray markers
+  in it. With a comment on the way, only the rest of that paragraph is hidden. A
+  comment with another inside it, `<!-- old <!-- older -->`, also hides any text
+  up to a second `-->`, as long as there's no blank line first, and the page may
+  look fine. `wolfden check` doesn't warn about either yet, so if an assistant
+  seems not to know something, read the note with no position or look for a stray
+  marker.
 - **Copying a note's file by hand makes a duplicate.** Both files have
   the same `id`, so Wolfden leaves both out of views, and links to them
   break, until one gets a new id. Copy with `wolfden copy`, or ask an AI

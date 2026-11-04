@@ -115,6 +115,15 @@ it can't see (F-BOOK-1), or that writes the story order of a book or series
 it can't see, while this is so. They MUST name the path, unless a session
 pinned to a universe would name another one, and write nothing. (#284.)
 
+A check or other view reads a file that another program has open, unless that
+program keeps others from reading it, so such a file isn't reported. Its read
+can land part way through a save, which its next read corrects. A write MUST NOT
+build on part of a save, so what it reads, it reads only when the system says no
+other program has that file open to write. For a write, a file open to write is
+one that can't be read, under the rules above, even though `check` doesn't list
+it. On Linux and macOS, a program writing a file doesn't normally say so, so a
+write can't tell. (#298.)
+
 ### 1.4 Notation and terms
 
 Grammars use ABNF ([RFC 5234]), except that quoted strings are

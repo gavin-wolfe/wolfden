@@ -244,7 +244,7 @@ prompts. This list is for knowing what the assistant can do.
   move, copy, or create checks links across the whole den, a change to
   `chapter_defaults` looks at every book below it, and a new book or
   series writes the story order. If a note, `book.md`, or outline is there
-  but can't be read, because another program has it open for writing, or a
+  but can't be read, because another program has it open to write, or a
   folder can't be listed, the write is refused as a whole with
   `den_unreadable`, names the file, and writes nothing (format.md F-GEN-5).
   So links in that file don't break, and a final book's refusal isn't
@@ -341,8 +341,10 @@ docs. The writer's own list is in
   Another program has the file open, or its permissions don't let
   Wolfden read it. Nothing was written. Tell the writer which file it is,
   and retry the same call once they've closed it. Don't call it broken:
-  this isn't about what's in it. `check` reports the same thing as F-GEN-5, and until
-  it's closed, links to that file can show as broken.
+  this isn't about what's in it. `check` reports it as F-GEN-5 only if the program
+  keeps others from reading: a file merely open to write can be read by you, and is
+  clean in `check`, but a write won't build on it, in case it's part of a save.
+  While it's locked, links to that file can show as broken.
 - **`den_notice` means some of the den is missing.** While the den has
   errors, every result but `check`'s has a short `den_notice`, such as
   `"This den has 2 errors, so some notes or sections may be missing from this

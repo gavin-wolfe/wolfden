@@ -1233,13 +1233,13 @@ out and has no page. Fix it and save.
   it names sections even at an early chapter. Pages at a position stay
   spoiler-safe: a note left out says only that it's left out, with **Show
   everything** to see why.
-- **A file another program holds locked can't be read,** so it's listed as that,
+- **A file another program has locked against reading can't be read,** so it's listed as that,
   with no **Edit file**, since this isn't about what's in it. Close it there,
   and the entry clears within a minute. Any errors inside it can't be seen until
   then, in the list or in `wolfden check`. A held `book.md`, `series.md`, or
   `universe.md` is also listed by its folder, saying not to add a file, since it's
   there. A held pack is also listed under `den.yaml` in the same way.
-- **While such a file is held,** a fix can be refused if its save had to read that
+- **While such a file is held, or another program has it open to write,** a fix can be refused if its save had to read that
   file: `den.yaml`, a pack, a book's, series', or universe's own file, or an
   outline. Another note being held doesn't stop a fix. Close the file named, and
   save again. Your text stays in the editor. If that file is above the one you
@@ -1436,21 +1436,31 @@ in it, which Wolfden calls a checkpoint.
 
 ### Files another program has open
 
-- **A note another program holds can stop a rename.** Wolfden can't read
-  a file while another program has it open for writing, even if that
-  program lets others read it too. While one does, Wolfden can't see
-  what's in that note, so it refuses a rename, a move, a copy, a new note,
-  a new book, or a freeze, says which file, and changes nothing. Otherwise
-  links in that note would break without a word. Close the file there,
-  then try again.
-- **`wolfden check` and the top bar's problems list it as an error** (F-GEN-5),
-  and links to that note can show as broken until it's closed. If no program has it open,
-  check the file's permissions. The same goes for a folder Wolfden isn't
-  allowed to look in.
-- **Pages still open.** A note that can't be read is left out of pages and
-  searches until it can be, so it can seem to have gone. Nothing happened
-  to it. A program that saves a file and lets go doesn't cause any of this,
-  and neither does one that has it open only to read and shares it.
+- **Pages and `wolfden check` still see a note open elsewhere,** as long as that
+  program lets others read it. If you catch it part way through saving, a page may
+  show part of the note, or an error, for a moment. Reload, and it's right.
+- **Changes wait until the other program has let go.** While a program has a note
+  open to write, it could be part way through saving, so on Windows Wolfden won't
+  build a change on that note. An edit of it is refused. So is anything that reads
+  every note: a rename, a move, a copy, a new note, or a freeze. An edit of a note
+  is refused too if it's that note's `book.md`, `series.md`, or `universe.md`
+  that's open, or `den.yaml`. It says which file, and changes nothing. Close it
+  there, or wait for the save to finish, then try again. An edit of a different
+  note isn't stopped.
+- **`wolfden check` won't list a note that's only open to write,** so a refusal can
+  name a file `check` calls fine. That's expected.
+- **A program that locks a note against reading goes further.** `wolfden check`
+  and the top bar's problems list it as an error (F-GEN-5), it's left out of pages
+  and searches until it can be read, so it can seem to have gone, and links to it
+  can show as broken. Nothing happened to it. If no program has it open, check the
+  file's permissions. The same goes for a folder Wolfden isn't allowed to look in.
+- **Which programs do what hasn't been tried.** How a program opens a file differs by
+  program and version, and this hasn't been tested with specific editors. A program
+  that saves a file and lets go shouldn't cause any of this.
+- **On Linux and macOS, Wolfden can't tell a note is open.** Programs there don't
+  normally say so. So don't start a rename while another program is in the middle
+  of saving a note: it could miss a link in the part still to come, or replace the
+  note with the part saved so far.
 
 ### Images and other editors
 

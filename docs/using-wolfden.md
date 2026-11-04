@@ -1041,16 +1041,18 @@ Any name will do, a pen name included, and the email can be a
 placeholder. They're saved for this den only, before the first
 checkpoint, never for the rest of your computer. If git already has a
 name and email, nothing is asked, and what you give wins for this den.
-Give both: a name alone is refused when git has a different name and an
-email, since the email would be recorded beside your pen name. (If your git settings give a name only inside
+Give both: one alone is refused, even if it's what git has, since it would
+be recorded beside what git has for the other. If git has only one, Wolfden
+asks for both. (If your git settings give a name only inside
 certain folders, the dialog can't tell until the den is a repository: it
 shows the fields, but you can leave them empty, and Wolfden asks again,
 for just what's missing, only if they're really needed.)
 
 If git signs your commits, the key it uses may belong to another name, and
-Wolfden can't always tell. So when you give a name or email, signing stays
-off for this den, even if they're what git already has: Wolfden says so,
-and a signature can't tie your pen name to the other key. To sign with a key
+Wolfden can't always tell. So when you give a name and email, signing stays
+off for this den, always, even if they're what git already has or the den's
+repository names its own key: Wolfden says so, and a signature can't tie your
+pen name to the other key. To sign with a key
 of this name's, run `git config --local user.signingkey <key>` and `git
 config --local commit.gpgsign true` in the den's folder. A `local-user` line
 in your `gpg.conf` adds that key's signature as well, so check for one first.
@@ -1337,7 +1339,7 @@ in it, which Wolfden calls a checkpoint.
   naming them), and
   the freeze prompt counts them.
 - **Your git name and email are for this den only.** Git records a name
-  and email on every checkpoint. Wolfden asks only when git has none,
+  and email on every checkpoint. Wolfden asks only when git lacks one,
   and saves what you give in this den's repository, never for the rest
   of your computer. A pen name is fine, and the email can be a
   placeholder. What you give wins over what git has for this den, and

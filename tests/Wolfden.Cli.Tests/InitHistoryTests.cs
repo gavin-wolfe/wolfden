@@ -79,8 +79,8 @@ public class InitHistoryTests
         Assert.Equal(CliApp.ExitUsage, refused);
         Assert.Empty(output.ToString());
         Assert.Equal(
-            "wolfden init: git records who made each checkpoint, and has no name or email for this den. " +
-            "Run 'wolfden init --git' again with --author-name <name> --author-email <email>: they're saved for this den's repository only, never globally. " +
+            "wolfden init: git records who made each checkpoint, and needs a name and an email for this den. " +
+            "Run 'wolfden init --git' again with --author-name \"<name>\" --author-email <email>: they're saved for this den's repository only, never globally. " +
             "Any name will do, a pen name included, and the email can be a placeholder, such as you@example.com. Nothing was changed in git.\n",
             error.ToString().ReplaceLineEndings("\n"));
         Assert.False(Directory.Exists(Path.Combine(den.Root, ".git")));
@@ -191,6 +191,7 @@ public class InitHistoryTests
         var refused = InitCommand.Run([folder.Root, "--git", "--author-name", "Ash Calloway", "--author-email", "ash@example.invalid"], output, error, NoIdentity(global));
 
         Assert.Equal(CliApp.ExitUsage, refused);
+        Assert.Contains("--author-name \"<name>\" --author-email <email>", error.ToString(), StringComparison.Ordinal);
         Assert.False(File.Exists(Path.Combine(folder.Root, "den.yaml")));
 
         // What it says works: the den first, then its history, under the name given.
@@ -263,24 +264,31 @@ public class InitHistoryTests
         Assert.Equal("Ash Calloway|ash@example.invalid|Ash Calloway|ash@example.invalid\n", GitRun(folder.Root, git, "log", "-1", "--format=%an|%ae|%cn|%ce"));
     }
 
-    [Fact]
+    [Theory]
     [Trait("Scenario", "SC-HIST-22")]
-    public void OneGivenAloneThatReplacesWhatGitHasIsRefused()
+    [InlineData(true, "--author-name", "Ash Calloway")]
+    [InlineData(true, "--author-email", "ash@example.invalid")]
+    [InlineData(true, "--author-name", "Marek Oswin")]
+    [InlineData(false, "--author-name", "Ash Calloway")]
+    public void OneGivenAloneIsRefusedAndNothingIsMade(bool existing, string option, string value)
     {
-        using var den = TempDen.DraculaCopy();
+        using var parent = TempDen.Empty();
+        using var dracula = TempDen.DraculaCopy();
         using var config = TempDen.Empty();
         var global = Path.Combine(config.Root, "gitconfig");
         File.WriteAllText(global, "[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n", new UTF8Encoding(false));
+        var folder = existing ? dracula.Root : Path.Combine(parent.Root, "kestrel-notes");
         var output = new StringWriter();
         var error = new StringWriter();
 
-        var exitCode = InitCommand.Run([den.Root, "--git", "--author-name", "Ash Calloway"], output, error, NoIdentity(global));
+        var exitCode = InitCommand.Run([folder, "--git", option, value], output, error, NoIdentity(global));
 
         Assert.Equal(CliApp.ExitUsage, exitCode);
         Assert.Empty(output.ToString());
-        Assert.StartsWith("wolfden init: A name was given without an email.", error.ToString(), StringComparison.Ordinal);
+        Assert.StartsWith("wolfden init: --author-name and --author-email go together", error.ToString(), StringComparison.Ordinal);
         Assert.DoesNotContain("marek", error.ToString(), StringComparison.OrdinalIgnoreCase);
-        Assert.False(Directory.Exists(Path.Combine(den.Root, ".git")));
+        Assert.False(Directory.Exists(Path.Combine(folder, ".git")));
+        Assert.Equal(existing, Directory.Exists(folder));
     }
 
     [Theory]
@@ -338,8 +346,8 @@ public class InitHistoryTests
         Assert.True(File.Exists(Path.Combine(folder, "den.yaml")));
         Assert.False(Directory.Exists(Path.Combine(folder, ".git")));
         Assert.StartsWith(
-            "wolfden init: the den was created, but its history wasn't turned on: git records who made each checkpoint, and has no email for this den. " +
-            "Run 'wolfden init --git' in the den with --author-email <email>:",
+            "wolfden init: the den was created, but its history wasn't turned on: git records who made each checkpoint, and needs a name and an email for this den. " +
+            "Run 'wolfden init --git' in the den with --author-name \"<name>\" --author-email <email>:",
             error.ToString(),
             StringComparison.Ordinal);
     }

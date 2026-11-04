@@ -574,8 +574,8 @@ function TurnOnDialog({ status, onClose }: { status: CheckpointStatus; onClose: 
                 <legend>Who makes the checkpoints</legend>
                 <p className="muted">
                   {required
-                    ? 'Git records a name and email with each checkpoint, and has none for this den yet.'
-                    : "Git records a name and email with each checkpoint, and doesn't seem to have them for this den. Some git setups give them only once the den's folder is a repository: leave these empty to use those. If there are none, Wolfden asks again. A name and email typed here are used for this den either way."}{' '}
+                    ? "Git records a name and email with each checkpoint, and doesn't have both for this den yet."
+                    : "Git records a name and email with each checkpoint, and doesn't seem to have them for this den. Some git setups give them only once the den's folder is a repository: leave these empty to use those. If there are none, Wolfden asks again. A name and email typed here are used for this den either way, and it takes both."}{' '}
                   Any name will do, a pen name included, and the email can be a placeholder, such as you@example.com. They're saved for this
                   den only.
                 </p>

@@ -151,6 +151,41 @@ public sealed class HistorySetupEndpointTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "SC-WEB-55")]
+    [Trait("Scenario", "SC-HIST-22")]
+    public async Task WhenGitHasOnlyOneTheStatusAsksForBothAndOneAloneIsAskedToBeCompleted()
+    {
+        var den = Den(TempDen.Dracula());
+        var global = Config("[user]\n\tname = Marek Oswin\n");
+        var git = Git(global: global);
+        await using var server = await StartAsync(den, git);
+
+        // What the dialog reads to decide which fields to show.
+        var turnOn = (await server.GetJsonAsync("/api/checkpoint", HttpStatusCode.OK)).GetProperty("turnOn");
+        Assert.True(turnOn.GetProperty("needsName").GetBoolean());
+        Assert.True(turnOn.GetProperty("needsEmail").GetBoolean());
+
+        var (nothingCode, nothing) = await Post(server, "/api/history/turn-on", """{"firstCheckpoint": true}""");
+        Assert.Equal(HttpStatusCode.BadRequest, nothingCode);
+        Assert.Equal("identity_needed", nothing.GetProperty("code").GetString());
+        Assert.True(nothing.GetProperty("needsName").GetBoolean());
+        Assert.True(nothing.GetProperty("needsEmail").GetBoolean());
+
+        var (aloneCode, alone) = await Post(server, "/api/history/turn-on", """{"authorEmail": "ash@example.invalid"}""");
+        Assert.Equal(HttpStatusCode.BadRequest, aloneCode);
+        Assert.Equal("identity_needed", alone.GetProperty("code").GetString());
+        Assert.True(alone.GetProperty("needsName").GetBoolean());
+        Assert.False(alone.GetProperty("needsEmail").GetBoolean());
+        Assert.DoesNotContain("Marek", alone.GetProperty("message").GetString(), StringComparison.Ordinal);
+        Assert.False(Directory.Exists(Path.Combine(den.Root, ".git")));
+
+        var (code, _) = await Post(server, "/api/history/turn-on", """{"authorName": "Ash Calloway", "authorEmail": "ash@example.invalid"}""");
+
+        Assert.Equal(HttpStatusCode.OK, code);
+        Assert.Equal("Ash Calloway|ash@example.invalid|Ash Calloway|ash@example.invalid\n", RunGit(den, git, "log", "-1", "--format=%an|%ae|%cn|%ce"));
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-HIST-21")]
     [Trait("Scenario", "SC-HIST-22")]
     public async Task ANameAndEmailInTheRequestWinOverGitsAndOneAloneIsAskedToBeCompleted()

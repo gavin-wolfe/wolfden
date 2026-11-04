@@ -3853,9 +3853,8 @@ email. They turn on history for their den.
   they're saved in the den's own repository only (`git config
   --local`), never in the writer's global settings, and the first
   checkpoint is recorded under that name.
-- When git has one but not the other, only the missing one is asked for
-  and saved, and the one git has is left alone. To replace that one too,
-  give both (SC-HIST-21).
+- When git has one but not the other, both are asked for, and both are
+  saved, so what's given is never recorded beside what git has (SC-HIST-22).
 - When git gives a name and email only inside a repository (`includeIf
   "gitdir:…"`), nothing is asked: they turn up once the folder is a
   repository, and they're used unless others are given. The dialog's
@@ -3868,7 +3867,7 @@ email. They turn on history for their den.
 Spec: design.md §6, "Turning history on" (maintainer decision,
 2026-10-28, #195). Covered by:
 `HistorySetupTests.AMissingNameAndEmailAreAskedForAndSavedForTheDensRepositoryOnly`,
-`HistorySetupTests.OnlyTheMissingHalfIsAskedForAndTheOneGitHasIsLeftAlone`,
+`HistorySetupTests.WhenGitHasOnlyOneBothAreAskedForAndOneAloneIsRefused`,
 `HistorySetupTests.ANameOrEmailThatGitCantRecordIsRefused`,
 `HistorySetupTests.ANameAndEmailGitGivesOnlyInsideTheRepositoryAreUsedAndNothingIsAsked`,
 `HistorySetupTests.ANameGitWontRecordIsRefusedBeforeAnythingIsSaved`,
@@ -4070,26 +4069,25 @@ Git has the writer's everyday name and email. They run `wolfden init --git
 --author-name "Ash Calloway"`, with no email.
 
 - It's refused, with nothing changed: the first checkpoint would have put
-  their everyday email beside the pen name. The message asks for an email
-  too, says a placeholder will do, and doesn't repeat the email git has. An
-  email without a name is refused the same way. The dialog asks for the
-  other field.
-- One given that's the same as git's changes nothing, so it's fine alone.
-- One that fills in what git lacks is what Wolfden asked for (SC-HIST-15), so
-  it's saved. The output says the email git has will be recorded beside the
-  name, without quoting it, and how to use another. That email can come from
-  `user.email`, `author.email`, `committer.email`, or `GIT_COMMITTER_EMAIL`.
-  The output says the same when the name is what git has but one of the last
-  three would put another email beside it.
+  their everyday email beside the pen name. The two go together, so the
+  message asks for both, and doesn't repeat what git has. On the command line
+  it's refused before anything is made, a new den included.
+- An email without a name is refused the same way, and so is one when git has
+  only the other, or one that's what git has already: a value on its own
+  never sits beside one git has.
+- In the dialog, when git has only one, the status asks for both fields. If
+  the writer fills in one while it can't yet be sure (`includeIf "gitdir:…"`),
+  the refusal asks for the other, and keeps what was typed.
 
-Spec: design.md §6, "Turning history on" (#286). Covered by:
-`HistorySetupTests.OneGivenAloneThatReplacesWhatGitHasIsRefusedWithNothingChanged`,
-`HistorySetupTests.OneGivenAloneThatIsWhatGitHasIsSavedAndNeedsNoOther`,
-`HistorySetupTests.ANameThatIsWhatGitHasStillSaysAnAuthorEmailGoesBesideIt`,
-`HistorySetupTests.ANameThatFillsAGapSaysAnEmailGitHasGoesBesideItWithoutQuotingIt`,
+Spec: design.md §6, "Turning history on" (maintainer decision, 2026-11-04,
+#286). Covered by:
+`HistorySetupTests.OneGivenAloneIsRefusedWithNothingChangedEvenIfItsWhatGitHas`,
+`HistorySetupTests.WhenGitHasOnlyOneBothAreAskedForAndOneAloneIsRefused`,
 `HistorySetupTests.AnAuthorEmailAloneIsntAnEmailGitHasSoANameAloneIsAskedForOne`,
-`InitHistoryTests.OneGivenAloneThatReplacesWhatGitHasIsRefused`,
-`HistorySetupEndpointTests.ANameAndEmailInTheRequestWinOverGitsAndOneAloneIsAskedToBeCompleted`.
+`InitHistoryTests.OneGivenAloneIsRefusedAndNothingIsMade`,
+`HistorySetupEndpointTests.ANameAndEmailInTheRequestWinOverGitsAndOneAloneIsAskedToBeCompleted`,
+`HistorySetupEndpointTests.WhenGitHasOnlyOneTheStatusAsksForBothAndOneAloneIsAskedToBeCompleted`,
+`Checkpoint.test.tsx` (web).
 
 ### SC-HIST-23. Git signs with the key of my other name
 
@@ -4097,7 +4095,7 @@ The writer's git signs every commit, with a key in their everyday name
 (`commit.gpgsign`, and `user.signingkey` or, with `gpg.format=ssh`,
 `gpg.ssh.defaultKeyCommand`). They turn on history under a pen name.
 
-- When a name or email is given, the den's checkpoints aren't signed. A
+- When a name and email are given, the den's checkpoints aren't signed. A
   signature would tie the pen name to the other key for good, so signing is
   saved as off in the den's repository (`commit.gpgsign`, `tag.gpgsign`,
   `tag.forceSignAnnotated`, `push.gpgSign`), before the first checkpoint. If
@@ -4109,10 +4107,10 @@ The writer's git signs every commit, with a key in their everyday name
   that den, and is told.
 - It stays off if signing is turned on globally later. With no signing set
   up today, the settings are saved the same way, and nothing is said.
-- The one exception is a `user.signingkey` in the den's own repository, in a
-  repository that was there before this run: it was chosen for it, so it
-  still signs. One in a repository this run made came from a template
-  (`init.templateDir`), and doesn't count.
+- A `user.signingkey` in the den's own repository doesn't change that: it stays
+  there for turning signing back on, but `local-user` in `gpg.conf` could add
+  another key, so it doesn't sign until the writer says so (maintainer
+  decision, 2026-11-04).
 - Nothing changes when nothing is given.
 - If a commit or tag fails while git's settings say that call would sign,
   git's output isn't repeated, whatever it was, since a signing program's
@@ -4128,7 +4126,7 @@ Spec: design.md §6, "Turning history on" (#286). Covered by:
 `HistorySetupTests.ANameGivenWithNoSigningSetUpSaysNothingOfItButStaysOffIfSigningIsTurnedOnLater`,
 `HistorySetupTests.WhatGitAlreadyHasGivenAgainStillTurnsSigningOffAndSaysSo`,
 `HistorySetupTests.NothingGivenLeavesSigningAloneAndItsFailureIsntRepeated`,
-`HistorySetupTests.AKeySetInTheDensOwnRepositoryIsLeftToSign`,
+`HistorySetupTests.AKeySetInTheDensOwnRepositoryDoesntSignEitherButIsKeptForTurningItBackOn`,
 `HistorySetupTests.ASigningFailureAtACheckpointOrTagDoesntRepeatWhoTheKeyBelongsTo`,
 `HistorySetupTests.WithSigningOffWhatGitSaidIsRepeatedEvenIfItMentionsSigning`,
 `HistorySetupTests.AKeyFromATemplateInARepositoryThisRunMadeIsNotChosenForIt`,
@@ -5126,7 +5124,7 @@ on…**, then **Turn on history**.
   quiet: the server uses the new history at once, without a restart, for
   the indicator, the History tab, the next checkpoint, and freezing.
 - A refusal shows the server's message; if git turns out to need a name
-  or email after all, the fields for just what's missing appear, and
+  or email after all, the fields for what's still needed appear, and
   stay while it tries again. When it can't be turned on
   here (no git, say), the dialog says why and offers no button.
 - A server pinned to one universe may turn it on: history covers the

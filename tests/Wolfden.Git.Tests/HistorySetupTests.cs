@@ -156,30 +156,44 @@ public sealed class HistorySetupTests : IDisposable
 
     [Fact]
     [Trait("Scenario", "SC-HIST-15")]
-    public void OnlyTheMissingHalfIsAskedForAndTheOneGitHasIsLeftAlone()
+    public void WhenGitHasOnlyOneBothAreAskedForAndOneAloneIsRefused()
     {
         var den = Den();
-        var global = Config("[user]\n\tname = Ash Calloway\n");
+        var global = Config("[user]\n\tname = Marek Oswin\n");
         var options = Without(global);
         var setup = new GitHistorySetup(den, options);
 
         var check = setup.Check(Token);
-        Assert.False(check.NeedsName);
+        Assert.True(check.NeedsName);
         Assert.True(check.NeedsEmail);
-        var refused = setup.TurnOn(new HistorySetupRequest("Someone Else"), Token);
-        Assert.Equal(HistorySetupCodes.IdentityNeeded, refused.Code);
-        Assert.False(refused.NeedsName);
-        Assert.True(refused.NeedsEmail);
 
-        var result = setup.TurnOn(new HistorySetupRequest(null, "ash@example.invalid"), Token);
+        var nothing = setup.TurnOn(new HistorySetupRequest(), Token);
+        Assert.Equal(HistorySetupCodes.IdentityNeeded, nothing.Code);
+        Assert.True(nothing.NeedsName);
+        Assert.True(nothing.NeedsEmail);
+        Assert.Contains("Give a name and an email", nothing.Problem, StringComparison.Ordinal);
+
+        var nameAlone = setup.TurnOn(new HistorySetupRequest("Ash Calloway"), Token);
+        Assert.Equal(HistorySetupCodes.IdentityNeeded, nameAlone.Code);
+        Assert.False(nameAlone.NeedsName);
+        Assert.True(nameAlone.NeedsEmail);
+
+        // The email Wolfden would once have taken alone, beside the name git has.
+        var emailAlone = setup.TurnOn(new HistorySetupRequest(null, "ash@example.invalid"), Token);
+        Assert.Equal(HistorySetupStatus.Refused, emailAlone.Status);
+        Assert.Equal(HistorySetupCodes.IdentityHalfGiven, emailAlone.Code);
+        Assert.True(emailAlone.NeedsName);
+        Assert.False(emailAlone.NeedsEmail);
+        Assert.DoesNotContain("Marek", emailAlone.Problem, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(Path.Combine(den, ".git")));
+        Assert.False(File.Exists(Path.Combine(den, ".gitignore")));
+
+        var result = setup.TurnOn(new HistorySetupRequest("Ash Calloway", "ash@example.invalid"), Token);
 
         Assert.Equal(HistorySetupStatus.Done, result.Status);
-        Assert.Equal(["user.email"], result.IdentitySaved);
-        Assert.Contains("Saved your email for this den's repository only.", result.Steps);
-        Assert.DoesNotContain("user.name", result.IdentitySaved);
-        Assert.Equal(1, GitProcess.Run(options, den, ["config", "--local", "--get", "user.name"], cancellationToken: Token).ExitCode);
-        Assert.Equal("Ash Calloway", GitHistory.ForDen(den, options, Token).Log(new HistoryLogQuery(), Token).Value[0].Author);
-        Assert.Equal("[user]\n\tname = Ash Calloway\n", File.ReadAllText(global));
+        Assert.Equal(["user.name", "user.email"], result.IdentitySaved);
+        Assert.Equal(AshOnly, FirstCommitIdentity(den, options));
+        Assert.Equal("[user]\n\tname = Marek Oswin\n", File.ReadAllText(global));
     }
 
     [Theory]
@@ -387,12 +401,12 @@ public sealed class HistorySetupTests : IDisposable
     {
         // Only a given email is checked: one git already has is git's business.
         var den = Den();
-        var setup = new GitHistorySetup(den, Without(Config("[user]\n\temail = \";\"\n")));
+        var setup = new GitHistorySetup(den, Without(Config("[user]\n\tname = Ash Calloway\n\temail = \";\"\n")));
 
-        var result = setup.TurnOn(new HistorySetupRequest("Ash Calloway"), Token);
+        var result = setup.TurnOn(new HistorySetupRequest(), Token);
 
         Assert.Equal(HistorySetupStatus.Done, result.Status);
-        Assert.Equal(["user.name"], result.IdentitySaved);
+        Assert.Empty(result.IdentitySaved);
     }
 
     [Fact]
@@ -551,7 +565,9 @@ public sealed class HistorySetupTests : IDisposable
     [Trait("Scenario", "SC-HIST-22")]
     [InlineData("Ash Calloway", null, false, true)]
     [InlineData(null, "ash@example.invalid", true, false)]
-    public void OneGivenAloneThatReplacesWhatGitHasIsRefusedWithNothingChanged(string? name, string? email, bool needsName, bool needsEmail)
+    [InlineData("Marek Oswin", null, false, true)] // what git has already: it would still sit beside an email not given
+    [InlineData(null, "marek@example.invalid", true, false)]
+    public void OneGivenAloneIsRefusedWithNothingChangedEvenIfItsWhatGitHas(string? name, string? email, bool needsName, bool needsEmail)
     {
         var den = Den();
         var setup = new GitHistorySetup(den, Without(Config("[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n")));
@@ -566,20 +582,6 @@ public sealed class HistorySetupTests : IDisposable
         Assert.EndsWith("Nothing was changed.", result.Problem, StringComparison.Ordinal);
         Assert.False(Directory.Exists(Path.Combine(den, ".git")));
         Assert.False(File.Exists(Path.Combine(den, ".gitignore")));
-    }
-
-    [Fact]
-    [Trait("Scenario", "SC-HIST-22")]
-    public void OneGivenAloneThatIsWhatGitHasIsSavedAndNeedsNoOther()
-    {
-        var den = Den();
-        var options = Without(Config("[user]\n\tname = Ash Calloway\n\temail = ash@example.invalid\n[commit]\n\tgpgsign = false\n"));
-
-        var result = new GitHistorySetup(den, options).TurnOn(new HistorySetupRequest("Ash Calloway"), Token);
-
-        Assert.Equal(HistorySetupStatus.Done, result.Status);
-        Assert.Equal(["user.name"], result.IdentitySaved);
-        Assert.Equal(AshOnly, FirstCommitIdentity(den, options));
     }
 
     [Theory]
@@ -695,23 +697,31 @@ public sealed class HistorySetupTests : IDisposable
     [Trait("Scenario", "SC-HIST-23")]
     [InlineData("gpg")]
     [InlineData("ssh")]
-    public void AKeySetInTheDensOwnRepositoryIsLeftToSign(string format)
+    public void AKeySetInTheDensOwnRepositoryDoesntSignEitherButIsKeptForTurningItBackOn(string format)
     {
-        // Chosen for this repository, so it's the one rule that leaves signing on: the program runs, and here it fails.
+        // A name given always turns signing off (maintainer decision, #286): gpg.conf's local-user could add another key.
         var den = Den();
         var (signing, attempts) = SigningConfig(format);
         var options = Without(Config(signing));
         RunGit(den, options, "init", "--quiet");
-        RunGit(den, options, "config", "--local", "user.signingkey", format == "ssh" ? "key::ssh-ed25519 KEY-OF-ASH" : "KEY-OF-ASH");
+        var key = format == "ssh" ? "key::ssh-ed25519 KEY-OF-ASH" : "KEY-OF-ASH";
+        RunGit(den, options, "config", "--local", "user.signingkey", key);
 
         var result = new GitHistorySetup(den, options).TurnOn(new HistorySetupRequest("Ash Calloway", "ash@example.invalid"), Token);
 
-        Assert.True(File.Exists(attempts));
+        Assert.Equal(HistorySetupStatus.Done, result.Status);
+        Assert.False(File.Exists(attempts));
+        var step = Assert.Single(result.Steps, s => s.StartsWith("Turned signing off", StringComparison.Ordinal));
+        Assert.Contains("local-user", step, StringComparison.Ordinal);
+        Assert.Equal(AshOnly, FirstCommitIdentity(den, options));
+        Assert.Equal("N\n", RunGit(den, options, "log", "-1", "--format=%G?"));
+        Assert.Equal($"{key}\n", RunGit(den, options, "config", "--local", "--get", "user.signingkey"));
+
+        // What the step says to do turns it back on, with that key.
+        RunGit(den, options, "config", "--local", "commit.gpgsign", "true");
+        File.WriteAllText(Path.Combine(den, "later.md"), "# Later\n", new UTF8Encoding(false));
+        Assert.Throws<HistoryException>(() => GitHistory.ForDen(den, options, Token).Checkpoint(new CheckpointRequest("Later"), Token));
         Assert.Contains("KEY-OF-ASH", File.ReadAllText(attempts), StringComparison.Ordinal);
-        Assert.Equal(HistorySetupStatus.Incomplete, result.Status);
-        Assert.DoesNotContain(result.Steps, s => s.Contains("signing", StringComparison.OrdinalIgnoreCase));
-        Assert.DoesNotContain("gpgsign", File.ReadAllText(Path.Combine(den, ".git", "config")), StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("marek", result.Problem, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -910,7 +920,7 @@ public sealed class HistorySetupTests : IDisposable
         Assert.Equal(HistorySetupCodes.WriteFailed, failed.Code);
         Assert.Equal(["user.name", "user.email"], failed.IdentitySaved);
         Assert.Contains(failed.Steps, s => s.StartsWith("Turned signing off", StringComparison.Ordinal));
-        Assert.Contains("--author-name", failed.Problem, StringComparison.Ordinal);
+        Assert.Contains("--author-name \"<name>\" --author-email <email>", failed.Problem, StringComparison.Ordinal);
         Assert.DoesNotContain("checkpoint dialog", failed.Problem, StringComparison.Ordinal);
 
         // Following the old advice to the letter, with no options, can't reach git's identity now.
@@ -1139,50 +1149,6 @@ public sealed class HistorySetupTests : IDisposable
         Assert.Contains("GIT_DIR", result.Problem, StringComparison.Ordinal);
         Assert.Equal(before, File.ReadAllText(Path.Combine(other, ".git", "config")));
         Assert.False(Directory.Exists(Path.Combine(den, ".git")));
-    }
-
-    [Theory]
-    [Trait("Scenario", "SC-HIST-22")]
-    [InlineData("user", "real@example.invalid", "real@example.invalid")]
-    [InlineData("author", "real@example.invalid", "fallback@example.invalid")]
-    [InlineData("committer", "fallback@example.invalid", "real@example.invalid")]
-    [InlineData("environment", "fallback@example.invalid", "real@example.invalid")]
-    public void ANameThatFillsAGapSaysAnEmailGitHasGoesBesideItWithoutQuotingIt(string source, string authorEmail, string committerEmail)
-    {
-        var den = Den();
-        var options = Without(Config(source switch
-        {
-            "user" => "[user]\n\temail = real@example.invalid\n",
-            "author" => "[user]\n\temail = fallback@example.invalid\n[author]\n\temail = real@example.invalid\n",
-            "committer" => "[user]\n\temail = fallback@example.invalid\n[committer]\n\temail = real@example.invalid\n",
-            _ => "[user]\n\temail = fallback@example.invalid\n",
-        }));
-        if (source == "environment")
-        {
-            options = options with { Environment = new Dictionary<string, string?>(options.Environment) { ["GIT_COMMITTER_EMAIL"] = "real@example.invalid" } };
-        }
-
-        var result = new GitHistorySetup(den, options).TurnOn(new HistorySetupRequest("Ash Calloway"), Token);
-
-        Assert.Equal(HistorySetupStatus.Done, result.Status);
-        Assert.Contains(result.Steps, s => s.StartsWith("The email git already has for this den is recorded beside the name given.", StringComparison.Ordinal));
-        Assert.DoesNotContain(result.Steps, s => s.Contains("@example.invalid", StringComparison.Ordinal));
-        Assert.Equal($"Ash Calloway|{authorEmail}|Ash Calloway|{committerEmail}\n", FirstCommitIdentity(den, options));
-    }
-
-    [Fact]
-    [Trait("Scenario", "SC-HIST-22")]
-    public void ANameThatIsWhatGitHasStillSaysAnAuthorEmailGoesBesideIt()
-    {
-        var den = Den();
-        var options = Without(Config("[user]\n\tname = Ash Calloway\n\temail = fallback@example.invalid\n[author]\n\temail = real@example.invalid\n"));
-
-        var result = new GitHistorySetup(den, options).TurnOn(new HistorySetupRequest("Ash Calloway"), Token);
-
-        Assert.Equal(HistorySetupStatus.Done, result.Status);
-        Assert.Contains(result.Steps, s => s.StartsWith("The email git already has for this den is recorded beside the name given.", StringComparison.Ordinal));
-        Assert.DoesNotContain(result.Steps, s => s.Contains("@example.invalid", StringComparison.Ordinal));
-        Assert.Equal("Ash Calloway|real@example.invalid|Ash Calloway|fallback@example.invalid\n", FirstCommitIdentity(den, options));
     }
 
     [Theory]

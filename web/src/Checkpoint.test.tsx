@@ -427,23 +427,62 @@ describe('SC-WEB-55: I turn on history from the checkpoint dialog', () => {
     expect(sent).toEqual([{ firstCheckpoint: true, authorName: 'Ash Calloway', authorEmail: 'ash@example.invalid' }])
   })
 
-  it('before the den is a repository, offers the fields without requiring them, and shows what git used instead', async () => {
-    const usedOwn: HistoryTurnedOn = {
-      ...TURNED_ON,
-      steps: [...TURNED_ON.steps, 'Git already has a name for this den (Ash Calloway), so the one given (Ilse Tarrow) wasn’t used.'],
-    }
-    const { sent } = stubTurnOn(() => noHistory({ needsName: true, needsEmail: true, identityCertain: false }), () => usedOwn)
+  it('before the den is a repository, offers the fields without requiring them, and sends nothing if they’re left empty', async () => {
+    const { sent } = stubTurnOn(() => noHistory({ needsName: true, needsEmail: true, identityCertain: false }))
     const dialog = await openTurnOn()
 
     expect(dialog.textContent).toMatch(/doesn't seem to have them/)
     const name = within(dialog).getByLabelText('Name') as HTMLInputElement
     expect(name.required).toBe(false)
-    fireEvent.change(name, { target: { value: 'Ilse Tarrow' } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Turn on history' }))
 
-    const done = await screen.findByRole('dialog', { name: 'History is on' })
-    expect(sent).toEqual([{ firstCheckpoint: true, authorName: 'Ilse Tarrow' }])
-    expect(within(done).getByText(/so the one given \(Ilse Tarrow\) wasn’t used/)).toBeTruthy()
+    await screen.findByRole('dialog', { name: 'History is on' })
+    expect(sent).toEqual([{ firstCheckpoint: true }])
+  })
+
+  it('when git has only an email or only a name, asks for both, and requires both', async () => {
+    // The server's status says both whichever one git has, since neither is recorded beside the other (#286).
+    const { sent } = stubTurnOn(() => noHistory({ needsName: true, needsEmail: true }))
+    const dialog = await openTurnOn()
+
+    expect(dialog.textContent).toMatch(/doesn't have both/)
+    const name = within(dialog).getByLabelText('Name') as HTMLInputElement
+    const email = within(dialog).getByLabelText('Email') as HTMLInputElement
+    expect(name.required).toBe(true)
+    expect(email.required).toBe(true)
+
+    fireEvent.change(email, { target: { value: 'ash@example.invalid' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Turn on history' }))
+    expect(await within(dialog).findByText(/Give a name/)).toBeTruthy()
+    expect(sent).toEqual([])
+  })
+
+  it('after an email alone is refused because git has a name, asks for the name and keeps the email', async () => {
+    // Before the den is a repository the fields are optional; once it is, an includeIf gives git a name.
+    const { sent } = stubTurnOn(
+      () => noHistory({ needsName: true, needsEmail: true, identityCertain: false }),
+      (body) =>
+        body.authorName === undefined
+          ? new Response(
+              JSON.stringify({ code: 'identity_needed', message: 'An email was given without a name.', needsName: true, needsEmail: false }),
+              { status: 400 },
+            )
+          : TURNED_ON,
+    )
+    const dialog = await openTurnOn()
+    fireEvent.change(within(dialog).getByLabelText('Email'), { target: { value: 'ash@example.invalid' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Turn on history' }))
+
+    expect((await within(dialog).findByRole('alert')).textContent).toMatch(/without a name/)
+    const name = within(dialog).getByLabelText('Name') as HTMLInputElement
+    expect(name.required).toBe(true)
+    expect((within(dialog).getByLabelText('Email') as HTMLInputElement).value).toBe('ash@example.invalid')
+
+    fireEvent.change(name, { target: { value: 'Ash Calloway' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Turn on history' }))
+
+    await screen.findByRole('dialog', { name: 'History is on' })
+    expect(sent[1]).toEqual({ firstCheckpoint: true, authorName: 'Ash Calloway', authorEmail: 'ash@example.invalid' })
   })
 
   it('asks only for what’s missing', async () => {

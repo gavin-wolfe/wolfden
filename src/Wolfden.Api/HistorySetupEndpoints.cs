@@ -182,8 +182,8 @@ public static class HistorySetupEndpoints
 /// <summary>For a den without history, whether this server can turn it on (#195).</summary>
 /// <param name="Possible">True if it can, given a name and email when they're needed.</param>
 /// <param name="Reason">Why it can't, in words for the writer, or null.</param>
-/// <param name="NeedsName">True if git has no name for the den, so the writer must give one.</param>
-/// <param name="NeedsEmail">True if git has no email for the den, so the writer must give one (a placeholder will do).</param>
+/// <param name="NeedsName">True if git lacks a name or an email for the den, so the writer must give a name: they go together (#286).</param>
+/// <param name="NeedsEmail">The same for an email (a placeholder will do).</param>
 /// <param name="IdentityCertain">
 /// True if <paramref name="NeedsName"/> and <paramref name="NeedsEmail"/> are
 /// final. False before the den is a repository: git may then have a name

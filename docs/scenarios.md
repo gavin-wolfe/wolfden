@@ -1199,8 +1199,8 @@ Spec: format.md §1.3, F-GEN-2 (#50). Covered by:
 
 ### SC-CHECK-63. Check lists what it couldn't read
 
-Another program has a note open for writing, or the writer's account may not
-list a `characters/` folder, while they run `wolfden check`.
+Another program has a note locked so nothing else can read it, or the writer's
+account may not list a `characters/` folder, while they run `wolfden check`.
 
 - The report has one more error for it, on its path with no line:
   `F-GEN-5: This file couldn't be read, so it wasn't checked, and links to it
@@ -1220,6 +1220,9 @@ list a `characters/` folder, while they run `wolfden check`.
 
 Spec: format.md F-GEN-1, F-GEN-5 (#284). Covered by:
 `LockedFileWriteTests.TheCheckToolListsALockedNoteAsAnError` (MCP),
+`SharedFileTests.AProgramHoldingAFileWithNoSharingStillStopsARead` (Core),
+`SharedFileTests.AProgramLettingOthersWriteButNotReadStillStopsAReadOnWindows` (Core),
+`SharedFileTests.AnExclusiveLockOnTheFilesBytesStillStopsAReadOnWindows` (Core),
 `LockedFileWriteTests.TheCheckToolListsAFolderThatCantBeListed` (MCP),
 `TrackingDenSourceTests.CheckReportsAFolderThatCantBeListed` (Core),
 `TrackingDenSourceTests.ACheckOfOneUniverseReportsOnlyItsOwnUnreadableFiles` (Core),
@@ -1229,6 +1232,18 @@ Spec: format.md F-GEN-1, F-GEN-5 (#284). Covered by:
 `UnreadableFileTests.AFileThatCantBeReadIsCheckedAsIfItWerentThere` (Core),
 `UnreadableFileTests.ANoteThatCantBeReadIsLeftOutAndTheCommandsStillWork` (CLI),
 `UnlistableFolderTests.AFolderThatCantBeListedIsLeftOutAndTheCommandsStillWork` (CLI).
+
+### SC-CHECK-64. Check reads a note another program has open
+
+Another program has a note open for writing, and lets others read it, while the
+writer runs `wolfden check`.
+
+- The note is checked like any other, and there's no F-GEN-5 for it. On Linux
+  and macOS, a program has to take an exclusive `flock` to stop a read, as before.
+
+Spec: format.md F-GEN-5 (#298). Covered by:
+`SharedFileTests.AProgramWritingAFileAndLettingOthersReadItDoesntStopARead` (Core),
+`SharedFileTests.ACheckOfADenWithAHeldNoteDoesntListItWhenItsShared` (Core).
 
 ## RT: saving a note keeps what the writer wrote
 
@@ -3202,7 +3217,7 @@ Spec: F-GEN-2, F-RT-5 (#50). Covered by:
 
 ### SC-MCP-38. A rename while another program holds a note
 
-The writer has a note open for writing in another program, and asks the
+The writer has a note locked against reading in another program, and asks the
 assistant to rename Mr. Swales. That note links to him.
 
 - The rename is refused as a whole with `den_unreadable`. The error names
@@ -3233,8 +3248,14 @@ assistant to rename Mr. Swales. That note links to him.
   held elsewhere: it doesn't depend on that note.
 - A note deleted just as the den is read isn't a failure. It's gone, so the
   rename goes ahead.
+- A note open in a program that lets others read it isn't held at all: pages
+  and `check` see it, and a rename that only needs to read it goes ahead, a
+  moment later than usual on Windows (SC-MCP-41).
 
-Spec: format.md F-GEN-5, F-RT-5 (#284). Covered by:
+Spec: format.md F-GEN-5, F-RT-5 (#284, #298). Covered by:
+`SharedFileWriteTests.ADenWideWriteGoesAheadWhileAnotherProgramIsHoldingANoteItCanRead`,
+`SharedFileWriteTests.ANoteHeldForWritingIsSeenSoAPageAndACheckAreRight`,
+`SharedFileWriteTests.ALockWithNoSharingStillRefusesAndIsStillListed`,
 `LockedFileWriteTests.ALockedNoteRefusesADenWideWriteAndNothingIsWritten`,
 `LockedFileWriteTests.TheLinksInALockedNoteFollowOnceItsClosedAndTheWriteIsRepeated`,
 `LockedFileWriteTests.AnOutlineIsNamedWhenItsTheOneLocked`,
@@ -3293,6 +3314,59 @@ A note has `status: maybe`, and another has a typo in a section comment.
 Spec: F-GEN-2 (#280). Covered by:
 `McpServerTests.AResultCarriesAShortNoticeWhileTheDenHasErrors`,
 `McpServerTests.ANoteLeftOutSaysWhyButNotAtAPosition`.
+
+### SC-MCP-41. My assistant writes while another program is saving a note
+
+Another program is part way through saving a note, writing it in place, as the
+assistant reads the den to rename Mr. Swales. The part still to come has a link
+to him. The program lets others read the file.
+
+- A page or a read tool can show the part saved so far, or say the note has an
+  error. Its next read shows the whole note, and the index catches up the same way.
+- An edit of that note was based on the hash of the whole file, or of the part
+  shown, so unless the file still holds exactly that it's `stale_file`, and the
+  program's save is left alone.
+- If the note holds something else by the time the rename saves, it's
+  `stale_file`, naming the note, and nothing is written. That covers every file
+  the rename read, not only those it would rewrite, or the link still to come
+  would break. Once the save has finished, the same call goes through and the
+  link follows. The same goes for `change_alias`, `rename_section`,
+  `move_entity`, `copy_entity`, `create_entity`, a new book or series, a change
+  to `chapter_defaults`, and saving from Edit file.
+- On Windows, Wolfden can tell a file is open for writing. It reads such a file
+  again after a moment. If it keeps changing, or has just been cut to nothing,
+  the rename is `den_unreadable` and names it. If the save finishes while Wolfden
+  looks, the rename uses the whole note. If it stays the same, the rename goes
+  ahead. A note the rename must rewrite is refused as open anyway, since Windows
+  won't replace it, and nothing is changed.
+- On Linux and macOS, Wolfden can't tell. It relies on seeing the note change.
+- **What it can't catch:** a program stalled mid-save for longer than the rename
+  takes looks like one holding a whole file. The rename goes ahead and misses a
+  link still to come, which `check` then lists as broken (F-LINK-8). On Linux and
+  macOS, a note the rename rewrites can be replaced with the part read, as it
+  could before #298.
+
+Spec: format.md F-GEN-5, F-RT-5, F-BOOK-1 (#298). Covered by:
+`SharedFileWriteTests.AnEditBasedOnTheWholeFileIsRefusedInTheMiddleOfASave`,
+`SharedFileWriteTests.AnEditBasedOnAPageShownMidSaveIsRefusedOnceTheSaveGoesOn`,
+`SharedFileWriteTests.AWriteIsRefusedIfWhatItReadWasPartOfASaveThatHasGoneOnSince`,
+`SharedFileWriteTests.TheSameWriteGoesThroughOnceTheSaveHasFinishedAndTheLinksFollow`,
+`SharedFileWriteTests.ANoteStillBeingWrittenToRefusesADenWideWriteOnWindows`,
+`SharedFileWriteTests.ANoteJustCutForASaveRefusesADenWideWriteOnWindows`,
+`SharedFileWriteTests.ASaveThatFinishesWhileAWriteLooksAtItIsReadWholeOnWindows`,
+`SharedFileWriteTests.ANoteARenameMustRewriteIsntOverwrittenWhileAnotherProgramHasItOpenOnWindows`,
+`SharedFileWriteTests.KnownLimitASavePausedForLongerThanAWriteTakesCanStillHideALink`,
+`SharedFileTests.AReadDuringASaveSeesPartOfItAndTheNextReadSeesItAll` (Core),
+`SharedFileTests.OnlyWindowsCanTellThatAFileIsOpenForWriting` (Core),
+`SharedFileTests.AFileNoOneHasOpenOrThatIsntThereIsntOpenForWriting` (Core),
+`SharedFileTests.AWriteTakesAFileOpenForWritingOnceItStaysTheSame` (Core),
+`SharedFileTests.AWriteTakesWhatASaveEndsUpAs` (Core),
+`SharedFileTests.AWriteCountsAFileThatKeepsChangingAsUnreadable` (Core),
+`SharedFileTests.AWriteCountsAnEmptyFileOpenForWritingAsUnreadable` (Core),
+`SharedFileTests.AFileAlreadyTakenIsntWaitedForAgain` (Core),
+`SharedFileTests.ACheckDoesntWaitOnAFileOpenForWriting` (Core),
+`SharedFileTests.AWriteCanTellThatAFileItReadHasChangedOrGone` (Core),
+`IncrementalUpdateTests.ANoteCaughtPartWayThroughASaveIsPutRightByTheNextChange` (index).
 
 ## STORE: Wolfden saves, moves, and deletes notes
 
@@ -5866,7 +5940,7 @@ Spec: F-VIEW-1, F-GEN-2 (#280). Covered by:
 
 ### SC-WEB-96. Another program holds a file while I'm fixing problems
 
-I have a note open for writing in another program, with the den's page open.
+I have a note locked against reading in another program, with the den's page open.
 
 - Within a minute, the top bar counts it. Its entry is the same as in
   `wolfden check` (F-GEN-5): it couldn't be read, and how to fix that. It has no

@@ -6,26 +6,37 @@ namespace Wolfden.Git;
 /// <summary>
 /// Turns git history on for a den that has none (#195): <c>git init</c> in
 /// the den's folder, <c>.wolfden/</c> in its <c>.gitignore</c>, a name and
-/// email saved in the repository's own config if git has none, and a first
-/// checkpoint. See <see cref="IHistorySetup"/> for the rules.
+/// email saved in the repository's own config if they're given or git has
+/// none, and a first checkpoint. See <see cref="IHistorySetup"/> for the rules.
 /// </summary>
 /// <remarks>
 /// <para>
 /// <b>The name and email</b> are what git itself would use for the den's
 /// repository: <c>git config user.name</c> and <c>user.email</c> run in the
 /// den's folder, so the user's global and system settings count. They're
-/// asked for only when one is missing, and saved with <c>git config
-/// --local</c>, in that repository only, never globally; an existing
-/// setting is never changed. They're checked once the repository exists,
-/// right after <c>git init</c>, since a setting can depend on where the
-/// repository is (git's <c>includeIf "gitdir:…"</c>), which git can't
-/// apply before. A missing one that wasn't given, or a pair git won't
-/// record (<c>git var GIT_COMMITTER_IDENT</c>, which also says what git
-/// makes of them: a given email it would record as empty, such as
+/// asked for only when one is missing. One given always wins for this den
+/// (#286): it's saved with <c>git config --local</c>, in that repository
+/// only, never globally, before the first checkpoint, even over what git
+/// already has, and over an <c>author.name</c> or <c>committer.email</c> of
+/// the kind that would otherwise beat it. They're checked once the
+/// repository exists, right after <c>git init</c>, since a setting can
+/// depend on where the repository is (git's <c>includeIf "gitdir:…"</c>),
+/// which git can't apply before. A missing one that wasn't given, or a pair
+/// git won't record (<c>git var GIT_COMMITTER_IDENT</c>, which also says
+/// what git makes of them: a given email it would record as empty, such as
 /// <c>;</c>, is refused as a name git strips to nothing is), refuses: the repository
 /// this run just made, with no commit yet, is taken away again, so nothing
-/// is changed. One given when git already has one isn't used, and the
-/// result says so.
+/// is changed. So does one given that replaces what git has while the other
+/// isn't given (it would pair a pen name with the email git has), and one
+/// that a <c>GIT_AUTHOR_NAME</c>-style environment variable would beat.
+/// </para>
+/// <para>
+/// <b>Signing.</b> A key set up for git's own name and email isn't this
+/// name's. So when what's given changes the name or email git would use,
+/// <see cref="SigningSettings"/> are saved as off in the den's repository,
+/// and stay off if signing is turned on globally later; the steps say so
+/// if signing was on. A <c>user.signingkey</c> in the repository's own
+/// config is a key chosen for this repository, so it's left to sign.
 /// </para>
 /// <para>
 /// <b>Its own repository</b> is one whose top level, as git says
@@ -58,6 +69,12 @@ public sealed class GitHistorySetup : IHistorySetup
     private static readonly UTF8Encoding Utf8 = new(false);
 
     private static readonly string[] IgnoreSpellings = [".wolfden", ".wolfden/", "/.wolfden", "/.wolfden/", ".wolfden/*", "/.wolfden/*", ".wolfden/**", "/.wolfden/**"];
+
+    /// <summary>What's saved as off in the den's repository when the name or email given isn't git's.</summary>
+    private static readonly string[] SigningSettings = ["commit.gpgsign", "tag.gpgsign", "tag.forcesignannotated", "push.gpgsign"];
+
+    /// <summary>The settings that make a commit or tag signed, so that signing is on if any is.</summary>
+    private static readonly string[] SignsCheckpoints = ["commit.gpgsign", "tag.gpgsign", "tag.forcesignannotated"];
 
     private readonly string _denRoot;
     private readonly GitOptions _options;
@@ -193,7 +210,9 @@ public sealed class GitHistorySetup : IHistorySetup
         }
 
         // 2. The name and email git will use: refused, with the repository just made taken
-        // away again, if one is missing and not given, or if git won't record them.
+        // away again, if one is missing and not given, if one given would be paired with a
+        // value of git's the writer didn't choose or lose to an environment variable, or if
+        // git won't record them.
         string? hasName;
         string? hasEmail;
         try
@@ -204,7 +223,17 @@ public sealed class GitHistorySetup : IHistorySetup
                 return Undo(HistorySetupCodes.IdentityNeeded, missing, hasName is null && name is null, hasEmail is null && email is null);
             }
 
-            if ((hasName is null || hasEmail is null) && Unrecordable(hasName ?? name!, hasEmail ?? email!, checkEmail: hasEmail is null, cancellationToken) is { } unrecordable)
+            if (HalfGiven(hasName, hasEmail, name, email) is { } half)
+            {
+                return Undo(HistorySetupCodes.IdentityHalfGiven, half, needsName: name is null, needsEmail: email is null);
+            }
+
+            if (BeatenByEnvironment(name, email) is { } beaten)
+            {
+                return Undo(HistorySetupCodes.BadArgument, beaten);
+            }
+
+            if ((name is not null || email is not null) && Unrecordable(name ?? hasName!, email ?? hasEmail!, name is not null, email is not null, cancellationToken) is { } unrecordable)
             {
                 return Undo(HistorySetupCodes.BadArgument, unrecordable);
             }
@@ -232,24 +261,45 @@ public sealed class GitHistorySetup : IHistorySetup
             return Stop(HistorySetupCodes.WriteFailed, $"Couldn't update .gitignore: {Sentence(e.Message)}", NotDone(identity: true));
         }
 
-        // 4. Save what's missing; say what was given but not needed.
+        // 4. Save what was given, which wins for this den (#286). Signing goes off first, so a
+        // save that stops part way, and a retry that then sees nothing to change, can't leave
+        // this name signing with git's key.
+        var signingOff = false;
         try
         {
-            if (hasName is null)
+            var stronger = StrongerSettings(name, email, cancellationToken);
+            if (((name is not null && name != hasName) || (email is not null && email != hasEmail) || stronger.Count > 0) && !HasLocalSigningKey(cancellationToken))
             {
-                SetLocal("user.name", name!, cancellationToken);
+                signingOff = SignsNow(cancellationToken);
+                foreach (var setting in SigningSettings)
+                {
+                    SetLocal(setting, "false", cancellationToken);
+                }
+            }
+
+            if (name is not null)
+            {
+                SetLocal("user.name", name, cancellationToken);
                 saved.Add("user.name");
             }
 
-            if (hasEmail is null)
+            if (email is not null)
             {
-                SetLocal("user.email", email!, cancellationToken);
+                SetLocal("user.email", email, cancellationToken);
                 saved.Add("user.email");
+            }
+
+            foreach (var (key, value) in stronger)
+            {
+                SetLocal(key, value, cancellationToken);
             }
         }
         catch (HistoryException e)
         {
-            return Stop(HistorySetupCodes.HistoryFailed, $"Couldn't save the name and email for the den's repository: {e.Message}", NotDone(identity: true));
+            var notDone = saved.Count == 0
+                ? NotDone(identity: true)
+                : request.FirstCheckpoint ? "Not all of it was saved, and no first checkpoint was made." : "Not all of it was saved.";
+            return Stop(HistorySetupCodes.HistoryFailed, $"Couldn't save the name and email for the den's repository: {e.Message}", notDone);
         }
 
         if (saved.Count > 0)
@@ -258,14 +308,11 @@ public sealed class GitHistorySetup : IHistorySetup
             steps.Add($"Saved {what} for this den's repository only.");
         }
 
-        if (hasName is not null && name is not null && name != hasName)
+        if (signingOff)
         {
-            steps.Add($"Git already has a name for this den ({hasName}), so the one given ({name}) wasn't used.");
-        }
-
-        if (hasEmail is not null && email is not null && email != hasEmail)
-        {
-            steps.Add($"Git already has an email for this den ({hasEmail}), so the one given ({email}) wasn't used.");
+            steps.Add(
+                "Turned signing off for this den's repository only: git is set to sign, with a key that isn't tied to the name and email given. " +
+                "To sign here with a key of this name's, run 'git config --local user.signingkey <key>' and 'git config --local commit.gpgsign true' in the den's folder.");
         }
 
         // 5. The first checkpoint.
@@ -363,6 +410,98 @@ public sealed class GitHistorySetup : IHistorySetup
         "The den's folder is a git repository now, so to finish, fix the problem and run 'wolfden init --git' in the den again: it picks up where this stopped. " +
         "Or make the first checkpoint from the web UI's checkpoint dialog.";
 
+    /// <summary>
+    /// Why a name or email given can't be used alone, in words, or null if it
+    /// can. One that replaces what git has, without the other, would record
+    /// it with git's other half: a pen name with the email it was meant to
+    /// keep apart. One that fills in what git lacks is what Wolfden asked for,
+    /// and one that's what git has already changes nothing. The value git
+    /// has isn't repeated, so the message is safe to copy anywhere.
+    /// </summary>
+    private static string? HalfGiven(string? hasName, string? hasEmail, string? name, string? email)
+    {
+        if (name is not null && email is null && hasName is not null && name != hasName)
+        {
+            return "A name was given without an email. Git has an email for this den, and would record it beside the name given. " +
+                "Give an email too: it's saved with the name for this den only, and a placeholder such as you@example.com will do.";
+        }
+
+        if (email is not null && name is null && hasEmail is not null && email != hasEmail)
+        {
+            return "An email was given without a name. Git has a name for this den, and would record it beside the email given. " +
+                "Give a name too: it's saved with the email for this den only, and any name will do, a pen name included.";
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Why a name or email given wouldn't be the one git records, in words, or
+    /// null: an environment variable that's set for git beats every setting,
+    /// and can't be saved over. Its value isn't repeated.
+    /// </summary>
+    private string? BeatenByEnvironment(string? name, string? email)
+    {
+        var beating = new[] { ("GIT_AUTHOR_NAME", name), ("GIT_COMMITTER_NAME", name), ("GIT_AUTHOR_EMAIL", email), ("GIT_COMMITTER_EMAIL", email) }
+            .Where(v => v.Item2 is not null && EnvironmentValue(v.Item1) is { } value && value != v.Item2)
+            .Select(v => v.Item1)
+            .ToList();
+        return beating.Count == 0
+            ? null
+            : $"Git would record the checkpoints under {string.Join(", ", beating)} from the environment, which beat{(beating.Count == 1 ? "s" : "")} what's saved for a den, " +
+                "not under the name and email given. Unset that, then try again.";
+    }
+
+    /// <summary>A variable as git will see it: <see cref="GitOptions.Environment"/> first, then this process's own.</summary>
+    private string? EnvironmentValue(string variable) =>
+        _options.Environment.TryGetValue(variable, out var value) ? value : Environment.GetEnvironmentVariable(variable);
+
+    /// <summary>
+    /// Settings git prefers to <c>user.name</c> and <c>user.email</c>
+    /// (<c>author.name</c>, <c>committer.email</c>, …) that hold something
+    /// other than what was given, each with the value to save over it.
+    /// </summary>
+    private List<(string Key, string Value)> StrongerSettings(string? name, string? email, CancellationToken cancellationToken)
+    {
+        var found = new List<(string, string)>();
+        foreach (var (field, value) in new[] { ("name", name), ("email", email) })
+        {
+            if (value is null)
+            {
+                continue;
+            }
+
+            foreach (var role in new[] { "author", "committer" })
+            {
+                if (Setting($"{role}.{field}", cancellationToken) is { } other && other != value)
+                {
+                    found.Add(($"{role}.{field}", value));
+                }
+            }
+        }
+
+        return found;
+    }
+
+    /// <summary>True if the repository's own config names a signing key: one chosen for this repository, not git's global one.</summary>
+    private bool HasLocalSigningKey(CancellationToken cancellationToken)
+    {
+        var run = Run(["config", "--local", "--get", "user.signingkey"], cancellationToken);
+        return run.ExitCode switch
+        {
+            0 => run.Output.Trim().Length > 0,
+            1 => false,
+            _ => throw new HistoryException($"Git couldn't read its 'user.signingkey' setting: {run.Said}"),
+        };
+    }
+
+    /// <summary>True if git would sign a commit or tag made now. A value git can't read as true or false counts as on.</summary>
+    private bool SignsNow(CancellationToken cancellationToken) => SignsCheckpoints.Any(key =>
+    {
+        var run = Run(["config", "--type=bool", "--get", key], cancellationToken);
+        return run.ExitCode != 1 && run.Output.Trim() != "false";
+    });
+
     private static string Count(int files) => files == 1 ? "1 file" : $"{files} files";
 
     /// <summary>What's missing that wasn't given, in words, or null if git will have both.</summary>
@@ -407,10 +546,14 @@ public sealed class GitHistorySetup : IHistorySetup
     /// made only of characters git strips (<c>;</c>, <c>,</c>, …). Git takes
     /// such an email but records it as empty (<c>Ann &lt;&gt;</c>), so with
     /// <paramref name="checkEmail"/> (the email is the one given) that's refused too.
+    /// What's given is also passed as <c>committer.name</c> and
+    /// <c>committer.email</c>, which beat <c>user.name</c> and would otherwise be what git checks.
     /// </summary>
-    private string? Unrecordable(string name, string email, bool checkEmail, CancellationToken cancellationToken)
+    private string? Unrecordable(string name, string email, bool checkName, bool checkEmail, CancellationToken cancellationToken)
     {
-        var run = Run(["-c", $"user.name={name}", "-c", $"user.email={email}", "var", "GIT_COMMITTER_IDENT"], cancellationToken);
+        string[] committerName = checkName ? ["-c", $"committer.name={name}"] : [];
+        string[] committerEmail = checkEmail ? ["-c", $"committer.email={email}"] : [];
+        var run = Run(["-c", $"user.name={name}", "-c", $"user.email={email}", .. committerName, .. committerEmail, "var", "GIT_COMMITTER_IDENT"], cancellationToken);
         if (!run.Succeeded)
         {
             return $"Git won't record that name and email on a checkpoint ({Sentence(run.Said)[..^1]}). Choose another; any ordinary name will do, a pen name included.";

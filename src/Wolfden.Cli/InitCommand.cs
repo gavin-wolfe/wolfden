@@ -26,8 +26,9 @@ namespace Wolfden.Cli;
 /// <para>
 /// <c>--git</c> turns history on after the den is made, as
 /// <see cref="GitHistorySetup"/> does: <c>git init</c>, <c>.wolfden/</c> in
-/// <c>.gitignore</c>, a name and email for the repository if git has none
-/// (<c>--author-name</c>, <c>--author-email</c>), and a first checkpoint,
+/// <c>.gitignore</c>, a name and email for the repository if they're given
+/// (<c>--author-name</c>, <c>--author-email</c>, which win over git's for this
+/// den) or git has none, and a first checkpoint,
 /// "Start of history", unless <c>--no-checkpoint</c>. A new den already
 /// inside a repository is left as it is, since a den can be a subfolder of
 /// a larger repository and its history is scoped to the den's files.
@@ -69,9 +70,11 @@ internal static class InitCommand
           --no-checkpoint   with --git, make no first checkpoint
           --author-name <name>, --author-email <email>
                             with --git, the name and email git records on
-                            checkpoints, when git has none: saved for this
-                            den's repository only. Any name will do, a pen
-                            name included; the email can be a placeholder
+                            checkpoints: saved for this den's repository only,
+                            and used even if git has its own. If git has its
+                            own, give both. Any name will do, a pen name
+                            included; the email can be a placeholder. Signing
+                            goes off for this den if they aren't git's own
           --json            print one JSON document instead of text
 
         It never overwrites anything, and won't create a den inside another den

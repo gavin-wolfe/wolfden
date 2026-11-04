@@ -150,6 +150,33 @@ public sealed class HistorySetupEndpointTests : IDisposable
         Assert.Equal("", File.ReadAllText(global));
     }
 
+    [Fact]
+    [Trait("Scenario", "SC-HIST-21")]
+    [Trait("Scenario", "SC-HIST-22")]
+    public async Task ANameAndEmailInTheRequestWinOverGitsAndOneAloneIsAskedToBeCompleted()
+    {
+        var den = Den(TempDen.Dracula());
+        var text = "[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n";
+        var global = Config(text);
+        var git = Git(global: global);
+        await using var server = await StartAsync(den, git);
+
+        var (halfCode, half) = await Post(server, "/api/history/turn-on", """{"authorName": "Ash Calloway"}""");
+        Assert.Equal(HttpStatusCode.BadRequest, halfCode);
+        Assert.Equal("identity_needed", half.GetProperty("code").GetString()); // the dialog asks for the other
+        Assert.False(half.GetProperty("needsName").GetBoolean());
+        Assert.True(half.GetProperty("needsEmail").GetBoolean());
+        Assert.DoesNotContain("marek", half.GetProperty("message").GetString(), StringComparison.OrdinalIgnoreCase);
+        Assert.False(Directory.Exists(Path.Combine(den.Root, ".git")));
+
+        var (code, made) = await Post(server, "/api/history/turn-on", """{"authorName": "Ash Calloway", "authorEmail": "ash@example.invalid"}""");
+
+        Assert.Equal(HttpStatusCode.OK, code);
+        Assert.Equal(["user.name", "user.email"], made.GetProperty("identitySaved").EnumerateArray().Select(e => e.GetString()));
+        Assert.Equal("Ash Calloway|ash@example.invalid|Ash Calloway|ash@example.invalid\n", RunGit(den, git, "log", "-1", "--format=%an|%ae|%cn|%ce"));
+        Assert.Equal(text, File.ReadAllText(global));
+    }
+
     [Theory]
     [Trait("Scenario", "SC-WEB-55")]
     [InlineData("""{"authorName": "Ash\nCalloway"}""", "one line")]

@@ -99,7 +99,7 @@ public class InitHistoryTests
 
     [Fact]
     [Trait("Scenario", "SC-HIST-15")]
-    public void ANameAndEmailGitGivesOnlyInsideTheRepositoryAreUsedAndOnesGivenSaySoIfNotUsed()
+    public void ANameAndEmailGitGivesOnlyInsideTheRepositoryAreUsedWhenNoneIsGiven()
     {
         using var den = TempDen.DraculaCopy();
         using var config = TempDen.Empty();
@@ -111,15 +111,78 @@ public class InitHistoryTests
         var output = new StringWriter();
         var error = new StringWriter();
 
-        var exitCode = InitCommand.Run([den.Root, "--git", "--author-name", "Ilse Tarrow"], output, error, NoIdentity(global));
+        var exitCode = InitCommand.Run([den.Root, "--git"], output, error, NoIdentity(global));
 
         Assert.Equal(CliApp.ExitOk, exitCode);
         Assert.Empty(error.ToString());
-        Assert.Contains(
-            "Git already has a name for this den (Ash Calloway), so the one given (Ilse Tarrow) wasn't used.\n",
-            output.ToString().ReplaceLineEndings("\n"),
-            StringComparison.Ordinal);
         Assert.Equal("Ash Calloway", GitHistory.ForDen(den.Root, NoIdentity(global), Token).Log(new HistoryLogQuery(), Token).Value[0].Author);
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-HIST-21")]
+    [Trait("Scenario", "SC-CLI-12")]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AGivenNameAndEmailWinOverGitsInAnExistingOrNewDen(bool existing)
+    {
+        using var den = existing ? TempDen.DraculaCopy() : TempDen.Empty();
+        using var config = TempDen.Empty();
+        var text = "[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n";
+        var global = Path.Combine(config.Root, "gitconfig");
+        File.WriteAllText(global, text, new UTF8Encoding(false));
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var exitCode = InitCommand.Run([den.Root, "--git", "--author-name", "Ash Calloway", "--author-email", "ash@example.invalid"], output, error, NoIdentity(global));
+
+        Assert.Equal(CliApp.ExitOk, exitCode);
+        Assert.Empty(error.ToString());
+        Assert.Contains("Saved your name and email for this den's repository only.\n", output.ToString().ReplaceLineEndings("\n"), StringComparison.Ordinal);
+        Assert.DoesNotContain("Marek", output.ToString(), StringComparison.Ordinal);
+        Assert.Equal("Ash Calloway|ash@example.invalid|Ash Calloway|ash@example.invalid\n", TestGit.Run(den.Root, "log", "-1", "--format=%an|%ae|%cn|%ce"));
+        Assert.Equal(text, File.ReadAllText(global));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-22")]
+    public void OneGivenAloneThatReplacesWhatGitHasIsRefused()
+    {
+        using var den = TempDen.DraculaCopy();
+        using var config = TempDen.Empty();
+        var global = Path.Combine(config.Root, "gitconfig");
+        File.WriteAllText(global, "[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n", new UTF8Encoding(false));
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var exitCode = InitCommand.Run([den.Root, "--git", "--author-name", "Ash Calloway"], output, error, NoIdentity(global));
+
+        Assert.Equal(CliApp.ExitUsage, exitCode);
+        Assert.Empty(output.ToString());
+        Assert.StartsWith("wolfden init: A name was given without an email.", error.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("marek", error.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.False(Directory.Exists(Path.Combine(den.Root, ".git")));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-23")]
+    public void AGivenNameTurnsSigningOffForTheDenAndSaysSo()
+    {
+        using var den = TempDen.DraculaCopy();
+        using var config = TempDen.Empty();
+        var global = Path.Combine(config.Root, "gitconfig");
+        File.WriteAllText(
+            global,
+            "[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n\tsigningkey = KEY-OF-MAREK\n[commit]\n\tgpgsign = true\n[gpg]\n\tprogram = wolfden-test-no-such-gpg\n",
+            new UTF8Encoding(false));
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var exitCode = InitCommand.Run([den.Root, "--git", "--author-name", "Ash Calloway", "--author-email", "ash@example.invalid"], output, error, NoIdentity(global));
+
+        Assert.Equal(CliApp.ExitOk, exitCode);
+        Assert.Contains("Turned signing off for this den's repository only", output.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("KEY-OF-MAREK", output.ToString(), StringComparison.Ordinal);
+        Assert.Equal("Ash Calloway|ash@example.invalid|Ash Calloway|ash@example.invalid\n", TestGit.Run(den.Root, "log", "-1", "--format=%an|%ae|%cn|%ce"));
     }
 
     [Fact]

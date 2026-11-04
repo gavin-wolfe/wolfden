@@ -128,7 +128,7 @@ public static class HistorySetupEndpoints
 
         var status = result.Code switch
         {
-            HistorySetupCodes.BadArgument or HistorySetupCodes.IdentityNeeded when result.Status == HistorySetupStatus.Refused => StatusCodes.Status400BadRequest,
+            HistorySetupCodes.BadArgument or HistorySetupCodes.IdentityNeeded or HistorySetupCodes.IdentityHalfGiven when result.Status == HistorySetupStatus.Refused => StatusCodes.Status400BadRequest,
             HistorySetupCodes.InRepository or HistorySetupCodes.HasRepository or HistorySetupCodes.GitNotInstalled => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status500InternalServerError,
         };
@@ -138,9 +138,10 @@ public static class HistorySetupEndpoints
             ? $"{string.Join(" ", result.Steps)} {result.Problem}"
             : result.Problem!;
 
-        // Git needs a name or email after all: say which, so the page asks only for what's missing.
-        return result.Code == HistorySetupCodes.IdentityNeeded
-            ? Results.Json(new ApiError(result.Code, message, NeedsName: result.NeedsName, NeedsEmail: result.NeedsEmail), statusCode: status)
+        // Git needs a name or email after all, or one given needs the other to go with it (#286):
+        // say which, so the page asks only for what's missing. To the page they're the same question.
+        return result.Code is HistorySetupCodes.IdentityNeeded or HistorySetupCodes.IdentityHalfGiven
+            ? Results.Json(new ApiError(HistorySetupCodes.IdentityNeeded, message, NeedsName: result.NeedsName, NeedsEmail: result.NeedsEmail), statusCode: status)
             : Error(status, result.Code!, message);
     }
 

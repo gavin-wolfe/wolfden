@@ -599,6 +599,301 @@ describe('SC-WEB-55: I turn on history from the checkpoint dialog', () => {
   })
 })
 
+describe('SC-WEB-99: I use a different name for this den when I turn on history', () => {
+  const DIFFERENT = 'Use a different name for this den'
+  const SIGNING_STEP = "Turned signing off for this den's repository only: git is set to sign, and Wolfden can't tell whose key that would use."
+
+  const openDifferent = (dialog: HTMLElement) => fireEvent.click(within(dialog).getByRole('button', { name: DIFFERENT }))
+  const fill = (dialog: HTMLElement, name: string, email: string) => {
+    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: name } })
+    fireEvent.change(within(dialog).getByLabelText('Email'), { target: { value: email } })
+  }
+  const submit = (dialog: HTMLElement) => fireEvent.click(within(dialog).getByRole('button', { name: 'Turn on history' }))
+  const refusal = (code: string, message: string, status: number) => () => new Response(JSON.stringify({ code, message }), { status })
+
+  it('is closed at first, keeps focus where it was, and sends no name', async () => {
+    const { sent } = stubTurnOn(() => noHistory())
+    const dialog = await openTurnOn()
+
+    const toggle = within(dialog).getByRole('button', { name: DIFFERENT })
+    expect(toggle.getAttribute('type')).toBe('button')
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    expect(toggle.getAttribute('aria-controls')).toBeNull()
+    expect(within(dialog).queryByLabelText('Name')).toBeNull()
+    expect(within(dialog).queryByLabelText('Email')).toBeNull()
+    expect(document.activeElement).toBe(within(dialog).getByLabelText(/Make a first checkpoint/))
+
+    submit(dialog)
+    await screen.findByRole('dialog', { name: 'History is on' })
+    expect(sent).toEqual([{ firstCheckpoint: true }])
+  })
+
+  it('opens both fields and what it does to signing, and sends both, tidied, with the first checkpoint choice', async () => {
+    const { sent } = stubTurnOn(() => noHistory())
+    const dialog = await openTurnOn()
+    openDifferent(dialog)
+
+    const toggle = within(dialog).getByRole('button', { name: DIFFERENT })
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    const fields = document.getElementById(toggle.getAttribute('aria-controls')!)!
+    expect(within(fields).getByLabelText('Name').getAttribute('aria-required')).toBe('true')
+    expect(within(fields).getByLabelText('Email').getAttribute('aria-required')).toBe('true')
+    expect(fields.textContent).toMatch(/Signing goes off for this den/)
+    expect(fields.textContent).toMatch(/how to sign here with a key of this name's/)
+    expect(document.activeElement).not.toBe(within(fields).getByLabelText('Name'))
+
+    fill(dialog, '  Ash Calloway ', ' ash@example.invalid ')
+    fireEvent.click(within(dialog).getByLabelText(/Make a first checkpoint/))
+    submit(dialog)
+
+    await screen.findByRole('dialog', { name: 'History is on' })
+    expect(sent).toEqual([{ firstCheckpoint: false, authorName: 'Ash Calloway', authorEmail: 'ash@example.invalid' }])
+  })
+
+  it('offers it when the den isn’t a repository yet and git seems to have a name, and still requires both', async () => {
+    const { sent } = stubTurnOn(() => noHistory({ identityCertain: false }))
+    const dialog = await openTurnOn()
+    openDifferent(dialog)
+    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Ash Calloway' } })
+    submit(dialog)
+
+    expect((await within(dialog).findByRole('alert')).textContent).toMatch(/Give an email/)
+    expect(sent).toEqual([])
+  })
+
+  it('isn’t offered when git needs a name or email: the fields are asked for already', async () => {
+    stubTurnOn(() => noHistory({ needsName: true, needsEmail: true }))
+    const dialog = await openTurnOn()
+
+    expect(within(dialog).queryByRole('button', { name: DIFFERENT })).toBeNull()
+    expect(within(dialog).getByLabelText('Name')).toBeTruthy()
+  })
+
+  it.each([
+    ['name', '', 'ash@example.invalid', /Give a name/, 'Name'],
+    ['name', '   ', 'ash@example.invalid', /Give a name/, 'Name'],
+    ['email', 'Ash Calloway', '', /Give an email/, 'Email'],
+    ['email', 'Ash Calloway', '   ', /Give an email/, 'Email'],
+  ])('refuses in the page without a %s (%j, %j), keeps what’s typed, and goes to the field', async (_what, name, email, says, label) => {
+    const { sent } = stubTurnOn(() => noHistory())
+    const dialog = await openTurnOn()
+    openDifferent(dialog)
+    fill(dialog, name, email)
+    submit(dialog)
+
+    expect((await within(dialog).findByRole('alert')).textContent).toMatch(says)
+    expect(sent).toEqual([])
+    expect((within(dialog).getByLabelText('Name') as HTMLInputElement).value).toBe(name)
+    expect((within(dialog).getByLabelText('Email') as HTMLInputElement).value).toBe(email)
+    expect(document.activeElement).toBe(within(dialog).getByLabelText(label))
+    expect(within(dialog).getByLabelText(label).getAttribute('aria-invalid')).toBe('true')
+  })
+
+  it('doesn’t send what’s typed once it’s closed, says so, and has it back when it’s opened again', async () => {
+    const { sent } = stubTurnOn(() => noHistory())
+    const dialog = await openTurnOn()
+    expect(dialog.textContent).not.toMatch(/What you typed/)
+    openDifferent(dialog)
+    fill(dialog, 'Ash Calloway', 'ash@example.invalid')
+    openDifferent(dialog)
+
+    expect(within(dialog).queryByLabelText('Name')).toBeNull()
+    expect(dialog.textContent).toMatch(/What you typed isn't used while this is closed/)
+
+    openDifferent(dialog)
+    expect((within(dialog).getByLabelText('Name') as HTMLInputElement).value).toBe('Ash Calloway')
+    expect(dialog.textContent).not.toMatch(/What you typed/)
+    openDifferent(dialog)
+
+    submit(dialog)
+    await screen.findByRole('dialog', { name: 'History is on' })
+    expect(sent).toEqual([{ firstCheckpoint: true }])
+  })
+
+  it('clears a complaint about a missing field when it’s closed, and sends nothing hidden if only one was typed', async () => {
+    const { sent } = stubTurnOn(() => noHistory())
+    const dialog = await openTurnOn()
+    openDifferent(dialog)
+    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Ash Calloway' } })
+    submit(dialog)
+    await within(dialog).findByRole('alert')
+    openDifferent(dialog)
+
+    expect(within(dialog).queryByRole('alert')).toBeNull()
+    submit(dialog)
+    await screen.findByRole('dialog', { name: 'History is on' })
+    expect(sent).toEqual([{ firstCheckpoint: true }])
+  })
+
+  it.each([
+    ['a den with checkpoints', 'has_repository', 409, "The den's folder is already a git repository with checkpoints, so its history is on. The name and email given weren't applied."],
+    ['a den inside a larger repository', 'in_repository', 409, "The den is inside the git repository at 'C:/kestrel'. The name and email given weren't applied."],
+    ['a value git won’t record', 'bad_argument', 400, 'The email given is one git would record as empty.'],
+  ])('shows the refusal for %s, keeps what’s typed, and can try again', async (_what, code, status, message) => {
+    let answer: () => Response | HistoryTurnedOn = refusal(code, message, status)
+    const { sent } = stubTurnOn(
+      () => noHistory(),
+      () => answer(),
+    )
+    const dialog = await openTurnOn()
+    openDifferent(dialog)
+    fill(dialog, 'Ash Calloway', 'ash@example.invalid')
+    submit(dialog)
+
+    expect((await within(dialog).findByRole('alert')).textContent).toBe(message)
+    await waitFor(() => expect((within(dialog).getByRole('button', { name: 'Turn on history' }) as HTMLButtonElement).disabled).toBe(false))
+    expect((within(dialog).getByLabelText('Name') as HTMLInputElement).value).toBe('Ash Calloway')
+    expect((within(dialog).getByLabelText('Email') as HTMLInputElement).value).toBe('ash@example.invalid')
+    expect(within(dialog).getByRole('button', { name: DIFFERENT }).getAttribute('aria-expanded')).toBe('true')
+
+    answer = () => TURNED_ON
+    submit(dialog)
+    await screen.findByRole('dialog', { name: 'History is on' })
+    expect(sent).toHaveLength(2)
+    expect(sent[1]).toEqual(sent[0])
+  })
+
+  it('brings a refusal into view, since the open fields can push it below the dialog’s fold', async () => {
+    const scrolled = vi.fn()
+    const had = Element.prototype.scrollIntoView
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled(this.getAttribute('role'))
+    }
+    try {
+      stubTurnOn(() => noHistory(), refusal('has_repository', 'Its history is on.', 409))
+      const dialog = await openTurnOn()
+      openDifferent(dialog)
+      fill(dialog, 'Ash Calloway', 'ash@example.invalid')
+      submit(dialog)
+
+      await within(dialog).findByRole('alert')
+      await waitFor(() => expect(scrolled).toHaveBeenCalledWith('alert'))
+    } finally {
+      Element.prototype.scrollIntoView = had
+    }
+  })
+
+  it('when the server still asks for one of them, keeps it open with both typed, and sends both again', async () => {
+    let answer: () => Response | HistoryTurnedOn = () =>
+      new Response(JSON.stringify({ code: 'identity_needed', message: 'A name was given without an email.', needsName: false, needsEmail: true }), { status: 400 })
+    const { sent } = stubTurnOn(
+      () => noHistory(),
+      () => answer(),
+    )
+    const dialog = await openTurnOn()
+    openDifferent(dialog)
+    fill(dialog, 'Ash Calloway', 'ash@example.invalid')
+    submit(dialog)
+
+    expect((await within(dialog).findByRole('alert')).textContent).toMatch(/without an email/)
+    expect(within(dialog).getByRole('button', { name: DIFFERENT }).getAttribute('aria-expanded')).toBe('true')
+    expect((within(dialog).getByLabelText('Name') as HTMLInputElement).value).toBe('Ash Calloway')
+
+    answer = () => TURNED_ON
+    submit(dialog)
+    await screen.findByRole('dialog', { name: 'History is on' })
+    expect(sent[1]).toEqual({ firstCheckpoint: true, authorName: 'Ash Calloway', authorEmail: 'ash@example.invalid' })
+  })
+
+  it('when it stopped part way, says what was done and sends the name again on a retry', async () => {
+    let answer: () => Response | HistoryTurnedOn = refusal(
+      'history_failed',
+      "Made the den's folder a git repository. Saved your name and email for this den's repository only. Couldn't make the first checkpoint: a hook refused it.",
+      500,
+    )
+    const { sent } = stubTurnOn(
+      () => noHistory(),
+      () => answer(),
+    )
+    const dialog = await openTurnOn()
+    openDifferent(dialog)
+    fill(dialog, 'Ash Calloway', 'ash@example.invalid')
+    submit(dialog)
+
+    expect((await within(dialog).findByRole('alert')).textContent).toMatch(/a hook refused it/)
+    answer = () => TURNED_ON
+    await waitFor(() => expect((within(dialog).getByRole('button', { name: 'Turn on history' }) as HTMLButtonElement).disabled).toBe(false))
+    submit(dialog)
+
+    await screen.findByRole('dialog', { name: 'History is on' })
+    expect(sent[1]).toEqual({ firstCheckpoint: true, authorName: 'Ash Calloway', authorEmail: 'ash@example.invalid' })
+  })
+
+  it('if git turns out to need them with it closed, shows what was typed in the fields it asks for, so nothing is sent unseen', async () => {
+    const { sent } = stubTurnOn(
+      () => noHistory({ identityCertain: false }),
+      () => new Response(JSON.stringify({ code: 'identity_needed', message: 'Git has no name or email for this den.', needsName: true, needsEmail: true }), { status: 400 }),
+    )
+    const dialog = await openTurnOn()
+    openDifferent(dialog)
+    fill(dialog, 'Ash Calloway', 'ash@example.invalid')
+    openDifferent(dialog)
+    submit(dialog)
+
+    await within(dialog).findByRole('alert')
+    expect(sent).toEqual([{ firstCheckpoint: true }])
+    expect(within(dialog).queryByRole('button', { name: DIFFERENT })).toBeNull()
+    expect((within(dialog).getByLabelText('Name') as HTMLInputElement).value).toBe('Ash Calloway')
+    expect((within(dialog).getByLabelText('Email') as HTMLInputElement).value).toBe('ash@example.invalid')
+  })
+
+  it('can’t be changed while it’s turning history on', async () => {
+    let finish: (answer: HistoryTurnedOn) => void = () => {}
+    stubTurnOn(
+      () => noHistory(),
+      () => new Promise((resolve) => (finish = resolve)),
+    )
+    const dialog = await openTurnOn()
+    openDifferent(dialog)
+    fill(dialog, 'Ash Calloway', 'ash@example.invalid')
+    submit(dialog)
+
+    await waitFor(() => expect((within(dialog).getByRole('button', { name: DIFFERENT }) as HTMLButtonElement).disabled).toBe(true))
+    expect((within(dialog).getByLabelText('Name') as HTMLInputElement).disabled).toBe(true)
+    finish(TURNED_ON)
+    await screen.findByRole('dialog', { name: 'History is on' })
+  })
+
+  it('stays inside the dialog’s Tab order, and Tab from the last control comes round', async () => {
+    stubTurnOn(() => noHistory())
+    const dialog = await openTurnOn()
+    openDifferent(dialog)
+    const cancel = within(dialog).getByRole('button', { name: 'Cancel' })
+    cancel.focus()
+    fireEvent.keyDown(cancel, { key: 'Tab' })
+    expect(document.activeElement).toBe(within(dialog).getByLabelText(/Make a first checkpoint/))
+    const controls = [...dialog.querySelectorAll<HTMLElement>('button, input')]
+    expect(controls.slice(1, 4)).toEqual([
+      within(dialog).getByRole('button', { name: DIFFERENT }),
+      within(dialog).getByLabelText('Name'),
+      within(dialog).getByLabelText('Email'),
+    ])
+  })
+
+  it('never shows what git has, and a browser’s saved name isn’t offered for the different one', async () => {
+    const turned: HistoryTurnedOn = {
+      ...TURNED_ON,
+      steps: [...TURNED_ON.steps, SIGNING_STEP],
+      checkpoint: { ...TURNED_ON.checkpoint!, author: 'Marek Oswin' },
+    }
+    stubTurnOn(
+      () => noHistory(),
+      () => turned,
+    )
+    const dialog = await openTurnOn()
+    openDifferent(dialog)
+
+    expect(within(dialog).getByLabelText('Name').getAttribute('autocomplete')).toBe('off')
+    expect(within(dialog).getByLabelText('Email').getAttribute('autocomplete')).toBe('off')
+    fill(dialog, 'Ash Calloway', 'ash@example.invalid')
+    submit(dialog)
+
+    const done = await screen.findByRole('dialog', { name: 'History is on' })
+    expect(within(done).getByText(SIGNING_STEP)).toBeTruthy()
+    expect(done.textContent).not.toMatch(/Marek/)
+  })
+})
+
 describe('SC-WEB-50: when the status can’t be read', () => {
   it('shows a quiet "History unavailable" with the reason, rather than hiding', async () => {
     stubCheckpoints(

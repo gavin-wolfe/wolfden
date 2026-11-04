@@ -2290,7 +2290,10 @@ docs/
     server asks again only if it doesn't: `identity_needed` carries
     `needsName` and `needsEmail`, and the dialog then asks for just
     those, required, keeping a field the writer already filled in. What
-    it asks for stays put while the retry is pending (#207).
+    it asks for stays put while the retry is pending (#207). When git has
+    them, **Use a different name for this den**, closed by default, opens
+    the same two fields, both required, and what that does to signing;
+    they're sent only while it's open, and what git has isn't shown (#314).
     `POST /api/history/turn-on` takes `{"authorName"?, "authorEmail"?,
     "firstCheckpoint"?}` (it defaults to true), with the same guards as
     the checkpoint POST (cross-site, `application/json`, no query, 64 KB),

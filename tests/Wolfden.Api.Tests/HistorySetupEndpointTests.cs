@@ -378,6 +378,112 @@ public sealed class HistorySetupEndpointTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, made);
     }
 
+    [Fact]
+    [Trait("Scenario", "SC-WEB-99")]
+    [Trait("Scenario", "SC-HIST-23")]
+    public async Task ADifferentNameFromTheDialogGetsTheSameSigningNoticeAndNoSignature()
+    {
+        var den = Den(TempDen.Dracula());
+
+        // A signing program that can't run: if signing were tried, the first checkpoint would fail.
+        var git = Git("[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n[commit]\n\tgpgsign = true\n[gpg]\n\tprogram = no-such-signer\n[core]\n\tautocrlf = false\n");
+        await using var server = await StartAsync(den, git);
+
+        var status = await server.GetJsonAsync("/api/checkpoint", HttpStatusCode.OK);
+        Assert.False(status.GetProperty("turnOn").GetProperty("needsName").GetBoolean());
+        Assert.DoesNotContain("marek", status.ToString(), StringComparison.OrdinalIgnoreCase);
+
+        var (code, made) = await Post(server, "/api/history/turn-on", """{"authorName": "Ash Calloway", "authorEmail": "ash@example.invalid", "firstCheckpoint": true}""");
+
+        Assert.Equal(HttpStatusCode.OK, code);
+        var steps = made.GetProperty("steps").EnumerateArray().Select(s => s.GetString()!).ToList();
+        Assert.Contains(steps, s => s.StartsWith("Turned signing off for this den's repository only", StringComparison.Ordinal) && s.Contains("git config --local user.signingkey", StringComparison.Ordinal));
+        Assert.DoesNotContain("marek", made.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("Ash Calloway|ash@example.invalid|N\n", RunGit(den, git, "log", "-1", "--format=%an|%ae|%G?"));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-99")]
+    public async Task ADifferentNameIsRefusedInADenWithCheckpointsOrInALargerRepositoryWithNothingChanged()
+    {
+        const string Given = """{"authorName": "Ash Calloway", "authorEmail": "ash@example.invalid"}""";
+        var text = "[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n[commit]\n\tgpgsign = false\n[core]\n\tautocrlf = false\n";
+
+        var finished = Den(TempDen.Dracula());
+        var git = Git(text);
+        RunGit(finished, git, "init", "--quiet");
+        RunGit(finished, git, "add", "-A");
+        RunGit(finished, git, "commit", "--quiet", "-m", "Start");
+        var config = File.ReadAllText(Path.Combine(finished.Root, ".git", "config"));
+        await using (var server = await StartAsync(finished, git))
+        {
+            var (code, json) = await Post(server, "/api/history/turn-on", Given);
+
+            Assert.Equal(HttpStatusCode.Conflict, code);
+            Assert.Equal("has_repository", json.GetProperty("code").GetString());
+            var message = json.GetProperty("message").GetString()!;
+            Assert.Contains("weren't applied", message, StringComparison.Ordinal);
+            Assert.Contains("git config --local user.name", message, StringComparison.Ordinal);
+            Assert.DoesNotContain("marek", message, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("Ash", message, StringComparison.Ordinal);
+            Assert.Equal(config, File.ReadAllText(Path.Combine(finished.Root, ".git", "config")));
+        }
+
+        var writing = Den(TempDen.Dracula());
+        RunGit(writing, git, "init", "--quiet");
+        var outer = File.ReadAllText(Path.Combine(writing.Root, ".git", "config"));
+        writing.Write("notes/kestrel/den.yaml", "format: 1\n");
+        var root = Path.Combine(writing.Root, "notes", "kestrel");
+        await using (var server = await Server.StartAsync(
+            new WolfdenApiOptions(root) { History = () => GitHistory.ForDen(root, git), HistorySetup = new GitHistorySetup(root, git) }))
+        {
+            var (code, json) = await Post(server, "/api/history/turn-on", Given);
+
+            Assert.Equal(HttpStatusCode.Conflict, code);
+            Assert.Equal("in_repository", json.GetProperty("code").GetString());
+            var message = json.GetProperty("message").GetString()!;
+            Assert.Contains("weren't applied", message, StringComparison.Ordinal);
+            Assert.DoesNotContain("marek", message, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(outer, File.ReadAllText(Path.Combine(writing.Root, ".git", "config")));
+            Assert.False(File.Exists(Path.Combine(root, ".gitignore")));
+        }
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-99")]
+    [Trait("Scenario", "SC-HIST-16")]
+    public async Task ADifferentNameThatStopsPartWayIsKeptOnARetryFromTheDialog()
+    {
+        var den = Den(TempDen.Dracula());
+        var hooks = Path.Combine(TestsFolder, $"hooks-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(hooks);
+        var hook = Path.Combine(hooks, "pre-commit");
+        File.WriteAllText(hook, "#!/bin/sh\necho 'notes must be proofread first' >&2\nexit 1\n", new UTF8Encoding(false));
+        _files.Add(hook);
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(hook, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+
+        var git = Git(WithIdentity + $"[core]\n\thooksPath = {hooks.Replace('\\', '/')}\n");
+        await using var server = await StartAsync(den, git);
+        const string Given = """{"authorName": "Ash Calloway", "authorEmail": "ash@example.invalid"}""";
+
+        var (stopped, json) = await Post(server, "/api/history/turn-on", Given);
+
+        Assert.Equal(HttpStatusCode.InternalServerError, stopped);
+        var message = json.GetProperty("message").GetString()!;
+        Assert.Contains("Saved your name and email for this den's repository only.", message, StringComparison.Ordinal);
+        Assert.Contains("--author-name", message, StringComparison.Ordinal);
+
+        // The dialog stays open and sends them again, once the problem is fixed.
+        File.Delete(hook);
+        var (code, _) = await Post(server, "/api/history/turn-on", Given);
+
+        Assert.Equal(HttpStatusCode.OK, code);
+        Assert.Equal("Ash Calloway|ash@example.invalid\n", RunGit(den, git, "log", "-1", "--format=%an|%ae"));
+    }
+
     private TempDen Den(TempDen den)
     {
         _dens.Add(den);

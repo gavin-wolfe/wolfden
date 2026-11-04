@@ -111,9 +111,9 @@ export function makeCheckpoint(message: string): Promise<CheckpointMade> {
 
 /** What turning history on asks for (#195). */
 export interface TurnOnRequest {
-  /** Only when git has no name for the den. */
+  /** When git has no name for the den, or the writer gives a different one (with an email: they go together, #286). */
   authorName?: string
-  /** Only when git has no email for the den. */
+  /** When git has no email for the den, or the writer gives a different one (with a name). */
   authorEmail?: string
   firstCheckpoint: boolean
 }

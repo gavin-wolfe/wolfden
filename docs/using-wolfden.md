@@ -1036,12 +1036,19 @@ start with none. The page picks it up straight away: no restart.
 
 Git records a name and email with each checkpoint. If it doesn't have
 them yet, Wolfden asks: fields in the dialog, or `--author-name` and
-`--author-email` on the command line. On the command line you can also
-give them when git has its own, to keep this den under a pen name:
+`--author-email` on the command line. You can also give them when git has
+its own, to keep this den under a pen name. In the dialog, choose **Use a
+different name for this den**, which is closed until you open it, and fill
+in both. Or, from the command line:
 
 ```text
 wolfden init --git --author-name "Ash Calloway" --author-email ash@example.com
 ```
+
+The dialog doesn't show what git has, and it sends a different name only
+while that part is open: if you close it, what you typed isn't used, and it
+says so. Open it again and your typing is still there. If Wolfden refuses,
+the dialog says why and keeps what you typed.
 
 Any name will do, a pen name included, and the email can be a
 placeholder. They're saved for this den only, before the first
@@ -1057,7 +1064,8 @@ for just what's missing, only if they're really needed.)
 If git signs your commits, the key it uses may belong to another name, and
 Wolfden can't always tell. So when you give a name and email, signing stays
 off for this den, always, even if they're what git already has or the den's
-repository names its own key: Wolfden says so, and a signature can't tie your
+repository names its own key: Wolfden says so, in the dialog's list of what it
+did or the command's output, and a signature can't tie your
 pen name to the other key. To sign with a key
 of this name's, run `git config --local user.signingkey <key>` and `git
 config --local commit.gpgsign true` in the den's folder, and `git config

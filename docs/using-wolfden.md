@@ -1025,8 +1025,8 @@ Any name will do, a pen name included, and the email can be a
 placeholder. They're saved for this den only, before the first
 checkpoint, never for the rest of your computer. If git already has a
 name and email, nothing is asked, and what you give wins for this den.
-Give both: a name alone is refused when git has an email, since the two
-would be recorded together. (If your git settings give a name only inside
+Give both: a name alone is refused when git has a different name and an
+email, since the email would be recorded beside your pen name. (If your git settings give a name only inside
 certain folders, the dialog can't tell until the den is a repository: it
 shows the fields, but you can leave them empty, and Wolfden asks again,
 for just what's missing, only if they're really needed.)
@@ -1036,6 +1036,22 @@ you give isn't what git has, signing stays off for this den: Wolfden says
 so, and a signature can't tie your pen name to the other key. To sign
 with a key of this name's, run `git config --local user.signingkey <key>`
 and `git config --local commit.gpgsign true` in the den's folder.
+
+A pen name given this way has limits worth knowing:
+
+- **It's saved in this copy of the den's repository only.** Git doesn't copy
+  a repository's settings when it's cloned, so a clone on another computer
+  starts with that computer's global name and email, and its checkpoints
+  are recorded under them. Before the first one there, run `git config
+  --local user.name <name>` and `git config --local user.email <email>` in
+  the clone.
+- **An environment variable still beats it.** If `GIT_AUTHOR_NAME` or one of
+  its relatives is set when `wolfden serve` or a later checkpoint runs, git
+  uses that, as it does in any repository.
+- **It can't be added this way once there are checkpoints, or in a bigger
+  repository.** Wolfden refuses, and says the name wasn't applied. With
+  checkpoints, the same `git config --local` commands change it from then
+  on; earlier checkpoints keep the name they have.
 
 A few things to know:
 
@@ -1286,7 +1302,9 @@ in it, which Wolfden calls a checkpoint.
   and saves what you give in this den's repository, never for the rest
   of your computer. A pen name is fine, and the email can be a
   placeholder. What you give wins over what git has for this den, and
-  turns signing off here, since git's key is for git's name
+  turns signing off here, since git's key is for git's name. A clone doesn't
+  bring it along, and an environment variable such as `GIT_AUTHOR_NAME` still
+  beats it
   ([Turning on history](#turning-on-history)).
 - **Not in a synced folder.** Git and Dropbox, OneDrive, or iCloud
   together can corrupt the history when two computers sync while git is

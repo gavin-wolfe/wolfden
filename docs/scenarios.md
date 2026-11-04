@@ -3813,8 +3813,19 @@ the den's folder by hand, and made no commit.
   with the same repository and `.gitignore`.
 - A den whose own repository has no commits is finished the same way,
   rather than refused.
+- A name and email given are saved before any of this, so a `.gitignore`
+  or a hook that fails afterward can't leave a retry under git's own name.
+  If saving them fails in a repository this run made, the repository is
+  taken away again. In one that was already there, the output says which
+  were saved, and whether signing is off. Every one of these asks for the
+  same `--author-name` and `--author-email` again, without repeating them,
+  and doesn't offer the web UI's dialog.
 
-Spec: design.md §6, "Turning history on" (#195). Covered by:
+Spec: design.md §6, "Turning history on" (#195, #286). Covered by:
+`HistorySetupTests.AFailedSaveInARepositoryThisRunMadeTakesTheRepositoryAway`,
+`HistorySetupTests.APartialSaveSaysWhatWasSavedAndAskedAgainItFinishesUnderTheNameGiven`,
+`HistorySetupTests.AGitignoreThatFailsLeavesTheNameSavedSoTryingAgainWithoutItIsStillTheNameGiven`,
+`HistorySetupTests.AFailedFirstCheckpointWithANameGivenAsksForItAgainAndNotTheDialog`,
 `HistorySetupTests.AFailedFirstCheckpointSaysWhatWasDoneAndTryingAgainFinishes`,
 `HistorySetupTests.ADenWhoseOwnRepositoryHasNoCheckpointsIsFinished`,
 `InitHistoryTests.ADenWhoseOwnRepositoryHasNoCheckpointsIsFinished`,
@@ -3837,9 +3848,22 @@ checkpoints. A third time, on a computer without git.
 - A den that's an orphan linked worktree of `writing/` (`git worktree
   add --orphan`) has no commits, but its settings are `writing/`'s, so
   it's refused the same way, and `writing/`'s config is left alone.
+- With a name and email given, the den in `writing/` and the den with
+  checkpoints also say they weren't applied, so later checkpoints stay under
+  what git has. For the den with checkpoints, it names the `git config
+  --local` commands that change that from now on.
+- A new den given a name and email inside `writing/`, or in a folder that's
+  already a repository, is refused (exit 2) before anything is made, rather
+  than made under what git has. Without a name and email, it's made and left
+  as it is, as SC-CLI-12 says. In a folder that's already a repository, it
+  says to make the den first, then turn on its history with the name.
 
 Spec: design.md §6, "Turning history on", "A den inside a larger
-repository" (maintainer decision, 2026-10-28, #195). Covered by:
+repository" (maintainer decision, 2026-10-28, #195, #286). Covered by:
+`HistorySetupTests.ANameGivenToADenWithCheckpointsSaysItWasntAppliedAndHowToChangeIt`,
+`HistorySetupTests.ANameGivenToADenInALargerRepositorySaysItWasntAppliedAndChangesThatRepositorysNothing`,
+`InitHistoryTests.ANewDenInALargerRepositoryIsRefusedWithANameGivenAndNothingIsMade`,
+`InitHistoryTests.ANewDenInAFolderThatIsARepositoryIsRefusedWithANameGivenAndSaysHowToGiveIt`,
 `HistorySetupTests.ADenInsideALargerRepositoryIsRefusedWithNothingChanged`,
 `HistorySetupTests.ADenWhoseOwnRepositoryHasCheckpointsIsRefused`,
 `HistorySetupTests.WithoutGitItSaysSoAndChangesNothing`,
@@ -3914,16 +3938,25 @@ is for what they write as Ash Calloway, so they run `wolfden init --git
 --author-name "Ash Calloway" --author-email ash@example.com`.
 
 - The name and email given win, for this den only. They're saved with `git
-  config --local` before the first checkpoint, so that checkpoint, and every
-  later one, has Ash Calloway as both author and committer. The global
-  settings aren't changed, and the output doesn't repeat them.
+  config --local` before the first checkpoint, so that checkpoint has Ash
+  Calloway as both author and committer, and so do later ones, as long as
+  nothing stronger is set when they're made: `GIT_AUTHOR_NAME` in the
+  environment of `wolfden serve` or a later run still beats them, as it does
+  for any git repository. The global settings aren't changed, and the
+  output doesn't repeat them.
 - The same goes for a name git gives only inside a repository (`includeIf
   "gitdir:…"`), for global `author.name` or `committer.email` settings,
   which git otherwise prefers to `user.name` and `user.email`, and for a
   repository with no checkpoints yet that has a name of its own already.
 - An environment variable such as `GIT_AUTHOR_NAME` beats every setting, so
   it would defeat what was given. That's refused, naming the variable but
-  not its value, with nothing changed.
+  not its value, with nothing changed. So is `GIT_DIR` or `GIT_COMMON_DIR`,
+  which would save them in another repository.
+- Once they're saved, git is asked what it would record. If something it
+  reads later still beats them (`GIT_CONFIG_COUNT`, `GIT_CONFIG_PARAMETERS`,
+  `extensions.worktreeConfig`, an `[include]` in the repository's config),
+  no checkpoint is made and the value isn't repeated. A repository this run
+  made is taken away again.
 
 Spec: design.md §6, "Turning history on" (maintainer decision, 2026-11-03,
 #286). Covered by:
@@ -3932,6 +3965,10 @@ Spec: design.md §6, "Turning history on" (maintainer decision, 2026-11-03,
 `HistorySetupTests.AGivenNameAndEmailWinOverAuthorAndCommitterSettings`,
 `HistorySetupTests.AGivenNameAndEmailReplaceOnesInARepositoryWithNoCheckpointsYet`,
 `HistorySetupTests.AnEnvironmentVariableThatWouldBeatWhatsGivenRefusesWithNothingChanged`,
+`HistorySetupTests.ASettingFromTheEnvironmentThatBeatsWhatsSavedRefusesBeforeTheFirstCheckpoint`,
+`HistorySetupTests.ALaterSettingInTheRepositoryThatBeatsWhatsSavedStopsBeforeTheFirstCheckpoint`,
+`HistorySetupTests.CharactersGitStripsFromWhatsGivenArentTakenForSomethingBeatingIt`,
+`HistorySetupTests.GitDirInTheEnvironmentRefusesRatherThanSaveInAnotherRepository`,
 `InitHistoryTests.AGivenNameAndEmailWinOverGitsInAnExistingOrNewDen`,
 `HistorySetupEndpointTests.ANameAndEmailInTheRequestWinOverGitsAndOneAloneIsAskedToBeCompleted`.
 
@@ -3946,11 +3983,16 @@ Git has the writer's everyday name and email. They run `wolfden init --git
   email without a name is refused the same way. The dialog asks for the
   other field.
 - One given that's the same as git's changes nothing, so it's fine alone.
-  One that fills in what git lacks is what Wolfden asked for (SC-HIST-15).
+- One that fills in what git lacks is what Wolfden asked for (SC-HIST-15), so
+  it's saved. The output says the email git has will be recorded beside the
+  name, without quoting it, and how to use another. That email can come from
+  `user.email`, `author.email`, `committer.email`, or `GIT_COMMITTER_EMAIL`.
 
 Spec: design.md §6, "Turning history on" (#286). Covered by:
 `HistorySetupTests.OneGivenAloneThatReplacesWhatGitHasIsRefusedWithNothingChanged`,
 `HistorySetupTests.OneGivenAloneThatIsWhatGitHasIsSavedAndChangesNothingElse`,
+`HistorySetupTests.ANameThatFillsAGapSaysAnEmailGitHasGoesBesideItWithoutQuotingIt`,
+`HistorySetupTests.AnAuthorEmailAloneIsntAnEmailGitHasSoANameAloneIsAskedForOne`,
 `InitHistoryTests.OneGivenAloneThatReplacesWhatGitHasIsRefused`,
 `HistorySetupEndpointTests.ANameAndEmailInTheRequestWinOverGitsAndOneAloneIsAskedToBeCompleted`.
 
@@ -3967,8 +4009,18 @@ The writer's git signs every commit with a key in their everyday name
 - It stays off if signing is turned on globally later. With no signing set
   up today, the settings are saved the same way, and nothing is said.
 - A `user.signingkey` in the den's own repository was chosen for it, so it
-  still signs. Nor does anything change when nothing is given, or when
-  what's given is what git has: those are the writer's own name and key.
+  still signs, unless this run made the repository: then it came from a
+  template (`init.templateDir`), and doesn't count.
+- When what's given is what git has, it still signs only if the key is in
+  the same config file as that name, or git has no key and so asks for the
+  key of that name. A name in the repository's config or an `includeIf` file
+  with a key in the plain global file is turned off like a new name. Nothing
+  changes when nothing is given.
+- If signing fails, gpg's output isn't repeated, since it can name who the
+  key belongs to. The message says to run `git commit` to see it. That holds
+  for every checkpoint and tag, not just the first.
+- A signing setting that stays on after saving (`GIT_CONFIG_COUNT`, say)
+  stops it before any checkpoint.
 
 Spec: design.md §6, "Turning history on" (#286). Covered by:
 `HistorySetupTests.GitsKeyIsNotUsedForANameGivenAndSigningStaysOffForTheDen`,
@@ -3976,6 +4028,11 @@ Spec: design.md §6, "Turning history on" (#286). Covered by:
 `HistorySetupTests.WhatGitAlreadyHasGivenAgainLeavesSigningAlone`,
 `HistorySetupTests.NothingGivenLeavesSigningAlone`,
 `HistorySetupTests.AKeySetInTheDensOwnRepositoryIsLeftToSign`,
+`HistorySetupTests.AKeyFromAnotherFileThanTheNameIsNotUsedEvenWhenWhatsGivenIsWhatGitHas`,
+`HistorySetupTests.AKeyFromTheSameFileAsTheNameSignsAndItsFailureDoesntRepeatWhoItBelongsTo`,
+`HistorySetupTests.ASigningFailureAtACheckpointDoesntRepeatWhoTheKeyBelongsTo`,
+`HistorySetupTests.AKeyFromATemplateInARepositoryThisRunMadeIsNotChosenForIt`,
+`HistorySetupTests.ASigningSettingFromTheEnvironmentThatStaysOnRefusesBeforeTheFirstCheckpoint`,
 `InitHistoryTests.AGivenNameTurnsSigningOffForTheDenAndSaysSo`.
 
 ## WEB: the den in a browser

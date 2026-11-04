@@ -193,6 +193,17 @@ public sealed class DenIndex : IDisposable
         return CanonQuery.PointOf(Context, universeKey, position);
     }
 
+    /// <summary>
+    /// The ordinal of every position that resolves in universe
+    /// <paramref name="universeKey"/>, by its text: each bare book and each
+    /// chapter (format.md F-POS-4, F-POS-7).
+    /// </summary>
+    public IReadOnlyDictionary<string, long> PointsOf(string universeKey)
+    {
+        ArgumentNullException.ThrowIfNull(universeKey);
+        return CanonQuery.PointsOf(Context, universeKey);
+    }
+
     /// <summary>The links that resolve to the entity with this key: its backlinks, by path and place in the file.</summary>
     public IReadOnlyList<LinkRecord> Backlinks(string entityKey)
     {

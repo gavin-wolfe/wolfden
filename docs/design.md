@@ -1565,9 +1565,10 @@ docs/
   and `serve --universe` pins every request as `mcp --universe` pins a
   session. `asOf` is the tools' `as_of`: a position, with the same
   syntax, checks, and canon-as-of meaning; without it, the author's
-  full view. An endpoint refuses a parameter it doesn't take (so
+  full view. `marksAt` is a position for the writer, which no MCP tool
+  has: "Marks for the writer" below. An endpoint refuses a parameter it doesn't take (so
   `as_of` isn't quietly ignored) or one given twice. An empty value
-  counts as left out, except an empty `asOf`, which is `bad_argument`:
+  counts as left out, except an empty `asOf` or `marksAt`, which is `bad_argument`:
   left out it would give the full view, spoilers and all, so a page that
   meant to send a position fails closed. A revision that can't be a
   checkpoint (it starts with `-` or holds a space) is `bad_argument`,
@@ -1584,9 +1585,9 @@ docs/
   | `/api/positions` | `universe` | Every story position in order, with its book's name and series and the chapter's number and title, for a position picker. A book with no chapters yet is listed by its bare key. |
   | `/api/entities` | `universe`, `type`, `status`, `series`, `book`, `asOf`, `limit` | `list_entities`; with `asOf`, only the entities in the canon view there, in its order. |
   | `/api/entities/lookup` | `query`, `universe`, `type`, `asOf`, `limit` | The notes whose name, alias, file name, or id has a word starting with each word typed, best first, each with what matched and which alias, for the link pickers (#198; "Looking notes up by name and alias" below). `type` takes several types separated by commas; with `asOf`, only notes the reader has met by then. |
-  | `/api/entity` | `entity`, `universe`, `asOf` | `get_entity`, as a page: each field value or entry and each section lists its links, resolved from the index (the entity reached, or broken or ambiguous); also the scope's container chain, where the entity enters canon (its `from`, or its scope's start, inherited, format.md F-ENT-6), and its backlinks (which entity, field, section, chapter, or outline row). As of a position, a link to an entity the reader hasn't met doesn't say what it reaches, and only links in what the reader has met count as backlinks. |
+  | `/api/entity` | `entity`, `universe`, `asOf`, `marksAt` | `get_entity`, as a page: each field value or entry and each section lists its links, resolved from the index (the entity reached, or broken or ambiguous); also the scope's container chain, where the entity enters canon (its `from`, or its scope's start, inherited, format.md F-ENT-6), and its backlinks (which entity, field, section, chapter, or outline row). As of a position, a link to an entity the reader hasn't met doesn't say what it reaches, and only links in what the reader has met count as backlinks. |
   | `/api/canon` | `universe`, `asOf`, `series`, `book`, `type`, `brief` | `canon_as_of`. |
-  | `/api/search` | `query`, `universe`, `type`, `canonOnly`, `limit`, `status`, `series`, `book`, `asOf`, `field` | `search`, with snippets; it can also keep entities of one status, those a series or book filter covers (as in a canon view), or, as of a position, hits in the entities, sections, and field values in the canon view there. Each hit adds `text`, the snippet without marks, and `matches`, the `start` and `length` of each match in it (UTF-16 code units), so the page never mistakes a note's own brackets for a match (#179). |
+  | `/api/search` | `query`, `universe`, `type`, `canonOnly`, `limit`, `status`, `series`, `book`, `asOf`, `field`, `marksAt` | `search`, with snippets; it can also keep entities of one status, those a series or book filter covers (as in a canon view), or, as of a position, hits in the entities, sections, and field values in the canon view there. Each hit adds `text`, the snippet without marks, and `matches`, the `start` and `length` of each match in it (UTF-16 code units), so the page never mistakes a note's own brackets for a match (#179). |
   | `/api/den/files` | | A fingerprint of the den's files (their paths, sizes, and times, no contents), for an open page to see that something changed (#285). It's all this answers, and it doesn't bring the index up to date. |
   | `/api/fields` | `universe`, `asOf` | The names of the fields notes give values for, for the search page's Field filter (#179); as of a position, only those of values in the canon view there. |
   | `/api/history` | `entity`, `universe`, `limit`, `before` | `get_history`'s checkpoints, a page at a time. |
@@ -1638,11 +1639,89 @@ docs/
   parse, and one that doesn't parse now, or has such a list that isn't one, is sent to
   the writer's own editor. Empty text is refused, invisible characters included. `den.yaml` is saved only while it doesn't load.
 
+  **Marks for the writer** (#300, maintainer decisions). In the web UI the
+  writer is the author: show everything, and tag what readers don't know yet.
+  Filtering exists for AI agents, which could spoil prose. `marksAt` gives the
+  API's half of that. With it, `/api/entity` is the full view and `/api/search`
+  finds what it finds with no position, in the universe the position settles,
+  and the answer says what readers there don't know. Without it, nothing is
+  different: `asOf` is still the canon view, and giving both is `bad_argument`.
+  The Reader's view starts from that view, but `asOf` gives later `until`s and
+  position values for the writer (F-VIEW-4, F-VIEW-5), which the Reader's view
+  hides, so it needs more than `asOf`. A position that can't be read is
+  `bad_position`, with the message `asOf` gets, and `universe=*` doesn't go with
+  one. `Wolfden.Api`'s `ReaderMarks` makes the marks, and no MCP tool can ask for
+  them or reach that project (`McpStaysStrictTests`). What's added, only with
+  `marksAt`, and left out where there's nothing to say:
+
+  ```json
+  {
+    "view": "full", "marksAt": "ember:3",
+    "entity": {
+      "name": "The salt tithe",
+      "fields": [
+        { "name": "planted", "value": ["ember:1", "ash:2", "dusk:9"], "aheadValues": ["ash:2"], "unplacedValues": ["dusk:9"] },
+        { "name": "keeper", "value": "Orrin Vale", "until": "ash:2" },
+        { "name": "keeper", "value": "Morvane", "from": "ash:2", "readerMark": { "kind": "ahead", "at": "ash:2" } }
+      ],
+      "sections": [
+        { "name": "Terms", "until": "ember:2", "readerMark": { "kind": "ended", "at": "ember:2" } },
+        { "name": "Payoff", "from": null, "readerMark": { "kind": "ahead", "at": "ash:3" } },
+        { "name": "The last toll", "from": "dusk:9", "readerMark": { "kind": "unplaced", "at": "dusk:9" } },
+        { "name": "Old draft", "from": "ash:3", "until": "ash:1", "readerMark": { "kind": "never", "at": "ash:3" } }
+      ]
+    }
+  }
+  ```
+
+  - **`readerMark`**, on the page's `entity`, a field's value or entry, a section,
+    or a search hit. `kind` is `ahead`, for a note or fact readers reach after
+    the position (the page says `enters at …` for a note, `ahead of readers` for
+    a fact), or `ended`, for a fact whose end is at or before it (`no longer
+    true here`, not `ahead of readers`). Two more say no position reaches it, at
+    any position: `unplaced`, for a note or fact with a position that doesn't
+    resolve (F-POS-4), such as a chapter of a book not outlined yet, and `never`,
+    for a fact whose positions resolve but whose range holds nothing (F-TMP-3,
+    F-SEC-8), or a subsection that starts after its parent ends (F-SEC-9). They're
+    apart because the writer does different things about them: list the chapter,
+    or fix the dates. `at` is the position that makes it so, and the words are
+    the page's. `ahead` and `ended` compare by the index's effective ranges, as
+    canon views do, so `at` may not be written on the fact: a thread's
+    `## Payoff` starts at `paid_off`, and an entry or section that hands over
+    (F-TMP-4, F-SEC-8) ends where the next starts. `at` is as the note writes
+    that point if it does, else the chapter there. For `unplaced` it's the written
+    position that doesn't resolve, the `paid_off` of a Payoff, or a parent's.
+    For `never`, it's where the range starts.
+  - **`aheadValues`** and **`unplacedValues`**, on a field or a hit in a field:
+    which of a `position` field's values are later than the position, and which
+    can't be compared (F-VIEW-5), as written, since only some of a list may be.
+    An assistant at the position gets neither. The field keeps its whole `value`.
+  - **`marksAt`** on the answer repeats the position.
+  - **A later `until` on a fact in effect has no mark.** The read gives the
+    `until`, and the page's `isAheadOf` tags it from the position, as it already
+    does (#288), so that's still one rule.
+  - **No reader marks** on what's kept out for a reason other than the position:
+    a note, section, or entry out of canon, a bookkeeping section, or a section
+    an error leaves out. Each has its own badge.
+  - **A note readers meet later** has `readerMark` at where it enters, the same
+    position as its `entry`. Its facts that start with it, or earlier, say
+    nothing more; a fact of its own that starts later still has a mark, and so
+    does one that's `unplaced` or `never`. In an `unplaced` note, only the note
+    has a mark, since nothing in it can reach a reader.
+  - **What has no mark and isn't badged is what a reader sees,** at every
+    position, with one exception: an entry that loses an overlap (F-TMP-5, which
+    `wolfden check` warns about) isn't ahead or ended, so it has no mark, though
+    the canon view shows only the other.
+  - **A search hit** has the mark of the text it found: its section's or entry's,
+    or else the note's. Links, backlinks, and the page's `pinned` carry no marks.
+    So a field hit found through a linked note's name or alias has the mark of the
+    field, even if readers meet that note later.
+
   An `/api/entity` for a note left out is still 404 `unknown_entity`, with
   `leftOut` (`path`, `line`, `rule`, `message`), found by its path, a path under a
   container left out, or the id, name, or file name written in the file. As of a
   position, only a path or an id finds it, `leftOut`'s members are null, and the
-  message names neither. The MCP tools share the message. Each MCP result but
+  message names neither. With `marksAt`, it answers as a full read does. The MCP tools share the message. Each MCP result but
   `check`'s adds `den_notice` while there are errors, a count that names nothing.
 
   **As of a position, nothing names what the reader hasn't met.** A

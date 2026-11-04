@@ -6487,3 +6487,40 @@ a picker of the den's authors, waits for #311. Covered by:
 `HistorySetupEndpointTests.ADifferentNameIsRefusedInADenWithCheckpointsOrInALargerRepositoryWithNothingChanged`,
 `HistorySetupEndpointTests.ADifferentNameThatStopsPartWayIsKeptOnARetryFromTheDialog`,
 `Checkpoint.test.tsx` (web).
+
+### SC-WEB-100. The page gets everything, with what readers don't know marked
+
+I'm checking a note at chapter 3, and a page asks `/api/entity` or `/api/search`
+with `marksAt` for that position (#300). No page asks yet: the Note tab does in
+the next step.
+
+- I get the whole note, or every hit a search with no position finds in that
+  universe. Nothing is hidden.
+- A note readers meet later has `readerMark`, `ahead`, at where it enters. A
+  field's entry or a section that starts later has its own, at its effective
+  start: a thread's `## Payoff` starts at `paid_off`, though it has no `from`.
+- A fact whose end is at or before chapter 3 has `readerMark`, `ended`. An entry
+  or section that hands over ends where the next starts, though it has no `until`.
+- A position field's values later than chapter 3 are in `aheadValues`, and the
+  field still gives all of them. A value at chapter 3 isn't later, and a bare book
+  is the same point as its first chapter.
+- A fact in effect with a later `until` has no mark, and keeps its `until`: the
+  page's `ahead of readers` tag is for that (SC-WEB-97).
+- An idea, undecided, candidate, or retconned note, section, or entry, a
+  bookkeeping section, and a section an error leaves out keep their badges and get
+  no reader marks.
+- A note or fact with a position that doesn't resolve, such as a thread paid off
+  in a book I haven't outlined yet, has `readerMark`, `unplaced`, at that position,
+  at every chapter. A position field's value that can't be compared is in
+  `unplacedValues`.
+- A fact whose range holds nothing (`from=ash:3 until=ash:1`, or a subsection that
+  starts after its parent ends) has `readerMark`, `never`, at every chapter.
+- At every position, what has no mark and no badge is what a reader sees.
+  An entry that loses an overlap is the one exception (F-TMP-5).
+- A position that can't be read is `bad_position`, as `asOf` refuses it. An empty
+  `marksAt`, or `asOf` and `marksAt` together, is `bad_argument`.
+- Without `marksAt`, every answer is as it was, and `asOf` is as strict as it was.
+- An AI assistant's same read through MCP stays strict, and no tool can ask for
+  marks (SC-MCP-47).
+
+Spec: F-VIEW-1, F-VIEW-4, F-VIEW-5, F-GEN-2 (#300). Covered by: `MarksAtTests`.

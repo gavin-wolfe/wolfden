@@ -84,7 +84,7 @@ function stubImages(answer: (upload: Upload, n: number) => Response | AddedImage
 }
 
 function added(name: string, extra: Partial<AddedImage> = {}): AddedImage {
-  const slug = name.toLowerCase().replace(/\.[^.]*$/, '').replace(/[^a-z0-9]+/g, '-')
+  const slug = name.toLowerCase().replace(/\.[^.]*$/, '').replace(/['’‘ʼ]/g, '').replace(/[^a-z0-9]+/g, '-')
   const ext = name.slice(name.lastIndexOf('.')).toLowerCase()
   return {
     version: 1,

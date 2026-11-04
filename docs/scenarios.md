@@ -3294,6 +3294,84 @@ Spec: F-GEN-2 (#280). Covered by:
 `McpServerTests.AResultCarriesAShortNoticeWhileTheDenHasErrors`,
 `McpServerTests.ANoteLeftOutSaysWhyButNotAtAPosition`.
 
+### SC-MCP-41. My assistant can't see when a fact stops holding
+
+Ilse's posting is the *Tessaly* until `ash:2`, and her Recovery section runs
+until `ash:3`. My assistant is drafting a chapter.
+
+- `get_entity` with `as_of` `ember:1` gives the posting with no `until`, and
+  so does `canon_as_of` at `ember:1`. Nothing says one was left out.
+- At `ash:1`, the Recovery section has no `until` either. A pinned fact has
+  none in `pinned` or in place, and `brief` gives none in `pinned`.
+- When the assistant is helping me plan, `get_entity` with no `as_of` gives
+  both dates. The server's instructions tell it to read that way before changing
+  a fact, so a change doesn't drop a date it wasn't shown.
+- A field of my own that's a mapping with a key named `until`, and no `value`,
+  isn't a dated fact (F-TMP-1), so it comes through as I wrote it.
+- The web API gives the date at the same position, for me (SC-WEB-97).
+
+Spec: F-VIEW-4 (#288). Covered by: `FutureUntilTests`.
+
+### SC-MCP-42. My assistant adds a note with an apostrophe in its name
+
+The writer asks for "Mina's Journal", typed with a straight apostrophe or a
+curly one.
+
+- The file or folder is `minas-journal`: the apostrophe is dropped rather
+  than made a hyphen, so "O'Brien's War" is `obriens-war`. A leading "The"
+  stays (`the-long-dark`), and a space still ends a word (`rock-n-roll`). An
+  image's file name follows the same rule (`minas-map.png`).
+- "Minas Journal" reaches the same key, so they clash. A second note or copy
+  in that folder gets `minas-journal-2.md`, and `minas-journal` asked for as
+  a slug is refused (`already_exists`). A book whose key another book in the
+  universe has is refused (`already_exists`), since positions name a book by
+  its key alone, and so is a series whose key another series or a standalone
+  book has (F-KEY-5). A series can share a key with a book inside a series.
+- A name of only apostrophes has nothing to make a key from: a note uses the
+  type key, an image is `image.png`, and a book or series is refused.
+- A den made before this keeps its keys. `mina-s-house.md` and its
+  `[[mina-s-house]]` links work, and so do positions in a book folder
+  `mina-s-journal`. Renaming or moving the note keeps the slug. A new note or
+  book of the same name gets the new form beside the old one, and the old
+  one's file doesn't change, unless a link by that name would become
+  ambiguous: with a `[[Mina's House]]` link elsewhere, a new "Mina's House" is
+  refused unless `allow_relinks` is given.
+- "Mina's" and "Minas" share a slug across folders too. With a `[[Minas]]`
+  link, a new "Mina's" is refused, since its slug would take the link. With no
+  such link it's made, and a later `[[minas]]` gets the usual ambiguous-link
+  warning, as for identical names.
+
+Spec: types.md F-TPL-6, format.md F-KEY-4, F-KEY-5 (#289). Covered by:
+`WriteToolTests.AnApostropheIsDroppedFromASlugAndALeadingTheStays`,
+`WriteToolTests.TwoNamesThatReachOneSlugDontShareAFile`,
+`WriteToolTests.ANoteWithAnOldHyphenSlugKeepsItAndItsLinksStillReachIt`,
+`WriteToolTests.ANewNoteOfAnOldFormsNameThatWouldTakeALinkIsRefusedUnlessAllowed`,
+`WriteToolTests.NamesThatShareASlugInDifferentFoldersOnlyClashOverLinks`,
+`WriteToolTests.ANameOfOnlyApostrophesUsesTheTypeKeyAndReadsBack`,
+`WriteToolTests.RenamingOrMovingAnOldFormNoteKeepsItsSlugAndLinks`,
+`CreateContainerTests.ANameOfOnlyApostrophesMakesNoKeyAndALeadingOneIsLeftOutOfTheSuggestion`,
+`CopyEntityToolTests.ACopysSlugDropsAnApostropheAndTwoNamesThatReachOneSlugDontShareAFile`,
+`CreateContainerTests.TwoNamesThatReachOneKeyAreAClash`,
+`CreateContainerTests.ABookWithAnOldHyphenKeyKeepsItAndItsPositionsStillResolve`,
+`ImageEndpointTests.AnImagesNameDropsAnApostropheAsASlugDoes`.
+
+### SC-MCP-44. My assistant writes a character who knows more than the reader
+
+I ask my assistant to draft a scene with Renfield at `dracula:20`. He has
+already let the Count in, and the reader learns that at `dracula:21`.
+
+- `get_entity` for Renfield with `as_of` `dracula:20` has him in view, with
+  nothing about his death, that he turns on his master, or how he let the Count in,
+  and the event *Renfield lets the Count in* isn't in view at all.
+- `get_entity` with no `as_of` has all of it, so the assistant can read the two
+  together: what the reader knows, and what the note holds beyond that.
+- The server's instructions tell it when to read ahead, and that a later fact
+  can shape hints, and how a character who'd already know it behaves, without
+  the prose stating it. He's let the Count in by then, but his death hasn't
+  happened. The prose is the assistant's, so no test can hold it to that.
+
+Spec: #300. Covered by: `McpServerTests`.
+
 ## STORE: Wolfden saves, moves, and deletes notes
 
 Background: the den store (design.md §6, #121) is how Wolfden writes a
@@ -5316,14 +5394,14 @@ series**, "The Harker Papers", placed after Dracula, and on its page,
   A name is required and a bad number is refused before anything is sent.
 - **Create** sends `POST /api/book/create` (or `/api/series/create`) with
   the hash `GET /api/works` gave for `universe.md` or `series.md`. It
-  makes `universes/dracula/books/dracula-s-guest/book.md`, with a new id,
+  makes `universes/dracula/books/draculas-guest/book.md`, with a new id,
   the name, and chapters `"1"` to `"3"` numbered 1 to 3, and adds the key
   to the universe's `order`. Dracula's universe had one book and no
   `order`, so the list is written with that book first,
-  `[dracula, dracula-s-guest]`, and `check` stays quiet. The rest of the
+  `[dracula, draculas-guest]`, and `check` stays quiet. The rest of the
   file is as it was.
 - "The Harker Papers" goes after Dracula: `order: [dracula,
-  the-harker-papers, dracula-s-guest]`. A book in a series goes in its
+  the-harker-papers, draculas-guest]`. A book in a series goes in its
   `books`, at the end or after the book chosen. A list that leaves works
   out gets them first, in the order they were read, and a list that
   already names the new key (a book planned ahead) keeps that place, with
@@ -6052,3 +6130,23 @@ Spec: F-GEN-5, F-GEN-2 (#284, #280). Covered by:
 `SectionErrorIndexTests.ANoteHeldOpenIsListedAsHeldAndItsOwnErrorsComeBackWithNoChangeToSee`,
 `SectionErrorIndexTests.TheDensOwnFolderReachesAsAFolder`,
 `web/src/DenErrors.test.tsx`.
+
+### SC-WEB-97. A date on a fact is ahead of the position I'm reading at
+
+A section of a note holds until chapter 5, and I'm reading at chapter 3.
+
+- The heading keeps the date, `until ch. 5` (`until Ash ch. 5` in a universe with
+  several books), with the words `ahead of readers` in a small muted tag beside it. Hovering says
+  "Readers at this point in the story don't know this yet." Clicking it, or pressing
+  Enter on it, shows the same sentence beside it. A field's entry is the same.
+- With no position, there's no tag.
+- At chapter 5 or after, there's no tag. A fact past its date is only shown at
+  that position in a full view: while editing, or with "Show it anyway".
+- At a bare book, a date of that book's first chapter has no tag, since they're
+  the same point (F-POS-7), and a date of its second chapter has one.
+- A date that isn't a chapter or book the universe has gets no tag.
+- `/api/entity` and `/api/canon` give the `until` at a position, which MCP leaves
+  out (SC-MCP-41).
+
+Spec: F-VIEW-4 (#288). Covered by: `ReadEndpointTests.AFactsFutureUntilStaysForTheWriter`,
+`web/src/AheadOfReaders.test.tsx`.

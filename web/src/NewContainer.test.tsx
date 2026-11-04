@@ -10,17 +10,17 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-const GUEST_PATH = 'universes/dracula/books/dracula-s-guest/book.md'
+const GUEST_PATH = 'universes/dracula/books/draculas-guest/book.md'
 
 const guest: BookNode = {
-  key: 'dracula-s-guest',
+  key: 'draculas-guest',
   name: "Dracula's Guest",
   id: 'B2',
-  path: 'universes/dracula/books/dracula-s-guest',
+  path: 'universes/dracula/books/draculas-guest',
   status: 'draft',
-  position: 'dracula-s-guest',
+  position: 'draculas-guest',
   entities: { total: 0, byType: {} },
-  chapters: [1, 2, 3].map((n) => ({ key: String(n), number: n, title: null, position: `dracula-s-guest:${n}`, heading: null })),
+  chapters: [1, 2, 3].map((n) => ({ key: String(n), number: n, title: null, position: `draculas-guest:${n}`, heading: null })),
 }
 
 const papers: SeriesNode = {
@@ -37,7 +37,7 @@ function made(extra: Partial<ContainerCreateResult> = {}): ContainerCreateResult
     version: 1,
     universe: 'dracula',
     kind: 'book',
-    key: 'dracula-s-guest',
+    key: 'draculas-guest',
     name: "Dracula's Guest",
     series: null,
     path: GUEST_PATH,
@@ -45,8 +45,8 @@ function made(extra: Partial<ContainerCreateResult> = {}): ContainerCreateResult
     id: 'B2',
     chapters: 3,
     effects: [
-      `Created ${GUEST_PATH}: book 'Dracula's Guest', key 'dracula-s-guest', with id B2. It has 3 chapters, dracula-s-guest:1 to dracula-s-guest:3.`,
-      'universes/dracula/universe.md had no order list, so one was written: [dracula, dracula-s-guest].',
+      `Created ${GUEST_PATH}: book 'Dracula's Guest', key 'draculas-guest', with id B2. It has 3 chapters, draculas-guest:1 to draculas-guest:3.`,
+      'universes/dracula/universe.md had no order list, so one was written: [dracula, draculas-guest].',
     ],
     warnings: [],
     files: [
@@ -169,7 +169,7 @@ describe('SC-WEB-69: I add a book or a series from its universe or series', () =
     const before = calls.filter((c) => c.startsWith('/api/hierarchy')).length
     fireEvent.click(within(form).getByRole('button', { name: 'Create' }))
 
-    await waitFor(() => expect(history.location.pathname).toBe('/u/dracula/b/dracula-s-guest'))
+    await waitFor(() => expect(history.location.pathname).toBe('/u/dracula/b/draculas-guest'))
     expect(posted).toEqual([{ path: '/api/book/create', body: { name: "Dracula's Guest", universe: 'dracula', chapters: 3, expectedHash: 'h-u' } }])
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(calls.filter((c) => c.startsWith('/api/hierarchy')).length).toBeGreaterThan(before)
@@ -179,9 +179,9 @@ describe('SC-WEB-69: I add a book or a series from its universe or series', () =
     const notice = document.querySelector<HTMLElement>('.created-notice')!
     expect(notice.getAttribute('role')).toBe('status')
     expect(notice.textContent).toContain(`Created ${GUEST_PATH}.`)
-    expect(notice.textContent).toContain('[dracula, dracula-s-guest]')
+    expect(notice.textContent).toContain('[dracula, draculas-guest]')
     // What the file holds stays in the notice: the key and the chapters.
-    expect(notice.textContent).toContain("Book 'Dracula's Guest', key 'dracula-s-guest', with id B2. It has 3 chapters, dracula-s-guest:1 to dracula-s-guest:3.")
+    expect(notice.textContent).toContain("Book 'Dracula's Guest', key 'draculas-guest', with id B2. It has 3 chapters, draculas-guest:1 to draculas-guest:3.")
     await waitFor(() => expect(document.activeElement).toBe(notice))
 
     // Leaving the page ends the notice.
@@ -193,7 +193,7 @@ describe('SC-WEB-69: I add a book or a series from its universe or series', () =
     const { posted } = stubCreate((path, body) =>
       path === '/api/series/create'
         ? made({ kind: 'series', key: 'the-harker-papers', name: 'The Harker Papers', path: 'universes/dracula/series/the-harker-papers/series.md', chapters: 0 })
-        : made({ series: String(body.series), path: 'universes/dracula/series/the-harker-papers/books/dracula-s-guest/book.md', chapters: 0 }),
+        : made({ series: String(body.series), path: 'universes/dracula/series/the-harker-papers/books/draculas-guest/book.md', chapters: 0 }),
     )
     const { history } = renderApp('/u/dracula')
     await screen.findByRole('heading', { name: 'Dracula', level: 1 })
@@ -217,7 +217,7 @@ describe('SC-WEB-69: I add a book or a series from its universe or series', () =
     fireEvent.change(within(form).getByLabelText('Name'), { target: { value: "Dracula's Guest" } })
     fireEvent.click(within(form).getByRole('button', { name: 'Create' }))
 
-    await waitFor(() => expect(history.location.pathname).toBe('/u/dracula/b/dracula-s-guest'))
+    await waitFor(() => expect(history.location.pathname).toBe('/u/dracula/b/draculas-guest'))
     expect(posted[1]).toEqual({
       path: '/api/book/create',
       body: { name: "Dracula's Guest", universe: 'dracula', series: 'the-harker-papers', expectedHash: 'h-s' },
@@ -238,7 +238,7 @@ describe('SC-WEB-69: I put a new book first', () => {
     fireEvent.change(after, { target: { value: [...after.options].find((o) => o.text.startsWith('At the start'))!.value } })
     fireEvent.click(within(form).getByRole('button', { name: 'Create' }))
 
-    await waitFor(() => expect(history.location.pathname).toBe('/u/dracula/b/dracula-s-guest'))
+    await waitFor(() => expect(history.location.pathname).toBe('/u/dracula/b/draculas-guest'))
     expect(posted).toEqual([{ path: '/api/book/create', body: { name: "Dracula's Guest", universe: 'dracula', first: true, expectedHash: 'h-u' } }])
   })
 })
@@ -269,9 +269,9 @@ describe('SC-WEB-70: New series and New book are guarded', () => {
     await waitFor(() => expect(calls.filter((c) => c.startsWith('/api/works')).length).toBeGreaterThan(works))
 
     // Another refusal is shown as the server words it.
-    answer = new Response(JSON.stringify({ code: 'already_exists', message: "Universe 'dracula' already has a book 'dracula-s-guest'." }), { status: 409 })
+    answer = new Response(JSON.stringify({ code: 'already_exists', message: "Universe 'dracula' already has a book 'draculas-guest'." }), { status: 409 })
     fireEvent.click(within(form).getByRole('button', { name: 'Create' }))
-    await waitFor(() => expect(within(form).getByRole('alert').textContent).toContain("already has a book 'dracula-s-guest'"))
+    await waitFor(() => expect(within(form).getByRole('alert').textContent).toContain("already has a book 'draculas-guest'"))
     expect(posted).toHaveLength(2)
 
     // Escape closes it, sends nothing more, and returns focus to the button.

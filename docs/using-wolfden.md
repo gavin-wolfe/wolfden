@@ -146,7 +146,8 @@ The form asks for three things:
 
 Choose **Create**, and Wolfden makes the file from the template and opens
 the new note, with the file's name at the top. Fill it in there, one
-field or section at a time, as below.
+field or section at a time, as below. The file is named from the note:
+"Mina's Aunt" is `minas-aunt.md`, or `minas-aunt-2.md` if that's taken.
 
 A new note is canon from the start of where it goes. If you're viewing the
 story at a chapter, the form also offers **Enters the story at** that
@@ -486,7 +487,8 @@ universe's page is a standalone book: one that isn't in a series. The form
 asks for:
 
 - **Name.** The series' or book's name. Its folder is named from it: "The
-  Long Dark" is `series/the-long-dark/`. That folder name is its *key*, which
+  Long Dark" is `series/the-long-dark/`, and an apostrophe is dropped, so
+  "Mina's Journal" is `minas-journal`. That folder name is its *key*, which
   story positions use (`ember:3`), so it never changes, but you can
   change the name in its `series.md` or `book.md` later.
 - **Place after…** Where it comes in reading order: at the end, at the
@@ -511,8 +513,9 @@ first. The rest of the file is kept as it was.
 Wolfden refuses a name whose key another book or series already has,
 since a story position names a book by its key alone: two books called
 "Ember" in one universe, even in different series, would make `ember:3`
-mean nothing. Choose another name, then change the name in `book.md`
-afterwards if you want it back. A name that starts with a digit
+mean nothing. "Minas Journal" and "Mina's Journal" clash the same way, since
+both make `minas-journal`. Choose another name, then change the name in
+`book.md` afterwards if you want it back. A name that starts with a digit
 ("1984") can't make a key, since keys start with a letter: start it with
 a word, and change it afterwards the same way. Keys use only the letters
 a–z and the digits 0–9 for now, so a name written entirely in another
@@ -809,6 +812,19 @@ entry** gives a field a new value from a later chapter; the one before
 it holds until then. A fact that doesn't change can still have a
 **Known from**, for a reveal the reader only learns later.
 
+When you read a note at a story position, a value or section that stops
+holding later still shows its date, with a small **ahead of readers** beside
+it: `until Ash ch. 5` is your plan, and readers at this point don't know it
+yet. Hover over it or click it to see that said in full. A date the position has reached
+has no tag. An AI assistant reading at that position isn't told the date at
+all, so it can't write toward it. When you're planning with one, ask it to
+read the note with no position, and it sees every date. Its instructions also
+tell it to read ahead for planning, foreshadowing, and reviewing continuity
+across chapters, and when writing a character who knows more than the reader,
+without letting later facts reach the prose. It can still tell you anything you
+ask about, and it should ask you if it isn't sure which read you want
+([more in the MCP guide](mcp-clients.md#7-gotchas-for-ai-assistants)).
+
 A typed From or Until has to be a chapter (or book) your universe has.
 A typo, such as `dracula:999`, is refused rather than saved, since the
 fact would drop out of every story-position view. So is one in a field
@@ -892,10 +908,10 @@ When you edit a note's opening, a section, or the whole file in
 - The alt text comes from the file's name. Change it to say what the
   picture shows: it's what shows if the picture can't, and what screen
   readers say.
-- The file name is made simple: lowercase, with `-` for spaces and
-  other characters, so the path needs no `%20`. If the folder already
-  has a file by that name, the new one gets a number (`castle-map-2.png`)
-  and the page says so. Wolfden never replaces an image that's there.
+- The file name is made simple: lowercase, with apostrophes dropped and
+  `-` for spaces and other characters, so the path needs no `%20`. If the
+  folder already has a file by that name, the new one gets a number
+  (`castle-map-2.png`) and the page says so. Wolfden never replaces an image that's there.
 - It takes `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.avif`, and `.svg`
   files of up to 10 MB, and checks that the file really is the kind of
   image its name says. A photo that's too big needs making smaller in an
@@ -1075,7 +1091,12 @@ A few things to know:
 
 - **Not in a synced folder.** Don't turn on history for a den in Dropbox,
   OneDrive, or iCloud: two machines syncing while git writes can corrupt
-  it. Use a private remote for a backup instead.
+  it. Use a private remote for a backup instead. Wolfden doesn't push to
+  one for you yet (#312). For a den with its own repository, after your
+  first checkpoint, run `git remote add origin <url>` in the den's folder,
+  then `git push -u origin HEAD --tags`. A backup only has what you've
+  pushed, so run `git push origin HEAD --tags` again after later
+  checkpoints. `--tags` includes your freeze tags.
 - **A den that's part of a bigger repository** already has history there,
   so there's nothing to turn on, and Wolfden says so.
 - **If a step fails** (a git hook refuses the first checkpoint, say),

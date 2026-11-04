@@ -44,20 +44,20 @@ public sealed class ContainerEndpointTests : IDisposable
         });
 
         Assert.Equal(HttpStatusCode.Created, code);
-        const string Path = "universes/dracula/books/dracula-s-guest/book.md";
+        const string Path = "universes/dracula/books/draculas-guest/book.md";
         Assert.Equal(Path, made.GetProperty("path").GetString());
         Assert.Equal("book", made.GetProperty("kind").GetString());
-        Assert.Equal("dracula-s-guest", made.GetProperty("key").GetString());
+        Assert.Equal("draculas-guest", made.GetProperty("key").GetString());
         Assert.Equal(2, made.GetProperty("chapters").GetInt32());
         Assert.Equal(JsonValueKind.Null, made.GetProperty("series").ValueKind);
         Assert.Equal([Path, DraculaUniverse], made.GetProperty("files").EnumerateArray().Select(f => f.GetProperty("path").GetString()));
         Assert.Contains("\nname: Dracula's Guest\n", den.Read(Path), StringComparison.Ordinal);
-        Assert.Contains("\norder: [dracula, dracula-s-guest]\n", den.Read(DraculaUniverse).ReplaceLineEndings("\n"), StringComparison.Ordinal);
+        Assert.Contains("\norder: [dracula, draculas-guest]\n", den.Read(DraculaUniverse).ReplaceLineEndings("\n"), StringComparison.Ordinal);
 
         // The tree has it, with its chapters, and the page can open it by key.
         var hierarchy = await server.GetJsonAsync("/api/hierarchy?universe=dracula", HttpStatusCode.OK);
-        var book = hierarchy.GetProperty("universe").GetProperty("books").EnumerateArray().Single(b => b.GetProperty("key").GetString() == "dracula-s-guest");
-        Assert.Equal(["dracula-s-guest:1", "dracula-s-guest:2"], book.GetProperty("chapters").EnumerateArray().Select(c => c.GetProperty("position").GetString()));
+        var book = hierarchy.GetProperty("universe").GetProperty("books").EnumerateArray().Single(b => b.GetProperty("key").GetString() == "draculas-guest");
+        Assert.Equal(["draculas-guest:1", "draculas-guest:2"], book.GetProperty("chapters").EnumerateArray().Select(c => c.GetProperty("position").GetString()));
 
         // A series, then a book in it, placed after the first; each create takes the hash it was based on.
         var (seriesCode, series) = await PostAsync(server, "/api/series/create", new
@@ -66,7 +66,7 @@ public sealed class ContainerEndpointTests : IDisposable
         });
         Assert.Equal(HttpStatusCode.Created, seriesCode);
         Assert.Equal("the-harker-papers", series.GetProperty("key").GetString());
-        Assert.Contains("\norder: [dracula, the-harker-papers, dracula-s-guest]\n", den.Read(DraculaUniverse).ReplaceLineEndings("\n"), StringComparison.Ordinal);
+        Assert.Contains("\norder: [dracula, the-harker-papers, draculas-guest]\n", den.Read(DraculaUniverse).ReplaceLineEndings("\n"), StringComparison.Ordinal);
 
         var seriesWorks = await server.GetJsonAsync("/api/works?universe=dracula&series=the-harker-papers", HttpStatusCode.OK);
         Assert.Equal("the-harker-papers", seriesWorks.GetProperty("series").GetString());
@@ -77,7 +77,7 @@ public sealed class ContainerEndpointTests : IDisposable
         });
         Assert.Equal(HttpStatusCode.Created, inSeriesCode);
         Assert.Equal("the-harker-papers", inSeries.GetProperty("series").GetString());
-        Assert.Equal("universes/dracula/series/the-harker-papers/books/mina-s-journal/book.md", inSeries.GetProperty("path").GetString());
+        Assert.Equal("universes/dracula/series/the-harker-papers/books/minas-journal/book.md", inSeries.GetProperty("path").GetString());
     }
 
     [Fact]

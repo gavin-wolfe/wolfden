@@ -199,9 +199,9 @@ prompts. This list is for knowing what the assistant can do.
 | Tool | What it does |
 |---|---|
 | `search` | Full-text search over names, aliases, leads, section text, and field values (a link in a field matches its note's name and aliases too); `field` searches one field's values. A hit in a field has `field` (its name) and `line` (the entry's line), with no `section`, such as `{"field": "occupation", "line": 10, "snippet": "[physician], professor", …}`. A query's words match anywhere in any order; words in double quotes (`"silver key"`) match as a phrase, side by side and in order. A hit in a section a bad comment leaves out has `left_out: true` and `in_canon: false`, so `canon_only` drops it. |
-| `get_entity` | One entity, by name, alias, file name, id, key, or path; with `as_of`, only what the reader knows at that position. Without `as_of`, a section a bad comment leaves out comes in its place with `left_out` (each error's `line`, `rule`, and `message`). With `as_of` it isn't there at all, and nothing says so, since a heading can give away a reveal. |
+| `get_entity` | One entity, by name, alias, file name, id, key, or path; with `as_of`, only what the reader knows at that position. Without `as_of`, a section a bad comment leaves out comes in its place with `left_out` (each error's `line`, `rule`, and `message`). With `as_of` it isn't there at all, and nothing says so, since a heading can give away a reveal. With `as_of`, a fact's `until` is left out too. |
 | `list_entities` | Entities by type, status, series, or book. A type includes its kinds here and in `search` and `canon_as_of`: `location` also finds a den's worlds ([types.md F-TYPE-13](types.md#3-type-definitions)), and each result says its own type. |
-| `canon_as_of` | Canon at a story position (or the end of the story), pinned canon first. Sections a bad comment leaves out aren't in it, at any position. |
+| `canon_as_of` | Canon at a story position (or the end of the story), pinned canon first. Sections a bad comment leaves out aren't in it, at any position. At a position, a fact's `until` is left out. |
 | `get_chapter` | A book's chapters and their fields, with each value's source (the chapter, or `chapter_defaults` above it), and each chapter's `heading`: its title, then the fields a `chapter_heading` lists, such as `"Ardent — Vesta Yards, 2350-04-12"`. A field the chapter writes with a value that's ignored is listed in the chapter's `ignored`, as written and why, such as `{"field": "setting", "as_written": "Whitby harbour", "reason": "setting is a link to one entity, …"}`; a list item that's left out has its number in `item`. A field written with no value (null) isn't a fault, so it isn't listed. |
 | `get_chapter_defaults` | A universe's, series', or book's `chapter_defaults`, and the books they reach. A default written with a value that's ignored has `ignored: true`, the value in `written`, and why in `reason`. |
 | `check` | The continuity check, as `wolfden check` runs it. |
@@ -290,6 +290,8 @@ described in [Pick a den](#2-pick-a-den).
 |---|---|
 | "Which characters has the reader met by chapter 9? Just the names." | `canon_as_of` |
 | "What does the reader know about Renfield as of chapter 8? No spoilers from later chapters." | `get_entity` with `as_of` |
+| "Where could I foreshadow Renfield letting the Count in? Read ahead." | `get_entity` with no `as_of` |
+| "Draft a short scene with Renfield at chapter 20. He has already let the Count in, which the reader learns in chapter 21, so let that show in how he behaves without saying it." | `get_entity` with `as_of`, then with no `as_of` |
 | "Where do my notes mention the bloofer lady?" | `search` |
 | "Which characters are physicians?" | `search` with `field: occupation` |
 | "Whose point of view is chapter 4, and when and where is it set?" | `get_chapter` |
@@ -384,6 +386,39 @@ docs. The writer's own list is in
   view, ideas and later reveals included. To draft or review a chapter,
   use `canon_as_of` at that chapter, or `get_entity` with `as_of`.
   `search` and `get_history` have no position.
+- **Read ahead when the work needs more than the reader knows.** Read the
+  note with `get_entity` and no `as_of` for planning, outlining, foreshadowing,
+  and reviewing continuity across chapters, or whenever the writer asks. A full
+  read has ideas and retconned facts as well as canon, so check a fact's status
+  before you rely on it.
+- **Read ahead to write a character who knows more than the reader.** A read
+  at a position leaves out what the reader hasn't learned, and that can be
+  something a character already knows. Say the reader knows a stranger only as
+  the Magpie, and her friend learned her real name in an earlier scene the
+  narrator didn't hear. At that chapter the name isn't in the view, so an
+  assistant reading only the view writes the friend as not knowing it.
+- **Keep later facts out of the prose, not away from the writer.** Tell the
+  writer anything they ask about, since spoilers are hidden from the prose and
+  never from the author. In prose, the view at the chapter is what the reader
+  knows. A later fact can shape what's hinted at, and how a character who'd
+  already know it behaves: the friend can avoid the nickname, or go quiet when
+  someone asks who the Magpie is. The prose must never state the fact, or have
+  a narrator or point-of-view character reveal it.
+- **A fact later for the reader isn't always known to the character yet.** A
+  full read holds what a character already knows beside what hasn't happened to
+  them. Renfield's note read at chapter 20 of the Dracula sample leaves out that
+  he let the Count in, which he's already done, and his death, which he has
+  ahead of him. Use only what the character would know by then: go by the note's
+  dates, such as an event's `when`, or ask the writer. If you aren't sure which
+  read applies, ask about that too.
+- **A read at a position doesn't say when a fact ends.** A fact's `until`
+  tells what the reader doesn't know yet, so `canon_as_of` and `get_entity`
+  leave it out at a position, and nothing says it's gone: in the result, the
+  fact just holds, as it does for the reader. To plan ahead, read the note
+  with `get_entity` and no `as_of`, which has every `from` and `until`.
+  `canon_as_of` with no position won't do, since it's the end of the story,
+  and a fact that ends before then isn't in it. Read without `as_of` before
+  changing a fact too, or the change can drop an `until` you weren't shown.
 - **Writes land at once; only `checkpoint` records them.** An open page
   in the web UI shows each write within about 5 seconds, or once the
   writer closes an editor or form they have open there. If they save a

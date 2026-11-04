@@ -725,8 +725,10 @@ With git as the backend:
   in `serve` records whatever an MCP session saved and hasn't
   checkpointed yet, without that agent's `Co-Authored-By` (its later
   `checkpoint` then has those files no more).
-- **Remotes:** optional. Wolfden can push and pull a configured remote but
-  never requires one.
+- **Remotes:** optional, and never required. Wolfden doesn't push or pull
+  yet; a den's repository works with `git remote` and `git push` like any
+  other. The maintainer has decided Wolfden should handle backup to a
+  private remote for the common path (#312).
 
 With or without a backend, **the index is never the only copy of
 anything.** Deleting it loses nothing (§7).

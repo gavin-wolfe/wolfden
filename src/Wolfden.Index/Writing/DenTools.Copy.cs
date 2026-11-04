@@ -148,7 +148,7 @@ public sealed partial class DenTools
     {
         var overlay = new OverlayDenSource(den, files);
         var afterLinks = LinkIndex.Build(EntityCatalog.Load(check.Structure, overlay), overlay);
-        RefuseUnreadable(den);
+        RefuseChangedOrUnreadable(den);
         var changed = LinkChanges.Between(links, afterLinks);
         var relinked = changed.Where(l => l.Before.Outcome == LinkOutcome.Resolved
             && (l.After.Outcome != LinkOutcome.Resolved || l.After.Target!.Path != l.Before.Target!.Path)).ToList();

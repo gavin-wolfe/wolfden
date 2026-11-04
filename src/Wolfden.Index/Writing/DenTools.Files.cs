@@ -132,7 +132,7 @@ public sealed partial class DenTools
         var ids = hasId ? IdsInUse(look, path) : [];
         using (EnterWrite())
         {
-            var tracked = new TrackingDenSource(Snapshot());
+            var tracked = new TrackingDenSource(Snapshot(), forWrite: true);
             IDenSource den = tracked;
             var structure = DenStructure.Load(den);
             CheckEditable(den, structure, path);
@@ -177,7 +177,7 @@ public sealed partial class DenTools
             {
                 // The den reads this file now, so a save may add no error (format.md §1.3).
                 var check = Check(den, structure, files);
-                RefuseUnreadable(tracked);
+                RefuseChangedOrUnreadable(tracked);
                 Save(files, new Dictionary<string, byte[]>(StringComparer.Ordinal) { [path] = original }, created: null);
                 return new WriteResult(DenReader.ResultVersion, true, path, HashOf(bytes), null, ["Saved the whole file."], [], Warnings(check));
             }
@@ -219,7 +219,7 @@ public sealed partial class DenTools
                 }
             }
 
-            RefuseUnreadable(tracked);
+            RefuseChangedOrUnreadable(tracked);
             Save(files, new Dictionary<string, byte[]>(StringComparer.Ordinal) { [path] = original }, created: null);
 
             List<string> effects = [healed

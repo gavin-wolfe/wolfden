@@ -381,7 +381,7 @@ public sealed class AutoCheckpointer : IDisposable
     {
         try
         {
-            return AutoCheckpoint.Read(File.ReadAllBytes(Path.Combine(denRoot, "den.yaml")));
+            return AutoCheckpoint.Read(SharedFile.ReadAllBytes(Path.Combine(denRoot, "den.yaml")));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {

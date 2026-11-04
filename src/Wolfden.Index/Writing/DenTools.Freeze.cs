@@ -366,7 +366,7 @@ public sealed partial class DenTools
     /// </summary>
     private void RefuseLeftOutSections(string universeKey, string key)
     {
-        var den = new TrackingDenSource(Snapshot());
+        var den = new TrackingDenSource(Snapshot(), forWrite: true);
         var structure = DenStructure.Load(den);
         var target = FindBook(structure, universeKey, key);
         var diagnostics = structure.Diagnostics.Concat(EntityCatalog.Load(structure, den).Diagnostics).ToList();

@@ -123,7 +123,7 @@ public sealed partial class DenTools
         var (universeKey, ids) = PlaceFor(universe, series);
         using (EnterWrite())
         {
-            var den = new TrackingDenSource(Snapshot());
+            var den = new TrackingDenSource(Snapshot(), forWrite: true);
             var structure = DenStructure.Load(den);
 
             // A sibling that can't be read would drop out of the story order written below (#284).
@@ -209,6 +209,7 @@ public sealed partial class DenTools
                 throw new DenToolException(ToolErrorCodes.UnsupportedEdit, $"The new {what} didn't read back as built, so it wasn't made. {ToolWords.Cap(Words.CheckTool)} to see why.");
             }
 
+            RefuseChangedOrUnreadable(den);
             try
             {
                 Save(files, listed is null ? null : new Dictionary<string, byte[]>(StringComparer.Ordinal) { [holder.FilePath] = original }, created: path);

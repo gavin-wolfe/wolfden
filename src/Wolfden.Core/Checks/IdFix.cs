@@ -89,7 +89,7 @@ public static class IdFix
         try
         {
             // The file may have changed since it was read; don't overwrite that.
-            if (!File.ReadAllBytes(full).AsSpan().SequenceEqual(file.ToBytes()))
+            if (!SharedFile.ReadAllBytes(full).AsSpan().SequenceEqual(file.ToBytes()))
             {
                 return Skip("it changed while the den was being checked; run the fix again.");
             }

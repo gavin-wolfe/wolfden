@@ -118,6 +118,9 @@ public sealed class FileSystemDenStore : IDenStore, IDenChangeFeed
     public bool CannotList(string path) => Reads.CannotList(path);
 
     /// <inheritdoc />
+    public bool IsOpenForWriting(string path) => Reads.IsOpenForWriting(path);
+
+    /// <inheritdoc />
     public IEnumerable<string> GetFolderLinks(string path) => Reads.GetFolderLinks(path);
 
     /// <inheritdoc />

@@ -97,6 +97,16 @@ public interface IDenSource
     bool CannotList(string path) => false;
 
     /// <summary>
+    /// True if another program has the file at <paramref name="path"/> open
+    /// to write it now, so what's read from it may be part of a save (#298).
+    /// False where that can't be told, as on Linux and macOS, and for a
+    /// source that isn't on disk. A <see cref="TrackingDenSource"/> reading
+    /// for a write asks it directly of the source it wraps, so a wrapper that
+    /// other wrappers read through needn't forward it.
+    /// </summary>
+    bool IsOpenForWriting(string path) => false;
+
+    /// <summary>
     /// The names of the folder links (symbolic links and junctions) directly
     /// in <paramref name="path"/>. <see cref="GetDirectories"/> leaves them
     /// out, so the den's walks never follow them; <c>wolfden check</c> lists
@@ -137,7 +147,10 @@ public sealed class FileSystemDenSource : IDenSource
     public bool FileExists(string path) => ExactPathExists(path, file: true);
 
     /// <inheritdoc />
-    public byte[] ReadFile(string path) => File.ReadAllBytes(Full(path));
+    public byte[] ReadFile(string path) => SharedFile.ReadAllBytes(Full(path));
+
+    /// <inheritdoc />
+    public bool IsOpenForWriting(string path) => SharedFile.IsOpenForWriting(Full(path));
 
     /// <summary>
     /// The folders directly in <paramref name="path"/>, by their names on

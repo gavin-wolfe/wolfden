@@ -178,7 +178,7 @@ internal sealed class IndexUpdater
                 var full = Path.Combine(_root, path.Replace('/', Path.DirectorySeparatorChar));
                 try
                 {
-                    bytes = File.ReadAllBytes(full);
+                    bytes = SharedFile.ReadAllBytes(full);
                 }
                 catch (Exception e) when (e is FileNotFoundException or DirectoryNotFoundException || e is IOException && FileSystemDenSource.IsBrokenLink(new FileInfo(full)))
                 {

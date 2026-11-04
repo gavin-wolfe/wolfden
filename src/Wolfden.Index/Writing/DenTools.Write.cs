@@ -111,6 +111,12 @@ public sealed partial class DenTools
     internal Action? BeforeWrite { get; init; }
 
     /// <summary>
+    /// For tests: called just before a write compares every file it read with
+    /// the disk, so a test can finish another program's save at that moment (#298).
+    /// </summary>
+    internal Action? BeforeSaveCheck { get; init; }
+
+    /// <summary>
     /// The den files this session's writes saved since a checkpoint last
     /// recorded them, each with the bytes the session last wrote, so
     /// <see cref="Checkpoint"/> can tell the session's edits from changes
@@ -431,7 +437,7 @@ public sealed partial class DenTools
             var files = plan.Files.ToDictionary(p => p.Key, p => p.Value, StringComparer.Ordinal);
             var idAdded = AddMissingId(target, files);
             var check = Check(den, structure, files);
-            RefuseUnreadable(den);
+            RefuseChangedOrUnreadable(den);
             Save(files, plan.Originals, created: null);
             var after = EntityCatalog.ReadEntityFile(check.Structure, path, files[path]).Entity!;
             var effects = new List<string>
@@ -1115,7 +1121,7 @@ public sealed partial class DenTools
         var (path, ids) = Locate(entity, universe);
         using (EnterWrite())
         {
-            var tracked = new TrackingDenSource(Snapshot());
+            var tracked = new TrackingDenSource(Snapshot(), forWrite: true);
             IDenSource den = tracked;
             var structure = DenStructure.Load(den);
             var original = den.TryReadFile(path) ?? throw GoneOrUnreadable(den, path);
@@ -1220,7 +1226,7 @@ public sealed partial class DenTools
     /// <summary>Everything the den reads, through a source that remembers what it couldn't.</summary>
     private (TrackingDenSource Den, DenStructure Structure, EntityCatalog Catalog, LinkIndex Links) LoadTracked()
     {
-        var den = new TrackingDenSource(Snapshot());
+        var den = new TrackingDenSource(Snapshot(), forWrite: true);
         var structure = DenStructure.Load(den);
         var catalog = EntityCatalog.Load(structure, den);
         return (den, structure, catalog, LinkIndex.Build(catalog, den));
@@ -1238,6 +1244,26 @@ public sealed partial class DenTools
         if (unreadable.Count > 0)
         {
             throw Unreadable(unreadable);
+        }
+    }
+
+    /// <summary>
+    /// Refuses a write, just before it saves, if a file it read can't be read
+    /// now or holds something else now. What it read may have been part of
+    /// another program's save, which can hide a link or a final book's status
+    /// in a file it wouldn't otherwise rewrite, so every file read is
+    /// compared, not only those to be written (#298).
+    /// </summary>
+    private void RefuseChangedOrUnreadable(TrackingDenSource den)
+    {
+        BeforeSaveCheck?.Invoke();
+        var changed = den.ChangedSinceRead();
+        RefuseUnreadable(den);
+        if (changed.Count > 0)
+        {
+            throw new DenToolException(
+                ToolErrorCodes.StaleFile,
+                $"{Named(changed.Select(p => new UnreadablePath(p, IsFolder: false)).ToList())} changed while this was being worked out, perhaps being saved in another program, so nothing was written. Read it again and retry.");
         }
     }
 

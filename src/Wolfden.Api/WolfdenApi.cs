@@ -260,7 +260,7 @@ public static class WolfdenApi
     {
         try
         {
-            return DenStructure.ReadRemoteImages(File.ReadAllBytes(Path.Combine(denRoot, "den.yaml")));
+            return DenStructure.ReadRemoteImages(SharedFile.ReadAllBytes(Path.Combine(denRoot, "den.yaml")));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {

@@ -192,7 +192,7 @@ public sealed partial class DenTools
                     $"{string.Join("; ", frozenRelinks.Take(ListedLinkChanges).Select(l => $"{Where(l.After)} reaches {Reached(l.Before)}"))}. Nothing was changed.");
             }
 
-            RefuseUnreadable(den);
+            RefuseChangedOrUnreadable(den);
             SaveMove(path, plan.To, plan.Interim, files, plan.Originals);
             var after = EntityCatalog.ReadEntityFile(check.Structure, plan.To, files[plan.To]).Entity!;
             var effects = new List<string>

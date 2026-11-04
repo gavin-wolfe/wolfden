@@ -67,13 +67,15 @@ export function ordinalOf(position: string, positions: readonly PositionView[]):
 
 /**
  * True if `position` comes after `at` in story order, so readers at `at`
- * haven't got there. False with no position being viewed, or for a position
- * the list doesn't have, since nothing can be said about it.
+ * haven't got there. A bare book orders the same as its first chapter
+ * (format.md F-POS-7), so `ash:1` isn't ahead of `ash`. False with no position
+ * being viewed, or for a position the list doesn't have, since nothing can be
+ * said about it.
  */
 export function isAheadOf(position: string, at: string | undefined, positions: readonly PositionView[]): boolean {
   const here = at === undefined ? null : ordinalOf(at, positions)
   const there = ordinalOf(position, positions)
-  return here !== null && there !== null && there > here
+  return here !== null && there !== null && Math.ceil(there) > Math.ceil(here)
 }
 
 /**

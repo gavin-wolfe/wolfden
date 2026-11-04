@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import type { EntityPageResult, PageField, PageSection } from './api'
 import { entities, page, positions, renderApp, stubApi } from './test/harness'
 import { isAheadOf } from './story'
@@ -47,6 +47,20 @@ describe('SC-WEB-97: a date ahead of the position is kept and marked', () => {
     expect(tag.getAttribute('title')).toBe(TOOLTIP)
   })
 
+  it('gives the sentence to a keyboard or a touch, since a tooltip only comes on hover', async () => {
+    const main = await openAt('dracula:3', { sections: [section('dracula:5')] })
+    const tag = await within(main).findByRole('button', { name: 'ahead of readers' })
+    expect(tag.getAttribute('aria-expanded')).toBe('false')
+    expect(within(main).queryByText(TOOLTIP)).toBeNull()
+
+    fireEvent.click(tag)
+    expect(tag.getAttribute('aria-expanded')).toBe('true')
+    expect(within(main).getByText(TOOLTIP)).toBeTruthy()
+
+    fireEvent.click(tag)
+    expect(within(main).queryByText(TOOLTIP)).toBeNull()
+  })
+
   it('tags a field entry’s until later than the position', async () => {
     const main = await openAt('dracula:3', { fields: [field('dracula:5')] })
 
@@ -78,11 +92,12 @@ describe('SC-WEB-97: a date ahead of the position is kept and marked', () => {
 })
 
 describe('isAheadOf', () => {
-  it('compares by story order, counting a bare book as the start of the book', () => {
+  it('compares by story order, a bare book ordering the same as its first chapter', () => {
     expect(isAheadOf('dracula:2', 'dracula:1', positions)).toBe(true)
     expect(isAheadOf('dracula:2', 'dracula:2', positions)).toBe(false)
     expect(isAheadOf('dracula:1', 'dracula:2', positions)).toBe(false)
-    expect(isAheadOf('dracula:1', 'dracula', positions)).toBe(true)
+    expect(isAheadOf('dracula:1', 'dracula', positions)).toBe(false)
+    expect(isAheadOf('dracula:2', 'dracula', positions)).toBe(true)
     expect(isAheadOf('dracula', 'dracula:1', positions)).toBe(false)
   })
 

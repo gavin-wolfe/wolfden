@@ -415,7 +415,8 @@ button.peek {
   font-variant-numeric: tabular-nums;
 }
 
-.ahead-of-readers {
+button.ahead-of-readers,
+.ahead-of-readers-why {
   font-family: var(--font-ui);
   font-size: 0.72rem;
   font-weight: 400;
@@ -423,6 +424,12 @@ button.peek {
   margin-left: 0.3rem;
   color: var(--text-muted);
   vertical-align: middle;
+}
+
+button.ahead-of-readers {
+  padding: 0;
+  border: none;
+  background: none;
   cursor: help;
 }
 

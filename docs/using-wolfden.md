@@ -757,7 +757,9 @@ the pages don't have a form for it yet. The rules are in
   and the opening (the text before the first section) has **Edit
   opening**. Edit opens the text as Markdown, as it's written in the
   file. Type `[[` and a few letters of a note's name or alias to pick a
-  note to link to. The link is the text you matched, so it reads well:
+  note to link to, with either kind of apostrophe: links don't mind whether
+  it's straight or curly, so `[[Mina’s Journal]]` reaches "Mina's Journal".
+  The link is the text you matched, so it reads well:
   `[[Mina Harker]]`, or `[[Madam Mina]]` if you typed her alias. When
   that text could mean another note too, it uses her name instead, or
   failing that her file name (`[[mina-harker]]`). A note that no link

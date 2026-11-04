@@ -1425,9 +1425,14 @@ empty target (`[[]]`, `[[ |Tarrow]]`) is a [warning] and isn't a link.
 
 **F-LINK-4.** Targets match slugs, names, and aliases, and headings match
 section names, after this normalization of both sides: NFC (F-ENC-5), trim,
-collapse each run of whitespace to one space, then Unicode default case
-folding. So matching is case-insensitive. Hyphens and spaces stay distinct:
-`[[ilse tarrow]]` matches the name "Ilse Tarrow", not the slug `ilse-tarrow`.
+collapse each run of whitespace to one space, Unicode default case folding,
+then each apostrophe made one character. The apostrophes are those a key drops
+(types.md F-TPL-6): straight `'`, curly `’`, left single quote `‘`, modifier
+letter `ʼ`, and fullwidth `＇`. So matching is case-insensitive, and
+`[[Mina’s Journal]]` matches the name "Mina's Journal", and the reverse. An
+apostrophe isn't dropped: `[[Minas Journal]]` doesn't match it. Hyphens and
+spaces stay distinct: `[[ilse tarrow]]` matches the name "Ilse Tarrow", not the
+slug `ilse-tarrow`.
 
 **F-LINK-5.** The candidates are the entities of the linking file's
 universe, at every scope and of every status. Container files aren't link

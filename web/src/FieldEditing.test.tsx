@@ -264,6 +264,12 @@ describe('SC-WEB-61: the changes a field edit sends', () => {
     expect(linkFor(year, [{ path: 'x/other.md', name: 'Other' }])).toBe('[[The Year]]')
     expect(linkFor(year, [{ path: 'x/the year.md' }])).toBeNull()
     expect(linkFor(year, [{ path: 'x/other.md', name: 'the  year' }])).toBeNull()
+    // Names that differ only by their apostrophes match as links do, so neither is a sure link (F-LINK-4, F-LINK-7).
+    const journal = { path: 'x/Mina Journal.md', name: "Mina's Journal", id: null }
+    expect(linkFor(journal, [{ path: 'x/other.md', name: 'Other' }])).toBe("[[Mina's Journal]]")
+    for (const apostrophe of ['\u2019', '\u2018', '\u02BC', '\uFF07']) {
+      expect(linkFor(journal, [{ path: 'x/other.md', name: `Mina${apostrophe}s Journal` }])).toBeNull()
+    }
     expect(linkFor(year, null)).toBeNull()
   })
 

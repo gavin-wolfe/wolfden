@@ -795,7 +795,8 @@ scope `S`:
    made from `N`: lowercase it, replace the letters that don't decompose
    (`æ` with `ae`, `œ` with `oe`, `ø` with `o`, `ß` with `ss`, `þ` with
    `th`, `ð` and `đ` with `d`, `ł` with `l`), decompose it (NFKD), drop
-   combining marks and apostrophes (`'`, `’`, `‘`, `ʼ`), replace each run
+   combining marks and apostrophes (`'`, `’`, `‘`, `ʼ`; NFKD has made a
+   fullwidth `＇` straight), replace each run
    of characters outside `a-z` and `0-9` with one `-`, trim `-` from both
    ends, and cut it to 64 characters (at a word boundary, where there is
    one), trimming a trailing `-`. So "Ærin Søvik" becomes `aerin-sovik`,

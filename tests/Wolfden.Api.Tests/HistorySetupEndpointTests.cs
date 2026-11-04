@@ -150,6 +150,68 @@ public sealed class HistorySetupEndpointTests : IDisposable
         Assert.Equal("", File.ReadAllText(global));
     }
 
+    [Fact]
+    [Trait("Scenario", "SC-WEB-55")]
+    [Trait("Scenario", "SC-HIST-22")]
+    public async Task WhenGitHasOnlyOneTheStatusAsksForBothAndOneAloneIsAskedToBeCompleted()
+    {
+        var den = Den(TempDen.Dracula());
+        var global = Config("[user]\n\tname = Marek Oswin\n");
+        var git = Git(global: global);
+        await using var server = await StartAsync(den, git);
+
+        // What the dialog reads to decide which fields to show.
+        var turnOn = (await server.GetJsonAsync("/api/checkpoint", HttpStatusCode.OK)).GetProperty("turnOn");
+        Assert.True(turnOn.GetProperty("needsName").GetBoolean());
+        Assert.True(turnOn.GetProperty("needsEmail").GetBoolean());
+
+        var (nothingCode, nothing) = await Post(server, "/api/history/turn-on", """{"firstCheckpoint": true}""");
+        Assert.Equal(HttpStatusCode.BadRequest, nothingCode);
+        Assert.Equal("identity_needed", nothing.GetProperty("code").GetString());
+        Assert.True(nothing.GetProperty("needsName").GetBoolean());
+        Assert.True(nothing.GetProperty("needsEmail").GetBoolean());
+
+        var (aloneCode, alone) = await Post(server, "/api/history/turn-on", """{"authorEmail": "ash@example.invalid"}""");
+        Assert.Equal(HttpStatusCode.BadRequest, aloneCode);
+        Assert.Equal("identity_needed", alone.GetProperty("code").GetString());
+        Assert.True(alone.GetProperty("needsName").GetBoolean());
+        Assert.False(alone.GetProperty("needsEmail").GetBoolean());
+        Assert.DoesNotContain("Marek", alone.GetProperty("message").GetString(), StringComparison.Ordinal);
+        Assert.False(Directory.Exists(Path.Combine(den.Root, ".git")));
+
+        var (code, _) = await Post(server, "/api/history/turn-on", """{"authorName": "Ash Calloway", "authorEmail": "ash@example.invalid"}""");
+
+        Assert.Equal(HttpStatusCode.OK, code);
+        Assert.Equal("Ash Calloway|ash@example.invalid|Ash Calloway|ash@example.invalid\n", RunGit(den, git, "log", "-1", "--format=%an|%ae|%cn|%ce"));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-21")]
+    [Trait("Scenario", "SC-HIST-22")]
+    public async Task ANameAndEmailInTheRequestWinOverGitsAndOneAloneIsAskedToBeCompleted()
+    {
+        var den = Den(TempDen.Dracula());
+        var text = "[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n";
+        var global = Config(text);
+        var git = Git(global: global);
+        await using var server = await StartAsync(den, git);
+
+        var (halfCode, half) = await Post(server, "/api/history/turn-on", """{"authorName": "Ash Calloway"}""");
+        Assert.Equal(HttpStatusCode.BadRequest, halfCode);
+        Assert.Equal("identity_needed", half.GetProperty("code").GetString()); // the dialog asks for the other
+        Assert.False(half.GetProperty("needsName").GetBoolean());
+        Assert.True(half.GetProperty("needsEmail").GetBoolean());
+        Assert.DoesNotContain("marek", half.GetProperty("message").GetString(), StringComparison.OrdinalIgnoreCase);
+        Assert.False(Directory.Exists(Path.Combine(den.Root, ".git")));
+
+        var (code, made) = await Post(server, "/api/history/turn-on", """{"authorName": "Ash Calloway", "authorEmail": "ash@example.invalid"}""");
+
+        Assert.Equal(HttpStatusCode.OK, code);
+        Assert.Equal(["user.name", "user.email"], made.GetProperty("identitySaved").EnumerateArray().Select(e => e.GetString()));
+        Assert.Equal("Ash Calloway|ash@example.invalid|Ash Calloway|ash@example.invalid\n", RunGit(den, git, "log", "-1", "--format=%an|%ae|%cn|%ce"));
+        Assert.Equal(text, File.ReadAllText(global));
+    }
+
     [Theory]
     [Trait("Scenario", "SC-WEB-55")]
     [InlineData("""{"authorName": "Ash\nCalloway"}""", "one line")]
@@ -338,14 +400,16 @@ public sealed class HistorySetupEndpointTests : IDisposable
         {
             ["GIT_CONFIG_GLOBAL"] = global ?? Config(text!),
             ["GIT_CONFIG_NOSYSTEM"] = "1",
-            ["GIT_CEILING_DIRECTORIES"] = TestsFolder,
-            ["GIT_DIR"] = null,
-            ["GIT_WORK_TREE"] = null,
-            ["GIT_INDEX_FILE"] = null,
+            ["GIT_CONFIG_COUNT"] = null,
+            ["GIT_CONFIG_PARAMETERS"] = null,
             ["GIT_AUTHOR_NAME"] = null,
             ["GIT_AUTHOR_EMAIL"] = null,
             ["GIT_COMMITTER_NAME"] = null,
             ["GIT_COMMITTER_EMAIL"] = null,
+            ["GIT_CEILING_DIRECTORIES"] = TestsFolder,
+            ["GIT_DIR"] = null,
+            ["GIT_WORK_TREE"] = null,
+            ["GIT_INDEX_FILE"] = null,
             ["EMAIL"] = null,
         },
     };

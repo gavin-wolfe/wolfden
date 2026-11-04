@@ -9,6 +9,8 @@ namespace Wolfden.Index.Reading;
 /// table splits and folds them (<see cref="SearchWords"/>: ignoring case and
 /// Latin accents), so <c>zoe ark</c> finds Zoë Arkwright, and a whole text
 /// that matches as a link would (<see cref="LinkText.Normalize"/>) ranks first.
+/// Any apostrophe splits a word as the straight one does, as links treat them
+/// alike (F-LINK-4), though search counts a modifier letter <c>ʼ</c> as a letter.
 /// </summary>
 public static class EntityLookup
 {
@@ -91,7 +93,7 @@ public static class EntityLookup
         return null;
     }
 
-    private static List<string> Words(string text) => SearchWords.Tokens(text).Select(t => t.Folded).ToList();
+    private static List<string> Words(string text) => SearchWords.Tokens(LinkText.FoldApostrophes(text)).Select(t => t.Folded).ToList();
 
     /// <summary>True if the text's first words start with the words typed, in order.</summary>
     private static bool StartsWith(List<string> text, List<string> typed) =>

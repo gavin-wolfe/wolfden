@@ -1361,6 +1361,18 @@ who may be checking their own plan, keeps it, and the web UI marks it (design.md
 The view at the end of the story has no `until` to leave out: it holds only
 the facts still in effect when the story ends.
 
+**F-VIEW-5.** The value of a `position` field (types.md F-FT-10), such as a
+thread's `paid_off`, can point past `p`, and that says what a reader at `p`
+doesn't know yet. An AI assistant's read at a position MUST leave out each
+such value that's later than `p` in story order (F-ORD-2), and doesn't say
+it did. This covers every field the entity's type defines as `position`,
+written plain or as an entry (F-TMP-1). A value at `p` isn't later, and a bare
+book is the same point as its first chapter (F-POS-7). In a list, only the
+later items go, a list that had items and has none left goes entirely, and a
+list written empty stays. A value that can't be compared (not a position, or a
+position that doesn't resolve, F-POS-4) goes too. A view without a position,
+and a view for the writer, leave out nothing under this rule.
+
 ### 9.5 Keeping reveals in place
 
 This section has no rules. It describes how to write notes whose
@@ -1434,9 +1446,14 @@ empty target (`[[]]`, `[[ |Tarrow]]`) is a [warning] and isn't a link.
 
 **F-LINK-4.** Targets match slugs, names, and aliases, and headings match
 section names, after this normalization of both sides: NFC (F-ENC-5), trim,
-collapse each run of whitespace to one space, then Unicode default case
-folding. So matching is case-insensitive. Hyphens and spaces stay distinct:
-`[[ilse tarrow]]` matches the name "Ilse Tarrow", not the slug `ilse-tarrow`.
+collapse each run of whitespace to one space, Unicode default case folding,
+then each apostrophe made one character. The apostrophes are those a key drops
+(types.md F-TPL-6): straight `'`, curly `’`, left single quote `‘`, modifier
+letter `ʼ`, and fullwidth `＇`. So matching is case-insensitive, and
+`[[Mina’s Journal]]` matches the name "Mina's Journal", and the reverse. An
+apostrophe isn't dropped: `[[Minas Journal]]` doesn't match it. Hyphens and
+spaces stay distinct: `[[ilse tarrow]]` matches the name "Ilse Tarrow", not the
+slug `ilse-tarrow`.
 
 **F-LINK-5.** The candidates are the entities of the linking file's
 universe, at every scope and of every status. Container files aren't link
@@ -1658,7 +1675,9 @@ rewrite, in the same change, every reference that depends on the old name:
   as an alias, so those links keep resolving.
 - Renaming a section: every link to it by heading
   (`[[entity#Old name]]`, matched as in F-LINK-4), in any file, so it
-  names the new heading.
+  names the new heading. A rename that changes only which apostrophes the
+  name uses rewrites none: each link still matches, and keeps what its
+  writer typed, even in a final book.
 - Moving an entity to another scope: any link that would no longer resolve
   to it (F-LINK-7) is rewritten to its id or another unique form. An
   entity without an `id` MUST get one in the same change (F-ID-6).

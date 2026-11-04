@@ -16,7 +16,7 @@ internal sealed class IndexRows
     internal static readonly Type[] TableOrder =
     [
         typeof(MetaRecord), typeof(DenRecord), typeof(FileRecord), typeof(ContainerRecord), typeof(ChapterRecord),
-        typeof(FieldDefaultRecord), typeof(EntityRecord), typeof(AliasRecord), typeof(FieldValueRecord), typeof(SectionRecord),
+        typeof(FieldDefaultRecord), typeof(PositionFieldRecord), typeof(EntityRecord), typeof(AliasRecord), typeof(FieldValueRecord), typeof(SectionRecord),
         typeof(LinkRecord), typeof(OutlineRowRecord), typeof(DiagnosticRecord),
     ];
 

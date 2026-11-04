@@ -64,9 +64,9 @@ Set things up in this order. Each step builds on the ones before it.
    universe, `vael` (a key: lowercase letters, digits, and hyphens,
    starting with a letter). It makes the folder a git repository, and
    makes a first checkpoint. If git doesn't
-   know your name and email yet, add `--author-name` and
-   `--author-email`: a pen name is fine, and they're saved for this den
-   only. For a den you already have, run `wolfden init --git` in its
+   know your name and email yet, or you want this den under another name,
+   add `--author-name` and `--author-email`: a pen name is fine, and
+   they're saved for this den only. For a den you already have, run `wolfden init --git` in its
    folder instead. Don't put a den with history in Dropbox, OneDrive, or
    iCloud. See [Turning on history](#turning-on-history).
 4. **Add your series and books.** In the den's folder, in reading order:
@@ -757,7 +757,9 @@ the pages don't have a form for it yet. The rules are in
   and the opening (the text before the first section) has **Edit
   opening**. Edit opens the text as Markdown, as it's written in the
   file. Type `[[` and a few letters of a note's name or alias to pick a
-  note to link to. The link is the text you matched, so it reads well:
+  note to link to, with either kind of apostrophe: links don't mind whether
+  it's straight or curly, so `[[Mina’s Journal]]` reaches "Mina's Journal".
+  The link is the text you matched, so it reads well:
   `[[Mina Harker]]`, or `[[Madam Mina]]` if you typed her alias. When
   that text could mean another note too, it uses her name instead, or
   failing that her file name (`[[mina-harker]]`). A note that no link
@@ -768,7 +770,9 @@ the pages don't have a form for it yet. The rules are in
   does dropping or pasting one into the text
   ([Adding an image while you edit](#adding-an-image-while-you-edit)).
   **Add section** adds one at the end or before another. Renaming a
-  section changes the links to it in every note; removing one asks first.
+  section changes the links to it in every note, unless only its
+  apostrophes change (straight to curly, say), since links already match
+  either; removing one asks first.
 - **Edit file** opens the whole note, frontmatter and all, for anything
   the other controls don't do, such as a section's
   `<!-- wolfden: ... -->` comment.
@@ -818,7 +822,13 @@ it: `until Ash ch. 5` is your plan, and readers at this point don't know it
 yet. Hover over it or click it to see that said in full. A date the position has reached
 has no tag. An AI assistant reading at that position isn't told the date at
 all, so it can't write toward it. When you're planning with one, ask it to
-read the note with no position, and it sees every date. Its instructions also
+read the note with no position, and it sees every date. A thread's `planted`
+and `paid_off`, and any other field that holds a story position, work the same
+way for it: at a position, it isn't told a value later than that, or one that
+isn't a chapter or book your universe has. You still see them all. This goes by
+positions only: text you put in a section or lead, or a field the note's type
+doesn't define, reaches the assistant as written, so it can still mention later
+events. Its instructions also
 tell it to read ahead for planning, foreshadowing, and reviewing continuity
 across chapters, and when writing a character who knows more than the reader,
 without letting later facts reach the prose. It can still tell you anything you
@@ -1030,20 +1040,65 @@ start with none. The page picks it up straight away: no restart.
 
 Git records a name and email with each checkpoint. If it doesn't have
 them yet, Wolfden asks: fields in the dialog, or `--author-name` and
-`--author-email` on the command line:
+`--author-email` on the command line. On the command line you can also
+give them when git has its own, to keep this den under a pen name:
 
 ```text
 wolfden init --git --author-name "Ash Calloway" --author-email ash@example.com
 ```
 
 Any name will do, a pen name included, and the email can be a
-placeholder. They're saved for this den only, never for the rest of your
-computer. If git already has a name and email, nothing is asked, and if
-you give one anyway, Wolfden says it used git's instead. (If your git
-settings give a name only inside certain folders, the dialog can't tell
-until the den is a repository: it shows the fields, but you can leave
-them empty, and Wolfden asks again, for just what's missing, only if
-they're really needed.)
+placeholder. They're saved for this den only, before the first
+checkpoint, never for the rest of your computer. If git already has a
+name and email, nothing is asked, and what you give wins for this den.
+Give both: one alone is refused, even if it's what git has, since it would
+be recorded beside what git has for the other. If git has only one, Wolfden
+asks for both. (If your git settings give a name only inside
+certain folders, the dialog can't tell until the den is a repository: it
+shows the fields, but you can leave them empty, and Wolfden asks again,
+for just what's missing, only if they're really needed.)
+
+If git signs your commits, the key it uses may belong to another name, and
+Wolfden can't always tell. So when you give a name and email, signing stays
+off for this den, always, even if they're what git already has or the den's
+repository names its own key: Wolfden says so, and a signature can't tie your
+pen name to the other key. To sign with a key
+of this name's, run `git config --local user.signingkey <key>` and `git
+config --local commit.gpgsign true` in the den's folder, and `git config
+--local tag.gpgsign true` to sign tags too. A `local-user` line
+in your `gpg.conf` adds that key's signature as well, so check for one first.
+
+A pen name given this way has limits worth knowing:
+
+- **It's saved in this copy of the den's repository only.** Git doesn't copy
+  a repository's settings when it's cloned, so a clone on another computer
+  starts with that computer's global name and email, and its checkpoints
+  are recorded under them and signed with its key. Before the first one
+  there, run the commands below in the clone.
+- **An environment variable still beats it.** If `GIT_AUTHOR_NAME` or one of
+  its relatives is set when `wolfden serve` or a later checkpoint runs, git
+  uses that, as it does in any repository.
+- **It can't be added this way once there are checkpoints, or in a bigger
+  repository.** Wolfden refuses, and says the name wasn't applied. With
+  checkpoints, the commands below change it from then on; earlier
+  checkpoints keep the name they have.
+
+To put a repository of its own under a name by hand, run these in its folder.
+The `author` and `committer` settings beat `user` if git has them, and the
+last four keep git's own key from signing under that name:
+
+```text
+git config --local user.name "<name>"
+git config --local user.email <email>
+git config --local author.name "<name>"
+git config --local author.email <email>
+git config --local committer.name "<name>"
+git config --local committer.email <email>
+git config --local commit.gpgsign false
+git config --local tag.gpgsign false
+git config --local tag.forcesignannotated false
+git config --local push.gpgsign false
+```
 
 A few things to know:
 
@@ -1295,12 +1350,13 @@ in it, which Wolfden calls a checkpoint.
   naming them), and
   the freeze prompt counts them.
 - **Your git name and email are for this den only.** Git records a name
-  and email on every checkpoint. Wolfden asks only when git has none,
-  and saves what you type in this den's repository, never for the rest
+  and email on every checkpoint. Wolfden asks only when git lacks one,
+  and saves what you give in this den's repository, never for the rest
   of your computer. A pen name is fine, and the email can be a
-  placeholder. If your git settings already give a name, perhaps through
-  an `includeIf` rule (one that picks a name by folder), git's is used,
-  and Wolfden says the one you typed wasn't
+  placeholder. What you give wins over what git has for this den, and
+  turns signing off here, since git's key may be another name's. A clone doesn't
+  bring it along, and an environment variable such as `GIT_AUTHOR_NAME` still
+  beats it
   ([Turning on history](#turning-on-history)).
 - **Not in a synced folder.** Git and Dropbox, OneDrive, or iCloud
   together can corrupt the history when two computers sync while git is

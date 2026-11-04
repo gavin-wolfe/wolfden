@@ -521,7 +521,8 @@ a bad one doesn't make the file invalid. A position that doesn't resolve
 is the F-POS-4 warning. The value stays indexed and is shown as written,
 but anything that needs its place in story order, such as a thread's
 state on the page (§9.1) or F-CORE-2, skips it. A value is never read as
-some other position than the one written.
+some other position than the one written. An AI assistant's read at a story
+position leaves out the values later than it (format.md F-VIEW-5).
 
 **F-FT-11. `date`.** An in-world date is either a string or a mapping:
 
@@ -795,7 +796,8 @@ scope `S`:
    made from `N`: lowercase it, replace the letters that don't decompose
    (`æ` with `ae`, `œ` with `oe`, `ø` with `o`, `ß` with `ss`, `þ` with
    `th`, `ð` and `đ` with `d`, `ł` with `l`), decompose it (NFKD), drop
-   combining marks and apostrophes (`'`, `’`, `‘`, `ʼ`), replace each run
+   combining marks and apostrophes (`'`, `’`, `‘`, `ʼ`; NFKD has made a
+   fullwidth `＇` straight), replace each run
    of characters outside `a-z` and `0-9` with one `-`, trim `-` from both
    ends, and cut it to 64 characters (at a word boundary, where there is
    one), trimming a trailing `-`. So "Ærin Søvik" becomes `aerin-sovik`,

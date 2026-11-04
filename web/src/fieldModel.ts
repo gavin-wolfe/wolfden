@@ -644,9 +644,9 @@ export function linkFor(
   return byName ? `[[${entity.name.trim()}]]` : null
 }
 
-/** A link's text as F-LINK-4 matches it: NFC, trimmed, whitespace runs as one space, case ignored. */
+/** A link's text as F-LINK-4 matches it: NFC, trimmed, whitespace runs as one space, case ignored, and any apostrophe (the server's set, NewEntity.IsApostrophe) the straight one. */
 function normalized(text: string): string {
-  return text.normalize('NFC').trim().replace(/\s+/g, ' ').toLowerCase()
+  return text.normalize('NFC').trim().replace(/\s+/g, ' ').toLowerCase().replace(/[\u0027\u2019\u2018\u02BC\uFF07]/g, "'")
 }
 
 /** A note's file name without `.md`, as a link by slug would match it. */

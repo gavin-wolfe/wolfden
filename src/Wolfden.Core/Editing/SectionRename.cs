@@ -61,7 +61,9 @@ public static class SectionRename
             throw new ArgumentException("The section isn't one of the entity's.", nameof(section));
         }
 
-        var targeting = links.LinksTo(entity).Where(l => ReferenceEquals(l.TargetSection, section)).ToList();
+        // Only the apostrophes change: every link still matches (F-LINK-4), so each keeps the style its writer typed.
+        var onlyApostrophes = LinkText.FoldApostrophes(section.Name) == LinkText.FoldApostrophes(newName);
+        var targeting = onlyApostrophes ? [] : links.LinksTo(entity).Where(l => ReferenceEquals(l.TargetSection, section)).ToList();
         if (targeting.Count > 0 && newName.IndexOfAny(NotInLinks) >= 0)
         {
             throw new ArgumentException(
@@ -106,7 +108,7 @@ public static class SectionRename
             });
 
         var keys = new[] { entity.Slug, entity.Name }.Concat(entity.Aliases).Where(k => k is not null).Select(k => LinkText.Normalize(k!)).ToHashSet(StringComparer.Ordinal);
-        var skipped = LinkRewriter.Skipped(
+        var skipped = onlyApostrophes ? [] : LinkRewriter.Skipped(
             links, den, entity, (target, heading) => heading is { } h && LinkText.Matches(h, section.Name) && (target == entity.Id || keys.Contains(LinkText.Normalize(target))));
         return new SectionRenamePlan(result.Files, result.Originals, result.Count, result.Frozen, skipped);
     }

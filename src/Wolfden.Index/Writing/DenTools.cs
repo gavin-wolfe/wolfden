@@ -94,6 +94,10 @@ public sealed partial class DenTools
     /// <summary>One entity, in the full view or as of a position. See <see cref="DenReader.GetEntity(string, string?, string?)"/>.</summary>
     public GetEntityResult GetEntity(string entity, string? universe = null, string? asOf = null) => Reader.GetEntity(entity, universe, asOf);
 
+    /// <summary>One entity, and how far a reader at the position has reached. See <see cref="DenReader.GetEntity(string, string?, string?, out StoryHorizon?)"/>.</summary>
+    public GetEntityResult GetEntity(string entity, string? universe, string? asOf, out StoryHorizon? horizon) =>
+        Reader.GetEntity(entity, universe, asOf, out horizon);
+
     /// <summary>The entities of the den or of one universe. See <see cref="DenReader.ListEntities"/>.</summary>
     public ListEntitiesResult ListEntities(
         string? universe = null, string? type = null, string? status = null, string? series = null, string? book = null, int limit = 200) =>
@@ -103,6 +107,11 @@ public sealed partial class DenTools
     public CanonAsOfResult CanonAsOf(
         string? universe = null, string? position = null, string? series = null, string? book = null, string? type = null, bool brief = false) =>
         Reader.CanonAsOf(universe, position, series, book, type, brief);
+
+    /// <summary>The canon-as-of view, and how far a reader at the position has reached. See <see cref="DenReader.CanonAsOf(string?, string?, string?, string?, string?, bool, out StoryHorizon?)"/>.</summary>
+    public CanonAsOfResult CanonAsOf(
+        string? universe, string? position, string? series, string? book, string? type, bool brief, out StoryHorizon? horizon) =>
+        Reader.CanonAsOf(universe, position, series, book, type, brief, out horizon);
 
     /// <summary>
     /// Runs every check on the den's files, as <c>wolfden check</c> does,

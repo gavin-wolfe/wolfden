@@ -56,6 +56,117 @@ public class LinkResolutionTests
         Assert.Equal(LinkOutcome.Broken, index.Link(Note, $"[[{IlseId.ToLowerInvariant()}]]").Outcome);
     }
 
+    /// <summary>A den with a note named <paramref name="name"/> holding the section "Mina's Notes", and a note holding <paramref name="links"/>.</summary>
+    private static LinkIndex Apostrophes(string name, string links, string frontmatter = "")
+    {
+        var source = Den()
+            .Entity(Starfall, "minas-journal", $"type: note\nname: \"{name}\"\nstatus: canon\n{frontmatter}".TrimEnd(), "## Mina's Notes\nText.\n", folder: "notes")
+            .Entity(Starfall, "links", "type: note\nname: Links\nstatus: canon", links, folder: "notes");
+        return LinkIndex.Load(source);
+    }
+
+    [Theory]
+    [InlineData("Mina's Journal", "[[Mina’s Journal]]")] // a curly link to a straight name
+    [InlineData("Mina’s Journal", "[[Mina's Journal]]")] // and the reverse
+    [InlineData("Mina's Journal", "[[Mina‘s Journal]]")]
+    [InlineData("Mina's Journal", "[[Minaʼs Journal]]")]
+    [InlineData("Mina's Journal", "[[Mina＇s Journal]]")]
+    [InlineData("Minaʼs Journal", "[[MINA’S   JOURNAL]]")]
+    public void AnyApostropheInALinkMatchesAnyInAName(string name, string link)
+    {
+        var index = Apostrophes(name, link + "\n");
+        var resolved = index.Link(Note, link);
+
+        Assert.Equal(LinkOutcome.Resolved, resolved.Outcome);
+        Assert.Equal(name, resolved.Target!.Name);
+        Assert.Equal(LinkMatchKind.Name, resolved.Resolution.MatchedBy);
+        Assert.Empty(index.Diagnostics);
+    }
+
+    [Theory]
+    [InlineData("[[Mina’s Journal#Mina's Notes]]")]
+    [InlineData("[[Mina's Journal#Mina’s Notes]]")]
+    [InlineData("[[Mina’s Journal#mina’s notes|Her notes]]")]
+    public void AnyApostropheMatchesInAHeadingWithOrWithoutALabel(string link)
+    {
+        var index = Apostrophes("Mina's Journal", link + "\n");
+        var resolved = index.Link(Note, link);
+
+        Assert.Equal("Mina's Journal", resolved.Target!.Name);
+        Assert.Equal("Mina's Notes", resolved.TargetSection!.Name);
+        Assert.Empty(index.Diagnostics);
+    }
+
+    [Fact]
+    public void ALinksLabelKeepsItsApostrophe()
+    {
+        var index = Apostrophes("Mina's Journal", "[[Mina’s Journal|Mina’s words]]\n");
+
+        Assert.Equal("Mina’s words", index.Link(Note, "[[Mina’s Journal|Mina’s words]]").Occurrence.Link.Label);
+    }
+
+    [Theory]
+    [InlineData("Mina's Diary", "[[Mina’s Diary]]")]
+    [InlineData("Mina’s Diary", "[[Mina's Diary]]")]
+    public void AnyApostropheMatchesInAnAlias(string alias, string link)
+    {
+        var index = Apostrophes("Mina's Journal", link + "\n", frontmatter: $"aliases: [\"{alias}\"]");
+        var resolved = index.Link(Note, link);
+
+        Assert.Equal("Mina's Journal", resolved.Target!.Name);
+        Assert.Equal(LinkMatchKind.Alias, resolved.Resolution.MatchedBy);
+    }
+
+    [Fact]
+    public void TwoNotesThatDifferOnlyByApostropheAreAmbiguous()
+    {
+        // Same scope, so neither is nearer (F-LINK-7), whichever apostrophe the link uses.
+        var source = Den()
+            .Entity(Starfall, "mina-straight", "type: note\nname: \"Mina's Journal\"\nstatus: canon", folder: "notes")
+            .Entity(Starfall, "mina-curly", "type: note\nname: \"Mina’s Journal\"\nstatus: canon", folder: "notes")
+            .Entity(Starfall, "links", "type: note\nname: Links\nstatus: canon", "[[Mina's Journal]] [[Mina’s Journal]]\n", folder: "notes");
+        var index = LinkIndex.Load(source);
+
+        foreach (var text in new[] { "[[Mina's Journal]]", "[[Mina’s Journal]]" })
+        {
+            Assert.Equal(LinkOutcome.Ambiguous, index.Link(Note, text).Outcome);
+        }
+
+        Assert.Equal(2, index.Rules().Count(r => r.Rule == "F-LINK-7"));
+    }
+
+    [Fact]
+    public void ANearerScopeStillBreaksATieBetweenApostrophes()
+    {
+        var inBook = Ember + "/entities/notes/links.md";
+        var source = Den()
+            .Entity(Starfall, "mina-straight", "type: note\nname: \"Mina's Journal\"\nstatus: canon", folder: "notes")
+            .Entity(Ember, "mina-curly", "type: note\nname: \"Mina’s Journal\"\nstatus: canon", folder: "notes")
+            .Entity(Ember, "links", "type: note\nname: Links\nstatus: canon", "[[Mina's Journal]]\n", folder: "notes");
+
+        Assert.Equal("Mina’s Journal", LinkIndex.Load(source).Link(inBook, "[[Mina's Journal]]").Target!.Name);
+    }
+
+    [Fact]
+    public void ABacklinkCountsWhicheverApostropheTheLinkUses()
+    {
+        var index = Apostrophes("Mina's Journal", "[[Mina’s Journal]] [[Mina's Journal]]\n");
+        var target = index.Catalog.Entities.Single(e => e.Name == "Mina's Journal");
+
+        Assert.Equal(2, index.LinksTo(target).Count);
+    }
+
+    [Fact]
+    public void ABrokenLinksHintMatchesAnyApostrophe()
+    {
+        var source = Den()
+            .Entity(Drift, "minas-journal", "type: note\nname: \"Mina's Journal\"\nstatus: canon", folder: "notes")
+            .Entity(Starfall, "links", "type: note\nname: Links\nstatus: canon", "[[Mina’s Journal]]\n", folder: "notes");
+
+        var problem = LinkIndex.Load(source).Link(Note, "[[Mina’s Journal]]").Resolution.Problem;
+        Assert.Contains("matches only 'Mina's Journal' in universe 'drift'", problem, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void HyphensAndSpacesStayDistinct()
     {

@@ -72,13 +72,18 @@ public sealed class WolfdenTools
         "positions where each one starts and ends. With as_of you get only what's canon at that point in the story, as a reader " +
         "would know it then: the name is matched only among the entities the reader has met by then, " +
         "and if the reader hasn't met the entity yet, in_view is false and nothing about it is returned. A fact's 'until' is left out " +
-        "with as_of, since when it stops holding is something the reader doesn't know yet: to plan ahead, read without as_of. " +
+        "with as_of, and so are a position field's values later than as_of (such as a thread's paid_off), since when a fact stops holding " +
+        "or a thread pays off is something the reader doesn't know yet: to plan ahead, read without as_of. " +
         PositionHelp)]
     public CallToolResult GetEntity(
         [Description("The entity: its name, an alias, its file name, its id, its key, or its path.")] string entity,
         [Description(UniverseHelp + " With as_of, the position's book settles it.")] string? universe = null,
         [Description("A story position, such as 'dracula:5', to read the entity as canon stands there. Leave it out for the full view.")] string? as_of = null) =>
-        Respond(() => AsOfReads.ForAssistant(_tools.GetEntity(entity, universe, as_of)));
+        Respond(() =>
+        {
+            var result = _tools.GetEntity(entity, universe, as_of, out var horizon);
+            return AsOfReads.ForAssistant(result, horizon);
+        });
 
     /// <summary>The <c>list_entities</c> tool.</summary>
     [McpServerTool(Name = "list_entities", Title = "List entities", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
@@ -101,8 +106,10 @@ public sealed class WolfdenTools
     [Description(
         "What's canon at a point in the story: every entity the reader has met by then, at any scope of the universe, with the " +
         "field values and sections in effect there. Ideas, undecided questions, retconned material, and bookkeeping sections are " +
-        "left out, and draft material is marked draft. Nothing the reader meets later is included, so it's safe for drafting a " +
-        "chapter without spoilers. So at a position a fact's 'until' is left out, since when it stops holding is something the reader " +
+        "left out, and draft material is marked draft. Nothing the reader meets later is included, going by its position, so it's safe for " +
+        "drafting a chapter as far as positions go; text the writer put in a section or lead, or a field the note's type doesn't define, can " +
+        "still mention later events. At a position a fact's 'until' is left out, and so are a position field's values later than the position " +
+        "(such as a thread's paid_off), since when a fact stops holding or a thread pays off is something the reader " +
         "doesn't know yet: to plan ahead, use get_entity without as_of. Pinned canon (the hard facts) comes first, under 'pinned', and is also listed in place. " +
         "Without position, the view is the end of the story: all canon so far. " + PositionHelp)]
     public CallToolResult CanonAsOf(
@@ -112,7 +119,11 @@ public sealed class WolfdenTools
         [Description("Only entities filed in this book, its series, or the universe.")] string? book = null,
         [Description(TypeFilterHelp)] string? type = null,
         [Description("If true, list the entities without their fields and sections (pinned canon is still given in full).")] bool brief = false) =>
-        Respond(() => AsOfReads.ForAssistant(_tools.CanonAsOf(universe, position, series, book, type, brief)));
+        Respond(() =>
+        {
+            var result = _tools.CanonAsOf(universe, position, series, book, type, brief, out var horizon);
+            return AsOfReads.ForAssistant(result, horizon);
+        });
 
     /// <summary>The <c>check</c> tool.</summary>
     [McpServerTool(Name = "check", Title = "Check the den", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
@@ -161,7 +172,8 @@ public sealed class WolfdenTools
 
     private const string HashHelp =
         "The hash of the file your edit is based on: 'hash' from get_entity, or from your last write's result. If the file has changed " +
-        "since (say, the writer edited it), the write is refused with stale_file: read it again.";
+        "since (say, the writer edited it), the write is refused with stale_file: read it again. A read with as_of gives the same hash, but it can " +
+        "leave values out, so it doesn't show all of what a change to a field replaces: read without as_of before changing a field.";
 
     /// <summary>The <c>create_entity</c> tool.</summary>
     [McpServerTool(Name = "create_entity", Title = "Create an entity", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
@@ -202,7 +214,9 @@ public sealed class WolfdenTools
         "'fields.rank.1.from' (item numbers from 0). An entry is {\"value\": x, \"from\": \"book:chapter\", \"until\": ..., \"status\": ..., \"pin\": true}. " +
         "The id never changes. Aliases can be added and moved here; to rename the entity, or change or remove an alias, use rename_entity or " +
         "change_alias, which rewrite the links that used the old text. A 'from', 'until', or position field value you set must be a position the " +
-        "universe has (bad_position otherwise); null leaves it out." + WriteHelp)]
+        "universe has (bad_position otherwise); null leaves it out. Read without as_of before changing a field: a read with as_of leaves out a position " +
+        "field's later values, so a field missing from it may be set in the note, and its list item numbers may not match the note's, " +
+        "which can overwrite a value you weren't shown or change the wrong item." + WriteHelp)]
     public CallToolResult UpdateFields(
         [Description("The entity: its name, an alias, its file name, its id, its key, or its path.")] string entity,
         [Description(HashHelp)] string expected_hash,
@@ -266,6 +280,7 @@ public sealed class WolfdenTools
     [Description(
         "Renames a section of an entity, and in the same change rewrites every link to it by heading ([[entity#Old name]]) in any " +
         "file of the den, so they name the new heading. If a file that links to it is in a final (frozen) book, nothing is renamed. " +
+        "A rename that changes only which apostrophes the name uses (straight or curly) rewrites no links, since they still match, so a final book doesn't stop it. " +
         "The result lists every file written, with its new hash." + WriteHelp)]
     public CallToolResult RenameSection(
         [Description("The entity: its name, an alias, its file name, its id, its key, or its path.")] string entity,
@@ -393,7 +408,7 @@ public sealed class WolfdenTools
     [Description(
         "Changes a chapter's own fields in book.md. 'changes' is a list of {\"op\": \"set\", \"field\": \"tense\", \"value\": \"present\"}, " +
         "{\"op\": \"add\", \"field\": \"pov\", \"value\": \"[[mina-harker]]\"}, {\"op\": \"remove\", \"field\": \"pov\", \"item\": 0} (or \"value\": the " +
-        "item's text, compared ignoring case and spacing; a link matches only if it's written the same way, so [[Mina]] doesn't match " +
+        "item's text, compared ignoring case, spacing, and which apostrophe is used; a link matches only if it's written the same way, so [[Mina]] doesn't match " +
         "[[mina-harker]]: use 'item' from get_chapter if unsure), {\"op\": \"replace\", \"field\": \"pov\", \"item\": 1, \"value\": \"[[jonathan-harker]]\"} " +
         "and {\"op\": \"move\", \"field\": \"pov\", \"item\": 2, \"index\": 0} (change or move one item in place, keeping its comments; taking it out " +
         "and adding it again drops them), and {\"op\": \"clear\", \"field\": \"pov\"}. Removing a list's last item leaves [], 'none here', which stops the chapter " +

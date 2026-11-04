@@ -2589,7 +2589,7 @@ The book's `chapter_defaults` give every chapter Mina's POV, and chapter
   book's `chapter_defaults`. Clearing the field goes back to that
   default; clearing a field the chapter doesn't set is refused. An item
   can go in at a given place, and come out by its text, compared
-  ignoring case and spacing: `[[Mina]]` doesn't match
+  ignoring case, spacing, and which apostrophe is used: `[[Mina]]` doesn't match
   `[[mina-harker]]`. A field named like the chapter's own keys (`key`)
   is refused (types.md F-CHAP-1). An item can also move (`move`) or be
   changed (`replace`) in place, keeping its comments (SC-RT-17). Either
@@ -2758,8 +2758,8 @@ renames him Old Swales.
   link changes, which suits a name that changes in the story. If
   another character in the book goes by "Mr. Swales" too, the result
   says that links by it are now ambiguous (F-LINK-7), naming the link
-  in the note. A new name that only changes case or spacing changes no
-  link.
+  in the note. A new name that only changes case, spacing, or which
+  apostrophe is used changes no link.
 - If a note in a final book uses the old name, nothing is renamed
   (`frozen`), and the error suggests `keep_old_name`, which leaves the
   frozen book alone. Swales in a final book isn't renamed at all. A new
@@ -3445,6 +3445,90 @@ already let the Count in, and the reader learns that at `dracula:21`.
 
 Spec: #300. Covered by: `McpServerTests`.
 
+### SC-MCP-45. My assistant can't see where a thread is going
+
+The missing manifest has `planted: ["ember:2", "ash:1"]` and
+`paid_off: "a-quiet-moon:2b"`. My assistant is drafting `ember:3`.
+
+- `get_entity` with `as_of` `ember:3` gives `planted: ["ember:2"]` and no
+  `paid_off`, and so does `canon_as_of` at `ember:3`. Nothing says they were
+  left out. `pinned` follows the same rule, in full and in `brief`, and a note
+  with nothing else pinned isn't listed there.
+- At `ash:1`, or a bare `ash`, `planted` has both. At `a-quiet-moon:2`, there's
+  still no `paid_off`, since `2b` comes after `2` in reading order. At
+  `a-quiet-moon:2b` it's there.
+- A field of any type counts if the type defines it as `position`, written plain,
+  as an entry, or as a list of dated entries. In a list, only the later items go.
+  A list with nothing left goes entirely, and one I wrote empty stays.
+- A value that can't be compared is left out: a chapter or book the universe
+  doesn't have, a book of another universe, the scene or row form, or anything
+  that isn't a position.
+- A string field that happens to look like a position, or a field the type
+  doesn't define, comes through as I wrote it.
+- When the assistant is helping me plan, `get_entity` with no `as_of` gives
+  every value. `canon_as_of` with no position leaves none out for being later,
+  though it's the end of the story, so it has only each field's entry in effect then.
+- `update_fields` and every `expected_hash` say to read without `as_of` before
+  changing a field, since a read at a position can hide a value or shift a
+  list's item numbers. It's advice: the hash is the same from both reads, so a
+  write based on a read at a position isn't refused.
+- A section or lead I wrote, or a field the type doesn't define, can still mention
+  a later event, and the tool's description says so.
+- The web API gives every value at the same position, for me.
+
+Spec: F-VIEW-5 (#305). Covered by: `FuturePositionFieldTests`,
+`ReadEndpointTests.APositionFieldsLaterValuesStayForTheWriter`.
+
+### SC-MCP-46. A link and a name use different apostrophes
+
+A note is named "Mina's Journal", typed with a straight apostrophe, and another
+note links `[[Mina’s Journal]]`, as a word processor writes it, or the reverse.
+
+- The link reaches the note. So does a heading (`[[Mina’s Journal#Mina’s
+  Notes]]` reaches the section "Mina's Notes"), a link by an alias, a `ref`
+  field, and a backlink. Straight `'`, curly `’`, left single quote `‘`, modifier
+  letter `ʼ`, and fullwidth `＇` all count as one character, the same ones a key
+  drops. `[[Minas Journal]]` still doesn't match, and a backtick or an ʻokina
+  isn't an apostrophe.
+- `get_entity`, the tools that name a note, and the link picker find it with
+  any of them. The picker also matches them a word at a time: `mina’s jour`
+  finds it.
+- The link stays as written, and its label is never touched. Nothing rewrites
+  it on indexing (F-LINK-10).
+- Two notes in one scope, "Mina's Journal" and "Mina’s Journal", are the same
+  name to a link, so a link to either is ambiguous and neither is chosen, unless
+  one is in a nearer scope. A new note that would do that to existing links is
+  refused unless `allow_relinks` is given, as for an identical name. Its file
+  is `minas-journal-2.md`.
+- Changing only the apostrophes in a name, an alias, or a section ("Mina's" to
+  "Mina’s") leaves every link as it is, even in a final book, and doesn't keep
+  the old name as an alias. Any other rename rewrites a link whichever
+  apostrophe it used, to the new text as it was given, and keeps its label, so
+  a link in a final book stops it.
+- A move treats them the same way. Moving the note leaves a curly link as it
+  is while it still reaches the note. Moved into the scope of a note that
+  differs only by apostrophe, a link to the moved note goes to its id, showing
+  the same text. If a link there reaches the other note, and would become
+  ambiguous, the move is refused, naming both, unless `allow_relinks` is given.
+- An index built before this is rebuilt, since it stored names under the old
+  matching.
+
+Spec: format.md F-LINK-4, F-LINK-7, F-LINK-9, F-LINK-11, F-RT-5, types.md
+F-TPL-6 (#308). Covered by: `LinkTextTests.EveryApostropheIsTheSameCharacter`,
+`LinkTextTests.WhatIsNotAnApostropheStaysDistinct`,
+`LinkResolutionTests.AnyApostropheInALinkMatchesAnyInAName`,
+`LinkResolutionTests.AnyApostropheMatchesInAHeadingWithOrWithoutALabel`,
+`LinkResolutionTests.ALinksLabelKeepsItsApostrophe`,
+`LinkResolutionTests.AnyApostropheMatchesInAnAlias`,
+`LinkResolutionTests.TwoNotesThatDifferOnlyByApostropheAreAmbiguous`,
+`LinkResolutionTests.ANearerScopeStillBreaksATieBetweenApostrophes`,
+`LinkResolutionTests.ABacklinkCountsWhicheverApostropheTheLinkUses`,
+`LinkResolutionTests.ABrokenLinksHintMatchesAnyApostrophe`,
+`EntityLookupTests.AnyApostropheTypedFindsAnyInAName`,
+`EntityLookupTests.AnyApostropheTypedFindsAnyInAnAlias`,
+`ApostropheLinkToolTests`, and in the web tests, `linkFor`'s check in
+`FieldEditing.test.tsx`.
+
 ## STORE: Wolfden saves, moves, and deletes notes
 
 Background: the den store (design.md §6, #121) is how Wolfden writes a
@@ -3926,13 +4010,12 @@ email. They turn on history for their den.
   they're saved in the den's own repository only (`git config
   --local`), never in the writer's global settings, and the first
   checkpoint is recorded under that name.
-- When git has one but not the other, only the missing one is asked for
-  and saved; the one git has is left alone, even if another was given,
-  and the output says the one given wasn't used.
+- When git has one but not the other, both are asked for, and both are
+  saved, so what's given is never recorded beside what git has (SC-HIST-22).
 - When git gives a name and email only inside a repository (`includeIf
   "gitdir:…"`), nothing is asked: they turn up once the folder is a
-  repository, and they're used. The dialog's fields are optional while
-  it can't be sure.
+  repository, and they're used unless others are given. The dialog's
+  fields are optional while it can't be sure.
 - A name or email of more than one line, with a control character, or
   with `<` or `>`, is refused, and so is a name git won't record (only
   characters it strips, such as `;`), or an email git would record as
@@ -3941,12 +4024,11 @@ email. They turn on history for their den.
 Spec: design.md §6, "Turning history on" (maintainer decision,
 2026-10-28, #195). Covered by:
 `HistorySetupTests.AMissingNameAndEmailAreAskedForAndSavedForTheDensRepositoryOnly`,
-`HistorySetupTests.OnlyTheMissingHalfIsSavedAndAnExistingSettingIsLeftAlone`,
+`HistorySetupTests.WhenGitHasOnlyOneBothAreAskedForAndOneAloneIsRefused`,
 `HistorySetupTests.ANameOrEmailThatGitCantRecordIsRefused`,
 `HistorySetupTests.ANameAndEmailGitGivesOnlyInsideTheRepositoryAreUsedAndNothingIsAsked`,
-`HistorySetupTests.ANameAndEmailGivenWhenGitHasThemAfterAllAreNotUsedAndItSaysSo`,
 `HistorySetupTests.ANameGitWontRecordIsRefusedBeforeAnythingIsSaved`,
-`InitHistoryTests.ANameAndEmailGitGivesOnlyInsideTheRepositoryAreUsedAndOnesGivenSaySoIfNotUsed`,
+`InitHistoryTests.ANameAndEmailGitGivesOnlyInsideTheRepositoryAreUsedWhenNoneIsGiven`,
 `InitHistoryTests.AMissingNameAndEmailAreAskedForThenSavedForTheDenOnly`,
 `HistorySetupEndpointTests.AMissingNameAndEmailAreAskedForAndSavedForTheDenOnly`,
 `Checkpoint.test.tsx` (web).
@@ -3965,8 +4047,21 @@ the den's folder by hand, and made no commit.
   with the same repository and `.gitignore`.
 - A den whose own repository has no commits is finished the same way,
   rather than refused.
+- A name and email given are saved before any of this, so a `.gitignore`
+  or a hook that fails afterward can't leave a retry under git's own name.
+  If saving them fails in a repository this run made, the repository is
+  taken away again. In one that was already there, what was saved is taken
+  back, and if that can't be done, the output names the settings still
+  saved. Every one of these asks for the same `--author-name` and
+  `--author-email` again, without repeating them, and doesn't offer the web
+  UI's dialog.
 
-Spec: design.md §6, "Turning history on" (#195). Covered by:
+Spec: design.md §6, "Turning history on" (#195, #286). Covered by:
+`HistorySetupTests.AFailedSaveInARepositoryThisRunMadeTakesTheRepositoryAway`,
+`HistorySetupTests.AFailedSaveInARepositoryThatWasThereTakesBackWhatWasSaved`,
+`HistorySetupTests.AHeldConfigThatStopsTheTakingBackSaysWhatsLeftAndAskedAgainItFinishesUnderTheNameGiven`,
+`HistorySetupTests.AGitignoreThatFailsLeavesTheNameSavedSoTryingAgainWithoutItIsStillTheNameGiven`,
+`HistorySetupTests.AFailedFirstCheckpointWithANameGivenAsksForItAgainAndNotTheDialog`,
 `HistorySetupTests.AFailedFirstCheckpointSaysWhatWasDoneAndTryingAgainFinishes`,
 `HistorySetupTests.ADenWhoseOwnRepositoryHasNoCheckpointsIsFinished`,
 `InitHistoryTests.ADenWhoseOwnRepositoryHasNoCheckpointsIsFinished`,
@@ -3989,9 +4084,31 @@ checkpoints. A third time, on a computer without git.
 - A den that's an orphan linked worktree of `writing/` (`git worktree
   add --orphan`) has no commits, but its settings are `writing/`'s, so
   it's refused the same way, and `writing/`'s config is left alone.
+- With a name and email given, the den in `writing/` and the den with
+  checkpoints also say they weren't applied, so later checkpoints stay under
+  what git has. For the den with checkpoints, it names every `git config
+  --local` command that changes that from now on: the name and email, the
+  `author.*` and `committer.*` settings git prefers to them, and signing off.
+  Following them records the next commit under that name, unsigned.
+- A new den given a name and email inside `writing/`, or in a folder that's
+  already a repository, is refused (exit 2) before anything is made, rather
+  than made under what git has. Without a name and email, it's made and left
+  as it is, as SC-CLI-12 says. In a folder that's a repository with no
+  checkpoints, it says to make the den first, then turn on its history with
+  the name. In one with checkpoints, it says to make the den, then gives the
+  `git config` commands, since turning on history would be refused.
+- A repository that appears while history is being turned on was made by
+  something else, so it's never taken away.
 
 Spec: design.md §6, "Turning history on", "A den inside a larger
-repository" (maintainer decision, 2026-10-28, #195). Covered by:
+repository" (maintainer decision, 2026-10-28, #195, #286). Covered by:
+`HistorySetupTests.ANameGivenToADenWithCheckpointsSaysHowToChangeItAndFollowingThatWorks`,
+`HistorySetupTests.ARepositoryMadeMeanwhileIsntTakenAwayWhenItsRefused`,
+`HistorySetupTests.ARepositoryWithCheckpointsMadeMeanwhileIsRefusedAndKept`,
+`InitHistoryTests.ANewDenInARepositoryWithCheckpointsIsRefusedWithAdviceThatWorks`,
+`HistorySetupTests.ANameGivenToADenInALargerRepositorySaysItWasntAppliedAndChangesThatRepositorysNothing`,
+`InitHistoryTests.ANewDenInALargerRepositoryIsRefusedWithANameGivenAndNothingIsMade`,
+`InitHistoryTests.ANewDenInAFolderThatIsARepositoryIsRefusedWithANameGivenAndSaysHowToGiveIt`,
 `HistorySetupTests.ADenInsideALargerRepositoryIsRefusedWithNothingChanged`,
 `HistorySetupTests.ADenWhoseOwnRepositoryHasCheckpointsIsRefused`,
 `HistorySetupTests.WithoutGitItSaysSoAndChangesNothing`,
@@ -4058,6 +4175,127 @@ Spec: design.md §11 (#34). Covered by:
 Spec: F-BOOK-1, F-GEN-2 (#50). Covered by:
 `SectionErrorToolTests.ABookWithALeftOutSectionCantBeFrozenUntilItsFixed`,
 `SectionErrorToolTests.ABadSectionInBookMdRefusesTooAndABookMarkedFinalByHandIsntSnapshotted`.
+
+### SC-HIST-21. I give a pen name, and git has my real one
+
+The writer's git has their everyday name and email, set globally. This den
+is for what they write as Ash Calloway, so they run `wolfden init --git
+--author-name "Ash Calloway" --author-email ash@example.com`.
+
+- The name and email given win, for this den only. They're saved with `git
+  config --local` before the first checkpoint, so that checkpoint has Ash
+  Calloway as both author and committer, and so do later ones, as long as
+  nothing stronger is set when they're made: `GIT_AUTHOR_NAME` in the
+  environment of `wolfden serve` or a later run still beats them, as it does
+  for any git repository. The global settings aren't changed, and the
+  output doesn't repeat them.
+- The same goes for a name git gives only inside a repository (`includeIf
+  "gitdir:…"`), for global `author.name` or `committer.email` settings,
+  which git otherwise prefers to `user.name` and `user.email`, and for a
+  repository with no checkpoints yet that has a name of its own already.
+- An environment variable such as `GIT_AUTHOR_NAME` beats every setting, so
+  it would defeat what was given. That's refused, naming the variable but
+  not its value, with nothing changed. So is `GIT_DIR` or `GIT_COMMON_DIR`,
+  which would save them in another repository.
+- Once they're saved, git is asked what it would record. If something it
+  reads later still beats them (`GIT_CONFIG_COUNT`, `GIT_CONFIG_PARAMETERS`,
+  `extensions.worktreeConfig`, an `[include]` in the repository's config),
+  no checkpoint is made and the value isn't repeated. A repository this run
+  made is taken away again. In one that was already there, what was saved is
+  taken back, so the next commit from anywhere is under git's own name, not
+  the pen name signed by another key. The output names anything that couldn't
+  be taken back.
+
+Spec: design.md §6, "Turning history on" (maintainer decision, 2026-11-03,
+#286). Covered by:
+`HistorySetupTests.AGivenNameAndEmailWinOverGitsForTheAuthorAndTheCommitter`,
+`HistorySetupTests.AGivenNameAndEmailWinOverOnesGitGivesOnlyInsideTheRepository`,
+`HistorySetupTests.AGivenNameAndEmailWinOverAuthorAndCommitterSettings`,
+`HistorySetupTests.AGivenNameAndEmailReplaceOnesInARepositoryWithNoCheckpointsYet`,
+`HistorySetupTests.AnEnvironmentVariableThatWouldBeatWhatsGivenRefusesWithNothingChanged`,
+`HistorySetupTests.ASettingFromTheEnvironmentThatBeatsWhatsSavedRefusesBeforeTheFirstCheckpoint`,
+`HistorySetupTests.ALaterSettingInTheRepositoryThatBeatsWhatsSavedStopsBeforeTheFirstCheckpoint`,
+`HistorySetupTests.WhatBeatsSigningBeingOffGetsItAllTakenBackSoNoLaterCommitSignsTheNameGiven`,
+`HistorySetupTests.CharactersGitStripsFromWhatsGivenArentTakenForSomethingBeatingIt`,
+`HistorySetupTests.UnusualSpacesAndMarksArentTakenForSomethingBeatingWhatsGiven`,
+`HistorySetupTests.ABadDateInTheEnvironmentIsntBlamedOnTheNameBeingBeaten`,
+`HistorySetupTests.SeveralValuesOfASettingDontStopTheSave`,
+`HistorySetupTests.GitDirInTheEnvironmentRefusesRatherThanSaveInAnotherRepository`,
+`InitHistoryTests.AGivenNameAndEmailWinOverGitsInAnExistingOrNewDen`,
+`HistorySetupEndpointTests.ANameAndEmailInTheRequestWinOverGitsAndOneAloneIsAskedToBeCompleted`.
+
+### SC-HIST-22. I give a pen name but not an email
+
+Git has the writer's everyday name and email. They run `wolfden init --git
+--author-name "Ash Calloway"`, with no email.
+
+- It's refused, with nothing changed: the first checkpoint would have put
+  their everyday email beside the pen name. The two go together, so the
+  message asks for both, and doesn't repeat what git has. On the command line
+  it's refused before anything is made, a new den included.
+- An email without a name is refused the same way, and so is one when git has
+  only the other, or one that's what git has already: a value on its own
+  never sits beside one git has.
+- In the dialog, when git has only one, the status asks for both fields. If
+  the writer fills in one while it can't yet be sure (`includeIf "gitdir:…"`),
+  the refusal asks for the other, and keeps what was typed.
+
+Spec: design.md §6, "Turning history on" (maintainer decision, 2026-11-04,
+#286). Covered by:
+`HistorySetupTests.OneGivenAloneIsRefusedWithNothingChangedEvenIfItsWhatGitHas`,
+`HistorySetupTests.WhenGitHasOnlyOneBothAreAskedForAndOneAloneIsRefused`,
+`HistorySetupTests.AnAuthorEmailAloneIsntAnEmailGitHasSoANameAloneIsAskedForOne`,
+`InitHistoryTests.OneGivenAloneIsRefusedAndNothingIsMade`,
+`HistorySetupEndpointTests.ANameAndEmailInTheRequestWinOverGitsAndOneAloneIsAskedToBeCompleted`,
+`HistorySetupEndpointTests.WhenGitHasOnlyOneTheStatusAsksForBothAndOneAloneIsAskedToBeCompleted`,
+`Checkpoint.test.tsx` (web).
+
+### SC-HIST-23. Git signs with the key of my other name
+
+The writer's git signs every commit, with a key in their everyday name
+(`commit.gpgsign`, and `user.signingkey` or, with `gpg.format=ssh`,
+`gpg.ssh.defaultKeyCommand`). They turn on history under a pen name.
+
+- When a name and email are given, the den's checkpoints aren't signed. A
+  signature would tie the pen name to the other key for good, so signing is
+  saved as off in the den's repository (`commit.gpgsign`, `tag.gpgsign`,
+  `tag.forceSignAnnotated`, `push.gpgSign`), before the first checkpoint. If
+  git was set to sign, the output says so, and how to sign here with a key of
+  this name's, for commits and for tags, and that a `local-user` line in
+  `gpg.conf` adds its key too.
+- That's so even when what's given is what git has already. The key git
+  uses needn't have anything to do with the name, and Wolfden can't see every
+  way it's chosen, so someone giving their own name again loses signing in
+  that den, and is told.
+- It stays off if signing is turned on globally later. With no signing set
+  up today, the settings are saved the same way, and nothing is said.
+- A `user.signingkey` in the den's own repository doesn't change that: it stays
+  there for turning signing back on, but `local-user` in `gpg.conf` could add
+  another key, so it doesn't sign until the writer says so (maintainer
+  decision, 2026-11-04).
+- Nothing changes when nothing is given.
+- If a commit or tag fails while git's settings say that call would sign,
+  git's output isn't repeated, whatever it was, since a signing program's
+  words can name who the key belongs to. The message says what shows it: `git add -A` then
+  `git commit -m <message>`, or `git tag -m <message> <name>`, and that either
+  makes the commit or tag if it succeeds. That holds at every checkpoint and tag, with or without
+  a name given. When that call wouldn't sign, git's output is repeated as
+  usual, even if it mentions signing.
+- A signing setting that stays on after saving (`GIT_CONFIG_COUNT`, say)
+  stops it before any checkpoint.
+
+Spec: design.md §6, "Turning history on" (#286). Covered by:
+`HistorySetupTests.GitsKeyIsNotUsedForANameGivenAndSigningStaysOffForTheDen`,
+`HistorySetupTests.ANameGivenWithNoSigningSetUpSaysNothingOfItButStaysOffIfSigningIsTurnedOnLater`,
+`HistorySetupTests.WhatGitAlreadyHasGivenAgainStillTurnsSigningOffAndSaysSo`,
+`HistorySetupTests.NothingGivenLeavesSigningAloneAndItsFailureIsntRepeated`,
+`HistorySetupTests.AKeySetInTheDensOwnRepositoryDoesntSignEitherButIsKeptForTurningItBackOn`,
+`HistorySetupTests.ASigningFailureAtACheckpointOrTagDoesntRepeatWhoTheKeyBelongsTo`,
+`HistorySetupTests.WithSigningOffWhatGitSaidIsRepeatedEvenIfItMentionsSigning`,
+`HistorySetupTests.AKeyFromATemplateInARepositoryThisRunMadeIsNotChosenForIt`,
+`HistorySetupTests.ASigningSettingFromTheEnvironmentThatStaysOnRefusesBeforeTheFirstCheckpoint`,
+`HistorySetupTests.WhatBeatsSigningBeingOffGetsItAllTakenBackSoNoLaterCommitSignsTheNameGiven`,
+`InitHistoryTests.AGivenNameTurnsSigningOffForTheDenAndSaysSo`.
 
 ## WEB: the den in a browser
 
@@ -4746,7 +4984,8 @@ by: `WriteEndpointTests.TheSourceGivesTheFilesHashAndEachSectionsTextAsWritten`,
 - Rename turns the heading into a text box. Saving renames the section
   and rewrites every link to it by heading, in any note, as the MCP
   `rename_section` does (format.md F-RT-5); if one of those links is in a
-  final book, nothing is renamed.
+  final book, nothing is renamed. Changing only its apostrophes rewrites no
+  link (SC-MCP-46).
 - Remove asks in the page, not in a browser dialog: "Remove the section
   'Arc' and its 1 subsection?", with "Keep it" focused. Removing takes the
   section's subsections too. Links to it by heading aren't rewritten; the
@@ -5050,7 +5289,7 @@ on…**, then **Turn on history**.
   quiet: the server uses the new history at once, without a restart, for
   the indicator, the History tab, the next checkpoint, and freezing.
 - A refusal shows the server's message; if git turns out to need a name
-  or email after all, the fields for just what's missing appear, and
+  or email after all, the fields for what's still needed appear, and
   stay while it tries again. When it can't be turned on
   here (no git, say), the dialog says why and offers no button.
 - A server pinned to one universe may turn it on: history covers the

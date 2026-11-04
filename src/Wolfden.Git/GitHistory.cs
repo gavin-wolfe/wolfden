@@ -566,7 +566,7 @@ public sealed partial class GitHistory : IHistoryProvider
             // Put the new files back as they were: untracked, not marked.
             Unmark(untracked);
             throw new HistoryException(
-                $"Git refused the checkpoint, so nothing was recorded ({commit.Said}). A pre-commit or commit-msg hook, commit signing, " +
+                $"Git refused the checkpoint, so nothing was recorded ({SaidUnlessSigning(commit, "'git add -A' then 'git commit -m <message>'", "the commit", "commit.gpgsign")}). A pre-commit or commit-msg hook, commit signing, " +
                 "or a merge or rebase in progress can do this. The den's files and what was staged are as they were.");
         }
 
@@ -769,7 +769,9 @@ public sealed partial class GitHistory : IHistoryProvider
 
         if (!made.Succeeded)
         {
-            throw Failed("tag", made);
+            throw request.Message is null
+                ? Failed("tag", made)
+                : new HistoryException($"git tag failed: {SaidUnlessSigning(made, "'git tag -m <message> <name>'", "the tag", "tag.gpgsign", "tag.forcesignannotated")}");
         }
 
         return HistoryResult<HistoryTag>.Done(new HistoryTag(request.Name, at));
@@ -1720,6 +1722,33 @@ public sealed partial class GitHistory : IHistoryProvider
     }
 
     private static HistoryException Failed(string command, GitRun run) => new($"git {command} failed: {run.Said}");
+
+    /// <summary>
+    /// What git said about a commit or tag it refused, unless one of <paramref name="settings"/>
+    /// says that call would sign. Then it isn't repeated, whatever it was: a signing program's
+    /// words can name who a key belongs to, and no list of words tells them apart (#286).
+    /// A setting git can't read as true or false counts as on.
+    /// </summary>
+    private string SaidUnlessSigning(GitRun failed, string commands, string result, params string[] settings)
+    {
+        bool signs;
+        try
+        {
+            signs = settings.Any(setting =>
+            {
+                var run = Start(["config", "--type=bool", "--get", setting], CancellationToken.None);
+                return run.ExitCode != 1 && run.Output.Trim() != "false";
+            });
+        }
+        catch (GitTimeoutException)
+        {
+            signs = true;
+        }
+
+        return signs
+            ? $"git is set to sign, so what it said isn't repeated here, since that can name who a key belongs to: to see it, run {commands} in the den's folder, which makes {result} if it succeeds"
+            : failed.Said;
+    }
 
     /// <summary>What to tell the writer when git didn't finish in time (#143).</summary>
     /// <param name="e">The timeout.</param>

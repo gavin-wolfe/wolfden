@@ -8,17 +8,18 @@ namespace Wolfden.Core.History;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>The steps, in order:</b> make the den's folder a repository; make sure
-/// its <c>.gitignore</c> leaves out <c>.wolfden/</c>; save a name and email
-/// for the repository if git has none; and, unless asked not to, make a
+/// <b>The steps, in order:</b> make the den's folder a repository; save a name
+/// and email for the repository if they're given; make sure its
+/// <c>.gitignore</c> leaves out <c>.wolfden/</c>; and, unless asked not to, make a
 /// first checkpoint, <see cref="FirstCheckpointMessage"/>. A step that fails
 /// stops the rest, and the result says what was done and what wasn't.
 /// </para>
 /// <para>
 /// <b>Refused, with nothing changed:</b> a den inside a larger repository
 /// (it already has history there), a den whose own repository already has
-/// checkpoints, git missing or refusing the folder, and a missing name or
-/// email that wasn't given.
+/// checkpoints, git missing or refusing the folder, a missing name or
+/// email that wasn't given, and one given without the other: the two go
+/// together, so neither is recorded beside what git has for the other (#286).
 /// </para>
 /// <para>
 /// <b>Finishing.</b> A den whose folder is the top of its own repository
@@ -40,8 +41,8 @@ public interface IHistorySetup
 /// <param name="Possible">True if <see cref="IHistorySetup.TurnOn"/> would go ahead (given a name and email, if they're needed).</param>
 /// <param name="Code">Why not, as a code (<see cref="HistorySetupCodes"/>), or null.</param>
 /// <param name="Reason">Why not, in words for the writer, or null.</param>
-/// <param name="NeedsName">True if git has no <c>user.name</c> for the den's repository, so one must be given.</param>
-/// <param name="NeedsEmail">True if git has no <c>user.email</c> for the den's repository, so one must be given.</param>
+/// <param name="NeedsName">True if git lacks a <c>user.name</c> or <c>user.email</c> for the den's repository, so a name must be given: they go together (#286).</param>
+/// <param name="NeedsEmail">The same for an email: it's true exactly when <paramref name="NeedsName"/> is.</param>
 /// <param name="Finishing">True if the den already has its own repository with no checkpoints, so turning on finishes it rather than making one.</param>
 /// <param name="IdentityCertain">
 /// True if <paramref name="NeedsName"/> and <paramref name="NeedsEmail"/> are
@@ -54,8 +55,8 @@ public sealed record HistorySetupCheck(
     bool Possible, string? Code, string? Reason, bool NeedsName, bool NeedsEmail, bool Finishing = false, bool IdentityCertain = false);
 
 /// <summary>What turning history on is asked to do.</summary>
-/// <param name="AuthorName">The name to save for the den's repository if git has none, or null. Ignored when git already has one.</param>
-/// <param name="AuthorEmail">The email to save if git has none, or null; a placeholder will do. Ignored when git already has one.</param>
+/// <param name="AuthorName">The name to save for the den's repository, with <paramref name="AuthorEmail"/>, or null with it to use git's. It wins over one git already has (#286).</param>
+/// <param name="AuthorEmail">The email to save, with <paramref name="AuthorName"/>, or null with it to use git's; a placeholder will do. It wins over one git already has (#286).</param>
 /// <param name="FirstCheckpoint">True to finish with a first checkpoint of the den as it is (the default).</param>
 public sealed record HistorySetupRequest(string? AuthorName = null, string? AuthorEmail = null, bool FirstCheckpoint = true)
 {
@@ -90,8 +91,8 @@ public enum HistorySetupStatus
 /// <param name="GitIgnore">What happened to <c>.gitignore</c>: <c>created</c>, <c>added</c> (the line was added to it), <c>present</c> (it already had it), or null if that step wasn't reached.</param>
 /// <param name="IdentitySaved">The settings saved in the repository's own config: <c>user.name</c>, <c>user.email</c>, both, or none.</param>
 /// <param name="Checkpoint">The first checkpoint, if one was made; otherwise null.</param>
-/// <param name="NeedsName">For <see cref="HistorySetupCodes.IdentityNeeded"/>, true if a name is missing.</param>
-/// <param name="NeedsEmail">For <see cref="HistorySetupCodes.IdentityNeeded"/>, true if an email is missing.</param>
+/// <param name="NeedsName">For <see cref="HistorySetupCodes.IdentityNeeded"/> and <see cref="HistorySetupCodes.IdentityHalfGiven"/>, true if a name is still needed.</param>
+/// <param name="NeedsEmail">For <see cref="HistorySetupCodes.IdentityNeeded"/> and <see cref="HistorySetupCodes.IdentityHalfGiven"/>, true if an email is still needed.</param>
 public sealed record HistorySetupResult(
     HistorySetupStatus Status,
     string? Code,
@@ -108,11 +109,14 @@ public sealed record HistorySetupResult(
 /// <summary>The codes of a refused or incomplete turn-on.</summary>
 public static class HistorySetupCodes
 {
-    /// <summary>A name or email given isn't usable: it's empty, too long, more than one line, or holds a control character or angle bracket.</summary>
+    /// <summary>A name or email given isn't usable: it's empty, too long, more than one line, holds a control character or angle bracket, git won't record it, or an environment variable would beat it.</summary>
     public const string BadArgument = "bad_argument";
 
     /// <summary>Git has no name or email for the den's repository, and none was given.</summary>
     public const string IdentityNeeded = "identity_needed";
+
+    /// <summary>A name or email was given without the other, and git has the other, so it would be recorded beside it.</summary>
+    public const string IdentityHalfGiven = "identity_half_given";
 
     /// <summary>The den is inside a larger repository, which keeps its history already.</summary>
     public const string InRepository = "in_repository";

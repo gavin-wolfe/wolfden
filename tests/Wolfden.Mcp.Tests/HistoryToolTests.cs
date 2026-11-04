@@ -32,6 +32,12 @@ public sealed class HistoryToolTests : IDisposable
         {
             ["GIT_CONFIG_GLOBAL"] = _config,
             ["GIT_CONFIG_NOSYSTEM"] = "1",
+            ["GIT_CONFIG_COUNT"] = null,
+            ["GIT_CONFIG_PARAMETERS"] = null,
+            ["GIT_AUTHOR_NAME"] = null,
+            ["GIT_AUTHOR_EMAIL"] = null,
+            ["GIT_COMMITTER_NAME"] = null,
+            ["GIT_COMMITTER_EMAIL"] = null,
             ["GIT_CEILING_DIRECTORIES"] = Path.Combine(Path.GetTempPath(), "wolfden-mcp-tests"),
             ["GIT_DIR"] = null,
             ["GIT_WORK_TREE"] = null,

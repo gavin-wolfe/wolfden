@@ -43,6 +43,28 @@ public class EntityLookupTests
     [InlineData(" - ")]
     public void ANoteThatDoesntStartAWordForEachWordTypedDoesntMatch(string query) => Assert.Null(Mina(query));
 
+    [Theory]
+    [Trait("Scenario", "SC-MCP-46")]
+    [InlineData("Mina's Journal", "mina’s journal", 0)] // whole, as a link would match
+    [InlineData("Mina’s Journal", "mina's journal", 0)]
+    [InlineData("Minaʼs Journal", "mina＇s journal", 0)]
+    [InlineData("Mina's Journal", "mina’s jour", 3)] // word by word
+    [InlineData("Mina's Journal", "minaʼs jour", 3)]
+    [InlineData("Minaʼs Journal", "mina's jour", 3)]
+    [InlineData("Mina’s Journal", "minaʼs", 3)]
+    public void AnyApostropheTypedFindsAnyInAName(string name, string query, int rank)
+    {
+        Assert.Equal(new LookupMatch(rank, "name", null), EntityLookup.Match(query, name, "minas-journal", null, []));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-46")]
+    public void AnyApostropheTypedFindsAnyInAnAlias()
+    {
+        Assert.Equal(new LookupMatch(2, "alias", "Mina's Diary"), EntityLookup.Match("Mina’s Diary", "Mina Harker", null, null, ["Mina's Diary"]));
+        Assert.Equal(new LookupMatch(6, "alias", "Minaʼs Diary"), EntityLookup.Match("mina's diar", "Mr. Harker", null, null, ["Minaʼs Diary"]));
+    }
+
     [Fact]
     [Trait("Scenario", "SC-WEB-78")]
     public void WordsCompareIgnoringCaseAndLatinAccentsAsSearchDoes()

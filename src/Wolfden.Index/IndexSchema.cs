@@ -22,8 +22,9 @@ public static class IndexSchema
     /// indexes a file with a bad section comment, and keeps which sections
     /// that leaves out, and which section each diagnostic leaves out. Version 9
     /// (#280) keeps the errors in outlines with the den's other diagnostics.
+    /// Version 10 (#305) keeps which fields of each type are <c>position</c> fields.
     /// </summary>
-    public const int Version = 9;
+    public const int Version = 10;
 
     /// <summary>The <c>meta</c> key for <see cref="Version"/>.</summary>
     public const string SchemaVersionKey = "schema_version";

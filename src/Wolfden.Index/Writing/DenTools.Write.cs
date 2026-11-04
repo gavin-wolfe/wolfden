@@ -1578,8 +1578,21 @@ public sealed partial class DenTools
             : new DenToolException(ToolErrorCodes.StaleFile, $"{path} changed while the {what} was being made, so nothing was written. Read it again and retry.") { StalePath = path };
 
     /// <summary>
+    /// What to say when the store left a file alone because it changed while the
+    /// write was going on (#323): <c>stale_file</c>, naming it, and what became of
+    /// anything written before it.
+    /// </summary>
+    private static DenToolException ChangedWhileSaving(DenStoreException changed, string what, string outcome, bool canRetry) => new(
+        ToolErrorCodes.StaleFile,
+        $"{changed.Path} changed while the {what} was being saved.{outcome}{(canRetry ? " Read it again and retry." : "")}")
+    {
+        StalePath = changed.Path,
+    };
+
+    /// <summary>
     /// Writes the files, after checking that none changed since it was read
     /// (<paramref name="originals"/>), and that a new file isn't there yet.
+    /// The store compares each again as it writes it (#323).
     /// </summary>
     private void Save(Dictionary<string, byte[]> files, IReadOnlyDictionary<string, byte[]>? originals, string? created)
     {
@@ -1599,7 +1612,7 @@ public sealed partial class DenTools
         {
             foreach (var (path, bytes) in files.OrderBy(p => p.Key, StringComparer.Ordinal))
             {
-                Store.WriteFile(path, bytes, path == created ? DenWriteMode.Create : DenWriteMode.Replace);
+                Store.WriteFile(path, bytes, path == created ? DenWriteMode.Create : DenWriteMode.Replace, originals?.GetValueOrDefault(path));
                 written.Add(path);
             }
 
@@ -1634,13 +1647,17 @@ public sealed partial class DenTools
                 throw;
             }
 
+            var outcome = written.Count == 0 ? " Nothing was written."
+                : stuck.Count == 0 ? $" The files already written ({string.Join(", ", written)}) were put back as they were, so nothing changed."
+                : $" Some files written before it failed couldn't be put back, and hold the edit: {string.Join(", ", stuck)}. Check them, or restore them from history.";
+            if (e is DenStoreException { Error: DenStoreError.Changed } changed)
+            {
+                throw ChangedWhileSaving(changed, "edit", outcome, stuck.Count == 0);
+            }
+
             var code = e is DenStoreException { Error: DenStoreError.AlreadyExists } ? ToolErrorCodes.AlreadyExists : ToolErrorCodes.WriteFailed;
             var said = e is DenStoreException ? e.Message : $"Couldn't write {failed}: {e.Message}";
-            throw new DenToolException(
-                code,
-                said + (written.Count == 0 ? " Nothing was written."
-                    : stuck.Count == 0 ? $" The files already written ({string.Join(", ", written)}) were put back as they were, so nothing changed."
-                    : $" Some files written before it failed couldn't be put back, and hold the edit: {string.Join(", ", stuck)}. Check them, or restore them from history."));
+            throw new DenToolException(code, said + outcome);
         }
     }
 
@@ -1666,11 +1683,11 @@ public sealed partial class DenTools
                 {
                     // Only a single-file write creates a file, and it's the one that failed if any did,
                     // so this isn't reached today; it's kept so a multi-file create rolls back too.
-                    Store.DeleteFile(path);
+                    Store.DeleteFile(path, files[path]);
                 }
                 else if (originals is not null && originals.TryGetValue(path, out var original))
                 {
-                    Store.WriteFile(path, original, DenWriteMode.Replace);
+                    Store.WriteFile(path, original, DenWriteMode.Replace, files[path]);
                 }
                 else
                 {

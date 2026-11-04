@@ -3394,7 +3394,7 @@ rename him.
 - The rename is refused with `den_unreadable`, naming the note, and nothing is
   written. Once the save has finished, the note is whole, the same call goes
   through, and the link follows. That holds for a save already under way when the
-  write reads the note; see the last point here for one that starts after.
+  write reads the note; for one that starts after, see SC-STORE-6.
 - The same goes for `change_alias`, `rename_section`, `move_entity`, `copy_entity`,
   `create_entity`, and an `add_idea` that makes a new note, for a freeze that will
   checkpoint, and for a freeze of the book a note is in. A new book or series is
@@ -3408,7 +3408,10 @@ rename him.
   `book.md`, and doesn't say the book is gone. If the save has stopped inside the
   frontmatter, the index can't load what it read, so the lookup fails. Then it's
   still `den_unreadable`, with the lookup's own error first, such as "has no book",
-  and then "Couldn't read `book.md` right now, which may be why."
+  and then "Couldn't read `book.md` right now, which may be why." If the lookup's
+  error is an error in the open file itself, it only names the file: that file isn't
+  broken and will be whole once the save ends, so it doesn't say how to fix it. An
+  error in a different file keeps its advice.
 - Adding an image is refused the same way if what's above the note is open, since
   that's how it knows whether the book is final. So an image can't reach a final
   book this way. The note itself being open doesn't stop it: an image doesn't read
@@ -3424,16 +3427,15 @@ rename him.
   it: a read can see that file.
 - On Linux and macOS, Wolfden can't tell a program has a file open, so none of
   these refusals come, and a write can build on part of a save, as it always could.
-- **What it can't catch, for now:** a save that starts after the write has read the
-  file. On Windows, if it stalls for a moment, about 100–250 ms in the measurements,
-  the store's retry keeps trying and replaces the file once the program closes it.
-  The write reports success, and that save is gone. #323 will compare the file again
-  before each retry. Linux and macOS have no such retry, and this wasn't measured there.
+- A save that starts after the write has read the file is SC-STORE-6: the write
+  compares again before each try, and leaves that save alone.
 
 Spec: format.md F-GEN-5, F-RT-5, F-BOOK-1 (#298). Covered by:
 `SharedFileWriteTests.ARenameIsRefusedByAStalledSaveInAnotherProcessAndTheNoteIsLeftWhole`,
 `SharedFileWriteTests.AFreezeIsRefusedByAStalledSaveInAnotherProcessAndTagsNothing`,
 `SharedFileWriteTests.AddingAChapterDuringAStalledSaveOfBookMdNamesIt`,
+`SharedFileWriteTests.ANoteUnderABookMdStalledInASaveIsntSaidToNeedAFix`,
+`SharedFileWriteTests.AnErrorInAFileThatIsntTheOneOpenKeepsItsAdvice`,
 `SharedFileWriteTests.EditingANoteDuringAStalledSaveOfItsBookMdNamesThat`,
 `SharedFileWriteTests.EditingANoteDuringAStalledSaveOfItNamesIt`,
 `SharedFileWriteTests.AnImageCantReachAFrozenBookDuringAStalledSaveOfItsBookMd`,
@@ -3707,6 +3709,52 @@ Spec: design.md §3, §6. Covered by:
 `DenStoreTests.AMoveDoesntOverwriteOrMoveAFolderIntoItself`,
 `DenStoreTests.ACaseOnlyFolderRenameGoesThroughAHiddenNameWhenThePlainMoveIsRefused`,
 `DenStoreTests.ACaseOnlyFolderRenameThatFailsHalfWayIsPutBack`.
+
+### SC-STORE-6. Another program saves a note just as Wolfden saves it
+
+Wolfden is about to save Ilse Tarrow's note, built on what it read. Another
+program starts saving the same note just after Wolfden's comparison, pauses part
+way, and closes the file. On Windows, Wolfden's save is refused while the file is
+open, and it tries again for a moment.
+
+- Before each try, the first one too, Wolfden compares the note with what its change
+  was built on. If it differs, even by part of a save still under way, or if the note
+  is gone, nothing replaces it: the write is `stale_file`, naming the note. Reading it
+  again and retrying builds on the other program's save.
+- A note that's only open, unchanged, as a virus scanner or indexer has it, is tried
+  again as before, and saved once it's let go. If it's still held after the last try,
+  the refusal says another program has it open.
+- A note locked against reading can't be compared, so that try isn't made. The next
+  look decides once it's let go.
+- A rename, a move, or anything else that writes several files puts back what it had
+  written and says nothing changed. A file saved elsewhere meanwhile is
+  never put back over: it's listed as holding the edit or left as saved, and the
+  message says to check it. The same goes for the steps of a move.
+- **What it can't catch:** a save made in the moment between the last comparison and
+  Wolfden's save is still replaced, and the write reports success. On Windows, a real
+  separate process saving a note, on saves timed to overlap a section add (starting
+  0–120 ms in, stalling 100–250 ms), lost 5 and 7–8 of 150 before this and 0 and 0 of
+  150 after. Those rates aren't everyday use, and 0 doesn't mean it can't happen.
+  Linux and macOS have no retry, and weren't measured. They do compare before the one
+  try. `check --fix` doesn't go through this: it writes in place.
+
+Spec: format.md F-GEN-5, F-RT-5, design.md §6 (#323). Covered by:
+`DenStoreTests.ASaveMadeWhileTheStoreWaitsIsntReplaced`,
+`DenStoreTests.PartOfASaveStillUnderWayCountsAsAChange`,
+`DenStoreTests.AFileOnlyOpenAndUnchangedIsStillTriedAgain`,
+`DenStoreTests.AFileHeldUnchangedThroughEveryTryIsStillInUse`,
+`DenStoreTests.AFileThatCantBeReadIsntTriedAndTheNextLookDecides`,
+`DenStoreTests.AFileDeletedWhileTheStoreWaitsIsntBroughtBack`,
+`DenStoreTests.ASaveJustBeforeTheFirstTryIsLeftOnEveryOs`,
+`DenStoreTests.AWriteThatMatchesWhatItBuiltOnGoesThroughOnEveryOs`,
+`DenStoreTests.AMoveOrDeleteLeavesASaveMadeWhileTheStoreWaits`,
+`SaveDuringWriteTests.AnEditLeavesASaveMadeJustBeforeItsWrite`,
+`SaveDuringWriteTests.AddingAChapterLeavesASaveOfBookMdMadeJustBeforeItsWrite`,
+`SaveDuringWriteTests.ARenameLeftByASavePartWayPutsBackWhatItWroteAndKeepsTheSave`,
+`SaveDuringWriteTests.ARenameSaysWhatHoldsTheEditWhenThePuttingBackIsLeftByASaveToo`,
+`SaveDuringWriteTests.AMoveLeftByASavePartWayPutsBackWhatItWroteAndKeepsTheSave`,
+`SaveDuringWriteTests.AMoveDoesntReplaceASaveOfTheNoteMadeJustBeforeItIsMoved`,
+`SharedFileWriteTests.ASaveInAnotherProcessThatStartsJustAfterTheComparisonIsLeftAlone`.
 
 ## HIST: version history
 

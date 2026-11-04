@@ -88,13 +88,13 @@ public sealed class BuiltInPacks : IDenStore
     public bool IsReadOnly => true;
 
     /// <inheritdoc />
-    public void WriteFile(string path, byte[] bytes, DenWriteMode mode = DenWriteMode.CreateOrReplace) => throw Refused(path);
+    public void WriteFile(string path, byte[] bytes, DenWriteMode mode = DenWriteMode.CreateOrReplace, byte[]? builtOn = null) => throw Refused(path);
 
     /// <inheritdoc />
-    public void DeleteFile(string path) => throw Refused(path);
+    public void DeleteFile(string path, byte[]? builtOn = null) => throw Refused(path);
 
     /// <inheritdoc />
-    public void MoveFile(string from, string to) => throw Refused(from);
+    public void MoveFile(string from, string to, byte[]? builtOn = null) => throw Refused(from);
 
     /// <inheritdoc />
     public void MoveFolder(string from, string to) => throw Refused(from);

@@ -505,7 +505,9 @@ The den store and the history provider are interfaces in `Wolfden.Core`
   to map, including a read-only file and one another program has open.
   The check and the write aren't one step, so another program can change
   the den in between; the store still never writes outside the den, and
-  never overwrites a file made in between. A store that can't be written says so
+  never overwrites a file made in between. A write can say what it built on
+  (`builtOn`), and the store compares that just before each try and refuses with
+  `Changed` if it differs (#323). A store that can't be written says so
   (`IsReadOnly`) and refuses every write: the built-in packs are one.
   `IDenChangeFeed` is the watch half: it reports changes with den-relative
   paths, lost events, and a broken watch, and the index's watcher listens
@@ -824,25 +826,38 @@ from the files:
   cost is that a write is refused while a note is open to write, even one that
   program won't change again. To revisit while dogfooding. A write's lookup still
   goes through the index, so it can find what its own read then can't, or miss
-  what the index read part of. Either way it names what's open, as `den_unreadable`,
-  rather than call the note broken or the book gone. That holds for adding an image
-  too, which reads what's above the note to know whether the book is final.
+  what the index read part of. Either way it's `den_unreadable` and names what's
+  open. The lookup's own error comes first, since a wrong name would look the same,
+  so during a stalled save it can say "has no book". It doesn't tell the writer to
+  fix the open file: if the lookup's error is an error in that file, it's part of a
+  save, so only the file is named (#323). That holds for adding an image too, which
+  reads what's above the note to know whether the book is final.
   The limits: on Linux and macOS, .NET takes the same shared `flock` for any
   sharing, and a program writing a file doesn't normally take a lock, so both kinds
   of read behave the same and a write there can read part of a save, as it always
-  could. And on Windows **a program can still lose a save without a word,** as on
-  `main`: if it starts saving after a write has read that file and stalls briefly,
-  the store's retry of about 300 ms, which only runs on Windows, keeps trying while
-  the file is open, then replaces it once the program closes it, and the write
-  reports success. The review of #307 measured this on Windows, with saves timed to
-  overlap a call (starting 0–120 ms in, stalling 100–250 ms): 5 and 13 lost of 150 on
-  this branch, 3 and 8 of 150 on `main`, and 0 of 60 with stalls of 500 ms or more.
-  An ordinary temp-and-rename save can hit the same gap. Linux and macOS weren't
-  measured. The maintainer has decided the fix, in #323: compare the file again
-  before each retry.
-  `checkpoint` hands files to git, which reads them itself, so a
+  could. `checkpoint` hands files to git, which reads them itself, so a
   checkpoint can record part of a save; a freeze refuses first but can't stop
   a save that starts after that look.
+- **A write compares again before each try** (#323; maintainer decision,
+  2026-11-04). A write that replaces a file gives the store what it built on, and
+  the store compares just before each try, the first one too, reading as a view does.
+  On Windows the move is refused while a program has the file open, and the store
+  retries for about 300 ms. Without the comparison, a program that started saving
+  after the write's own comparison, stalled, and closed the file during those
+  retries had its save replaced, and the write reported success. Now a file that's
+  different, even by part of a save still under way, or gone, is `stale_file`, naming
+  it. A file only held, as a virus scanner or indexer holds it, is unchanged, so it
+  retries as ever. One that can't be read uses up a try without a move, and the next
+  look decides. If the tries run out, it's the refusal for a file in use, as before. In a
+  whole-den write, what was already written is put back, each file only if it still
+  holds what was written, and the message says what became of them. Putting back and
+  each step of a move compare too. Measured on Windows only, with `wolfden mcp`
+  and a separate process saving a note, on the same tries in turn (starting 0–120 ms
+  into a section add, stalling 100–250 ms): 5 and 7–8 of 150 lost before, 0 and 0 of
+  150 after. **The gap isn't closed:** a program can save in the moment between the last
+  comparison and the move, and Wolfden can't tell. Linux and macOS have no retries,
+  but do compare before the one try. `check --fix` writes in place without the store,
+  so it has neither.
 - **Watched** (#14; v0 behaviour, not a recorded decision). The file
   watcher collects a burst of saves (an editor's temporary file and
   rename, a git checkout) into one batch, and ignores hidden paths such as

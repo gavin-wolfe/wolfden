@@ -232,6 +232,13 @@ public sealed partial class DenTools
             // A write can't read that file at all, so its error says both, and what to do (#298).
             if (!view && InThisUniverse(LoadTracked().Den.Unreadable) is { } forWrite && forWrite.Except(unreadable).Any())
             {
+                // An error in the very file that's open is part of a save, and it'll be whole
+                // once that ends: there's nothing to fix, so its advice isn't passed on (#323).
+                if (forWrite.Any(u => u.Path == e.LeftOut?.Path))
+                {
+                    throw Unreadable(forWrite);
+                }
+
                 throw new DenToolException(ToolErrorCodes.DenUnreadable, $"{e.Message} {MayBeWhy(forWrite)}", e.Candidates) { LeftOut = e.LeftOut };
             }
 

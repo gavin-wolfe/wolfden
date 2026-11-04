@@ -1369,7 +1369,7 @@ public sealed class WriteToolTests : IDisposable
 
         public bool FolderExists(string path) => _disk.FolderExists(path);
 
-        public void WriteFile(string path, byte[] bytes, Core.Structure.DenWriteMode mode = Core.Structure.DenWriteMode.CreateOrReplace)
+        public void WriteFile(string path, byte[] bytes, Core.Structure.DenWriteMode mode = Core.Structure.DenWriteMode.CreateOrReplace, byte[]? builtOn = null)
         {
             if (path == failing)
             {
@@ -1377,12 +1377,12 @@ public sealed class WriteToolTests : IDisposable
                 throw failure?.Invoke() ?? new Core.Structure.DenStoreException(Core.Structure.DenStoreError.AccessDenied, path, $"'{path}' is read-only.");
             }
 
-            _disk.WriteFile(path, bytes, mode);
+            _disk.WriteFile(path, bytes, mode, builtOn);
         }
 
-        public void DeleteFile(string path) => _disk.DeleteFile(path);
+        public void DeleteFile(string path, byte[]? builtOn = null) => _disk.DeleteFile(path, builtOn);
 
-        public void MoveFile(string from, string to) => _disk.MoveFile(from, to);
+        public void MoveFile(string from, string to, byte[]? builtOn = null) => _disk.MoveFile(from, to, builtOn);
 
         public void MoveFolder(string from, string to) => _disk.MoveFolder(from, to);
 

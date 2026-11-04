@@ -127,7 +127,7 @@ public sealed class FileSystemDenStore : IDenStore, IDenChangeFeed
     public IEnumerable<string> GetFolderLinks(string path) => Reads.GetFolderLinks(path);
 
     /// <inheritdoc />
-    public void WriteFile(string path, byte[] bytes, DenWriteMode mode = DenWriteMode.CreateOrReplace)
+    public void WriteFile(string path, byte[] bytes, DenWriteMode mode = DenWriteMode.CreateOrReplace, byte[]? builtOn = null)
     {
         ArgumentNullException.ThrowIfNull(bytes);
         DenPaths.CheckWritable(path);
@@ -159,7 +159,7 @@ public sealed class FileSystemDenStore : IDenStore, IDenChangeFeed
             BeforeReplace?.Invoke(temp);
             try
             {
-                Run(path, full, "written", () => FileMove(temp, full, mode != DenWriteMode.Create));
+                Run(path, full, "written", () => FileMove(temp, full, mode != DenWriteMode.Create), builtOn);
             }
             catch (IOException e) when (e is not DenStoreException && mode == DenWriteMode.Create && (File.Exists(full) || Directory.Exists(full)))
             {
@@ -174,7 +174,7 @@ public sealed class FileSystemDenStore : IDenStore, IDenChangeFeed
     }
 
     /// <inheritdoc />
-    public void DeleteFile(string path)
+    public void DeleteFile(string path, byte[]? builtOn = null)
     {
         DenPaths.CheckWritable(path);
         switch (Lookup(path))
@@ -186,11 +186,11 @@ public sealed class FileSystemDenStore : IDenStore, IDenChangeFeed
         }
 
         var full = Full(path);
-        Run(path, full, "deleted", () => File.Delete(full));
+        Run(path, full, "deleted", () => File.Delete(full), builtOn);
     }
 
     /// <inheritdoc />
-    public void MoveFile(string from, string to)
+    public void MoveFile(string from, string to, byte[]? builtOn = null)
     {
         DenPaths.CheckWritable(from);
         DenPaths.CheckWritable(to);
@@ -211,7 +211,7 @@ public sealed class FileSystemDenStore : IDenStore, IDenChangeFeed
         var source = Full(from);
         var full = Full(to);
         Directory.CreateDirectory(Path.GetDirectoryName(full)!);
-        Run(from, source, "moved", () => File.Move(source, full, overwrite: false));
+        Run(from, source, "moved", () => File.Move(source, full, overwrite: false), builtOn);
     }
 
     /// <inheritdoc />
@@ -591,7 +591,8 @@ public sealed class FileSystemDenStore : IDenStore, IDenChangeFeed
     /// <paramref name="full"/> (den path <paramref name="path"/>), trying
     /// again while another program holds it for a moment, and turns access
     /// that stays denied, or a file that stays in use, into a
-    /// <see cref="DenStoreException"/>.
+    /// <see cref="DenStoreException"/>. With <paramref name="builtOn"/>, every
+    /// try is made only if the file still holds that (<see cref="RefuseIfChanged"/>).
     /// </summary>
     /// <remarks>
     /// On Windows, virus scanners, indexers, sync clients, and readers such
@@ -603,13 +604,28 @@ public sealed class FileSystemDenStore : IDenStore, IDenChangeFeed
     /// from a holder that has let go since looks like no permission at all,
     /// so a file that's denied with nothing holding it now gets
     /// <see cref="LetGoAttempts"/> more tries before it's reported as denied.
+    /// <para>
+    /// A move refused because a program has the file open may be that program's
+    /// save under way, and when it closes the file the next try would go through
+    /// and replace that save (#323). So each try looks at the file first. A file
+    /// that's only open, as a virus scanner or indexer has it, hasn't changed, so
+    /// it's tried again as ever. One that can't be read now isn't tried, since
+    /// nothing can be said of it: that's a try used, and it's the next look that
+    /// tells. A program can still save in the moment between the last look and
+    /// the move, so this narrows the gap and doesn't close it.
+    /// </para>
     /// </remarks>
-    private static void Run(string path, string full, string what, Action action)
+    private static void Run(string path, string full, string what, Action action, byte[]? builtOn = null)
     {
         for (var attempt = 1; ; attempt++)
         {
             try
             {
+                if (builtOn is not null)
+                {
+                    RefuseIfChanged(path, full, what, builtOn);
+                }
+
                 action();
                 return;
             }
@@ -642,6 +658,30 @@ public sealed class FileSystemDenStore : IDenStore, IDenChangeFeed
                 throw InUse(path, what, e);
             }
         }
+    }
+
+    /// <summary>
+    /// Refuses with <see cref="DenStoreError.Changed"/> unless the file at
+    /// <paramref name="full"/> holds <paramref name="builtOn"/>. It's read shared
+    /// (<see cref="SharedFile"/>), so part of a save under way counts as a change.
+    /// A file that can't be read throws what the read threw, which <see cref="Run"/>
+    /// takes as it takes the same from the move.
+    /// </summary>
+    private static void RefuseIfChanged(string path, string full, string what, byte[] builtOn)
+    {
+        try
+        {
+            if (SharedFile.ReadAllBytes(full).AsSpan().SequenceEqual(builtOn))
+            {
+                return;
+            }
+        }
+        catch (Exception e) when (e is FileNotFoundException or DirectoryNotFoundException)
+        {
+            // Gone: changed too, and a move now would bring it back.
+        }
+
+        throw new DenStoreException(DenStoreError.Changed, path, $"'{path}' can't be {what}: it changed in the meantime, so it's left as it is.");
     }
 
     private static DenStoreException InUse(string path, string what, Exception inner) =>

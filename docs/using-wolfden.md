@@ -1537,13 +1537,16 @@ in it, which Wolfden calls a checkpoint.
   find a note or book while something's open, it says what it couldn't find and which
   file is open, since either could be the cause. Check the name, and try again once
   that file is closed.
-- **On Windows, a save can still be lost if it starts just after Wolfden has started.**
-  If you save a note in another program in the moment Wolfden is changing that same
-  note, and that program pauses briefly part way, Wolfden can finish its change over
-  yours and report success, and your save is gone. Nothing warns you. This takes a
-  save timed within a fraction of a second of a change, so it shouldn't be common.
-  It's been measured on Windows only. A fix is planned (#323). Until then, don't save
-  a note elsewhere while your assistant or a page is changing it, and checkpoint
+- **If you save a note elsewhere just as Wolfden is changing it, Wolfden backs off.**
+  It looks at the note again just before each try at saving. If your save got there
+  first, or is still under way, Wolfden leaves it alone and says the note changed, so
+  read it again and retry. A change that touches several notes puts back what it had
+  already written, or says which ones it couldn't.
+- **A save can still be lost in a very small gap.** If another program saves in the
+  instant between Wolfden's last look and its save, Wolfden's change replaces it and
+  reports success. In tries aimed at that moment on Windows, none of 300 was lost, but
+  that doesn't mean it can't happen. It hasn't been measured on Linux or macOS. Avoid
+  saving a note elsewhere while your assistant or a page is changing it, and checkpoint
   often: history keeps what you checkpointed.
 - **`wolfden check` won't list a note that's only open to write,** so a refusal can
   name a file `check` calls fine. That's expected.

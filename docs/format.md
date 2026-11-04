@@ -125,6 +125,10 @@ even though `check` doesn't list it. A write that can't find what it was given
 MUST name such a file if that file could be why. On Linux and macOS, a program writing a file doesn't normally say
 so, so a write can't tell. A checkpoint is an exception: it hands files to the
 history backend, which reads them itself, so it can record part of a save. (#298.)
+A write that replaces a file MUST compare it with what it read just before each
+try, and leave it alone and say so if it differs, so a try can't replace another
+program's save. A save made in the moment between the last comparison and the
+replacing can still be lost. (#323.)
 
 ### 1.4 Notation and terms
 

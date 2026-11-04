@@ -571,11 +571,11 @@ public sealed class LockedFileWriteTests : IDisposable
 
         public IEnumerable<string> GetFolderLinks(string path) => Reads.GetFolderLinks(path);
 
-        public void WriteFile(string path, byte[] bytes, DenWriteMode mode = DenWriteMode.CreateOrReplace) => inner.WriteFile(path, bytes, mode);
+        public void WriteFile(string path, byte[] bytes, DenWriteMode mode = DenWriteMode.CreateOrReplace, byte[]? builtOn = null) => inner.WriteFile(path, bytes, mode, builtOn);
 
-        public void DeleteFile(string path) => inner.DeleteFile(path);
+        public void DeleteFile(string path, byte[]? builtOn = null) => inner.DeleteFile(path, builtOn);
 
-        public void MoveFile(string from, string to) => inner.MoveFile(from, to);
+        public void MoveFile(string from, string to, byte[]? builtOn = null) => inner.MoveFile(from, to, builtOn);
 
         public void MoveFolder(string from, string to) => inner.MoveFolder(from, to);
 

@@ -538,31 +538,31 @@ public sealed class MoveEntityToolTests : IDisposable
 
         public bool FolderExists(string path) => _disk.FolderExists(path);
 
-        public void WriteFile(string path, byte[] bytes, Core.Structure.DenWriteMode mode = Core.Structure.DenWriteMode.CreateOrReplace)
+        public void WriteFile(string path, byte[] bytes, Core.Structure.DenWriteMode mode = Core.Structure.DenWriteMode.CreateOrReplace, byte[]? builtOn = null)
         {
             if (path == failWrite)
             {
                 throw new Core.Structure.DenStoreException(Core.Structure.DenStoreError.AccessDenied, path, $"'{path}' is read-only.");
             }
 
-            _disk.WriteFile(path, bytes, mode);
+            _disk.WriteFile(path, bytes, mode, builtOn);
             Look();
         }
 
-        public void DeleteFile(string path)
+        public void DeleteFile(string path, byte[]? builtOn = null)
         {
-            _disk.DeleteFile(path);
+            _disk.DeleteFile(path, builtOn);
             Look();
         }
 
-        public void MoveFile(string from, string to)
+        public void MoveFile(string from, string to, byte[]? builtOn = null)
         {
             if (failMove)
             {
                 throw new Core.Structure.DenStoreException(Core.Structure.DenStoreError.InUse, from, $"'{from}' is open in another program.");
             }
 
-            _disk.MoveFile(from, to);
+            _disk.MoveFile(from, to, builtOn);
             Look();
         }
 

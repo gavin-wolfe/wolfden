@@ -102,12 +102,12 @@ public sealed class CreateContainerTests : IDisposable
 
         var made = tools.CreateBook("Dracula's Guest", "dracula", chapters: 1);
 
-        Assert.Equal("universes/dracula/books/dracula-s-guest/book.md", made.Path);
+        Assert.Equal("universes/dracula/books/draculas-guest/book.md", made.Path);
         Assert.Equal(
-            text.Replace("authors: [bram-stoker]\n", "authors: [bram-stoker]\norder: [dracula, dracula-s-guest]\n", StringComparison.Ordinal),
+            text.Replace("authors: [bram-stoker]\n", "authors: [bram-stoker]\norder: [dracula, draculas-guest]\n", StringComparison.Ordinal),
             den.Read(DraculaUniverse).ReplaceLineEndings("\n"));
-        Assert.Contains(made.Effects, e => e.Contains("had no order list", StringComparison.Ordinal) && e.Contains("[dracula, dracula-s-guest]", StringComparison.Ordinal));
-        Assert.Contains(made.Effects, e => e.Contains("It has 1 chapter, dracula-s-guest:1.", StringComparison.Ordinal));
+        Assert.Contains(made.Effects, e => e.Contains("had no order list", StringComparison.Ordinal) && e.Contains("[dracula, draculas-guest]", StringComparison.Ordinal));
+        Assert.Contains(made.Effects, e => e.Contains("It has 1 chapter, draculas-guest:1.", StringComparison.Ordinal));
         Assert.Empty(Diagnostics(tools).Except(before));
 
         // A series with no books needs no list for its first; its second writes one.
@@ -213,7 +213,7 @@ public sealed class CreateContainerTests : IDisposable
 
         var made = tools.CreateBook("Dracula's Guest", "dracula");
 
-        Assert.Contains("order: [dracula, dracula-s-guest]", den.Read(DraculaUniverse), StringComparison.Ordinal);
+        Assert.Contains("order: [dracula, draculas-guest]", den.Read(DraculaUniverse), StringComparison.Ordinal);
         Assert.Contains("status: final", den.Read(DraculaBook), StringComparison.Ordinal);
         Assert.DoesNotContain(made.Files, f => f.Path.StartsWith("universes/dracula/books/dracula/", StringComparison.Ordinal));
     }
@@ -275,8 +275,8 @@ public sealed class CreateContainerTests : IDisposable
         var dracula = Den(TempDen.Dracula());
         var draculaTools = new DenTools(dracula.Root);
         var prequel = draculaTools.CreateBook("Dracula's Guest", "dracula", first: true);
-        Assert.Contains("\norder: [dracula-s-guest, dracula]\n", dracula.Read(DraculaUniverse).ReplaceLineEndings("\n"), StringComparison.Ordinal);
-        Assert.Contains(prequel.Effects, e => e.Contains("with the new one at the start: [dracula-s-guest, dracula]", StringComparison.Ordinal));
+        Assert.Contains("\norder: [draculas-guest, dracula]\n", dracula.Read(DraculaUniverse).ReplaceLineEndings("\n"), StringComparison.Ordinal);
+        Assert.Contains(prequel.Effects, e => e.Contains("with the new one at the start: [draculas-guest, dracula]", StringComparison.Ordinal));
         draculaTools.CreateSeries("The Harker Papers", "dracula");
         var lone = draculaTools.CreateBook("First Light", "dracula", "the-harker-papers", first: true);
         Assert.Single(lone.Files);
@@ -335,6 +335,56 @@ public sealed class CreateContainerTests : IDisposable
         Assert.Throws<DenToolException>(() => tools.CreateSeries("The Harker Papers", "dracula"));
 
         Assert.False(Directory.Exists(Path.Combine(den.Root, "universes", "dracula", "series")));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-41")]
+    public void TwoNamesThatReachOneKeyAreAClash()
+    {
+        var den = Den(TempDen.Dracula());
+        var tools = new DenTools(den.Root);
+
+        Assert.Equal("universes/dracula/books/minas-journal/book.md", tools.CreateBook("Minas Journal", "dracula").Path);
+        var files = Snapshot(den);
+
+        Refused(ToolErrorCodes.AlreadyExists, "already has a book 'minas-journal'", () => tools.CreateBook("Mina's Journal", "dracula"));
+        Refused(ToolErrorCodes.AlreadyExists, "already has a book 'minas-journal'", () => tools.CreateBook("Mina’s Journal", "dracula"));
+        Refused(ToolErrorCodes.AlreadyExists, "has a standalone book 'minas-journal'", () => tools.CreateSeries("Mina's Journal", "dracula"));
+        Assert.Equal(files, Snapshot(den));
+
+        Assert.Equal("universes/dracula/series/the-long-dark/series.md", tools.CreateSeries("The Long Dark", "dracula").Path);
+
+        void Refused(string code, string text, Action create)
+        {
+            var e = Assert.Throws<DenToolException>(create);
+            Assert.Equal(code, e.Code);
+            Assert.Contains(text, e.Message, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-41")]
+    public void ABookWithAnOldHyphenKeyKeepsItAndItsPositionsStillResolve()
+    {
+        const string OldBook = "universes/dracula/books/mina-s-journal/book.md";
+        var den = Den(TempDen.Dracula());
+        den.Write(OldBook, "---\nid: 01M4TF5F0EKGGWD5FNVBAEY9B3\nname: Mina's Journal\nchapters:\n  - { key: \"1\", number: 1 }\n---\n");
+        den.Write(
+            DraculaUniverse,
+            den.Read(DraculaUniverse).ReplaceLineEndings("\n").Replace("authors: [bram-stoker]\n", "authors: [bram-stoker]\norder: [dracula, mina-s-journal]\n", StringComparison.Ordinal));
+        var tools = new DenTools(den.Root);
+        var old = den.Read(OldBook);
+
+        Assert.Equal("mina-s-journal:1", tools.CreateEntity("character", "Sister Agatha", from: "mina-s-journal:1").Entity!.From);
+
+        // A new book of that name gets the new form; the old key isn't what it would make now, so it doesn't clash.
+        var made = tools.CreateBook("Mina's Journal", "dracula", chapters: 1);
+
+        Assert.Equal("minas-journal", made.Key);
+        Assert.Equal(old, den.Read(OldBook));
+        Assert.Contains("order: [dracula, mina-s-journal, minas-journal]", den.Read(DraculaUniverse), StringComparison.Ordinal);
+        Assert.Equal("mina-s-journal:1", tools.CreateEntity("character", "Mother Superior", from: "mina-s-journal:1").Entity!.From);
+        Assert.Equal("minas-journal:1", tools.CreateEntity("character", "Sister Ursula", from: "minas-journal:1").Entity!.From);
     }
 
     // ------------------------------------------------------------ helpers

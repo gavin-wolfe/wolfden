@@ -337,6 +337,15 @@ public sealed class CopyEntityToolTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "SC-MCP-41")]
+    public void ACopysSlugDropsAnApostropheAndTwoNamesThatReachOneSlugDontShareAFile()
+    {
+        Assert.Equal(Book + "/entities/characters/obriens-mate.md", Tools.CopyEntity("Mr. Swales", "O'Brien's Mate").Path);
+        Assert.Equal(Book + "/entities/characters/obriens-mate-2.md", Tools.CopyEntity("Mr. Swales", "O’Brien’s Mate").Path);
+        Assert.Equal(Book + "/entities/characters/obriens-mate-3.md", Tools.CopyEntity("Mr. Swales", "Obriens Mate").Path);
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-MCP-28")]
     public void CommentLinesThatGoWithTheAliasesAreSaid()
     {

@@ -187,7 +187,7 @@ public sealed class CheckpointEndpointTests : IDisposable
         // Both files the create wrote go through the server's ledger (#213).
         var status = await server.GetJsonAsync("/api/checkpoint", HttpStatusCode.OK);
         Assert.Equal(
-            [("universes/dracula/books/dracula-s-guest/book.md", "added", true), ("universes/dracula/universe.md", "modified", true)],
+            [("universes/dracula/books/draculas-guest/book.md", "added", true), ("universes/dracula/universe.md", "modified", true)],
             status.GetProperty("changes").EnumerateArray()
                 .Select(c => (c.GetProperty("path").GetString(), c.GetProperty("kind").GetString(), c.GetProperty("savedHere").GetBoolean()))
                 .OrderBy(c => c.Item1, StringComparer.Ordinal));

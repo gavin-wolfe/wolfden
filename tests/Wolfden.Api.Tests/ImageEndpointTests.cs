@@ -156,6 +156,19 @@ public class ImageEndpointTests
     }
 
     [Fact]
+    [Trait("Scenario", "SC-MCP-41")]
+    public async Task AnImagesNameDropsAnApostropheAsASlugDoes()
+    {
+        using var den = TempDen.Dracula();
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+
+        var (status, json) = await UploadAsync(server, Query(Castle, "Mina's Map.png"), Png);
+
+        Assert.Equal(HttpStatusCode.Created, status);
+        Assert.Equal($"{Images}/minas-map.png", json.GetProperty("path").GetString());
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-WEB-81")]
     public async Task ANoteInAFinalBookRefusesTheImageWithTheUnfreezeHint()
     {

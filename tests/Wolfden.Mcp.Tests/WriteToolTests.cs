@@ -207,6 +207,68 @@ public sealed class WriteToolTests : IDisposable
         Assert.Equal("universes/dracula/entities/locations/location.md", made.Path);
     }
 
+    [Theory]
+    [Trait("Scenario", "SC-MCP-41")]
+    [InlineData("Mina's Journal", "minas-journal")]
+    [InlineData("O'Brien's War", "obriens-war")]
+    [InlineData("Mina’s Journal", "minas-journal")] // U+2019, a curly apostrophe
+    [InlineData("O’Brien’s War", "obriens-war")]
+    [InlineData("Mina‘s Journal", "minas-journal")] // U+2018, typed for one
+    [InlineData("Minaʼs Journal", "minas-journal")] // U+02BC, the modifier letter
+    [InlineData("Mina＇s Journal", "minas-journal")] // U+FF07, which NFKD makes straight
+    [InlineData("The Long Dark", "the-long-dark")]
+    [InlineData("The Count's End", "the-counts-end")]
+    [InlineData("'Salem's Lot", "salems-lot")]
+    [InlineData("The Boys' Own Paper", "the-boys-own-paper")]
+    [InlineData("Rock 'n' Roll", "rock-n-roll")]
+    [InlineData("Mina 's Journal", "mina-s-journal")] // A space still ends a word.
+    [InlineData("'''", "")]
+    public void AnApostropheIsDroppedFromASlugAndALeadingTheStays(string name, string slug) =>
+        Assert.Equal(slug, NewEntity.Slugify(name));
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-41")]
+    public void TwoNamesThatReachOneSlugDontShareAFile()
+    {
+        const string Characters = Book + "/entities/characters";
+
+        Assert.Equal($"{Characters}/minas-aunt.md", Tools.CreateEntity("character", "Minas Aunt", book: "dracula").Path);
+        Assert.Equal($"{Characters}/minas-aunt-2.md", Tools.CreateEntity("character", "Mina's Aunt", book: "dracula").Path);
+        Assert.Equal($"{Characters}/minas-aunt-3.md", Tools.CreateEntity("character", "Mina’s Aunt", book: "dracula").Path);
+        Assert.Equal(
+            ToolErrorCodes.AlreadyExists,
+            Assert.Throws<DenToolException>(() => Tools.CreateEntity("character", "Mina's Aunt", book: "dracula", slug: "minas-aunt")).Code);
+        Assert.Equal("name: Minas Aunt", _den.Read($"{Characters}/minas-aunt.md").ReplaceLineEndings("\n").Split('\n')[3]);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-41")]
+    public void ANoteWithAnOldHyphenSlugKeepsItAndItsLinksStillReachIt()
+    {
+        const string Old = "universes/dracula/entities/locations/mina-s-house.md";
+        const string Linker = "universes/dracula/entities/locations/seward-asylum.md";
+        var text = _den.Read(Linker);
+        var asylum = Tools.GetEntity("seward-asylum").Entity!;
+        _den.Write(
+            Old,
+            text.Replace(asylum.Id!, "01M4TF5F0EKGGWD5FNVBAEY9B2", StringComparison.Ordinal)
+                .Replace($"name: {asylum.Name}", "name: Mina's House", StringComparison.Ordinal));
+        _den.Write(Linker, text.TrimEnd() + "\n\nSee [[mina-s-house]].\n");
+        var old = _den.Read(Old);
+
+        Assert.Equal(Old, Tools.GetEntity("mina-s-house").Entity!.Path);
+        Assert.DoesNotContain(Tools.Check(limit: 5000).Diagnostics, d => d.Message.Contains("mina-s-house", StringComparison.Ordinal));
+
+        // A new note of that name gets the new form, beside the old one, which nothing touches.
+        var made = Tools.CreateEntity("location", "Mina's House");
+
+        Assert.Equal("universes/dracula/entities/locations/minas-house.md", made.Path);
+        Assert.Equal(old, _den.Read(Old));
+        Assert.Equal(Old, Tools.GetEntity("mina-s-house").Entity!.Path);
+        Assert.Equal(made.Path, Tools.GetEntity("minas-house").Entity!.Path);
+        Assert.DoesNotContain(Tools.Check(limit: 5000).Diagnostics, d => d.Message.Contains("mina-s-house", StringComparison.Ordinal));
+    }
+
     [Fact]
     [Trait("Scenario", "SC-MCP-16")]
     public void FieldEditsKeepTheRestAndSayWhatTheyMean()
@@ -621,7 +683,7 @@ public sealed class WriteToolTests : IDisposable
     public void AnIdeaIsRecordedOutOfCanon()
     {
         var idea = Tools.AddIdea("What if the Count kept a diary too?", name: "The Count's diary", fields: Json("""{"about": ["[[count-dracula]]"]}"""));
-        Assert.Equal("universes/dracula/entities/ideas/the-count-s-diary.md", idea.Path);
+        Assert.Equal("universes/dracula/entities/ideas/the-counts-diary.md", idea.Path);
         Assert.Equal("idea", idea.Entity!.Status);
         Assert.Contains("\n# The Count's diary\n\n<!-- The idea in a sentence or two.", _den.Read(idea.Path), StringComparison.Ordinal);
         Assert.EndsWith("-->\n\nWhat if the Count kept a diary too?\n", _den.Read(idea.Path), StringComparison.Ordinal);

@@ -192,7 +192,7 @@ public sealed partial class DenTools
                     $"{string.Join("; ", frozenRelinks.Take(ListedLinkChanges).Select(l => $"{Where(l.After)} reaches {Reached(l.Before)}"))}. Nothing was changed.");
             }
 
-            RefuseChangedOrUnreadable(den);
+            RefuseUnreadable(den);
             SaveMove(path, plan.To, plan.Interim, files, plan.Originals);
             var after = EntityCatalog.ReadEntityFile(check.Structure, plan.To, files[plan.To]).Entity!;
             var effects = new List<string>
@@ -437,13 +437,13 @@ public sealed partial class DenTools
     /// </summary>
     private void SaveMove(string from, string to, byte[] interim, Dictionary<string, byte[]> files, IReadOnlyDictionary<string, byte[]> originals)
     {
+        BeforeSaveComparison?.Invoke();
         foreach (var (path, before) in originals)
         {
             var now = Store.TryReadFile(path);
             if (now is null || !now.AsSpan().SequenceEqual(before))
             {
-                throw new DenToolException(
-                    ToolErrorCodes.StaleFile, $"{path} changed while the move was being made, so nothing was written. Read it again and retry.");
+                throw ChangedOrHeld(path, now, "move");
             }
         }
 

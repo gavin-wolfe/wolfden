@@ -774,26 +774,6 @@ from the files:
   section rename, alias change, copy, create, `chapter_defaults`, a new book
   or series, and a freeze or unfreeze that will checkpoint) is refused as a
   whole. A write to one file isn't stopped by another that can't be read.
-- **Reads share a file with programs writing it** (#298; v0 behaviour, not a
-  recorded decision). They open with `FileShare.ReadWrite | Delete`
-  (`SharedFile`), so only a lock that keeps others from reading refuses one,
-  and a read doesn't get in the way of another program's save. On Linux and
-  macOS, .NET takes the same shared `flock` for any sharing, so nothing changes
-  there. A read can land part way through a save. A view corrects itself on its
-  next read. A write reads through a `TrackingDenSource` made `forWrite`: on
-  Windows, a file open for writing is read again 150 ms apart until two reads
-  agree, up to 4 times, and counts as unreadable if they don't, or if it stays
-  empty; and on every OS, every file read is compared again just before saving,
-  and any change is `stale_file`, so a part read can't hide a link in a file the
-  write wouldn't otherwise rewrite. The limit: a save stalled for longer than the
-  write takes looks like a program holding a whole file, and on Linux and macOS
-  a save that hasn't moved on by the comparison isn't seen at all, as it never
-  was. So a link in the part still to come can be missed, and `check` then shows
-  it as broken. On Windows a file that's open can't be replaced, so nothing is
-  lost. On Linux and macOS it can be, so a write that rewrites that file can
-  replace it with the part read, and the program's save goes to the old file;
-  that was already so before #298. Telling these apart isn't possible from
-  outside the program saving.
 - **Watched** (#14; v0 behaviour, not a recorded decision). The file
   watcher collects a burst of saves (an editor's temporary file and
   rename, a git checkout) into one batch, and ignores hidden paths such as

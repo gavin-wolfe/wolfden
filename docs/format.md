@@ -115,15 +115,6 @@ it can't see (F-BOOK-1), or that writes the story order of a book or series
 it can't see, while this is so. They MUST name the path, unless a session
 pinned to a universe would name another one, and write nothing. (#284.)
 
-A file another program has open can still be read if that program lets others
-read it, even while it writes, so it isn't reported. Only a lock that keeps
-others from reading makes a file unreadable here. So a read can land part way
-through another program's save. A view MAY show that part, and shows the whole
-file on its next read. A write MUST NOT save anything if a file it read has
-changed by the time it saves, whether or not it would rewrite that file, and
-SHOULD treat a file it can tell is still being saved as one that can't be read.
-(#298.)
-
 ### 1.4 Notation and terms
 
 Grammars use ABNF ([RFC 5234]), except that quoted strings are

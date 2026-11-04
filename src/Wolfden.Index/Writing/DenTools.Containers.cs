@@ -58,7 +58,7 @@ public sealed partial class DenTools
     public WorksView GetWorks(string? universe = null, string? series = null)
     {
         var (universeKey, _) = PlaceFor(universe, series);
-        var holder = Holder(DenStructure.Load(Snapshot()), universeKey, series);
+        var holder = Holder(DenStructure.Load(ViewSnapshot()), universeKey, series);
         var works = holder is Universe u
             ? u.Works.Select(w => new WorkView(w.Kind == ContainerKind.Series ? "series" : "book", w.Key, w.Name))
             : ((Series)holder).Books.Select(b => new WorkView("book", b.Key, b.Name));
@@ -123,7 +123,7 @@ public sealed partial class DenTools
         var (universeKey, ids) = PlaceFor(universe, series);
         using (EnterWrite())
         {
-            var den = new TrackingDenSource(Snapshot(), forWrite: true);
+            var den = new TrackingDenSource(Snapshot());
             var structure = DenStructure.Load(den);
 
             // A sibling that can't be read would drop out of the story order written below (#284).
@@ -209,7 +209,6 @@ public sealed partial class DenTools
                 throw new DenToolException(ToolErrorCodes.UnsupportedEdit, $"The new {what} didn't read back as built, so it wasn't made. {ToolWords.Cap(Words.CheckTool)} to see why.");
             }
 
-            RefuseChangedOrUnreadable(den);
             try
             {
                 Save(files, listed is null ? null : new Dictionary<string, byte[]>(StringComparer.Ordinal) { [holder.FilePath] = original }, created: path);

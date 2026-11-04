@@ -1,81 +1,308 @@
+using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
+using Wolfden.Core.History;
+using Wolfden.Git;
 
 namespace Wolfden.Mcp.Tests;
 
 /// <summary>
-/// Reads share a file with a program writing to it (#298), so a read can land
-/// in the middle of its save. A view corrects itself on the next read. These
-/// show what a write does: it doesn't build on what it can tell is part of a
-/// save, and it's refused if what it read has changed by the time it saves.
-/// The save is a real one, a program's handle writing in place, up to the
-/// tests that say otherwise.
+/// Views read a file another program has open to write; what a write builds on
+/// doesn't, so it's refused rather than built on part of a save (#298). These
+/// go through every write path. A refusal can only happen on Windows: on Linux
+/// and macOS a program writing a file doesn't normally say so, and the tests
+/// that need it say that.
 /// </summary>
 public sealed class SharedFileWriteTests : IDisposable
 {
-    private const string Swales = "universes/dracula/books/dracula/entities/characters/mr-swales.md";
+    private const string Book = "universes/dracula/books/dracula";
+    private const string BookFile = Book + "/book.md";
+    private const string UniverseFile = "universes/dracula/universe.md";
+    private const string Swales = Book + "/entities/characters/mr-swales.md";
+    private const string Lucy = Book + "/entities/characters/lucy-westenra.md";
     private const string Notes = "universes/dracula/entities/notes";
 
-    /// <summary>A note that needs rewriting by every write below, but only in the part still to come.</summary>
+    /// <summary>A note whose second half has links every den-wide write below cares about.</summary>
     private const string Note = Notes + "/whitby-dialect.md";
 
     /// <summary>A note that links to nothing the writes below change.</summary>
-    private const string Elsewhere = Notes + "/whitby-weather-almanac.md";
+    private const string Elsewhere = Notes + "/whitby-almanac.md";
 
     private const string Head = "---\nid: 01M4TF5F0EKGGWD5FNVBAEY8Z1\ntype: note\nname: Whitby dialect\nstatus: draft\n---\n\nAll about the dialect. ";
-    private const string Tail = "See [[Mr. Swales]], [[Mr. Swales#Voice]], and [[the Count]].\n";
+    private const string Tail = "See [[Mr. Swales]], [[Mr. Swales#Voice]], and [[the Count]].\n\nThe last words of the save.\n";
+    private const string LastWords = "The last words of the save.";
 
     private readonly TempDen _den = TempDen.Dracula();
 
     public SharedFileWriteTests()
     {
         _den.Write(Note, Head + Tail);
-        _den.Write(Elsewhere, "---\nid: 01M4TF5F0EKGGWD5FNVBAEY8Z2\ntype: note\nname: Weather almanac\nstatus: draft\n---\n\nFog, mostly.\n");
+        _den.Write(Elsewhere, "---\nid: 01M4TF5F0EKGGWD5FNVBAEY8Z2\ntype: note\nname: Whitby almanac\nstatus: draft\n---\n\nFog, mostly.\n");
     }
 
     private DenTools Tools => new(_den.Root);
 
     public void Dispose() => _den.Dispose();
 
-    public static TheoryData<string> DenWideWrites() =>
-        ["rename_entity", "change_alias", "rename_section", "move_entity", "copy_entity", "create_entity"];
+    private FileStream OpenToWrite(string path) => new(Full(path), FileMode.Open, FileAccess.Write, FileShare.Read);
 
-    private static WriteResult Call(DenTools tools, string tool, string swalesHash, string countHash) => tool switch
+    private static JsonElement Json(string json) => JsonDocument.Parse(json).RootElement.Clone();
+
+    public static TheoryData<string> WritesThatReadTheWholeDen() =>
+    [
+        "rename_entity", "change_alias", "rename_section", "move_entity", "copy_entity", "create_entity", "add_idea_new_note",
+    ];
+
+    private void CallDenWide(string tool, string swales, string count)
     {
-        "rename_entity" => tools.RenameEntity("Mr. Swales", "Old Swales", swalesHash),
-        "change_alias" => tools.ChangeAlias("Count Dracula", "the Count", countHash, newAlias: "the Nobleman"),
-        "rename_section" => tools.RenameSection("Mr. Swales", "Voice", "Dialect", swalesHash),
-        "move_entity" => tools.MoveEntity("Mr. Swales", swalesHash, keepEntry: true),
-        "copy_entity" => tools.CopyEntity("Mr. Swales", "Young Swales"),
-        "create_entity" => tools.CreateEntity("note", "Whitby weather"),
-        _ => throw new ArgumentException(tool),
-    };
+        var tools = Tools;
+        _ = tool switch
+        {
+            "rename_entity" => (object)tools.RenameEntity("Mr. Swales", "Old Swales", swales),
+            "change_alias" => tools.ChangeAlias("Count Dracula", "the Count", count, newAlias: "the Nobleman"),
+            "rename_section" => tools.RenameSection("Mr. Swales", "Voice", "Dialect", swales),
+            "move_entity" => tools.MoveEntity("Mr. Swales", swales, keepEntry: true),
+            "copy_entity" => tools.CopyEntity("Mr. Swales", "Young Swales"),
+            "create_entity" => tools.CreateEntity("note", "Whitby weather"),
+            "add_idea_new_note" => tools.AddIdea("Fog at the abbey.", name: "Whitby fog"),
+            "create_book" => tools.CreateBook("Fresh Book"),
+            "create_series" => tools.CreateSeries("Fresh Series"),
+            _ => throw new ArgumentException(tool),
+        };
+    }
 
     private (string Swales, string Count) Hashes() => (Tools.GetEntity("Mr. Swales").Entity!.Hash!, Tools.GetEntity("Count Dracula").Entity!.Hash!);
 
-    [Theory]
-    [MemberData(nameof(DenWideWrites))]
-    [Trait("Scenario", "SC-MCP-38")]
-    public void ADenWideWriteGoesAheadWhileAnotherProgramIsHoldingANoteItCanRead(string tool)
-    {
-        var (swales, count) = Hashes();
+    // Views.
 
-        WriteResult done;
-        using (new FileStream(Full(Elsewhere), FileMode.Open, FileAccess.Write, FileShare.Read))
+    [Fact]
+    [Trait("Scenario", "SC-CHECK-64")]
+    public void PagesAndCheckSeeANoteOpenElsewhereAndAWrongNameDoesntBlameIt()
+    {
+        using (OpenToWrite(Note))
         {
-            done = Call(Tools, tool, swales, count);
+            Assert.Equal("Whitby dialect", Tools.GetEntity("Whitby dialect").Entity!.Name);
+            Assert.NotEmpty(Tools.GetSource("Whitby dialect").Hash);
+            Assert.DoesNotContain(Tools.Check().Diagnostics, d => d.Rule == "F-GEN-5");
+
+            var wrong = Assert.Throws<DenToolException>(() => Tools.GetEntity("Nobody at all"));
+            Assert.Equal(ToolErrorCodes.UnknownEntity, wrong.Code);
+            Assert.DoesNotContain(Note, wrong.Message, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-CHECK-64")]
+    public void ReadToolsSeeABookFileOpenElsewhere()
+    {
+        using (OpenToWrite(BookFile))
+        {
+            var tools = Tools;
+            Assert.NotEmpty(tools.GetChapter("dracula").Chapters);
+            Assert.NotEmpty(tools.GetChapterDefaults(book: "dracula").Hash);
+            Assert.Equal("draft", tools.GetBookFreeze("dracula").Status);
+            Assert.NotEmpty(tools.GetFileSource(BookFile).Hash);
+            Assert.NotEmpty(tools.ListTypes().Types);
+        }
+    }
+
+    // Writes, on Windows: every path is refused rather than built on what's open.
+
+    [Theory]
+    [MemberData(nameof(WritesThatReadTheWholeDen))]
+    [Trait("Scenario", "SC-MCP-43")]
+    public void AWriteThatReadsTheWholeDenIsRefusedNamingTheNoteOpenElsewhereOnWindows(string tool)
+    {
+        SkipUnlessWindows();
+        var (swales, count) = Hashes();
+        var before = Files();
+
+        DenToolException refused;
+        using (OpenToWrite(Elsewhere))
+        {
+            refused = Assert.Throws<DenToolException>(() => CallDenWide(tool, swales, count));
         }
 
-        Assert.True(done.Changed);
+        Assert.Equal(ToolErrorCodes.DenUnreadable, refused.Code);
+        Assert.Contains(Elsewhere, refused.Message, StringComparison.Ordinal);
+        Assert.Equal(before, Files());
+
+        CallDenWide(tool, swales, count);
+    }
+
+    [Theory]
+    [InlineData("create_book", UniverseFile)]
+    [InlineData("create_book", BookFile)]
+    [InlineData("create_series", UniverseFile)]
+    [InlineData("create_series", BookFile)]
+    [Trait("Scenario", "SC-MCP-43")]
+    public void ANewBookOrSeriesIsRefusedNamingTheFileThatsOpenInItsStoryOrderOnWindows(string tool, string held)
+    {
+        SkipUnlessWindows();
+        var (swales, count) = Hashes();
+        var before = Files();
+
+        DenToolException refused;
+        using (OpenToWrite(held))
+        {
+            refused = Assert.Throws<DenToolException>(() => CallDenWide(tool, swales, count));
+        }
+
+        Assert.Equal(ToolErrorCodes.DenUnreadable, refused.Code);
+        Assert.Contains(held, refused.Message, StringComparison.Ordinal);
+        Assert.Equal(before, Files());
+
+        CallDenWide(tool, swales, count);
+    }
+
+    public static TheoryData<string> EditsOfOneNote() =>
+        ["replace_lead", "append_section", "update_fields", "remove_section", "replace_file", "replace_file_at"];
+
+    private void CallEdit(string tool, string hash, string text = "")
+    {
+        var tools = Tools;
+        var changed = text.ReplaceLineEndings("\n") + "\nMore.\n";
+        _ = tool switch
+        {
+            "replace_lead" => tools.ReplaceLead("Mr. Swales", "A new opening.\n", hash),
+            "append_section" => tools.AppendSection("Mr. Swales", "Voice", "More.\n", hash),
+            "update_fields" => tools.UpdateFields("Mr. Swales", hash, Json("""[{"op": "set", "path": "status", "value": "canon"}]""")),
+            "remove_section" => tools.RemoveSection("Mr. Swales", 2, "Arc", hash),
+            "replace_file" => tools.ReplaceFile("Mr. Swales", changed, hash),
+            "replace_file_at" => tools.ReplaceFileAt(Swales, changed, hash),
+            _ => throw new ArgumentException(tool),
+        };
+    }
+
+    [Theory]
+    [MemberData(nameof(EditsOfOneNote))]
+    [Trait("Scenario", "SC-MCP-43")]
+    public void AnEditIsRefusedNamingItsNoteWhileThatsOpenElsewhereOnWindows(string tool)
+    {
+        SkipUnlessWindows();
+        var hash = Tools.GetEntity("Mr. Swales").Entity!.Hash!;
+        var before = _den.Read(Swales);
+
+        DenToolException refused;
+        using (OpenToWrite(Swales))
+        {
+            refused = Assert.Throws<DenToolException>(() => CallEdit(tool, hash, before));
+        }
+
+        Assert.Equal(ToolErrorCodes.DenUnreadable, refused.Code);
+        Assert.Contains(Swales, refused.Message, StringComparison.Ordinal);
+        Assert.Equal(before, _den.Read(Swales));
+    }
+
+    [Theory]
+    [InlineData(BookFile)]
+    [InlineData(UniverseFile)]
+    [InlineData("den.yaml")]
+    [Trait("Scenario", "SC-MCP-43")]
+    public void AnEditNamesTheFileOpenAboveItsNoteAndDoesntBlameTheNoteOnWindows(string held)
+    {
+        SkipUnlessWindows();
+        var hash = Tools.GetEntity("Mr. Swales").Entity!.Hash!;
+        var before = Files();
+
+        DenToolException refused;
+        using (OpenToWrite(held))
+        {
+            refused = Assert.Throws<DenToolException>(() => CallEdit("append_section", hash));
+        }
+
+        Assert.Equal(ToolErrorCodes.DenUnreadable, refused.Code);
+        Assert.Contains(held, refused.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("has errors", refused.Message, StringComparison.Ordinal);
+        Assert.Equal(before, Files());
+    }
+
+    [Theory]
+    [InlineData("add_chapter")]
+    [InlineData("update_chapter_fields")]
+    [InlineData("update_chapter_defaults")]
+    [InlineData("freeze")]
+    [Trait("Scenario", "SC-MCP-43")]
+    public void AWriteToABooksFileNamesItWhileItsOpenElsewhereOnWindows(string tool)
+    {
+        SkipUnlessWindows();
+        var tools = Tools;
+        var hash = tools.GetBookFreeze("dracula").Hash;
+        var before = Files();
+
+        DenToolException refused;
+        using (OpenToWrite(BookFile))
+        {
+            refused = Assert.Throws<DenToolException>(() => CallBookWrite(tools, tool, hash));
+        }
+
+        Assert.Equal(ToolErrorCodes.DenUnreadable, refused.Code);
+        Assert.Contains(BookFile, refused.Message, StringComparison.Ordinal);
+        Assert.Equal(before, Files());
+
+        // It isn't a book that's gone: the same call works once it's closed.
+        CallBookWrite(tools, tool, hash);
+    }
+
+    private static void CallBookWrite(DenTools tools, string tool, string hash)
+    {
+        _ = tool switch
+        {
+            "add_chapter" => (object)tools.AddChapter("dracula", "A new chapter", expectedHash: hash),
+            "update_chapter_fields" => tools.UpdateChapterFields("dracula", "1", hash, Json("""[{"op": "set", "field": "narration", "value": "third"}]""")),
+            "update_chapter_defaults" => tools.UpdateChapterDefaults(hash, Json("""[{"op": "set", "field": "narration", "value": "third"}]"""), book: "dracula"),
+            "freeze" => tools.FreezeBook("dracula", hash),
+            _ => throw new ArgumentException(tool),
+        };
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-43")]
+    public void AnUnfreezeNamesTheBookFileOpenElsewhereOnWindows()
+    {
+        SkipUnlessWindows();
+        var tools = Tools;
+        var hash = tools.FreezeBook("dracula", tools.GetBookFreeze("dracula").Hash).Hash;
+
+        DenToolException refused;
+        using (OpenToWrite(BookFile))
+        {
+            refused = Assert.Throws<DenToolException>(() => tools.UnfreezeBook("dracula", hash));
+        }
+
+        Assert.Equal(ToolErrorCodes.DenUnreadable, refused.Code);
+        Assert.Contains(BookFile, refused.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-43")]
+    public void AFreezeWithoutHistoryIsRefusedWhileANoteInThatBookIsOpenElsewhereOnWindows()
+    {
+        SkipUnlessWindows();
+        var tools = Tools;
+        var hash = tools.GetBookFreeze("dracula").Hash;
+        var before = Files();
+
+        DenToolException refused;
+        using (OpenToWrite(Lucy))
+        {
+            refused = Assert.Throws<DenToolException>(() => tools.FreezeBook("dracula", hash));
+        }
+
+        Assert.Equal(ToolErrorCodes.DenUnreadable, refused.Code);
+        Assert.Contains(Lucy, refused.Message, StringComparison.Ordinal);
+        Assert.Equal(before, Files());
     }
 
     [Fact]
     [Trait("Scenario", "SC-MCP-38")]
-    public void ANoteHeldForWritingIsSeenSoAPageAndACheckAreRight()
+    public void AWriteToOneFileIsntStoppedByANoteOpenElsewhere()
     {
-        using (new FileStream(Full(Note), FileMode.Open, FileAccess.Write, FileShare.Read))
+        var hash = Tools.GetEntity("Mr. Swales").Entity!.Hash!;
+
+        using (OpenToWrite(Elsewhere))
         {
-            Assert.Contains("Mr. Swales", Tools.GetEntity("Whitby dialect").Entity!.Lead!, StringComparison.Ordinal);
-            Assert.DoesNotContain(Tools.Check().Diagnostics, d => d.Rule == "F-GEN-5");
+            Assert.True(Tools.AppendSection("Mr. Swales", "Voice", "More.\n", hash).Changed);
         }
     }
 
@@ -98,218 +325,209 @@ public sealed class SharedFileWriteTests : IDisposable
     }
 
     [Fact]
-    [Trait("Scenario", "SC-MCP-41")]
-    public void ANoteARenameMustRewriteIsntOverwrittenWhileAnotherProgramHasItOpenOnWindows()
+    [Trait("Scenario", "SC-MCP-43")]
+    public void AnotherNoteChangingBeforeTheSaveIsNamedAsWhatChanged()
     {
-        SkipUnlessWindows("Only Windows keeps an open file from being replaced.");
-        var (swales, _) = Hashes();
-        var before = Files();
+        var hash = Tools.GetEntity("Mr. Swales").Entity!.Hash!;
+        var tools = new DenTools(_den.Root) { BeforeSaveComparison = () => _den.Write(Note, Head + Tail + "And more.\n") };
 
-        using (new FileStream(Full(Note), FileMode.Open, FileAccess.Write, FileShare.Read))
-        {
-            var refused = Assert.Throws<DenToolException>(() => Tools.RenameEntity("Mr. Swales", "Old Swales", swales));
-            Assert.Equal(ToolErrorCodes.WriteFailed, refused.Code);
-            Assert.Contains("another program has it open", refused.Message, StringComparison.Ordinal);
-        }
-
-        Assert.Equal(before, Files());
-    }
-
-    [Fact]
-    [Trait("Scenario", "SC-MCP-41")]
-    public void AnEditBasedOnTheWholeFileIsRefusedInTheMiddleOfASave()
-    {
-        var hash = Tools.GetEntity("Whitby dialect").Entity!.Hash!;
-
-        using (var saving = BeginSave(Note))
-        {
-            var refused = Assert.Throws<DenToolException>(() => Tools.ReplaceLead("Whitby dialect", "New text.\n", hash));
-            Assert.Equal(ToolErrorCodes.StaleFile, refused.Code);
-
-            // Nothing was written over the save, which goes on to finish.
-            Assert.Equal(Head, Read(Note));
-            saving.Write(Encoding.UTF8.GetBytes(Tail));
-        }
-
-        Assert.Equal(Head + Tail, Read(Note));
-    }
-
-    [Fact]
-    [Trait("Scenario", "SC-MCP-41")]
-    public void AnEditBasedOnAPageShownMidSaveIsRefusedOnceTheSaveGoesOn()
-    {
-        string hash;
-        using (var saving = BeginSave(Note))
-        {
-            var shown = Tools.GetEntity("Whitby dialect").Entity!;
-            Assert.DoesNotContain("Mr. Swales", shown.Lead!, StringComparison.Ordinal);
-            hash = shown.Hash!;
-            saving.Write(Encoding.UTF8.GetBytes(Tail));
-        }
-
-        // The page corrects itself on the next read.
-        Assert.Contains("Mr. Swales", Tools.GetEntity("Whitby dialect").Entity!.Lead!, StringComparison.Ordinal);
-
-        var refused = Assert.Throws<DenToolException>(() => Tools.ReplaceLead("Whitby dialect", "New text.\n", hash));
-        Assert.Equal(ToolErrorCodes.StaleFile, refused.Code);
-        Assert.Equal(Head + Tail, Read(Note));
-    }
-
-    [Theory]
-    [MemberData(nameof(DenWideWrites))]
-    [Trait("Scenario", "SC-MCP-41")]
-    public void AWriteIsRefusedIfWhatItReadWasPartOfASaveThatHasGoneOnSince(string tool)
-    {
-        // As on Linux and macOS, nothing says a save is under way: only that the file changes.
-        var (swales, count) = Hashes();
-        _den.Write(Note, Head);
-        var before = Files();
-        var tools = new DenTools(_den.Root) { BeforeSaveCheck = () => _den.Write(Note, Head + Tail) };
-
-        var refused = Assert.Throws<DenToolException>(() => Call(tools, tool, swales, count));
+        var refused = Assert.Throws<DenToolException>(() => tools.RenameEntity("Mr. Swales", "Old Swales", hash));
 
         Assert.Equal(ToolErrorCodes.StaleFile, refused.Code);
+        Assert.Equal(Note, refused.StalePath);
         Assert.Contains(Note, refused.Message, StringComparison.Ordinal);
-        before[Rel(Note)] = Head + Tail;
-        Assert.Equal(before, Files());
     }
 
     [Fact]
-    [Trait("Scenario", "SC-MCP-41")]
-    public void TheSameWriteGoesThroughOnceTheSaveHasFinishedAndTheLinksFollow()
+    [Trait("Scenario", "SC-MCP-43")]
+    public void AnotherNoteOpenedBeforeTheSaveIsNamedAsOpenRatherThanChangedOnWindows()
     {
+        SkipUnlessWindows();
         var hash = Tools.GetEntity("Mr. Swales").Entity!.Hash!;
-        _den.Write(Note, Head);
-        var midSave = new DenTools(_den.Root) { BeforeSaveCheck = () => _den.Write(Note, Head + Tail) };
-        Assert.Throws<DenToolException>(() => midSave.RenameEntity("Mr. Swales", "Old Swales", hash));
-
-        Tools.RenameEntity("Mr. Swales", "Old Swales", hash);
-
-        Assert.Contains("[[Old Swales]]", Read(Note), StringComparison.Ordinal);
-    }
-
-    [Fact]
-    [Trait("Scenario", "SC-MCP-41")]
-    public async Task ANoteStillBeingWrittenToRefusesADenWideWriteOnWindows()
-    {
-        SkipUnlessWindows("Only Windows can tell that a file is open for writing.");
-        var hash = Tools.GetEntity("Mr. Swales").Entity!.Hash!;
-        using var stop = new CancellationTokenSource();
-        var saving = BeginSave(Elsewhere);
-        var writer = Task.Run(async () =>
-        {
-            while (!stop.IsCancellationRequested)
-            {
-                saving.Write("more "u8);
-                saving.Flush();
-                await Task.Delay(20, CancellationToken.None);
-            }
-        }, CancellationToken.None);
+        FileStream? held = null;
+        var tools = new DenTools(_den.Root) { BeforeSaveComparison = () => held = OpenToWrite(Note) };
+        var before = Files();
 
         try
         {
-            var refused = Assert.Throws<DenToolException>(() => Tools.RenameEntity("Mr. Swales", "Old Swales", hash));
-
+            var refused = Assert.Throws<DenToolException>(() => tools.RenameEntity("Mr. Swales", "Old Swales", hash));
             Assert.Equal(ToolErrorCodes.DenUnreadable, refused.Code);
-            Assert.Contains(Elsewhere, refused.Message, StringComparison.Ordinal);
-            Assert.Contains("Mr. Swales", Tools.GetEntity("Mr. Swales").Entity!.Name, StringComparison.Ordinal);
+            Assert.Contains(Note, refused.Message, StringComparison.Ordinal);
         }
         finally
         {
-            await stop.CancelAsync();
-            await writer;
-            await saving.DisposeAsync();
+            held?.Dispose();
         }
+
+        Assert.Equal(before, Files());
     }
 
-    [Fact]
-    [Trait("Scenario", "SC-MCP-41")]
-    public void ANoteJustCutForASaveRefusesADenWideWriteOnWindows()
-    {
-        SkipUnlessWindows("Only Windows can tell that a file is open for writing.");
-        var hash = Tools.GetEntity("Mr. Swales").Entity!.Hash!;
-
-        using var saving = new FileStream(Full(Elsewhere), FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
-        saving.SetLength(0);
-        saving.Flush();
-
-        var refused = Assert.Throws<DenToolException>(() => Tools.RenameEntity("Mr. Swales", "Old Swales", hash));
-        Assert.Equal(ToolErrorCodes.DenUnreadable, refused.Code);
-        Assert.Contains(Elsewhere, refused.Message, StringComparison.Ordinal);
-    }
+    // A real separate process, stalled in the middle of a save.
 
     [Fact]
-    [Trait("Scenario", "SC-MCP-41")]
-    public async Task ASaveThatFinishesWhileAWriteLooksAtItIsReadWholeOnWindows()
+    [Trait("Scenario", "SC-MCP-43")]
+    public async Task ARenameIsRefusedByAStalledSaveInAnotherProcessAndTheNoteIsLeftWhole()
     {
-        SkipUnlessWindows("Only Windows can tell that a file is open for writing.");
+        SkipUnlessWindows();
         var hash = Tools.GetEntity("Mr. Swales").Entity!.Hash!;
-        var saving = BeginSave(Note);
-        var finishing = Task.Run(async () =>
+        var before = Files();
+
+        await using (var saving = await StalledWriter.StartAsync(Full(Note), Head + Tail, Head.Length))
         {
-            await Task.Delay(50, CancellationToken.None);
-            saving.Write(Encoding.UTF8.GetBytes(Tail));
-            await saving.DisposeAsync();
-        }, CancellationToken.None);
+            // A page can see the part saved so far: that's the read a write mustn't build on.
+            Assert.DoesNotContain("Mr. Swales", Tools.GetEntity("Whitby dialect").Entity!.Lead!, StringComparison.Ordinal);
 
-        var done = Tools.RenameEntity("Mr. Swales", "Old Swales", hash);
-        await finishing;
+            var refused = Assert.Throws<DenToolException>(() => Tools.RenameEntity("Mr. Swales", "Old Swales", hash));
+            Assert.Equal(ToolErrorCodes.DenUnreadable, refused.Code);
+            Assert.Contains(Note, refused.Message, StringComparison.Ordinal);
 
-        Assert.True(done.Changed);
-        Assert.Contains("[[Old Swales]]", Read(Note), StringComparison.Ordinal);
+            await saving.FinishAsync();
+        }
+
+        // Nothing was written, and the save is whole.
+        Assert.Equal(before, Files());
+
+        // The same call goes through now, and the link that was still to come follows.
+        Assert.True(Tools.RenameEntity("Mr. Swales", "Old Swales", hash).Changed);
+        var after = _den.Read(Note);
+        Assert.Contains("[[Old Swales]]", after, StringComparison.Ordinal);
+        Assert.Contains(LastWords, after, StringComparison.Ordinal);
     }
 
     /// <summary>
-    /// The limit of what can be told. A program paused mid-save for longer
-    /// than a write takes, in a note the write doesn't otherwise touch, looks
-    /// just like one holding a whole file. The link still to come isn't seen,
-    /// and shows as broken in <c>check</c> afterwards. (On Linux and macOS, a
-    /// note the write does rewrite can be replaced with the part read, too; see
-    /// design.md.) This pins that down so it stays stated; it isn't what we'd want.
+    /// Stalls short enough for a save's retries to outlast them, which is how a
+    /// write built on a part read overwrote the finished save (review of #307).
+    /// Whether a write is refused or goes ahead after the save finishes depends
+    /// on timing, so this asserts what must hold either way: the save's text is there.
     /// </summary>
-    [Fact]
-    [Trait("Scenario", "SC-MCP-41")]
-    public void KnownLimitASavePausedForLongerThanAWriteTakesCanStillHideALink()
+    [Theory]
+    [InlineData("rename_entity", 100)]
+    [InlineData("rename_entity", 700)]
+    [InlineData("add_chapter", 100)]
+    [InlineData("add_chapter", 700)]
+    [InlineData("append_section", 100)]
+    [InlineData("append_section", 700)]
+    [Trait("Scenario", "SC-MCP-43")]
+    public async Task AShortStallNeverLosesTheRestOfTheSave(string tool, int stallMs)
     {
-        var hash = Tools.GetEntity("Mr. Swales").Entity!.Hash!;
+        SkipUnlessWindows();
+        var tools = Tools;
+        var noteHash = tools.GetEntity("Whitby dialect").Entity!.Hash!;
+        var swales = tools.GetEntity("Mr. Swales").Entity!.Hash!;
+        var path = tool == "add_chapter" ? BookFile : Note;
+        var whole = tool == "add_chapter" ? _den.Read(BookFile) + "\n" + LastWords + "\n" : Head + Tail;
 
-        using (var saving = BeginSave(Note))
+        await using (var saving = await StalledWriter.StartAsync(Full(path), whole, whole.Length / 2, stallMs))
         {
-            Assert.True(Tools.RenameEntity("Mr. Swales", "Old Swales", hash).Changed);
-            saving.Write(Encoding.UTF8.GetBytes(Tail));
+            try
+            {
+                _ = tool switch
+                {
+                    "rename_entity" => (object)tools.RenameEntity("Mr. Swales", "Old Swales", swales),
+                    "add_chapter" => tools.AddChapter("dracula", "A new chapter"),
+                    "append_section" => tools.AppendSection("Whitby dialect", "Later", "More.\n", noteHash, newSection: true),
+                    _ => throw new ArgumentException(tool),
+                };
+            }
+            catch (DenToolException e) when (e.Code is ToolErrorCodes.DenUnreadable or ToolErrorCodes.StaleFile or ToolErrorCodes.WriteFailed or ToolErrorCodes.UnknownEntity or ToolErrorCodes.UnknownScope)
+            {
+                // Refused: fine.
+            }
+
+            await saving.FinishAsync();
         }
 
-        Assert.Contains(Tools.Check().Diagnostics, d => d.Rule == "F-LINK-8" && d.Path == Note);
+        Assert.Contains(LastWords, _den.Read(path), StringComparison.Ordinal);
     }
 
-    /// <summary>A program's save of <see cref="Head"/> so far: the old text cut, the first part written, and still open.</summary>
-    private FileStream BeginSave(string path)
+    [Fact]
+    [Trait("Scenario", "SC-MCP-43")]
+    public async Task AFreezeIsRefusedByAStalledSaveInAnotherProcessAndTagsNothing()
     {
-        var saving = new FileStream(Full(path), FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
-        saving.SetLength(0);
-        saving.Write(Encoding.UTF8.GetBytes(path == Note ? Head : "---\nid: 01M4TF5F0EKGGWD5FNVBAEY8Z2\ntype: note\nname: Weather almanac\nstatus: draft\n---\n\n"));
-        saving.Flush();
-        return saving;
+        SkipUnlessWindows();
+        var config = Path.Combine(_den.Root, "..", $"gitconfig-{Guid.NewGuid():N}");
+        File.WriteAllText(config, "[user]\n\tname = Test Writer\n\temail = writer@example.com\n[commit]\n\tgpgsign = false\n[tag]\n\tgpgsign = false\n[core]\n\tautocrlf = false\n", new UTF8Encoding(false));
+        try
+        {
+            var git = new GitOptions
+            {
+                Environment = new Dictionary<string, string?> { ["GIT_CONFIG_GLOBAL"] = config, ["GIT_CONFIG_NOSYSTEM"] = "1", ["GIT_DIR"] = null, ["GIT_WORK_TREE"] = null, ["GIT_INDEX_FILE"] = null },
+            };
+            RunGit(git, "init", "--quiet");
+            RunGit(git, "add", "--all");
+            RunGit(git, "commit", "--quiet", "-m", "Start");
+            var head = RunGit(git, "rev-parse", "HEAD");
+            var tools = new DenTools(_den.Root) { History = () => GitHistory.ForDen(_den.Root, git) };
+            var whole = _den.Read(Lucy);
+            var book = _den.Read(BookFile);
+
+            await using (var saving = await StalledWriter.StartAsync(Full(Lucy), whole, whole.Length / 2))
+            {
+                var refused = Assert.Throws<DenToolException>(() => tools.FreezeBook("dracula", null));
+                Assert.Equal(ToolErrorCodes.DenUnreadable, refused.Code);
+                Assert.Contains(Lucy, refused.Message, StringComparison.Ordinal);
+                await saving.FinishAsync();
+            }
+
+            Assert.Equal(whole, _den.Read(Lucy));
+            Assert.Equal(book, _den.Read(BookFile));
+            Assert.Equal(head, RunGit(git, "rev-parse", "HEAD"));
+            Assert.Empty(RunGit(git, "tag", "--list"));
+
+            var frozen = tools.FreezeBook("dracula", null);
+            Assert.Equal(FreezeSnapshot.Tagged, frozen.Snapshot);
+        }
+        finally
+        {
+            File.Delete(config);
+        }
     }
 
-    private static void SkipUnlessWindows(string why)
+    private string RunGit(GitOptions git, params string[] args)
+    {
+        var start = new ProcessStartInfo("git")
+        {
+            WorkingDirectory = _den.Root,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        foreach (var arg in args)
+        {
+            start.ArgumentList.Add(arg);
+        }
+
+        foreach (var (name, value) in git.Environment)
+        {
+            if (value is null)
+            {
+                start.Environment.Remove(name);
+            }
+            else
+            {
+                start.Environment[name] = value;
+            }
+        }
+
+        using var process = Process.Start(start)!;
+        var error = process.StandardError.ReadToEndAsync(CancellationToken.None);
+        var output = process.StandardOutput.ReadToEnd().Trim();
+        process.WaitForExit();
+        Assert.True(process.ExitCode == 0, $"git {string.Join(' ', args)} failed");
+        _ = error;
+        return output;
+    }
+
+    private static void SkipUnlessWindows()
     {
         if (!OperatingSystem.IsWindows())
         {
-            Assert.Skip(why);
+            Assert.Skip("Only Windows can refuse a program that's writing a file: on Linux and macOS it doesn't normally say so.");
         }
     }
 
     private string Full(string path) => Path.Combine(_den.Root, path.Replace('/', Path.DirectorySeparatorChar));
-
-    private static string Rel(string path) => path.Replace('/', Path.DirectorySeparatorChar);
-
-    private string Read(string path)
-    {
-        using var stream = new FileStream(Full(path), FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-        using var reader = new StreamReader(stream);
-        return reader.ReadToEnd();
-    }
 
     /// <summary>Every file of the den but the index, with its text.</summary>
     private Dictionary<string, string> Files() =>

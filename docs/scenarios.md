@@ -1199,8 +1199,8 @@ Spec: format.md §1.3, F-GEN-2 (#50). Covered by:
 
 ### SC-CHECK-63. Check lists what it couldn't read
 
-Another program has a note locked so nothing else can read it, or the writer's
-account may not list a `characters/` folder, while they run `wolfden check`.
+Another program has a note open for writing, or the writer's account may not
+list a `characters/` folder, while they run `wolfden check`.
 
 - The report has one more error for it, on its path with no line:
   `F-GEN-5: This file couldn't be read, so it wasn't checked, and links to it
@@ -1220,9 +1220,6 @@ account may not list a `characters/` folder, while they run `wolfden check`.
 
 Spec: format.md F-GEN-1, F-GEN-5 (#284). Covered by:
 `LockedFileWriteTests.TheCheckToolListsALockedNoteAsAnError` (MCP),
-`SharedFileTests.AProgramHoldingAFileWithNoSharingStillStopsARead` (Core),
-`SharedFileTests.AProgramLettingOthersWriteButNotReadStillStopsAReadOnWindows` (Core),
-`SharedFileTests.AnExclusiveLockOnTheFilesBytesStillStopsAReadOnWindows` (Core),
 `LockedFileWriteTests.TheCheckToolListsAFolderThatCantBeListed` (MCP),
 `TrackingDenSourceTests.CheckReportsAFolderThatCantBeListed` (Core),
 `TrackingDenSourceTests.ACheckOfOneUniverseReportsOnlyItsOwnUnreadableFiles` (Core),
@@ -1232,18 +1229,6 @@ Spec: format.md F-GEN-1, F-GEN-5 (#284). Covered by:
 `UnreadableFileTests.AFileThatCantBeReadIsCheckedAsIfItWerentThere` (Core),
 `UnreadableFileTests.ANoteThatCantBeReadIsLeftOutAndTheCommandsStillWork` (CLI),
 `UnlistableFolderTests.AFolderThatCantBeListedIsLeftOutAndTheCommandsStillWork` (CLI).
-
-### SC-CHECK-64. Check reads a note another program has open
-
-Another program has a note open for writing, and lets others read it, while the
-writer runs `wolfden check`.
-
-- The note is checked like any other, and there's no F-GEN-5 for it. On Linux
-  and macOS, a program has to take an exclusive `flock` to stop a read, as before.
-
-Spec: format.md F-GEN-5 (#298). Covered by:
-`SharedFileTests.AProgramWritingAFileAndLettingOthersReadItDoesntStopARead` (Core),
-`SharedFileTests.ACheckOfADenWithAHeldNoteDoesntListItWhenItsShared` (Core).
 
 ## RT: saving a note keeps what the writer wrote
 
@@ -3217,7 +3202,7 @@ Spec: F-GEN-2, F-RT-5 (#50). Covered by:
 
 ### SC-MCP-38. A rename while another program holds a note
 
-The writer has a note locked against reading in another program, and asks the
+The writer has a note open for writing in another program, and asks the
 assistant to rename Mr. Swales. That note links to him.
 
 - The rename is refused as a whole with `den_unreadable`. The error names
@@ -3248,14 +3233,8 @@ assistant to rename Mr. Swales. That note links to him.
   held elsewhere: it doesn't depend on that note.
 - A note deleted just as the den is read isn't a failure. It's gone, so the
   rename goes ahead.
-- A note open in a program that lets others read it isn't held at all: pages
-  and `check` see it, and a rename that only needs to read it goes ahead, a
-  moment later than usual on Windows (SC-MCP-41).
 
-Spec: format.md F-GEN-5, F-RT-5 (#284, #298). Covered by:
-`SharedFileWriteTests.ADenWideWriteGoesAheadWhileAnotherProgramIsHoldingANoteItCanRead`,
-`SharedFileWriteTests.ANoteHeldForWritingIsSeenSoAPageAndACheckAreRight`,
-`SharedFileWriteTests.ALockWithNoSharingStillRefusesAndIsStillListed`,
+Spec: format.md F-GEN-5, F-RT-5 (#284). Covered by:
 `LockedFileWriteTests.ALockedNoteRefusesADenWideWriteAndNothingIsWritten`,
 `LockedFileWriteTests.TheLinksInALockedNoteFollowOnceItsClosedAndTheWriteIsRepeated`,
 `LockedFileWriteTests.AnOutlineIsNamedWhenItsTheOneLocked`,
@@ -5965,7 +5944,7 @@ Spec: F-VIEW-1, F-GEN-2 (#280). Covered by:
 
 ### SC-WEB-96. Another program holds a file while I'm fixing problems
 
-I have a note locked against reading in another program, with the den's page open.
+I have a note open for writing in another program, with the den's page open.
 
 - Within a minute, the top bar counts it. Its entry is the same as in
   `wolfden check` (F-GEN-5): it couldn't be read, and how to fix that. It has no

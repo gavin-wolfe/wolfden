@@ -1233,7 +1233,7 @@ out and has no page. Fix it and save.
   it names sections even at an early chapter. Pages at a position stay
   spoiler-safe: a note left out says only that it's left out, with **Show
   everything** to see why.
-- **A file another program has locked against reading can't be read,** so it's listed as that,
+- **A file another program holds locked can't be read,** so it's listed as that,
   with no **Edit file**, since this isn't about what's in it. Close it there,
   and the entry clears within a minute. Any errors inside it can't be seen until
   then, in the list or in `wolfden check`. A held `book.md`, `series.md`, or
@@ -1436,32 +1436,13 @@ in it, which Wolfden calls a checkpoint.
 
 ### Files another program has open
 
-- **Having a note open elsewhere is often fine.** Wolfden reads a file even
-  while another program has it open for writing, as long as that program lets
-  others read it. How a program opens a file differs by program and version,
-  and this hasn't been tried with specific editors, so the error below is how
-  you'll know.
-- **A note another program locks against reading can stop a rename.** While one
-  does, Wolfden can't see what's in that note, so it refuses a rename, a move,
-  a copy, a new note, a new book, or a freeze, says which file, and changes
-  nothing. Otherwise links in that note would break without a word. Close the
-  file there, then try again.
-- **A save under way can stop one too.** If a note is changing while Wolfden
-  works out a rename or a move, it says the note changed or couldn't be read,
-  and changes nothing. Try again once the save has finished.
-- **Wolfden won't overwrite a note that's open, on Windows.** A change that has
-  to rewrite an open note, such as a link in it after a rename, says another
-  program has it open and changes nothing. Close it there, then try again.
-- **A page can catch a save part way.** It may show part of a note for a moment,
-  or say it has an error. Reload the page, and it's right.
-- **What Wolfden can't catch.** If a program stalls in the middle of saving a
-  note, for longer than a rename takes, that looks the same as a program holding
-  a whole note. The rename can miss a link in the part still to come, and
-  `wolfden check` then lists it as broken. On Linux and macOS, where an open file
-  can be replaced and Wolfden can't tell it's open, a rename that rewrites that
-  note can also replace it with the part saved so far. Use a program's normal
-  save, and this is very unlikely to come up. History has the note as of your
-  last checkpoint.
+- **A note another program holds can stop a rename.** Wolfden can't read
+  a file while another program has it open for writing, even if that
+  program lets others read it too. While one does, Wolfden can't see
+  what's in that note, so it refuses a rename, a move, a copy, a new note,
+  a new book, or a freeze, says which file, and changes nothing. Otherwise
+  links in that note would break without a word. Close the file there,
+  then try again.
 - **`wolfden check` and the top bar's problems list it as an error** (F-GEN-5),
   and links to that note can show as broken until it's closed. If no program has it open,
   check the file's permissions. The same goes for a folder Wolfden isn't
@@ -1469,7 +1450,7 @@ in it, which Wolfden calls a checkpoint.
 - **Pages still open.** A note that can't be read is left out of pages and
   searches until it can be, so it can seem to have gone. Nothing happened
   to it. A program that saves a file and lets go doesn't cause any of this,
-  and neither does one that has it open and lets others read it.
+  and neither does one that has it open only to read and shares it.
 
 ### Images and other editors
 

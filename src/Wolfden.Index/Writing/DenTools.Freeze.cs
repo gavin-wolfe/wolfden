@@ -56,7 +56,7 @@ public sealed partial class DenTools
     public BookFreezeView GetBookFreeze(string book, string? universe = null)
     {
         var (universeKey, key) = BookArgument(book, universe);
-        var target = FindBook(DenStructure.Load(Snapshot()), universeKey, key);
+        var target = FindBook(DenStructure.Load(ViewSnapshot()), universeKey, key);
         var history = History();
         var canCheckpoint = history.CheckpointUnavailable is null;
         var canTag = canCheckpoint && history.Capabilities.HasFlag(HistoryCapabilities.Tag);
@@ -256,7 +256,9 @@ public sealed partial class DenTools
         using (EnterWrite())
         {
             // A book that isn't final isn't written or checkpointed, so nothing needs reading.
-            if (FindBook(DenStructure.Load(Snapshot()), universeKey, key).Status == BookStatus.Final)
+            var tracked = new TrackingDenSource(Snapshot());
+            var structure = DenStructure.Load(tracked);
+            if (Finding(tracked, () => FindBook(structure, universeKey, key)).Status == BookStatus.Final)
             {
                 RefuseUnreadableBeforeCheckpoint();
             }
@@ -334,9 +336,9 @@ public sealed partial class DenTools
     private (Book Book, byte[] Bytes, bool Changed, string? IdAdded, IReadOnlyList<DiagnosticView> Warnings) SetStatus(
         string universeKey, string key, string? expectedHash, BookStatus status)
     {
-        var den = Snapshot();
+        var den = new TrackingDenSource(Snapshot());
         var structure = DenStructure.Load(den);
-        var target = FindBook(structure, universeKey, key);
+        var target = Finding(den, () => FindBook(structure, universeKey, key));
         var path = target.FilePath;
         var original = target.File.ToBytes();
         if (expectedHash is not null)
@@ -366,9 +368,9 @@ public sealed partial class DenTools
     /// </summary>
     private void RefuseLeftOutSections(string universeKey, string key)
     {
-        var den = new TrackingDenSource(Snapshot(), forWrite: true);
+        var den = new TrackingDenSource(Snapshot());
         var structure = DenStructure.Load(den);
-        var target = FindBook(structure, universeKey, key);
+        var target = Finding(den, () => FindBook(structure, universeKey, key));
         var diagnostics = structure.Diagnostics.Concat(EntityCatalog.Load(structure, den).Diagnostics).ToList();
 
         // A note of this book that can't be read may have a bad section comment too (#284).

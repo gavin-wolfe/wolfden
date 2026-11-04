@@ -437,6 +437,22 @@ describe('SC-WEB-42: Edit file', () => {
   })
 })
 
+describe('SC-WEB-98: when another file stopped the save', () => {
+  it("shows the server's message naming it, not that this note changed", async () => {
+    const named = 'universes/dracula/entities/notes/other.md changed while the edit was being made, so nothing was written.'
+    stubEditing({ onPost: () => Response.json({ code: 'stale_file', message: named }, { status: 409 }) })
+    renderApp('/u/dracula/e/E-MINA')
+    fireEvent.click(await screen.findByRole('button', { name: 'Rename “Arc”' }))
+    const input = await screen.findByLabelText('New name for the section “Arc”')
+    fireEvent.change(input, { target: { value: 'Story' } })
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Rename' }) as HTMLButtonElement).disabled).toBe(false))
+    fireEvent.click(screen.getByRole('button', { name: 'Rename' }))
+
+    await screen.findByText(named, { exact: false })
+    expect(screen.queryByText(/The note changed meanwhile/)).toBeNull()
+  })
+})
+
 describe('SC-WEB-43: when the file changed meanwhile', () => {
   const stale = () =>
     Response.json({ code: 'stale_file', message: 'It changed.', current: source('h9', 'An agent wrote this.') }, { status: 409 })

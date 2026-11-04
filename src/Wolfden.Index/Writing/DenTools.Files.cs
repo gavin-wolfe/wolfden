@@ -79,7 +79,7 @@ public sealed partial class DenTools
     /// <summary>A file as Edit file needs it, by its path, read from the file. See the remarks on this part of the class for which paths it takes.</summary>
     public FileSourceResult GetFileSource(string path)
     {
-        var den = Snapshot();
+        var den = ViewSnapshot();
         var structure = DenStructure.Load(den);
         var kind = CheckEditable(den, structure, path, opening: true);
         var bytes = den.TryReadFile(path) ?? throw UnreadableOrNoFile(den, path, opening: true);
@@ -132,7 +132,7 @@ public sealed partial class DenTools
         var ids = hasId ? IdsInUse(look, path) : [];
         using (EnterWrite())
         {
-            var tracked = new TrackingDenSource(Snapshot(), forWrite: true);
+            var tracked = new TrackingDenSource(Snapshot());
             IDenSource den = tracked;
             var structure = DenStructure.Load(den);
             CheckEditable(den, structure, path);
@@ -177,7 +177,7 @@ public sealed partial class DenTools
             {
                 // The den reads this file now, so a save may add no error (format.md §1.3).
                 var check = Check(den, structure, files);
-                RefuseChangedOrUnreadable(tracked);
+                RefuseUnreadable(tracked);
                 Save(files, new Dictionary<string, byte[]>(StringComparer.Ordinal) { [path] = original }, created: null);
                 return new WriteResult(DenReader.ResultVersion, true, path, HashOf(bytes), null, ["Saved the whole file."], [], Warnings(check));
             }
@@ -219,7 +219,7 @@ public sealed partial class DenTools
                 }
             }
 
-            RefuseChangedOrUnreadable(tracked);
+            RefuseUnreadable(tracked);
             Save(files, new Dictionary<string, byte[]>(StringComparer.Ordinal) { [path] = original }, created: null);
 
             List<string> effects = [healed

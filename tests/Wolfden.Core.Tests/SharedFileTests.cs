@@ -5,9 +5,10 @@ using Wolfden.Core.Structure;
 namespace Wolfden.Core.Tests;
 
 /// <summary>
-/// Reads share a file with programs writing to it, so only a truly exclusive
-/// lock refuses one (#298). The holders here are real, opened as another
-/// program would open the file; they're in this process, which makes no
+/// Views read a file shared with programs writing it, so only a lock that keeps
+/// others from reading hides a note. Reads a write builds on don't share writing,
+/// so they can't build on part of a save (#298). The holders here are in this
+/// process, opened as another program would open the file, which makes no
 /// difference to how the OS or .NET treats them.
 /// </summary>
 public sealed class SharedFileTests : IDisposable
@@ -21,8 +22,6 @@ public sealed class SharedFileTests : IDisposable
 
     private string Full => Path.Combine(_root, Name);
 
-    private FileSystemDenSource Source => new(_root);
-
     public void Dispose() => Directory.Delete(_root, recursive: true);
 
     private static string Text(byte[] bytes) => Encoding.UTF8.GetString(bytes);
@@ -33,33 +32,63 @@ public sealed class SharedFileTests : IDisposable
     [InlineData(FileAccess.Write, FileShare.ReadWrite)]
     [InlineData(FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete)]
     [Trait("Scenario", "SC-CHECK-64")]
-    public void AProgramWritingAFileAndLettingOthersReadItDoesntStopARead(FileAccess access, FileShare share)
+    public void AViewReadsAFileAProgramIsWritingAndLettingOthersRead(FileAccess access, FileShare share)
     {
         using var holder = new FileStream(Full, FileMode.Open, access, share);
-        var tracked = new TrackingDenSource(Source);
+        var tracked = new TrackingDenSource(FileSystemDenSource.ForViews(_root));
 
         Assert.Equal(Whole, Text(((IDenSource)tracked).TryReadFile(Name)!));
         Assert.Empty(tracked.Unreadable);
     }
 
-    [Fact]
-    [Trait("Scenario", "SC-CHECK-63")]
-    public void AProgramHoldingAFileWithNoSharingStillStopsARead()
+    [Theory]
+    [InlineData(FileAccess.Write, FileShare.Read)]
+    [InlineData(FileAccess.ReadWrite, FileShare.Read)]
+    [InlineData(FileAccess.Write, FileShare.ReadWrite)]
+    [InlineData(FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete)]
+    [Trait("Scenario", "SC-MCP-43")]
+    public void AReadForAWriteIsRefusedWhileAProgramHasTheFileOpenToWriteOnWindows(FileAccess access, FileShare share)
     {
-        using var holder = new FileStream(Full, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
-        var tracked = new TrackingDenSource(Source);
+        SkipUnlessWindows("Linux and macOS can't tell: any sharing is the same shared lock there.");
+        using var holder = new FileStream(Full, FileMode.Open, access, share);
+        var tracked = new TrackingDenSource(new FileSystemDenSource(_root));
 
         Assert.Null(((IDenSource)tracked).TryReadFile(Name));
         Assert.Equal([new UnreadablePath(Name, IsFolder: false)], tracked.Unreadable);
     }
 
+    [Theory]
+    [InlineData(FileShare.Read)]
+    [InlineData(FileShare.ReadWrite | FileShare.Delete)]
+    [Trait("Scenario", "SC-MCP-43")]
+    public void AProgramOnlyReadingAFileDoesntStopAReadForAWrite(FileShare share)
+    {
+        using var holder = new FileStream(Full, FileMode.Open, FileAccess.Read, share);
+
+        Assert.Equal(Whole, Text(new FileSystemDenSource(_root).ReadFile(Name)));
+    }
+
     [Fact]
     [Trait("Scenario", "SC-CHECK-63")]
-    public void AProgramLettingOthersWriteButNotReadStillStopsAReadOnWindows()
+    public void AProgramHoldingAFileWithNoSharingStopsBothKindsOfRead()
+    {
+        using var holder = new FileStream(Full, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+
+        foreach (var source in new[] { FileSystemDenSource.ForViews(_root), new FileSystemDenSource(_root) })
+        {
+            var tracked = new TrackingDenSource(source);
+            Assert.Null(((IDenSource)tracked).TryReadFile(Name));
+            Assert.Equal([new UnreadablePath(Name, IsFolder: false)], tracked.Unreadable);
+        }
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-CHECK-63")]
+    public void AProgramLettingOthersWriteButNotReadStopsAViewOnWindows()
     {
         SkipUnlessWindows("Linux and macOS have no lock that lets writers in but not readers.");
         using var holder = new FileStream(Full, FileMode.Open, FileAccess.ReadWrite, FileShare.Write);
-        var tracked = new TrackingDenSource(Source);
+        var tracked = new TrackingDenSource(FileSystemDenSource.ForViews(_root));
 
         Assert.Null(((IDenSource)tracked).TryReadFile(Name));
         Assert.Equal([new UnreadablePath(Name, IsFolder: false)], tracked.Unreadable);
@@ -67,7 +96,7 @@ public sealed class SharedFileTests : IDisposable
 
     [Fact]
     [Trait("Scenario", "SC-CHECK-63")]
-    public void AnExclusiveLockOnTheFilesBytesStillStopsAReadOnWindows()
+    public void AnExclusiveLockOnTheFilesBytesStopsAViewOnWindows()
     {
         if (!OperatingSystem.IsWindows())
         {
@@ -77,7 +106,7 @@ public sealed class SharedFileTests : IDisposable
 
         using var holder = new FileStream(Full, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete);
         holder.Lock(0, Whole.Length);
-        var tracked = new TrackingDenSource(Source);
+        var tracked = new TrackingDenSource(FileSystemDenSource.ForViews(_root));
 
         // This one opens fine: it's the read that fails.
         Assert.Null(((IDenSource)tracked).TryReadFile(Name));
@@ -85,9 +114,10 @@ public sealed class SharedFileTests : IDisposable
     }
 
     [Fact]
-    [Trait("Scenario", "SC-MCP-41")]
-    public void AReadDuringASaveSeesPartOfItAndTheNextReadSeesItAll()
+    [Trait("Scenario", "SC-MCP-43")]
+    public void AViewDuringASaveSeesPartOfItAndTheNextReadSeesItAll()
     {
+        var view = FileSystemDenSource.ForViews(_root);
         byte[] during;
         using (var saving = new FileStream(Full, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
         {
@@ -95,140 +125,52 @@ public sealed class SharedFileTests : IDisposable
             saving.Write(Encoding.UTF8.GetBytes(Whole[..10]));
             saving.Flush();
 
-            during = Source.ReadFile(Name);
+            during = view.ReadFile(Name);
             saving.Write(Encoding.UTF8.GetBytes(Whole[10..]));
         }
 
         Assert.Equal(Whole[..10], Text(during));
-        Assert.Equal(Whole, Text(Source.ReadFile(Name)));
-    }
-
-    [Theory]
-    [InlineData(FileAccess.Write, FileShare.Read, true)]
-    [InlineData(FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete, true)]
-    [InlineData(FileAccess.Read, FileShare.Read, false)]
-    [InlineData(FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, false)]
-    [Trait("Scenario", "SC-MCP-41")]
-    public void OnlyWindowsCanTellThatAFileIsOpenForWriting(FileAccess access, FileShare share, bool writing)
-    {
-        using var holder = new FileStream(Full, FileMode.Open, access, share);
-
-        Assert.Equal(writing && OperatingSystem.IsWindows(), Source.IsOpenForWriting(Name));
-    }
-
-    [Fact]
-    [Trait("Scenario", "SC-MCP-41")]
-    public void AFileNoOneHasOpenOrThatIsntThereIsntOpenForWriting()
-    {
-        Assert.False(Source.IsOpenForWriting(Name));
-        Assert.False(Source.IsOpenForWriting("nobody.md"));
-    }
-
-    [Fact]
-    [Trait("Scenario", "SC-MCP-41")]
-    public void AWriteTakesAFileOpenForWritingOnceItStaysTheSame()
-    {
-        var den = new ScriptedSource(Whole, Whole);
-        var tracked = new TrackingDenSource(den, forWrite: true);
-
-        Assert.Equal(Whole, Text(((IDenSource)tracked).TryReadFile(Name)!));
-        Assert.Empty(tracked.Unreadable);
-    }
-
-    [Fact]
-    [Trait("Scenario", "SC-MCP-41")]
-    public void AWriteTakesWhatASaveEndsUpAs()
-    {
-        var den = new ScriptedSource("---\nna", Whole, Whole);
-        var tracked = new TrackingDenSource(den, forWrite: true);
-
-        Assert.Equal(Whole, Text(((IDenSource)tracked).TryReadFile(Name)!));
-        Assert.Empty(tracked.Unreadable);
-        Assert.Empty(tracked.ChangedSinceRead());
-    }
-
-    [Fact]
-    [Trait("Scenario", "SC-MCP-41")]
-    public void AWriteCountsAFileThatKeepsChangingAsUnreadable()
-    {
-        var den = new ScriptedSource(Enumerable.Range(0, TrackingDenSource.SettleLooks + 1).Select(i => new string('x', i + 1)).ToArray());
-        var tracked = new TrackingDenSource(den, forWrite: true);
-
-        Assert.Null(((IDenSource)tracked).TryReadFile(Name));
-        Assert.Equal([new UnreadablePath(Name, IsFolder: false)], tracked.Unreadable);
-    }
-
-    [Fact]
-    [Trait("Scenario", "SC-MCP-41")]
-    public void AWriteCountsAnEmptyFileOpenForWritingAsUnreadable()
-    {
-        var tracked = new TrackingDenSource(new ScriptedSource("", ""), forWrite: true);
-
-        Assert.Null(((IDenSource)tracked).TryReadFile(Name));
-        Assert.Equal([new UnreadablePath(Name, IsFolder: false)], tracked.Unreadable);
-    }
-
-    [Fact]
-    [Trait("Scenario", "SC-MCP-41")]
-    public void AFileAlreadyTakenIsntWaitedForAgain()
-    {
-        var den = new ScriptedSource(Whole, Whole, Whole, Whole);
-        IDenSource tracked = new TrackingDenSource(den, forWrite: true);
-
-        tracked.TryReadFile(Name);
-        tracked.TryReadFile(Name);
-        tracked.TryReadFile(Name);
-
-        Assert.Equal(1, den.Asked);
-    }
-
-    [Fact]
-    [Trait("Scenario", "SC-MCP-41")]
-    public void ACheckDoesntWaitOnAFileOpenForWriting()
-    {
-        var den = new ScriptedSource("---\nna", Whole);
-        IDenSource tracked = new TrackingDenSource(den);
-
-        Assert.Equal("---\nna", Text(tracked.TryReadFile(Name)!));
-        Assert.Equal(0, den.Asked);
-        Assert.Empty(((TrackingDenSource)tracked).ChangedSinceRead());
-    }
-
-    [Fact]
-    [Trait("Scenario", "SC-MCP-41")]
-    public void AWriteCanTellThatAFileItReadHasChangedOrGone()
-    {
-        const string other = "other.md";
-        File.WriteAllText(Path.Combine(_root, other), "other");
-        var tracked = new TrackingDenSource(Source, forWrite: true);
-        IDenSource source = tracked;
-        source.TryReadFile(Name);
-        source.TryReadFile(other);
-        Assert.Empty(tracked.ChangedSinceRead());
-
-        File.AppendAllText(Full, "And the rest.\n");
-        File.Delete(Path.Combine(_root, other));
-
-        Assert.Equal([Name, other], tracked.ChangedSinceRead());
-        Assert.Empty(tracked.Unreadable);
+        Assert.Equal(Whole, Text(view.ReadFile(Name)));
     }
 
     [Fact]
     [Trait("Scenario", "SC-CHECK-64")]
-    public void ACheckOfADenWithAHeldNoteDoesntListItWhenItsShared()
+    public void CheckDoesntListAHeldNoteWhenItsSharedAndDoesWhenItIsnt()
     {
         var den = Path.Combine(_root, "den");
         CopyStarfall(den);
         var ilse = Path.Combine(den, "universes", "starfall", "series", "long-dark", "entities", "characters", "ilse-tarrow.md");
         using (new FileStream(ilse, FileMode.Open, FileAccess.Write, FileShare.Read))
         {
-            Assert.DoesNotContain(DenCheck.Run(new FileSystemDenSource(den)).Diagnostics, d => d.Diagnostic.RuleId == "F-GEN-5");
+            Assert.DoesNotContain(DenCheck.Run(den).Diagnostics, d => d.Diagnostic.RuleId == "F-GEN-5");
         }
 
         using (new FileStream(ilse, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
         {
-            Assert.Contains(DenCheck.Run(new FileSystemDenSource(den)).Diagnostics, d => d.Diagnostic.RuleId == "F-GEN-5");
+            Assert.Contains(DenCheck.Run(den).Diagnostics, d => d.Diagnostic.RuleId == "F-GEN-5");
         }
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-43")]
+    public void ChecksFixDoesntAddAnIdToANoteThatsOpenToWriteOnWindows()
+    {
+        SkipUnlessWindows("Linux and macOS can't tell that a file is open to write.");
+        var den = Path.Combine(_root, "den");
+        CopyStarfall(den);
+        var ilse = Path.Combine(den, "universes", "starfall", "series", "long-dark", "entities", "characters", "ilse-tarrow.md");
+        var text = File.ReadAllText(ilse);
+        var withoutId = string.Join('\n', text.ReplaceLineEndings("\n").Split('\n').Where(l => !l.StartsWith("id:", StringComparison.Ordinal)));
+        File.WriteAllText(ilse, withoutId);
+
+        IReadOnlyList<IdFixResult> fixes;
+        using (new FileStream(ilse, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
+        {
+            fixes = IdFix.Run(den);
+        }
+
+        Assert.DoesNotContain(fixes, f => f.Outcome == IdFixOutcome.Added && f.Path.EndsWith("ilse-tarrow.md", StringComparison.Ordinal));
+        Assert.Equal(withoutId, File.ReadAllText(ilse));
     }
 
     private static void CopyStarfall(string to)
@@ -247,27 +189,5 @@ public sealed class SharedFileTests : IDisposable
         {
             Assert.Skip(why);
         }
-    }
-
-    /// <summary>A den of one file, open for writing, whose reads give each text in turn, then the last again.</summary>
-    private sealed class ScriptedSource(params string[] reads) : IDenSource
-    {
-        private int _next;
-
-        public int Asked { get; private set; }
-
-        public bool IsOpenForWriting(string path)
-        {
-            Asked++;
-            return true;
-        }
-
-        public bool FileExists(string path) => path == Name;
-
-        public byte[] ReadFile(string path) => Encoding.UTF8.GetBytes(reads[Math.Min(_next++, reads.Length - 1)]);
-
-        public IEnumerable<string> GetDirectories(string path) => [];
-
-        public IEnumerable<string> GetFiles(string path) => [Name];
     }
 }

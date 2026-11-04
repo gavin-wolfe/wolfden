@@ -132,6 +132,13 @@ public sealed class DenToolException : Exception
         Candidates = candidates;
     }
 
+    /// <summary>
+    /// For a <c>stale_file</c> from a write that read other files too, the one
+    /// that changed, which needn't be the one the writer is editing (#298).
+    /// Null if it's the file the call is about.
+    /// </summary>
+    public string? StalePath { get; init; }
+
     /// <summary>An error with no code or message.</summary>
     public DenToolException()
         : this(ToolErrorCodes.Internal, "")

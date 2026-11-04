@@ -978,7 +978,7 @@ public sealed partial class DenReader
         // The frontmatter may not parse, so its lines are read as text, as far as the closing '---'.
         bool WrittenIn(string path, string text, bool byName)
         {
-            if (((IDenSource)new FileSystemDenSource(Root)).TryReadFile(path) is not { } bytes)
+            if (((IDenSource)FileSystemDenSource.ForViews(Root)).TryReadFile(path) is not { } bytes)
             {
                 return false;
             }

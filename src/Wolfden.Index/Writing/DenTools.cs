@@ -217,7 +217,7 @@ public sealed partial class DenTools
         catch (DenToolException e) when (e.Code is ToolErrorCodes.UnknownEntity or ToolErrorCodes.UnknownScope or ToolErrorCodes.UnknownUniverse
             or ToolErrorCodes.NoUniverse or ToolErrorCodes.DenNotLoaded)
         {
-            var unreadable = InThisUniverse(LoadTracked().Den.Unreadable);
+            var unreadable = InThisUniverse(UnreadableToViews());
             if (unreadable.Count == 0)
             {
                 throw;

@@ -59,7 +59,7 @@ public sealed partial class DenTools
     public GetChapterDefaultsResult GetChapterDefaults(string? universe = null, string? series = null, string? book = null)
     {
         var universeKey = LocateContainer(universe, series, book);
-        var container = FindContainer(DenStructure.Load(Snapshot()), universeKey, series, book);
+        var container = FindContainer(DenStructure.Load(ViewSnapshot()), universeKey, series, book);
         var view = DefaultsOf(container);
         return new GetChapterDefaultsResult(
             DenReader.ResultVersion, universeKey, view.Kind, view.Key, view.Path, HashOf(container.File.ToBytes()), container is Book { Status: BookStatus.Final },
@@ -84,9 +84,9 @@ public sealed partial class DenTools
         var universeKey = LocateContainer(universe, series, book);
         using (EnterWrite())
         {
-            var den = new TrackingDenSource(Snapshot(), forWrite: true);
+            var den = new TrackingDenSource(Snapshot());
             var structure = DenStructure.Load(den);
-            var target = FindContainer(structure, universeKey, series, book);
+            var target = Finding(den, () => FindContainer(structure, universeKey, series, book));
             var path = target.FilePath;
             var original = target.File.ToBytes();
             CheckHash(path, original, hash);
@@ -146,12 +146,17 @@ public sealed partial class DenTools
             var below = FilesBelow(den, target).Where(f => f.Path != path).ToList();
 
             // A book below that can't be read may be final, so its chapters mustn't inherit this (#284).
-            RefuseChangedOrUnreadable(den);
+            RefuseUnreadable(den);
             CheckFinalBooksBelow(edit, touched);
             var unloaded = CheckUnloadedBooksBelow(den, structure, target);
             BeforeDefaultsSave?.Invoke();
-            if (below.FirstOrDefault(f => Store.TryReadFile(f.Path) is not { } now || !now.AsSpan().SequenceEqual(f.Bytes)) is { Path: not null })
+            if (below.FirstOrDefault(f => Store.TryReadFile(f.Path) is not { } now || !now.AsSpan().SequenceEqual(f.Bytes)) is { Path: not null } differs)
             {
+                if (Store.TryReadFile(differs.Path) is null && Store.FileExists(differs.Path))
+                {
+                    throw Unreadable([new UnreadablePath(differs.Path, IsFolder: false)]);
+                }
+
                 throw new DenToolException(
                     ToolErrorCodes.StaleFile,
                     $"A file below {target.Kind.ToString().ToLowerInvariant()} '{target.Key}' changed while the edit was being made, " +

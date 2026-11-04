@@ -97,16 +97,6 @@ public interface IDenSource
     bool CannotList(string path) => false;
 
     /// <summary>
-    /// True if another program has the file at <paramref name="path"/> open
-    /// to write it now, so what's read from it may be part of a save (#298).
-    /// False where that can't be told, as on Linux and macOS, and for a
-    /// source that isn't on disk. A <see cref="TrackingDenSource"/> reading
-    /// for a write asks it directly of the source it wraps, so a wrapper that
-    /// other wrappers read through needn't forward it.
-    /// </summary>
-    bool IsOpenForWriting(string path) => false;
-
-    /// <summary>
     /// The names of the folder links (symbolic links and junctions) directly
     /// in <paramref name="path"/>. <see cref="GetDirectories"/> leaves them
     /// out, so the den's walks never follow them; <c>wolfden check</c> lists
@@ -119,12 +109,33 @@ public interface IDenSource
 /// <summary>A den on disk.</summary>
 public sealed class FileSystemDenSource : IDenSource
 {
-    /// <summary>Reads the den whose root folder is <paramref name="root"/>.</summary>
+    private readonly bool _shared;
+
+    /// <summary>
+    /// Reads the den whose root folder is <paramref name="root"/>, for a write
+    /// to build on: a file another program has open to write can't be read,
+    /// so a write never builds on part of its save (#298).
+    /// </summary>
     public FileSystemDenSource(string root)
+        : this(root, shared: false)
+    {
+    }
+
+    private FileSystemDenSource(string root, bool shared)
     {
         ArgumentNullException.ThrowIfNull(root);
         Root = Path.GetFullPath(root);
+        _shared = shared;
     }
+
+    /// <summary>
+    /// Reads the den for a view: a page, a read tool, the index, or a check.
+    /// A file another program has open to write can be read, unless it keeps
+    /// others from reading, and may be part of a save, which the next read
+    /// corrects (<see cref="SharedFile"/>, #298). Nothing a write builds on
+    /// reads through this.
+    /// </summary>
+    public static FileSystemDenSource ForViews(string root) => new(root, shared: true);
 
     /// <summary>The den root's full path.</summary>
     public string Root { get; }
@@ -147,10 +158,7 @@ public sealed class FileSystemDenSource : IDenSource
     public bool FileExists(string path) => ExactPathExists(path, file: true);
 
     /// <inheritdoc />
-    public byte[] ReadFile(string path) => SharedFile.ReadAllBytes(Full(path));
-
-    /// <inheritdoc />
-    public bool IsOpenForWriting(string path) => SharedFile.IsOpenForWriting(Full(path));
+    public byte[] ReadFile(string path) => _shared ? SharedFile.ReadAllBytes(Full(path)) : File.ReadAllBytes(Full(path));
 
     /// <summary>
     /// The folders directly in <paramref name="path"/>, by their names on

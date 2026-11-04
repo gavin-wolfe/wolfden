@@ -110,11 +110,8 @@ public sealed partial class DenTools
     /// </summary>
     internal Action? BeforeWrite { get; init; }
 
-    /// <summary>
-    /// For tests: called just before a write compares every file it read with
-    /// the disk, so a test can finish another program's save at that moment (#298).
-    /// </summary>
-    internal Action? BeforeSaveCheck { get; init; }
+    /// <summary>For tests: called just before a write compares the files it will write with the disk, with the den's write lock held.</summary>
+    internal Action? BeforeSaveComparison { get; init; }
 
     /// <summary>
     /// The den files this session's writes saved since a checkpoint last
@@ -437,7 +434,7 @@ public sealed partial class DenTools
             var files = plan.Files.ToDictionary(p => p.Key, p => p.Value, StringComparer.Ordinal);
             var idAdded = AddMissingId(target, files);
             var check = Check(den, structure, files);
-            RefuseChangedOrUnreadable(den);
+            RefuseUnreadable(den);
             Save(files, plan.Originals, created: null);
             var after = EntityCatalog.ReadEntityFile(check.Structure, path, files[path]).Entity!;
             var effects = new List<string>
@@ -489,7 +486,7 @@ public sealed partial class DenTools
         }
 
         var (universeKey, _) = LocateBook(book.Trim(), universe);
-        var den = Snapshot();
+        var den = ViewSnapshot();
         var structure = DenStructure.Load(den);
         var found = FindBook(structure, universeKey, book.Trim());
         var chapters = chapter is null ? found.Chapters.ToList() : [FindChapter(found, chapter)];
@@ -522,9 +519,9 @@ public sealed partial class DenTools
         var (universeKey, _) = LocateBook(book.Trim(), universe);
         using (EnterWrite())
         {
-            var den = Snapshot();
+            var den = new TrackingDenSource(Snapshot());
             var structure = DenStructure.Load(den);
-            var target = FindBook(structure, universeKey, book.Trim());
+            var target = Finding(den, () => FindBook(structure, universeKey, book.Trim()));
             var ch = FindChapter(target, chapter);
             var path = target.FilePath;
             var original = target.File.ToBytes();
@@ -1121,11 +1118,21 @@ public sealed partial class DenTools
         var (path, ids) = Locate(entity, universe);
         using (EnterWrite())
         {
-            var tracked = new TrackingDenSource(Snapshot(), forWrite: true);
+            var tracked = new TrackingDenSource(Snapshot());
             IDenSource den = tracked;
             var structure = DenStructure.Load(den);
             var original = den.TryReadFile(path) ?? throw GoneOrUnreadable(den, path);
             CheckHash(path, original, hash);
+
+            // The index reads as a view, so it can have found a note this load can't place:
+            // what's above it is open in another program, or changed since (#298).
+            if (EntityCatalog.EntityFileScope(structure, path) is null)
+            {
+                RefuseHeldAbove(tracked, structure, path);
+                throw new DenToolException(
+                    ToolErrorCodes.InvalidEdit, $"An error in what holds {path} leaves it out too, so it can't be edited here. {ToolWords.Cap(Words.CheckFile(path))} to see it.");
+            }
+
             var read = EntityCatalog.ReadEntityFile(structure, path, original);
             var before = read.Entity ?? throw new DenToolException(
                 ToolErrorCodes.InvalidEdit, $"{path} has errors now, so the den leaves it out and it can't be edited here. {ToolWords.Cap(Words.CheckFile(path))} to see them.");
@@ -1207,7 +1214,11 @@ public sealed partial class DenTools
             $"Book '{book.Key}' has no chapter '{key}'." + (book.Chapters.Count == 0 ? " It has no chapters yet." : $" Its chapters: {string.Join(", ", book.Chapters.Select(c => c.Key))}."));
     }
 
+    /// <summary>The den for a write to build on: a file another program has open to write can't be read (#298).</summary>
     private IDenSource Snapshot() => Store is FileSystemDenStore disk ? disk.Snapshot() : Store;
+
+    /// <summary>The den for a read tool, or for what's said about one: it reads as the index does (#298). A write never builds on this.</summary>
+    private IDenSource ViewSnapshot() => Store is FileSystemDenStore disk ? disk.ViewSnapshot() : Store;
 
     /// <summary>
     /// Loads everything the den reads, for a write that has to have seen
@@ -1226,10 +1237,56 @@ public sealed partial class DenTools
     /// <summary>Everything the den reads, through a source that remembers what it couldn't.</summary>
     private (TrackingDenSource Den, DenStructure Structure, EntityCatalog Catalog, LinkIndex Links) LoadTracked()
     {
-        var den = new TrackingDenSource(Snapshot(), forWrite: true);
+        var den = new TrackingDenSource(Snapshot());
         var structure = DenStructure.Load(den);
         var catalog = EntityCatalog.Load(structure, den);
         return (den, structure, catalog, LinkIndex.Build(catalog, den));
+    }
+
+    /// <summary>
+    /// What a view can't read, so what the index left out. A file another program
+    /// merely has open to write isn't among these: the index read it, so it can't
+    /// be why a name wasn't found (#298).
+    /// </summary>
+    private IReadOnlyList<UnreadablePath> UnreadableToViews()
+    {
+        var den = new TrackingDenSource(ViewSnapshot());
+        var structure = DenStructure.Load(den);
+        var catalog = EntityCatalog.Load(structure, den);
+        _ = LinkIndex.Build(catalog, den);
+        return den.Unreadable;
+    }
+
+    /// <summary>
+    /// Refuses, naming what can't be read, if a lookup failed because a file
+    /// above what a write is about can't be read for it. The index reads as a
+    /// view, so it can have found a book whose <c>book.md</c> another program
+    /// has open to write, and the lookup would then call the book missing (#298).
+    /// </summary>
+    private T Finding<T>(TrackingDenSource den, Func<T> find)
+    {
+        try
+        {
+            return find();
+        }
+        catch (DenToolException e) when (e.Code is ToolErrorCodes.UnknownScope or ToolErrorCodes.UnknownUniverse && den.Unreadable.Count > 0)
+        {
+            throw Unreadable(den.Unreadable);
+        }
+    }
+
+    /// <summary>
+    /// Refuses, naming it, if the note at <paramref name="path"/> can't be read as
+    /// the den would because of a file above it that can't be read for this write,
+    /// so it isn't blamed for an error it doesn't have (#298).
+    /// </summary>
+    private void RefuseHeldAbove(TrackingDenSource den, DenStructure structure, string path)
+    {
+        var why = den.Unreadable.Where(u => !structure.IsLoaded || IsAtOrUnder(path, u.IsFolder ? u.Path : DenPaths.Parent(u.Path))).ToList();
+        if (why.Count > 0)
+        {
+            throw Unreadable(why);
+        }
     }
 
     /// <summary>
@@ -1244,26 +1301,6 @@ public sealed partial class DenTools
         if (unreadable.Count > 0)
         {
             throw Unreadable(unreadable);
-        }
-    }
-
-    /// <summary>
-    /// Refuses a write, just before it saves, if a file it read can't be read
-    /// now or holds something else now. What it read may have been part of
-    /// another program's save, which can hide a link or a final book's status
-    /// in a file it wouldn't otherwise rewrite, so every file read is
-    /// compared, not only those to be written (#298).
-    /// </summary>
-    private void RefuseChangedOrUnreadable(TrackingDenSource den)
-    {
-        BeforeSaveCheck?.Invoke();
-        var changed = den.ChangedSinceRead();
-        RefuseUnreadable(den);
-        if (changed.Count > 0)
-        {
-            throw new DenToolException(
-                ToolErrorCodes.StaleFile,
-                $"{Named(changed.Select(p => new UnreadablePath(p, IsFolder: false)).ToList())} changed while this was being worked out, perhaps being saved in another program, so nothing was written. Read it again and retry.");
         }
     }
 
@@ -1528,18 +1565,29 @@ public sealed partial class DenTools
     }
 
     /// <summary>
+    /// What to say of a file a write read that isn't the same just before it saves:
+    /// another program has it open now, so it's named as one that can't be read, or
+    /// it changed. <see cref="DenToolException.StalePath"/> says which file, since
+    /// it needn't be the one the writer is editing (#298).
+    /// </summary>
+    private DenToolException ChangedOrHeld(string path, byte[]? now, string what) =>
+        now is null && Store.FileExists(path)
+            ? Unreadable([new UnreadablePath(path, IsFolder: false)])
+            : new DenToolException(ToolErrorCodes.StaleFile, $"{path} changed while the {what} was being made, so nothing was written. Read it again and retry.") { StalePath = path };
+
+    /// <summary>
     /// Writes the files, after checking that none changed since it was read
     /// (<paramref name="originals"/>), and that a new file isn't there yet.
     /// </summary>
     private void Save(Dictionary<string, byte[]> files, IReadOnlyDictionary<string, byte[]>? originals, string? created)
     {
+        BeforeSaveComparison?.Invoke();
         foreach (var (path, original) in originals ?? new Dictionary<string, byte[]>())
         {
             var now = Store.TryReadFile(path);
             if (now is null || !now.AsSpan().SequenceEqual(original))
             {
-                throw new DenToolException(
-                    ToolErrorCodes.StaleFile, $"{path} changed while the edit was being made, so nothing was written. Read it again and retry.");
+                throw ChangedOrHeld(path, now, "edit");
             }
         }
 

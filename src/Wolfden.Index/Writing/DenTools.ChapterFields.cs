@@ -28,7 +28,7 @@ public sealed partial class DenTools
         }
 
         var (universeKey, _) = LocateBook(book.Trim(), universe);
-        var den = Snapshot();
+        var den = ViewSnapshot();
         var structure = DenStructure.Load(den);
         var found = FindBook(structure, universeKey, book.Trim());
         var links = new Lazy<LinkResolver>(() => new LinkResolver(EntityCatalog.Load(structure, den)));
@@ -53,7 +53,7 @@ public sealed partial class DenTools
     public ChapterDefaultsSourceResult GetChapterDefaultsSource(string? universe = null, string? series = null, string? book = null)
     {
         var universeKey = LocateContainer(universe, series, book);
-        var den = Snapshot();
+        var den = ViewSnapshot();
         var structure = DenStructure.Load(den);
         var container = FindContainer(structure, universeKey, series, book);
         var links = new Lazy<LinkResolver>(() => new LinkResolver(EntityCatalog.Load(structure, den)));

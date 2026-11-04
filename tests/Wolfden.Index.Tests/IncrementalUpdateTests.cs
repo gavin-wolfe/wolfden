@@ -267,7 +267,7 @@ public sealed class IncrementalUpdateTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-MCP-41")]
+    [Trait("Scenario", "SC-MCP-43")]
     public void ANoteCaughtPartWayThroughASaveIsPutRightByTheNextChange()
     {
         using var den = TempDen.Starfall();

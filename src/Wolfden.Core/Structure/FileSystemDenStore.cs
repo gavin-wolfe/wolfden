@@ -91,6 +91,12 @@ public sealed class FileSystemDenStore : IDenStore, IDenChangeFeed
     /// </summary>
     public FileSystemDenSource Snapshot() => new(Root);
 
+    /// <summary>
+    /// <see cref="Snapshot"/> for a view rather than a write: it can read a file
+    /// another program has open to write (<see cref="FileSystemDenSource.ForViews"/>).
+    /// </summary>
+    public FileSystemDenSource ViewSnapshot() => FileSystemDenSource.ForViews(Root);
+
     private IDenSource Reads => Snapshot();
 
     /// <inheritdoc />
@@ -116,9 +122,6 @@ public sealed class FileSystemDenStore : IDenStore, IDenChangeFeed
 
     /// <inheritdoc />
     public bool CannotList(string path) => Reads.CannotList(path);
-
-    /// <inheritdoc />
-    public bool IsOpenForWriting(string path) => Reads.IsOpenForWriting(path);
 
     /// <inheritdoc />
     public IEnumerable<string> GetFolderLinks(string path) => Reads.GetFolderLinks(path);

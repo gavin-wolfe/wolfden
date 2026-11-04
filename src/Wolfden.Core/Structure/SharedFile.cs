@@ -1,29 +1,28 @@
 namespace Wolfden.Core.Structure;
 
 /// <summary>
-/// How the den's files are opened to be read (#298): shared with anything
-/// that's writing, renaming, or deleting them, so only a truly exclusive lock
-/// refuses a read, and a read never gets in the way of another program's save.
+/// How a view opens a den's file to read it (#298): shared with anything
+/// writing, renaming, or deleting it, so only a lock that keeps others from
+/// reading stops a page or a check seeing a note that's open elsewhere.
 /// </summary>
 /// <remarks>
 /// <para>
-/// The cost is that a read during another program's save can see part of it.
-/// A view corrects itself on its next read. A write can't take that on trust:
-/// see <see cref="TrackingDenSource"/>, and format.md F-GEN-5.
+/// A read like this can land part way through another program's save. A view
+/// corrects itself on its next read. A write couldn't undo what it built on
+/// that part, so nothing a write builds on reads this way: it reads with
+/// <see cref="File.ReadAllBytes(string)"/>, which doesn't share writing, so it's
+/// refused while another program has the file open to write. See
+/// <see cref="FileSystemDenSource.ForViews"/> and format.md F-GEN-5.
 /// </para>
 /// <para>
-/// On Linux and macOS, .NET turns any sharing into the same advisory shared
-/// <c>flock</c> (<see cref="FileShare.None"/> alone takes an exclusive one),
-/// and ignores <see cref="FileShare.Delete"/>. So there this changes nothing:
-/// only a program that takes an exclusive <c>flock</c> refuses a read, as it
-/// did before, and a program that doesn't lock could always be read mid-save.
+/// On Linux and macOS, .NET takes the same advisory shared <c>flock</c> for any
+/// sharing but <see cref="FileShare.None"/>, and ignores
+/// <see cref="FileShare.Delete"/>, so the two kinds of read are the same there:
+/// only an exclusive <c>flock</c> refuses either one.
 /// </para>
 /// </remarks>
 public static class SharedFile
 {
-    // ERROR_SHARING_VIOLATION.
-    private const int SharingViolation = 32;
-
     /// <summary>
     /// The bytes of the file at the full path <paramref name="full"/>, read to
     /// its end as it is at that moment, so a file that shrinks or grows during
@@ -35,35 +34,5 @@ public static class SharedFile
         using var bytes = new MemoryStream();
         stream.CopyTo(bytes);
         return bytes.ToArray();
-    }
-
-    /// <summary>
-    /// True if another program has the file at the full path
-    /// <paramref name="full"/> open with write access now. Only Windows can
-    /// tell, so it's false on Linux and macOS, where programs writing a file
-    /// don't normally say so. False too if the file can't be opened for any
-    /// other reason: what reads it next reports that.
-    /// </summary>
-    public static bool IsOpenForWriting(string full)
-    {
-        if (!OperatingSystem.IsWindows())
-        {
-            return false;
-        }
-
-        try
-        {
-            // Not sharing writes is what conflicts with a program that has write access.
-            using var probe = File.OpenHandle(full, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
-            return false;
-        }
-        catch (IOException e) when ((e.HResult & 0xFFFF) == SharingViolation)
-        {
-            return true;
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            return false;
-        }
     }
 }

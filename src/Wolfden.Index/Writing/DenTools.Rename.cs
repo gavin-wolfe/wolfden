@@ -298,7 +298,7 @@ public sealed partial class DenTools
                     $"{string.Join("; ", frozenRelinks.Take(ListedLinkChanges).Select(l => $"{Where(l.After)} reaches {Reached(l.Before)}"))}. Nothing was changed. Choose other text.");
             }
 
-            RefuseChangedOrUnreadable(den);
+            RefuseUnreadable(den);
             Save(files, plan.Originals, created: null);
             var after = EntityCatalog.ReadEntityFile(check.Structure, path, files[path]).Entity!;
             var ownMoved = moved.Any(l => l.Before.Target?.Path == path);

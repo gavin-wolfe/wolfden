@@ -255,7 +255,7 @@ internal sealed class IndexUpdater
         }
         else
         {
-            var source = new OverlayDenSource(new FileSystemDenSource(_root), overlay);
+            var source = new OverlayDenSource(FileSystemDenSource.ForViews(_root), overlay);
             next = IndexWriter.Update(state, source, entities, outlines, tree);
         }
 

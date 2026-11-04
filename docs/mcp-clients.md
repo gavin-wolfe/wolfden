@@ -252,7 +252,8 @@ prompts. This list is for knowing what the assistant can do.
   skipped. `check` lists such a file if it's locked against reading. An error
   that a name or position wasn't found keeps its own code, and adds that a file
   couldn't be read and may be why. If a file is only open to write, a write's
-  lookup that fails is `den_unreadable` naming it, even if the name is wrong too.
+  lookup that fails says the same, but its code is `den_unreadable`: check the name
+  in the message too, since either could be the cause.
 - **Effects, not just bytes.** Results say what an edit means for the
   story: a status that takes an entity out of canon views, a chapter left
   with no POV, the links a rename rewrote, and any link that would now

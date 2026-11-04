@@ -830,14 +830,16 @@ from the files:
   The limits: on Linux and macOS, .NET takes the same shared `flock` for any
   sharing, and a program writing a file doesn't normally take a lock, so both kinds
   of read behave the same and a write there can read part of a save, as it always
-  could. And on every OS, **a program can still lose a save without a word,** as on
+  could. And on Windows **a program can still lose a save without a word,** as on
   `main`: if it starts saving after a write has read that file and stalls briefly,
-  the store's retry of about 300 ms keeps trying while the file is open, then
-  replaces it once the program closes it, and the write reports success. The
-  review of #307 measured this with saves timed to overlap a call (starting 0–120 ms
-  in, stalling 100–250 ms): 5 and 13 lost of 150 on this branch, 3 and 8 of 150 on
-  `main`, and 0 of 60 with stalls of 500 ms or more. An ordinary temp-and-rename save
-  can hit the same gap. A follow-up may stop the retry when the file has changed.
+  the store's retry of about 300 ms, which only runs on Windows, keeps trying while
+  the file is open, then replaces it once the program closes it, and the write
+  reports success. The review of #307 measured this on Windows, with saves timed to
+  overlap a call (starting 0–120 ms in, stalling 100–250 ms): 5 and 13 lost of 150 on
+  this branch, 3 and 8 of 150 on `main`, and 0 of 60 with stalls of 500 ms or more.
+  An ordinary temp-and-rename save can hit the same gap. Linux and macOS weren't
+  measured. The maintainer has decided the fix, in #323: compare the file again
+  before each retry.
   `checkpoint` hands files to git, which reads them itself, so a
   checkpoint can record part of a save; a freeze refuses first but can't stop
   a save that starts after that look.

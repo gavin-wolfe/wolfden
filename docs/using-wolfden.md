@@ -1533,17 +1533,18 @@ in it, which Wolfden calls a checkpoint.
   refused too if it's that note's `book.md`, `series.md`, or `universe.md` that's
   open, or `den.yaml`. It says which file, and changes nothing. Close it there, or
   wait for the save to finish, then try again. An edit of a different note isn't
-  stopped, and neither is adding an image to the note that's open. A change whose
-  note or book can't be found while something's open says which file is open, even
-  if the name you gave is wrong too: try again once it's closed.
-- **A save can still be lost if it starts just after Wolfden has started.** If you
-  save a note in another program in the moment Wolfden is changing that same note,
-  and that program pauses briefly part way, Wolfden can finish its change over
+  stopped, and neither is adding an image to the note that's open. If a change can't
+  find a note or book while something's open, it says what it couldn't find and which
+  file is open, since either could be the cause. Check the name, and try again once
+  that file is closed.
+- **On Windows, a save can still be lost if it starts just after Wolfden has started.**
+  If you save a note in another program in the moment Wolfden is changing that same
+  note, and that program pauses briefly part way, Wolfden can finish its change over
   yours and report success, and your save is gone. Nothing warns you. This takes a
-  save timed within a fraction of a second of a change, so it shouldn't be common,
-  but it isn't impossible, on any system. Don't save a note elsewhere while your
-  assistant or a page is changing it, and checkpoint often: history keeps what you
-  checkpointed.
+  save timed within a fraction of a second of a change, so it shouldn't be common.
+  It's been measured on Windows only. A fix is planned (#323). Until then, don't save
+  a note elsewhere while your assistant or a page is changing it, and checkpoint
+  often: history keeps what you checkpointed.
 - **`wolfden check` won't list a note that's only open to write,** so a refusal can
   name a file `check` calls fine. That's expected.
 - **A program that locks a note against reading goes further.** `wolfden check`

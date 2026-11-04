@@ -1248,7 +1248,8 @@ Spec: format.md F-GEN-5 (#298). Covered by:
 `SharedFileTests.AViewReadsAFileAProgramIsWritingAndLettingOthersRead` (Core),
 `SharedFileTests.CheckDoesntListAHeldNoteWhenItsSharedAndDoesWhenItIsnt` (Core),
 `SharedFileWriteTests.PagesAndCheckSeeANoteOpenElsewhereAndAWrongNameDoesntBlameIt` (MCP),
-`SharedFileWriteTests.ReadToolsSeeABookFileOpenElsewhere` (MCP).
+`SharedFileWriteTests.ReadToolsSeeABookFileOpenElsewhere` (MCP),
+`SharedFileWriteTests.AWrongNameInEveryReadLookupDoesntBlameANoteOpenElsewhere` (MCP).
 
 ## RT: saving a note keeps what the writer wrote
 
@@ -3404,9 +3405,10 @@ rename him.
 - An edit of a note whose `book.md`, `series.md`, or `universe.md`, or `den.yaml`,
   is open names that file. It doesn't say the note has errors. A write to `book.md`,
   such as adding a chapter, a chapter's fields, its defaults, or freezing, names
-  `book.md`, and doesn't say the book is gone. That holds when the save has stopped
-  inside the frontmatter, so the index can't load what it read: the lookup fails,
-  and the refusal still names the file.
+  `book.md`, and doesn't say the book is gone. If the save has stopped inside the
+  frontmatter, the index can't load what it read, so the lookup fails. Then it's
+  still `den_unreadable`, with the lookup's own error first, such as "has no book",
+  and then "Couldn't read `book.md` right now, which may be why."
 - Adding an image is refused the same way if what's above the note is open, since
   that's how it knows whether the book is final. So an image can't reach a final
   book this way. The note itself being open doesn't stop it: an image doesn't read
@@ -3414,27 +3416,31 @@ rename him.
 - If a file the write read becomes open just before it saves, it's named as open.
   If it changed, it's `stale_file`, naming it.
 - A note open elsewhere doesn't stop an edit of a different note.
-- A wrong name in a write, while something is open to write, is `den_unreadable`
-  naming that, since Wolfden can't tell which is the cause. Once it's closed, the
-  same call is `unknown_entity`. A read tool's wrong name doesn't name it: a read
-  can see that file.
+- A wrong name in a write, while something is open to write, is `den_unreadable`,
+  since Wolfden can't tell which is the cause. The message says both, the wrong name
+  first, with any hint such as "Its books: dracula", then the file: "No entity
+  matches 'Mr. Swalez'. Couldn't read X right now, which may be why." Once it's
+  closed, the same call is `unknown_entity`. A read tool's wrong name doesn't name
+  it: a read can see that file.
 - On Linux and macOS, Wolfden can't tell a program has a file open, so none of
   these refusals come, and a write can build on part of a save, as it always could.
-- **What it can't catch, on any system:** a save that starts after the write has
-  read the file. If it stalls for a moment, about 100–250 ms in the measurements,
+- **What it can't catch, for now:** a save that starts after the write has read the
+  file. On Windows, if it stalls for a moment, about 100–250 ms in the measurements,
   the store's retry keeps trying and replaces the file once the program closes it.
-  The write reports success, and that save is gone.
+  The write reports success, and that save is gone. #323 will compare the file again
+  before each retry. Linux and macOS have no such retry, and this wasn't measured there.
 
 Spec: format.md F-GEN-5, F-RT-5, F-BOOK-1 (#298). Covered by:
 `SharedFileWriteTests.ARenameIsRefusedByAStalledSaveInAnotherProcessAndTheNoteIsLeftWhole`,
 `SharedFileWriteTests.AFreezeIsRefusedByAStalledSaveInAnotherProcessAndTagsNothing`,
-`SharedFileWriteTests.AddingAChapterDuringAStalledSaveOfBookMdNamesItAndDoesntSayTheBookIsGone`,
+`SharedFileWriteTests.AddingAChapterDuringAStalledSaveOfBookMdNamesIt`,
 `SharedFileWriteTests.EditingANoteDuringAStalledSaveOfItsBookMdNamesThat`,
-`SharedFileWriteTests.EditingANoteDuringAStalledSaveOfItNamesItAndDoesntBlameIt`,
+`SharedFileWriteTests.EditingANoteDuringAStalledSaveOfItNamesIt`,
 `SharedFileWriteTests.AnImageCantReachAFrozenBookDuringAStalledSaveOfItsBookMd`,
 `SharedFileWriteTests.AnImageCantReachAFrozenBookWhileWhatsAboveTheNoteIsOpenElsewhereOnWindows`,
 `SharedFileWriteTests.AnImageIsntStoppedByItsOwnNoteOrAnotherOpenElsewhere`,
-`SharedFileWriteTests.AWrongNameInAWriteNamesAFileOpenElsewhereThenSaysItsWrongOnWindows`,
+`SharedFileWriteTests.AWrongNameInAWriteSaysSoAndNamesAFileOpenElsewhereOnWindows`,
+`SharedFileWriteTests.AWrongBookInAWriteKeepsItsHintAndNamesAFileOpenElsewhereOnWindows`,
 `NewChapterCommandTests.AddingAChapterPartWayThroughASaveOfBookMdNamesIt` (CLI),
 `SharedFileWriteTests.AWriteThatReadsTheWholeDenIsRefusedNamingTheNoteOpenElsewhereOnWindows`,
 `SharedFileWriteTests.ANewBookOrSeriesIsRefusedNamingTheFileThatsOpenInItsStoryOrderOnWindows`,
@@ -6385,7 +6391,11 @@ On Windows, I have a note open in another program that lets others read it.
   try again. My text stays in the editor.
 - If what's open is that note's `book.md`, the message names `book.md`. It doesn't
   say the note has errors. Adding a chapter says the same, and so does adding an
-  image, which is refused rather than risk reaching a final book.
+  image, which is refused rather than risk reaching a final book. If a save has
+  stopped inside the frontmatter, the page's lookup can fail too: the message then
+  starts with that error, and goes on to name the file that may be why.
+- A wrong name on a read, such as a book that isn't there, says only that. It doesn't
+  name a note open elsewhere, or say nothing was changed.
 - If a rename or section rename is stopped because a different note changed, the
   message names that note. It doesn't say this note changed, or offer it as what
   changed.

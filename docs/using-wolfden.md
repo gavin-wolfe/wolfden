@@ -825,10 +825,22 @@ all, so it can't write toward it. When you're planning with one, ask it to
 read the note with no position, and it sees every date. A thread's `planted`
 and `paid_off`, and any other field that holds a story position, work the same
 way for it: at a position, it isn't told a value later than that, or one that
-isn't a chapter or book your universe has. You still see them all. This goes by
-positions only: text you put in a section or lead, or a field the note's type
-doesn't define, reaches the assistant as written, so it can still mention later
-events. Its instructions also
+isn't a chapter or book your universe has. You still see them all.
+
+**Comments don't reach an assistant drafting at a position.** An HTML comment in
+a lead or section (`<!-- She dies at ash:4 -->`) is safe for notes to yourself:
+at a position, an assistant doesn't get it, and isn't told it was there. That
+also means a comment can't carry guidance to it. For guidance it should follow
+while drafting, such as "keep her limp out of this chapter", write it as visible
+text, in a section of its own if you like, or ask the assistant to read the note
+with no position, where it gets every comment. A comment shown as code, in
+backticks or a code block, stays. You still see them all, and so does an assistant
+with no position. If it edits a note's file some way other than Wolfden's tools,
+it's told to read that way first, so it doesn't rewrite your comments away.
+
+Apart from that, this goes by positions only: text you put in a section or lead,
+a field the note's type doesn't define, or a `ref` field's value reaches the
+assistant as written, so it can still mention later events. Its instructions also
 tell it to read ahead for planning, foreshadowing, and reviewing continuity
 across chapters, and when writing a character who knows more than the reader,
 without letting later facts reach the prose. It can still tell you anything you
@@ -1451,9 +1463,22 @@ in it, which Wolfden calls a checkpoint.
   text in the section the comment is under, with no position of its own. On
   the page, that section's heading shows at every position where the note
   does, and the text after it, plus any later sections it swallowed, disappears.
-  An assistant reading through the tools gets the raw text, so a reveal in it
-  can reach an assistant at an early position. `wolfden check` still passes, so
+  An assistant reading at a position doesn't get the swallowed text either, but
+  it does get whatever comes after that `-->`, with no position of its own, so a
+  reveal there can reach it early. `wolfden check` still passes, so
   read its warnings: this one names the line where the swallowed text ends.
+- **A stray comment marker can keep your text from an assistant, with no
+  warning.** At a position, an assistant doesn't get what a comment hides, and
+  Wolfden reads a badly formed comment on the side of hiding. If you write
+  `<!-- to do` in a paragraph and forget the `-->`, and a `-->` comes later in the
+  section with no other comment on the way, the assistant gets nothing between
+  them, however long that is, while the page shows it all with the stray markers
+  in it. With a comment on the way, only the rest of that paragraph is hidden. A
+  comment with another inside it, `<!-- old <!-- older -->`, also hides any text
+  up to a second `-->`, as long as there's no blank line first, and the page may
+  look fine. `wolfden check` doesn't warn about either yet, so if an assistant
+  seems not to know something, read the note with no position or look for a stray
+  marker.
 - **Copying a note's file by hand makes a duplicate.** Both files have
   the same `id`, so Wolfden leaves both out of views, and links to them
   break, until one gets a new id. Copy with `wolfden copy`, or ask an AI

@@ -1208,7 +1208,8 @@ the warning says to move it to the next line, and any in `outline.md`.
 
 **F-SEC-11.** All other HTML comments are kept and ignored, wherever they
 are, including directly under a heading. A comment inside a code block or
-code span is just text.
+code span is just text. An AI assistant's read at a position leaves out every
+comment (F-VIEW-6).
 
 **F-SEC-12.** A **bookkeeping** section records work on the notes rather
 than the story: a change log or session notes. A section is bookkeeping if
@@ -1358,7 +1359,9 @@ order.
 than `p`. It says when the fact stops holding, which a reader at `p`
 doesn't know yet. An AI assistant's read at a position (design.md §8) MUST
 leave it out, and doesn't say it did, since saying so would hint that the
-fact ends. The assistant reads it without a position. A view for the writer,
+fact ends. For the same reason, a field that was an entry or a list item only
+to hold its `until`, with no `from`, `pin`, or status of its own, reads as
+`plain`. The assistant reads it without a position. A view for the writer,
 who may be checking their own plan, keeps it, and the web UI marks it (design.md §9).
 The view at the end of the story has no `until` to leave out: it holds only
 the facts still in effect when the story ends.
@@ -1374,6 +1377,44 @@ later items go, a list that had items and has none left goes entirely, and a
 list written empty stays. A value that can't be compared (not a position, or a
 position that doesn't resolve, F-POS-4) goes too. A view without a position,
 and a view for the writer, leave out nothing under this rule.
+
+**F-VIEW-6.** An HTML comment can say anything, including what a reader at `p`
+doesn't know yet. An AI assistant's read at a position MUST leave every HTML
+comment out of a lead, and out of a section's text and heading, and doesn't say
+it did. That covers the writer's own comments and wolfden comments that do
+nothing (F-SEC-10). A view without a position, and a view for the writer, leave
+out nothing under this rule. Since a badly formed comment may still be meant to
+hide what it holds, this rule reads comments more widely than CommonMark does:
+
+- `<!--` starts a comment anywhere in the text, in any block, except in a code
+  span or code block (F-SEC-11), or after a backslash that escapes it. Both
+  show as text, and stay. A backslash escapes nothing in an HTML block. A fence's
+  info string isn't code, so a comment in it goes, ending with the line at the latest.
+- A comment ends at its first `-->`, however far on, unless another `<!--` opens
+  on the way. Then, if a later `-->` balances the two with no blank line after the
+  first `-->`, the comment ends there. If there's a blank line before the first
+  `-->`, and the comment doesn't start a comment block on a line of its own,
+  nothing closes it and the next rule applies, since that `-->` belongs to the
+  later comment. So a stray `<!--` or `-->` can't take the paragraphs after it
+  unless no other comment comes between. A `-->` with no comment open is text.
+- A comment that nothing closes runs to the end of its block. On a line of its
+  own that's an HTML block, which has no end (F-SEC-10), so the rest of the text
+  goes with it. In a paragraph or heading, where CommonMark shows it as text, the
+  next block stays. Each lead and section's own text is read alone, so a comment
+  doesn't run on into the next section unless F-SEC-10 has already made it part
+  of this one.
+- The text reads as if no comment was there. A line it leaves empty goes, and a
+  comment between two lines leaves one blank line, as it was a block of its own.
+  A list item or block quote holding only a comment goes too. Nothing else
+  changes, in code or elsewhere, and neither do `line` numbers, which are the file's.
+- A lead or section with only comments reads as one with no text. The section
+  stays listed, since its heading isn't a comment. A heading with only a comment
+  has an empty name in every view (F-SEC-3), and its subsections' `heading_path`
+  has the same.
+
+A field's value isn't markdown, so a `<!--` in one is text. YAML comments aren't
+in any view. A write based on such a read isn't refused, since the file's hash is
+the same, so an assistant MUST read without a position before replacing text.
 
 ### 9.5 Keeping reveals in place
 

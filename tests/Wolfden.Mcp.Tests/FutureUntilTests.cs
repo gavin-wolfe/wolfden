@@ -106,6 +106,50 @@ public sealed class FutureUntilTests : IDisposable
 
     [Fact]
     [Trait("Scenario", "SC-MCP-41")]
+    public void AnUntilThatWasAllAFieldHadLeavesNoHintInItsKind()
+    {
+        _den.Write(
+            "universes/starfall/entities/notes/the-toll-board.md",
+            """
+            ---
+            type: note
+            name: The toll board
+            status: canon
+            fields:
+              plain_one: written plain
+              single: { value: lasts, until: "ash:2" }
+              listed:
+                - { value: lasts, until: "ash:2" }
+              dated:
+                - { value: lasts, from: "ember:1", until: "ash:2" }
+              marked: { value: lasts, until: "ash:2", status: draft }
+              pinned_one: { value: lasts, until: "ash:2", pin: true }
+              no_end: { value: stays }
+            ---
+
+            # The toll board
+            """);
+
+        using var json = Read(_tools.GetEntity("The toll board", "starfall", "ember:1"));
+
+        Assert.Equal("plain", Field(json, "plain_one").GetProperty("kind").GetString());
+        Assert.Equal("plain", Field(json, "single").GetProperty("kind").GetString());
+        Assert.Equal("plain", Field(json, "listed").GetProperty("kind").GetString());
+
+        // These say something else that makes them an entry, and that's all they say.
+        Assert.Equal("temporal", Field(json, "dated").GetProperty("kind").GetString());
+        Assert.Equal("entry", Field(json, "marked").GetProperty("kind").GetString());
+        Assert.Equal("entry", Field(json, "pinned_one").GetProperty("kind").GetString());
+        Assert.Equal("entry", Field(json, "no_end").GetProperty("kind").GetString());
+
+        // A read with no position still has them as written.
+        using var full = Read(_tools.GetEntity("The toll board", "starfall"));
+        Assert.Equal("entry", Field(full, "single").GetProperty("kind").GetString());
+        Assert.Equal("temporal", Field(full, "listed").GetProperty("kind").GetString());
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-41")]
     public void AnAssistantHelpingToPlanSeesItByReadingWithoutAPosition()
     {
         using var json = Read(_tools.GetEntity(Ilse, "starfall"));

@@ -1014,6 +1014,13 @@ same code (§9):
   ahead, an assistant reads `get_entity` without `as_of`. It's done in the
   MCP layer (`AsOfReads`), so it's a place these tools differ from
   the web API and `query`, which keep the date for the writer.
+- **A later position value is left out** (maintainer decision on #305).
+  With a position, `canon_as_of` and `get_entity` leave out each value of a
+  `position` field that's later than it (format.md F-VIEW-5), since a thread's
+  `paid_off` says when it resolves, just as an `until` does. A value that
+  can't be compared goes too. It's in `AsOfReads` as well, so the web API and
+  `query` keep every value. The index keeps which fields of each type are
+  `position` fields, since a field's type isn't in its value.
 - **Pinned first.** Results of `canon_as_of` and `get_entity` start with
   `pinned`, the pinned canon view (F-VIEW-2), and list the same facts in
   place too, so each entity is complete.

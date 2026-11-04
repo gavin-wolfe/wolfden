@@ -3372,6 +3372,40 @@ already let the Count in, and the reader learns that at `dracula:21`.
 
 Spec: #300. Covered by: `McpServerTests`.
 
+### SC-MCP-45. My assistant can't see where a thread is going
+
+The missing manifest has `planted: ["ember:2", "ash:1"]` and
+`paid_off: "a-quiet-moon:2b"`. My assistant is drafting `ember:3`.
+
+- `get_entity` with `as_of` `ember:3` gives `planted: ["ember:2"]` and no
+  `paid_off`, and so does `canon_as_of` at `ember:3`. Nothing says they were
+  left out. `pinned` follows the same rule, in full and in `brief`, and a note
+  with nothing else pinned isn't listed there.
+- At `ash:1`, or a bare `ash`, `planted` has both. At `a-quiet-moon:2`, there's
+  still no `paid_off`, since `2b` comes after `2` in reading order. At
+  `a-quiet-moon:2b` it's there.
+- A field of any type counts if the type defines it as `position`, written plain,
+  as an entry, or as a list of dated entries. In a list, only the later items go.
+  A list with nothing left goes entirely, and one I wrote empty stays.
+- A value that can't be compared is left out: a chapter or book the universe
+  doesn't have, a book of another universe, the scene or row form, or anything
+  that isn't a position.
+- A string field that happens to look like a position, or a field the type
+  doesn't define, comes through as I wrote it.
+- When the assistant is helping me plan, `get_entity` with no `as_of` gives
+  every value. `canon_as_of` with no position leaves none out for being later,
+  though it's the end of the story, so it has only each field's entry in effect then.
+- `update_fields` and every `expected_hash` say to read without `as_of` before
+  changing a field, since a read at a position can hide a value or shift a
+  list's item numbers. It's advice: the hash is the same from both reads, so a
+  write based on a read at a position isn't refused.
+- A section or lead I wrote, or a field the type doesn't define, can still mention
+  a later event, and the tool's description says so.
+- The web API gives every value at the same position, for me.
+
+Spec: F-VIEW-5 (#305). Covered by: `FuturePositionFieldTests`,
+`ReadEndpointTests.APositionFieldsLaterValuesStayForTheWriter`.
+
 ## STORE: Wolfden saves, moves, and deletes notes
 
 Background: the den store (design.md §6, #121) is how Wolfden writes a

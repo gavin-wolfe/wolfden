@@ -3312,6 +3312,49 @@ until `ash:3`. My assistant is drafting a chapter.
 
 Spec: F-VIEW-4 (#288). Covered by: `FutureUntilTests`.
 
+### SC-MCP-42. My assistant adds a note with an apostrophe in its name
+
+The writer asks for "Mina's Journal", typed with a straight apostrophe or a
+curly one.
+
+- The file or folder is `minas-journal`: the apostrophe is dropped rather
+  than made a hyphen, so "O'Brien's War" is `obriens-war`. A leading "The"
+  stays (`the-long-dark`), and a space still ends a word (`rock-n-roll`). An
+  image's file name follows the same rule (`minas-map.png`).
+- "Minas Journal" reaches the same key, so they clash. A second note or copy
+  in that folder gets `minas-journal-2.md`, and `minas-journal` asked for as
+  a slug is refused (`already_exists`). A book whose key another book in the
+  universe has is refused (`already_exists`), since positions name a book by
+  its key alone, and so is a series whose key another series or a standalone
+  book has (F-KEY-5). A series can share a key with a book inside a series.
+- A name of only apostrophes has nothing to make a key from: a note uses the
+  type key, an image is `image.png`, and a book or series is refused.
+- A den made before this keeps its keys. `mina-s-house.md` and its
+  `[[mina-s-house]]` links work, and so do positions in a book folder
+  `mina-s-journal`. Renaming or moving the note keeps the slug. A new note or
+  book of the same name gets the new form beside the old one, and the old
+  one's file doesn't change, unless a link by that name would become
+  ambiguous: with a `[[Mina's House]]` link elsewhere, a new "Mina's House" is
+  refused unless `allow_relinks` is given.
+- "Mina's" and "Minas" share a slug across folders too. With a `[[Minas]]`
+  link, a new "Mina's" is refused, since its slug would take the link. With no
+  such link it's made, and a later `[[minas]]` gets the usual ambiguous-link
+  warning, as for identical names.
+
+Spec: types.md F-TPL-6, format.md F-KEY-4, F-KEY-5 (#289). Covered by:
+`WriteToolTests.AnApostropheIsDroppedFromASlugAndALeadingTheStays`,
+`WriteToolTests.TwoNamesThatReachOneSlugDontShareAFile`,
+`WriteToolTests.ANoteWithAnOldHyphenSlugKeepsItAndItsLinksStillReachIt`,
+`WriteToolTests.ANewNoteOfAnOldFormsNameThatWouldTakeALinkIsRefusedUnlessAllowed`,
+`WriteToolTests.NamesThatShareASlugInDifferentFoldersOnlyClashOverLinks`,
+`WriteToolTests.ANameOfOnlyApostrophesUsesTheTypeKeyAndReadsBack`,
+`WriteToolTests.RenamingOrMovingAnOldFormNoteKeepsItsSlugAndLinks`,
+`CreateContainerTests.ANameOfOnlyApostrophesMakesNoKeyAndALeadingOneIsLeftOutOfTheSuggestion`,
+`CopyEntityToolTests.ACopysSlugDropsAnApostropheAndTwoNamesThatReachOneSlugDontShareAFile`,
+`CreateContainerTests.TwoNamesThatReachOneKeyAreAClash`,
+`CreateContainerTests.ABookWithAnOldHyphenKeyKeepsItAndItsPositionsStillResolve`,
+`ImageEndpointTests.AnImagesNameDropsAnApostropheAsASlugDoes`.
+
 ## STORE: Wolfden saves, moves, and deletes notes
 
 Background: the den store (design.md §6, #121) is how Wolfden writes a
@@ -5185,14 +5228,14 @@ series**, "The Harker Papers", placed after Dracula, and on its page,
   A name is required and a bad number is refused before anything is sent.
 - **Create** sends `POST /api/book/create` (or `/api/series/create`) with
   the hash `GET /api/works` gave for `universe.md` or `series.md`. It
-  makes `universes/dracula/books/dracula-s-guest/book.md`, with a new id,
+  makes `universes/dracula/books/draculas-guest/book.md`, with a new id,
   the name, and chapters `"1"` to `"3"` numbered 1 to 3, and adds the key
   to the universe's `order`. Dracula's universe had one book and no
   `order`, so the list is written with that book first,
-  `[dracula, dracula-s-guest]`, and `check` stays quiet. The rest of the
+  `[dracula, draculas-guest]`, and `check` stays quiet. The rest of the
   file is as it was.
 - "The Harker Papers" goes after Dracula: `order: [dracula,
-  the-harker-papers, dracula-s-guest]`. A book in a series goes in its
+  the-harker-papers, draculas-guest]`. A book in a series goes in its
   `books`, at the end or after the book chosen. A list that leaves works
   out gets them first, in the order they were read, and a list that
   already names the new key (a book planned ahead) keeps that place, with

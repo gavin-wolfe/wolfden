@@ -156,6 +156,25 @@ public class ImageEndpointTests
     }
 
     [Fact]
+    [Trait("Scenario", "SC-MCP-42")]
+    public async Task AnImagesNameDropsAnApostropheAsASlugDoes()
+    {
+        using var den = TempDen.Dracula();
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+
+        var (status, json) = await UploadAsync(server, Query(Castle, "Mina's Map.png"), Png);
+
+        Assert.Equal(HttpStatusCode.Created, status);
+        Assert.Equal($"{Images}/minas-map.png", json.GetProperty("path").GetString());
+
+        // A name of only apostrophes has nothing to make a name from.
+        var (onlyStatus, only) = await UploadAsync(server, Query(Castle, "'''.png"), Png);
+
+        Assert.Equal(HttpStatusCode.Created, onlyStatus);
+        Assert.Equal($"{Images}/image.png", only.GetProperty("path").GetString());
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-WEB-81")]
     public async Task ANoteInAFinalBookRefusesTheImageWithTheUnfreezeHint()
     {

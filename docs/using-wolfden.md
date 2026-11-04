@@ -146,7 +146,8 @@ The form asks for three things:
 
 Choose **Create**, and Wolfden makes the file from the template and opens
 the new note, with the file's name at the top. Fill it in there, one
-field or section at a time, as below.
+field or section at a time, as below. The file is named from the note:
+"Mina's Aunt" is `minas-aunt.md`, or `minas-aunt-2.md` if that's taken.
 
 A new note is canon from the start of where it goes. If you're viewing the
 story at a chapter, the form also offers **Enters the story at** that
@@ -486,7 +487,8 @@ universe's page is a standalone book: one that isn't in a series. The form
 asks for:
 
 - **Name.** The series' or book's name. Its folder is named from it: "The
-  Long Dark" is `series/the-long-dark/`. That folder name is its *key*, which
+  Long Dark" is `series/the-long-dark/`, and an apostrophe is dropped, so
+  "Mina's Journal" is `minas-journal`. That folder name is its *key*, which
   story positions use (`ember:3`), so it never changes, but you can
   change the name in its `series.md` or `book.md` later.
 - **Place after…** Where it comes in reading order: at the end, at the
@@ -511,8 +513,9 @@ first. The rest of the file is kept as it was.
 Wolfden refuses a name whose key another book or series already has,
 since a story position names a book by its key alone: two books called
 "Ember" in one universe, even in different series, would make `ember:3`
-mean nothing. Choose another name, then change the name in `book.md`
-afterwards if you want it back. A name that starts with a digit
+mean nothing. "Minas Journal" and "Mina's Journal" clash the same way, since
+both make `minas-journal`. Choose another name, then change the name in
+`book.md` afterwards if you want it back. A name that starts with a digit
 ("1984") can't make a key, since keys start with a letter: start it with
 a word, and change it afterwards the same way. Keys use only the letters
 a–z and the digits 0–9 for now, so a name written entirely in another
@@ -900,10 +903,10 @@ When you edit a note's opening, a section, or the whole file in
 - The alt text comes from the file's name. Change it to say what the
   picture shows: it's what shows if the picture can't, and what screen
   readers say.
-- The file name is made simple: lowercase, with `-` for spaces and
-  other characters, so the path needs no `%20`. If the folder already
-  has a file by that name, the new one gets a number (`castle-map-2.png`)
-  and the page says so. Wolfden never replaces an image that's there.
+- The file name is made simple: lowercase, with apostrophes dropped and
+  `-` for spaces and other characters, so the path needs no `%20`. If the
+  folder already has a file by that name, the new one gets a number
+  (`castle-map-2.png`) and the page says so. Wolfden never replaces an image that's there.
 - It takes `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.avif`, and `.svg`
   files of up to 10 MB, and checks that the file really is the kind of
   image its name says. A photo that's too big needs making smaller in an

@@ -27,9 +27,11 @@ public static class WolfdenMcpServer
 
         A story position is 'book:chapter' using the den's keys (such as 'dracula:5'), or a bare book key for the start of that
         book. Facts can carry the position where the reader learns them (from) and where they stop holding (until), so canon
-        changes as the story goes on. Chapter keys come from get_chapter. A read at a position the universe doesn't have, or a
-        write (create_entity, update_fields, append_section) that sets one as a from or until, or as a position field's value
-        (such as a thread's planted), is refused (bad_position), and nothing is written.
+        changes as the story goes on. A read at a position leaves out each fact's until, which the reader doesn't know yet; a read
+        without one (get_entity without as_of) has it, for planning ahead. Read without as_of before changing a fact, so a change
+        doesn't drop an until you weren't shown. Chapter keys come from get_chapter. A read at a position the universe doesn't
+        have, or a write (create_entity, update_fields, append_section) that sets one as a from or until, or as a position field's
+        value (such as a thread's planted), is refused (bad_position), and nothing is written.
 
         Every tool except check reads one universe. A den with one universe uses it. In a den with several, pass 'universe'
         (its key), or a position whose book only one universe has, which settles it. Only search and list_entities take
@@ -44,8 +46,12 @@ public static class WolfdenMcpServer
 
         To draft or review a chapter without spoilers, use canon_as_of with that chapter's position, or get_entity with as_of.
         Without a position, get_entity, list_entities, and search give the author's full view, including ideas and material the
-        reader meets later. Use check for continuity problems, and get_history for the checkpoints that changed an entity and
-        what changed since.
+        reader meets later. Read ahead (get_entity without as_of) to plan, outline, foreshadow, or review continuity across chapters,
+        when the writer asks, or to write a character who knows more than the reader, since a read at a position leaves that out. In
+        prose, the view at the chapter is what the reader knows. A later fact can shape hints, and how a character who'd already know
+        it behaves, but the prose must never state it or have a narrator or point-of-view character reveal it.
+        If you aren't sure which read applies, ask the writer. Use check for continuity problems, and get_history for the checkpoints
+        that changed an entity and what changed since.
 
         An image kept in the den is written in a note as ![alt text](path), with the path relative to the folder of the note's own
         file, or from the den root if it starts with '/'. move_entity and copy_entity don't move images or rewrite their paths.

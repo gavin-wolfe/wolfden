@@ -795,18 +795,23 @@ scope `S`:
    made from `N`: lowercase it, replace the letters that don't decompose
    (`æ` with `ae`, `œ` with `oe`, `ø` with `o`, `ß` with `ss`, `þ` with
    `th`, `ð` and `đ` with `d`, `ł` with `l`), decompose it (NFKD), drop
-   combining marks, replace each run of characters outside `a-z` and
-   `0-9` with one `-`, trim `-` from both ends, and cut it to 64
-   characters (at a word boundary, where there is one), trimming a
-   trailing `-`. So "Ærin Søvik"
-   becomes `aerin-sovik`. If the result is empty, the writer asks for a
-   slug or uses the type key (`character`). The slug MUST be a valid key
-   (F-KEY-1), and `<slug>.md` MUST NOT match the name of a file already in
-   that folder, compared case-insensitively, since many file systems are
-   case-insensitive. If it's taken, the writer asks for a slug, or adds
-   `-2`, `-3`, and so on, first cutting the slug back (at a word boundary,
-   where there is one, and trimming a trailing `-`) so the whole stays
-   within 64 characters.
+   combining marks and apostrophes (`'`, `’`, `‘`, `ʼ`), replace each run
+   of characters outside `a-z` and `0-9` with one `-`, trim `-` from both
+   ends, and cut it to 64 characters (at a word boundary, where there is
+   one), trimming a trailing `-`. So "Ærin Søvik" becomes `aerin-sovik`,
+   "O'Brien's War" and "O’Brien’s War" become `obriens-war`, and "The Long
+   Dark" becomes `the-long-dark`: a leading "The" stays. If the result is
+   empty, the writer asks for a slug or uses the type key (`character`).
+   The slug MUST be a valid key (F-KEY-1), and `<slug>.md` MUST NOT match
+   the name of a file already in that folder, compared case-insensitively,
+   since many file systems are case-insensitive. If it's taken, the writer
+   asks for a slug, or adds `-2`, `-3`, and so on, first cutting the slug
+   back (at a word boundary, where there is one, and trimming a trailing
+   `-`) so the whole stays within 64 characters. So "Minas Journal" and
+   "Mina's Journal" in one folder are `minas-journal` and
+   `minas-journal-2`. This rule only makes new slugs: a slug is the file's
+   name (F-KEY-4), so a file made under an earlier rule, such as
+   `mina-s-journal.md`, keeps its slug and its links.
 2. Writes the frontmatter in template order (F-TPL-7): `id` (a new ULID,
    F-ID-6), `type: T`, `name: N`, then `aliases`, `status`, `from`, and
    `fields` where there are any, then the template's other keys in the

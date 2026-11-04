@@ -368,6 +368,21 @@ public class ReadEndpointTests
     }
 
     [Fact]
+    [Trait("Scenario", "SC-WEB-97")]
+    public async Task AFactsFutureUntilStaysForTheWriter()
+    {
+        using var den = TempDen.Starfall();
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+
+        var page = await server.GetJsonAsync("/api/entity?universe=starfall&entity=Ilse%20Tarrow&asOf=ember:1", HttpStatusCode.OK);
+        Assert.Contains(page.GetProperty("entity").GetProperty("fields").EnumerateArray(), f => f.GetProperty("until").GetString() == "ash:2");
+
+        var canon = await server.GetJsonAsync("/api/canon?universe=starfall&asOf=ash:1", HttpStatusCode.OK);
+        var ilse = canon.GetProperty("entities").EnumerateArray().Single(e => e.GetProperty("name").GetString() == "Ilse Tarrow");
+        Assert.Contains(ilse.GetProperty("sections").EnumerateArray(), s => s.GetProperty("until").GetString() == "ash:3");
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-WEB-7")]
     public async Task ListsAndSearchesWithoutAPositionGiveWhatTheToolsGive()
     {

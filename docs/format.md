@@ -246,6 +246,13 @@ valid chapter key. A chapter key MUST NOT be `r` followed by a digit
 name that isn't a valid key (`Ilse Tarrow.md`) is a [warning]: the entity is
 indexed but has no slug, so links reach it only by id, name, or alias.
 
+A reader takes keys and slugs from the folder and file names as they are, and
+never works them out from a name. A writer making a new one from a name
+follows types.md F-TPL-6, which drops apostrophes ("Mina's Journal" is
+`minas-journal`). A folder or file with another form that's still a valid key,
+such as `mina-s-journal.md`, keeps it, and its links and positions still
+resolve.
+
 **F-KEY-5.** Book keys MUST be unique within a universe, across all of its
 series and standalone books, since positions name a book without its
 series. A series key MUST NOT equal a standalone book key in the same
@@ -1343,6 +1350,16 @@ file path. A series orders at its start (F-ORD-3), just before its first
 book, and a series with no books yet at its own place in story order.
 Within an entity, fields come in frontmatter order and sections in file
 order.
+
+**F-VIEW-4.** A fact past its `until` isn't in a view at that position
+(F-TMP-3, F-SEC-8), so every `until` in a canon-as-of view at `p` is later
+than `p`. It says when the fact stops holding, which a reader at `p`
+doesn't know yet. An AI assistant's read at a position (design.md §8) MUST
+leave it out, and doesn't say it did, since saying so would hint that the
+fact ends. The assistant reads it without a position. A view for the writer,
+who may be checking their own plan, keeps it, and the web UI marks it (design.md §9).
+The view at the end of the story has no `until` to leave out: it holds only
+the facts still in effect when the story ends.
 
 ### 9.5 Keeping reveals in place
 

@@ -58,11 +58,18 @@ public sealed class McpServerTests : IAsyncLifetime
 
     [Fact]
     [Trait("Scenario", "SC-MCP-10")]
+    [Trait("Scenario", "SC-MCP-44")]
     public async Task TheClientSeesTheServerAndItsTools()
     {
         Assert.Equal("wolfden", Client.ServerInfo!.Name);
         Assert.Contains("story position", Client.ServerInstructions!, StringComparison.Ordinal);
         Assert.Contains("checkpoint", Client.ServerInstructions!, StringComparison.Ordinal);
+        Assert.Contains("Read without as_of before changing a fact", Client.ServerInstructions!, StringComparison.Ordinal);
+
+        // When to read ahead, and that later facts stay out of the prose (#300).
+        Assert.All(
+            new[] { "Read ahead (get_entity without as_of)", "who knows more than the reader", "A later fact can shape hints", "who'd already know", "the prose must never state it or have a narrator", "If you aren't sure which read applies, ask the writer" },
+            s => Assert.Contains(s, Client.ServerInstructions!, StringComparison.Ordinal));
 
         // The traps an agent must know before its first write (#206): each refusal code it can meet, and what to do.
         Assert.All(
@@ -146,6 +153,29 @@ public sealed class McpServerTests : IAsyncLifetime
         var lucy = Text(await Call("get_entity", new() { ["entity"] = "Lucy", ["as_of"] = "dracula:4" }));
         Assert.Contains("\"in_view\":false", lucy, StringComparison.Ordinal);
         Assert.DoesNotContain("Westenra", lucy, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-44")]
+    public async Task ReadingAheadHasWhatACharacterKnowsAndTheReaderDoesnt()
+    {
+        var renfieldAt = Text(await Call("get_entity", new() { ["entity"] = "Renfield", ["as_of"] = "dracula:20" }));
+        Assert.Contains("\"in_view\":true", renfieldAt, StringComparison.Ordinal);
+        Assert.DoesNotContain("how he let the Count in", renfieldAt, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"died\"", renfieldAt, StringComparison.Ordinal);
+        Assert.DoesNotContain("turns on his master", renfieldAt, StringComparison.Ordinal);
+
+        var eventAt = Text(await Call("get_entity", new() { ["entity"] = "Renfield lets the Count in", ["as_of"] = "dracula:20" }));
+        Assert.Contains("\"in_view\":false", eventAt, StringComparison.Ordinal);
+        Assert.DoesNotContain("Lord and Master", eventAt, StringComparison.Ordinal);
+
+        var renfieldAhead = Text(await Call("get_entity", new() { ["entity"] = "Renfield" }));
+        Assert.Contains("how he let the Count in", renfieldAhead, StringComparison.Ordinal);
+        Assert.Contains("\"died\"", renfieldAhead, StringComparison.Ordinal);
+        Assert.Contains("turns on his master", renfieldAhead, StringComparison.Ordinal);
+
+        var eventAhead = Text(await Call("get_entity", new() { ["entity"] = "Renfield lets the Count in" }));
+        Assert.Contains("Lord and Master", eventAhead, StringComparison.Ordinal);
     }
 
     [Fact]

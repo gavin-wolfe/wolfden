@@ -725,8 +725,10 @@ With git as the backend:
   in `serve` records whatever an MCP session saved and hasn't
   checkpointed yet, without that agent's `Co-Authored-By` (its later
   `checkpoint` then has those files no more).
-- **Remotes:** optional. Wolfden can push and pull a configured remote but
-  never requires one.
+- **Remotes:** optional, and never required. Wolfden doesn't push or pull
+  yet; a den's repository works with `git remote` and `git push` like any
+  other. **Decided (maintainer, 2026-11-04, #312):** Wolfden will handle
+  backup to a private remote for the common path.
 
 With or without a backend, **the index is never the only copy of
 anything.** Deleting it loses nothing (§7).
@@ -994,6 +996,13 @@ same code (§9):
   matches does it ask all the entities, to tell one the reader hasn't met
   (`in_view: false`, and nothing about it) from one that doesn't exist
   (`unknown_entity`). Aliases aren't positional (format.md §9.5).
+- **A future `until` is left out** (maintainer decision on #288). With a
+  position, `canon_as_of` and `get_entity` leave out each fact's `until`
+  (format.md F-VIEW-4), since it tells an assistant drafting that chapter
+  that a "truth" gets overturned, and it could write toward that. To plan
+  ahead, an assistant reads `get_entity` without `as_of`. It's done in the
+  MCP layer (`AsOfReads`), so it's a place these tools differ from
+  the web API and `query`, which keep the date for the writer.
 - **Pinned first.** Results of `canon_as_of` and `get_entity` start with
   `pinned`, the pinned canon view (F-VIEW-2), and list the same facts in
   place too, so each entity is complete.
@@ -1606,6 +1615,16 @@ docs/
     note at that position: navigation, a change of position, or a
     reload hides it again. What it shows follows the full view, so its
     links to other notes the reader hasn't met may resolve.
+  - **`ahead of readers`** (maintainer decision on #288). The writer
+    still sees a fact's `until` at a position, and when it's later than
+    the position it has a small muted text tag, `ahead of readers`, with
+    the tooltip "Readers at this point in the story don't know this yet."
+    It's a button that also shows that sentence in place, since a tooltip
+    only comes on hover, which a keyboard or a touch can't do.
+    An `until` the position has reached has no tag, which can only be
+    seen where the page shows the full view at a position (editing, or
+    "Show it anyway"). The tag is its own component, `AheadOfReaders`, for
+    the wider question in #300.
 
   The rest is v0 behaviour, not a recorded decision.
   - **Routes and URLs.** The UI routes with TanStack Router:
@@ -2406,7 +2425,8 @@ docs/
   - **Where it goes and what it's called.** A universe's page makes a
     series or a standalone book, and a series' page a book of the
     series. The folder's name, the key, is made from the name as a
-    note's slug is (types.md F-TPL-6), but a key that's taken, by a
+    note's slug is (types.md F-TPL-6, so "Mina's Journal" is
+    `minas-journal`), but a key that's taken, by a
     folder of any case or by a clash F-KEY-5 forbids (a book key
     anywhere in the universe, or a series key and a standalone book
     key), is refused (`already_exists`) rather than given `-2`, since

@@ -29,22 +29,22 @@ public sealed class NewContainerCommandTests : IDisposable
 
         Assert.Equal(CliApp.ExitOk, exitCode);
         Assert.Empty(error);
-        const string Guest = "universes/dracula/books/dracula-s-guest/book.md";
-        Assert.StartsWith($"Created {Guest}\n  Created {Guest}: book 'Dracula's Guest', key 'dracula-s-guest', with id ", output, StringComparison.Ordinal);
-        Assert.Contains("It has 2 chapters, dracula-s-guest:1 to dracula-s-guest:2.", output, StringComparison.Ordinal);
-        Assert.Contains("[dracula, dracula-s-guest]", output, StringComparison.Ordinal);
+        const string Guest = "universes/dracula/books/draculas-guest/book.md";
+        Assert.StartsWith($"Created {Guest}\n  Created {Guest}: book 'Dracula's Guest', key 'draculas-guest', with id ", output, StringComparison.Ordinal);
+        Assert.Contains("It has 2 chapters, draculas-guest:1 to draculas-guest:2.", output, StringComparison.Ordinal);
+        Assert.Contains("[dracula, draculas-guest]", output, StringComparison.Ordinal);
         Assert.Contains("\nchapters:\n  - { key: \"1\", number: 1 }\n  - { key: \"2\", number: 2 }\n---\n", _den.Read(Guest), StringComparison.Ordinal);
-        Assert.Contains("\norder: [dracula, dracula-s-guest]\n", _den.Read(Universe).ReplaceLineEndings("\n"), StringComparison.Ordinal);
+        Assert.Contains("\norder: [dracula, draculas-guest]\n", _den.Read(Universe).ReplaceLineEndings("\n"), StringComparison.Ordinal);
 
         // A series after the novel, then a book in it, named by its bare key in a den with one universe.
         Assert.Equal(CliApp.ExitOk, New("series", "The Harker Papers", "--after", "dracula").ExitCode);
-        Assert.Contains("\norder: [dracula, the-harker-papers, dracula-s-guest]\n", _den.Read(Universe).ReplaceLineEndings("\n"), StringComparison.Ordinal);
+        Assert.Contains("\norder: [dracula, the-harker-papers, draculas-guest]\n", _den.Read(Universe).ReplaceLineEndings("\n"), StringComparison.Ordinal);
         var inSeries = New("book", "Mina's Journal", "--in", "the-harker-papers");
         Assert.Equal(CliApp.ExitOk, inSeries.ExitCode);
-        Assert.StartsWith("Created universes/dracula/series/the-harker-papers/books/mina-s-journal/book.md\n", inSeries.Output, StringComparison.Ordinal);
-        Assert.Equal(CliApp.ExitOk, New("book", "Jonathan's Journal", "--in", "dracula/the-harker-papers", "--after", "mina-s-journal").ExitCode);
+        Assert.StartsWith("Created universes/dracula/series/the-harker-papers/books/minas-journal/book.md\n", inSeries.Output, StringComparison.Ordinal);
+        Assert.Equal(CliApp.ExitOk, New("book", "Jonathan's Journal", "--in", "dracula/the-harker-papers", "--after", "minas-journal").ExitCode);
         Assert.Contains(
-            "\nbooks: [mina-s-journal, jonathan-s-journal]\n",
+            "\nbooks: [minas-journal, jonathans-journal]\n",
             _den.Read("universes/dracula/series/the-harker-papers/series.md").ReplaceLineEndings("\n"),
             StringComparison.Ordinal);
 
@@ -53,7 +53,7 @@ public sealed class NewContainerCommandTests : IDisposable
         Assert.Equal(CliApp.ExitOk, checkExit);
         Assert.DoesNotContain("universe.md", check, StringComparison.Ordinal);
         Assert.DoesNotContain("harker-papers", check, StringComparison.Ordinal);
-        Assert.DoesNotContain("dracula-s-guest", check, StringComparison.Ordinal);
+        Assert.DoesNotContain("draculas-guest", check, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -214,8 +214,8 @@ public sealed class NewContainerCommandTests : IDisposable
         var (exitCode, output, _) = New("book", "Dracula's Guest", "--first");
 
         Assert.Equal(CliApp.ExitOk, exitCode);
-        Assert.Contains("at the start: [dracula-s-guest, dracula]", output, StringComparison.Ordinal);
-        Assert.Contains("\norder: [dracula-s-guest, dracula]\n", _den.Read(Universe).ReplaceLineEndings("\n"), StringComparison.Ordinal);
+        Assert.Contains("at the start: [draculas-guest, dracula]", output, StringComparison.Ordinal);
+        Assert.Contains("\norder: [draculas-guest, dracula]\n", _den.Read(Universe).ReplaceLineEndings("\n"), StringComparison.Ordinal);
     }
 
     [Fact]

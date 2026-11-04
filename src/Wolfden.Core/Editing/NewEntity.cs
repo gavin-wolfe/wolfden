@@ -89,8 +89,9 @@ public static class NewEntity
     /// <summary>
     /// A slug made from <paramref name="name"/> as F-TPL-6 says: lowercased,
     /// letters that don't decompose spelled out (<c>æ</c> as <c>ae</c>, and so
-    /// on), accents dropped, each run of other characters made one <c>-</c>,
-    /// and cut to 64 characters at a word boundary. Empty if nothing is left.
+    /// on), accents and apostrophes dropped, each run of other characters made
+    /// one <c>-</c>, and cut to 64 characters at a word boundary. Empty if
+    /// nothing is left.
     /// </summary>
     public static string Slugify(string name)
     {
@@ -115,7 +116,9 @@ public static class NewEntity
         var pending = false;
         foreach (var c in lower.ToString().Normalize(NormalizationForm.FormKD))
         {
-            if (CharUnicodeInfo.GetUnicodeCategory(c) is UnicodeCategory.NonSpacingMark or UnicodeCategory.SpacingCombiningMark or UnicodeCategory.EnclosingMark)
+            // An apostrophe doesn't end a word: "Mina's" is one word. Curly ones and their lookalikes count the same.
+            if (IsApostrophe(c)
+                || CharUnicodeInfo.GetUnicodeCategory(c) is UnicodeCategory.NonSpacingMark or UnicodeCategory.SpacingCombiningMark or UnicodeCategory.EnclosingMark)
             {
                 continue;
             }
@@ -505,6 +508,9 @@ public static class NewEntity
             throw new EditVerificationException("The new entity didn't read back as built from its template, so it wasn't made.");
         }
     }
+
+    /// <summary>True for a straight or curly apostrophe (U+0027, U+2019), a left single quote typed as one (U+2018), or the modifier letter (U+02BC).</summary>
+    public static bool IsApostrophe(char c) => c is (char)0x27 or (char)0x2019 or (char)0x2018 or (char)0x02BC;
 
     /// <summary>Cuts <paramref name="slug"/> to <paramref name="max"/> characters, at a word boundary where there is one, without a trailing <c>-</c>.</summary>
     private static string Cut(string slug, int max)

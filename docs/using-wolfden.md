@@ -816,9 +816,10 @@ yet. Hover over it or click it to see that said in full. A date the position has
 has no tag. An AI assistant reading at that position isn't told the date at
 all, so it can't write toward it. When you're planning with one, ask it to
 read the note with no position, and it sees every date. Its instructions also
-tell it to read ahead for planning, foreshadowing, and continuity checks, and
-to write a character who knows more than the reader, without letting later
-facts reach the prose. It should ask you if it isn't sure which read you want
+tell it to read ahead for planning, foreshadowing, and reviewing continuity
+across chapters, and when writing a character who knows more than the reader,
+without letting later facts reach the prose. It can still tell you anything you
+ask about, and it should ask you if it isn't sure which read you want
 ([more in the MCP guide](mcp-clients.md#7-gotchas-for-ai-assistants)).
 
 A typed From or Until has to be a chapter (or book) your universe has.

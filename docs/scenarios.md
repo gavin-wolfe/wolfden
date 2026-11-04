@@ -3317,14 +3317,15 @@ Spec: F-VIEW-4 (#288). Covered by: `FutureUntilTests`.
 I ask my assistant to draft a scene with Renfield at `dracula:20`. He has
 already let the Count in, and the reader learns that at `dracula:21`.
 
-- `get_entity` for Renfield with `as_of` `dracula:20` has nothing about his
-  death or how he let the Count in, and the event *Renfield lets the Count in*
-  isn't in view at all.
-- `get_entity` with no `as_of` has both, so the assistant can read the two
-  together: what the reader knows, and what's coming.
-- The server's instructions tell it when to read ahead, and to let later facts
-  shape hints and how a character behaves without stating them. The prose is
-  the assistant's, so no test can hold it to that.
+- `get_entity` for Renfield with `as_of` `dracula:20` has him in view, with
+  nothing about his death, his turn on his master, or how he let the Count in,
+  and the event *Renfield lets the Count in* isn't in view at all.
+- `get_entity` with no `as_of` has all of it, so the assistant can read the two
+  together: what the reader knows, and what the note holds beyond that.
+- The server's instructions tell it when to read ahead, and that a later fact
+  can shape hints, and how a character who'd already know it behaves, without
+  the prose stating it. He's let the Count in by then, but his death hasn't
+  happened. The prose is the assistant's, so no test can hold it to that.
 
 Spec: #300. Covered by: `McpServerTests`.
 

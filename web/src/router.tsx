@@ -21,16 +21,22 @@ import { NotFound } from './components/States'
 /**
  * The search params every page shares. `at` is the story position the pages
  * show the den as of (the API's asOf), or undefined for everything: the end
- * of the story, the author's full view.
+ * of the story, the author's full view. `readers` is `1` for the Reader's view
+ * at that position (#300). It's only in the URL, so a fresh start opens the
+ * Author's view, and it means nothing without a position.
  */
 export interface StorySearch {
   at?: string
+  readers?: '1'
 }
 
 export function validateStorySearch(search: Record<string, unknown>): StorySearch {
   // A blank `at` is kept as '', not taken for everything, so the pages say
   // it isn't a position rather than quietly showing the whole story.
-  return typeof search.at === 'string' ? { at: search.at.trim() } : {}
+  const at = typeof search.at === 'string' ? search.at.trim() : undefined
+
+  // Both are always returned: the router would keep a key left out as it's written in the URL.
+  return { at, readers: at !== undefined && (search.readers === '1' || search.readers === 1) ? '1' : undefined }
 }
 
 /**
@@ -54,8 +60,8 @@ interface RouterContext {
 
 const rootRoute = createRootRouteWithContext<RouterContext>()({
   validateSearch: validateStorySearch,
-  // The position carries from page to page unless a link sets it.
-  search: { middlewares: [retainSearchParams(['at'])] },
+  // The position and the view of it carry from page to page unless a link sets them.
+  search: { middlewares: [retainSearchParams(['at', 'readers'])] },
   component: Layout,
   notFoundComponent: NotFound,
 })

@@ -729,7 +729,7 @@ Chapter 3 is headed "Ardent — Vesta Yards, 2350-04-12", and chapter 4
   headings from fields off for that book (or series), even if the
   universe sets one.
 - **Reading as of a chapter.** A chapter after the reading position
-  shows only its title. Wolfden never supplies the name of a note the
+  shows only its title. In the Reader's view, Wolfden never supplies the name of a note the
   reader hasn't met yet: a link to one shows as you wrote it, its label
   if it has one, or else its target.
 - **Tip: label a link to a note the reader meets later.** A POV
@@ -777,8 +777,8 @@ the pages don't have a form for it yet. The rules are in
   the other controls don't do, such as a section's
   `<!-- wolfden: ... -->` comment.
 - **While you edit, you see everything.** The page shows the whole note,
-  whatever the story position, and says "Editing shows everything". The
-  position view comes back when you save or cancel.
+  and says "Editing shows everything". With a story position picked, that's the
+  Author's view, tags included. The Reader's view can't be edited.
 - **If something else changed the note meanwhile,** such as an AI
   assistant working through Wolfden, or you in another editor, the save
   is refused and you see both versions. Choose **Keep mine** (save yours
@@ -816,16 +816,43 @@ entry** gives a field a new value from a later chapter; the one before
 it holds until then. A fact that doesn't change can still have a
 **Known from**, for a reveal the reader only learns later.
 
-When you read a note at a story position, a value or section that stops
-holding later still shows its date, with a small **ahead of readers** beside
-it: `until Ash ch. 5` is your plan, and readers at this point don't know it
-yet. Hover over it or click it to see that said in full. A date the position has reached
-has no tag. An AI assistant reading at that position isn't told the date at
-all, so it can't write toward it. When you're planning with one, ask it to
-read the note with no position, and it sees every date. A thread's `planted`
+**The Author's view and the Reader's view.** Once you pick a story position, a
+note's page has a two-way switch in the position bar: **Author's view** and
+**Reader's view**. The one you're in is always highlighted.
+
+- **The Author's view** is the default. You wrote the book, so nothing is hidden,
+  and small tags say what readers at this point don't know. Hover over a tag or
+  click it to see why. You can edit from here, and it's always the real note.
+  - **ahead of readers:** a value, section, or date they haven't reached:
+    `until Ash ch. 5` is your plan, and they don't know it yet.
+  - **no longer true here:** a value or section that has already ended.
+  - **enters at chapter 11:** a whole note they haven't met yet.
+  - **not placed in the story yet:** it names a chapter or book your universe
+    doesn't have yet, so no chapter reaches it. List the chapter, or fix the name.
+  - **never true (its dates don't overlap):** it ends before it starts. Fix its
+    dates.
+
+  Ideas, bookkeeping, and sections with an error keep their own badges instead.
+  **Linked from** has the same tags, as plain words, for a link in something later.
+- **The Reader's view** shows what a reader at that chapter knows, and nothing else:
+  no tags, no later dates, no comments, and no sections with an error. A note they
+  haven't met says where they first meet it. It's read-only, and it has no history,
+  since old versions can say anything. It also shows a type's default values, with a
+  **type default** badge, which the Author's view leaves out because they aren't in
+  your note. It's the same as an AI assistant gets at that position, so it's a good
+  check of what one can see.
+
+The Reader's view stays while you follow links and change chapters, and its link
+keeps it (`?readers=1`), but Wolfden doesn't remember it: opening Wolfden fresh starts
+in the Author's view. For now this covers a note's Note and History tabs. Lists,
+search, and the book page still show only what readers know at a position.
+
+An AI assistant reading at a position gets the Reader's view of a note, so it isn't
+told a later date at all, and can't write toward it. When you're planning with one,
+ask it to read the note with no position, and it sees every date. A thread's `planted`
 and `paid_off`, and any other field that holds a story position, work the same
 way for it: at a position, it isn't told a value later than that, or one that
-isn't a chapter or book your universe has. You still see them all.
+isn't a chapter or book your universe has.
 
 **Comments don't reach an assistant drafting at a position.** An HTML comment in
 a lead or section (`<!-- She dies at ash:4 -->`) is safe for notes to yourself:
@@ -1328,8 +1355,8 @@ out and has no page. Fix it and save.
 - **A pack's file, or a folder missing its `book.md` or `series.md`,** is listed,
   and you fix it outside Wolfden.
 - **The story position doesn't change the list.** Like editing, it's for you, so
-  it names sections even at an early chapter. Pages at a position stay
-  spoiler-safe: a note left out says only that it's left out, with **Show
+  it names sections even at an early chapter. So does a note's Author's view. The
+  Reader's view doesn't: a note left out says only that it's left out, with **Show
   everything** to see why.
 - **A file another program has locked against reading can't be read,** so it's listed as that,
   with no **Edit file**, since this isn't about what's in it. Close it there,

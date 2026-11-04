@@ -316,7 +316,7 @@ describe('SC-WEB-40: editing a section or the opening in place', () => {
     expect(panel.textContent).toContain('Line 13')
   })
 
-  it('shows everything while editing, with a badge, and the position view again after', async () => {
+  it('edits from the Author’s view at a position, which needs no other read of the note', async () => {
     const { calls } = stubEditing()
     renderApp('/u/dracula/e/E-MINA?at=dracula:3')
     await screen.findByRole('heading', { level: 1, name: 'Mina Harker' })
@@ -324,11 +324,22 @@ describe('SC-WEB-40: editing a section or the opening in place', () => {
 
     await openSectionEditor()
     expect(screen.getByText('Editing shows everything')).toBeTruthy()
-    await waitFor(() => expect(calls).toContain('/api/entity?entity=E-MINA&universe=dracula'))
+    expect(calls).not.toContain('/api/entity?entity=E-MINA&universe=dracula')
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(screen.queryByText('Editing shows everything')).toBeNull())
-    expect(calls.filter((c) => c === '/api/entity?entity=E-MINA&universe=dracula&asOf=dracula%3A3').length).toBeGreaterThan(0)
+    expect(calls.filter((c) => c === '/api/entity?entity=E-MINA&universe=dracula&marksAt=dracula%3A3').length).toBeGreaterThan(0)
+  })
+
+  it('offers nothing to edit in the Reader’s view, and asks for neither the source nor an edit', async () => {
+    const { calls } = stubEditing()
+    renderApp('/u/dracula/e/E-MINA?at=dracula:3&readers=1')
+    await screen.findByRole('heading', { level: 1, name: 'Mina Harker' })
+
+    expect(screen.getByText(/The Reader's view is read-only/)).toBeTruthy()
+    expect(document.querySelector('.edit-button')).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Edit/ })).toBeNull()
+    expect(calls.some((c) => c.startsWith('/api/entity/source'))).toBe(false)
   })
 
   it('shows what the save did: effects, pinned canon, and warnings', async () => {

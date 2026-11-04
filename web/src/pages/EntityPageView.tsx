@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { Link, getRouteApi, useRouter, useRouterState } from '@tanstack/react-router'
 import { wasHistoryStep } from '../router'
 import {
@@ -14,8 +14,9 @@ import {
   type PageField,
   type PageSection,
   type PositionView,
+  type ReaderMark,
 } from '../api'
-import { AheadOfReaders } from '../components/AheadOfReaders'
+import { AheadOfReaders, MarkList, MarkTag, ReaderTag } from '../components/AheadOfReaders'
 import { EntityTabs } from '../components/EntityTabs'
 import { EntityLink, LinkedText, createLinkMatcher, sectionAnchor } from '../components/Links'
 import { Markdown } from '../components/Markdown'
@@ -38,29 +39,29 @@ import { sourceQuery, type EntitySource } from '../editApi'
 import { ErrorState, Loading, StatusBadge } from '../components/States'
 import { useDocumentTitle, useEntitiesInView, usePosition } from '../hooks'
 import { chapterWords, describePosition, entryOf, isAheadOf, ordinalOf } from '../story'
-import { useReveal } from '../reveal'
+import { NOT_PLACED, MARKS_LEGEND, notPlacedWhy } from '../readerWords'
 
 const route = getRouteApi('/u/$universe/e/$')
 
 /**
  * An entity's page (#24): its name, type, status, scope, and where it enters
  * the story; its fields and sections, with links in-app; and what links to
- * it. As of a position it shows the canon-as-of view, and an entity the
- * reader hasn't met shows a banner saying where they first meet it, and
- * nothing else of it.
+ * it. At a position, by default it's the Author's view (#300): all of the note,
+ * tagged with what readers there don't know, and it can be edited. The Reader's
+ * view shows only what they know, and is read-only, and a note the reader hasn't
+ * met shows a banner saying where they first meet it, and nothing else of it.
  */
 export function EntityPageView() {
   const { universe, _splat: key = '' } = route.useParams()
-  const { at } = usePosition()
-  // Editing shows the full note, whatever the position (maintainer decision on #28).
+  const { at, readers } = usePosition()
   const [target, setTarget] = useState<EditTarget | null>(null)
-  const live = useQuery({ ...entityQuery(universe, key, target ? undefined : at), placeholderData: target ? keepPreviousData : undefined })
+  const live = useQuery(entityQuery(universe, key, at, readers))
   // While something's being edited the page stays as the editor opened on it. An answer already on its way when
   // the editor opened could move a section's line, or fail, and either would take the editor and its text away.
   const opened = useRef<typeof live.data>(undefined)
   if (target === null) {
     opened.current = undefined
-  } else if (opened.current === undefined && !live.isPlaceholderData) {
+  } else if (opened.current === undefined) {
     opened.current = live.data
   }
   const data = opened.current ?? live.data
@@ -83,18 +84,11 @@ export function EntityPageView() {
   const { entity } = data
   if (!entity) {
     const summary = view.all?.entities.find((e) => e.key === key || e.id === key || e.path === key)
-    // "Show it anyway" is shared with the History tab, and resets when the note or position changes (EntityRoute).
-    return (
-      <NotInView
-        universe={universe}
-        entityKey={key}
-        summary={summary}
-        note={data.note}
-        positions={view.positions ?? []}
-        at={at}
-        edit={{ target, setTarget }}
-      />
-    )
+    return <NotInView summary={summary} note={data.note} positions={view.positions ?? []} at={at} />
+  }
+
+  if (readers) {
+    return <EntityArticle universe={universe} entity={entity} positions={view.positions ?? []} readersView />
   }
 
   return (
@@ -151,37 +145,23 @@ function LeftOutPage({ message, note, at, onErrorsChanged }: { message: string; 
 }
 
 /**
- * The banner for an entity the reader hasn't met at the position. "Show it
- * anyway" (maintainer decision, #26) shows the note below it, greyed, at the
- * same position: by default its full view, which is fetched only on that
- * click, or what a tab passes as `children`, such as its history. The
- * reveal is shared by the note's tabs, and lasts only while they show this
- * note at this position (see reveal.tsx).
+ * The banner of the Reader's view for an entity the reader hasn't met at the
+ * position. The Author's view is the way to see it from here (#300).
  */
 export function NotInView({
-  universe,
-  entityKey,
   summary,
   note,
   positions,
   at,
   className = 'page-body',
-  edit,
-  children,
 }: {
-  universe: string
-  entityKey: string
   summary: EntitySummary | undefined
   note: string | null
   positions: PositionView[]
   at: string | undefined
   className?: string
-  /** The page's editing state: the note shown anyway can be edited, which shows it in full. */
-  edit?: { target: EditTarget | null; setTarget: (target: EditTarget | null) => void }
-  children?: ReactNode
 }) {
-  const { setAt } = usePosition()
-  const { revealed, reveal } = useReveal()
+  const { setAt, setReaders } = usePosition()
   const entry = summary ? entryOf(summary, positions) : null
   const entryOrdinal = entry === null ? -1 : ordinalOf(entry, positions)
   const here = at === undefined ? null : ordinalOf(at, positions)
@@ -194,6 +174,10 @@ export function NotInView({
         {later ? (
           <p>
             Readers first meet <strong>{summary!.name}</strong> {where.startsWith('the start of') ? 'at' : 'in'} {where}.
+          </p>
+        ) : summary && reachesReaders(summary.status) ? (
+          <p>
+            <strong>{summary.name}</strong> isn't placed in the story yet, so readers don't meet it at any chapter.
           </p>
         ) : summary ? (
           <p>
@@ -211,56 +195,23 @@ export function NotInView({
           <button type="button" onClick={() => setAt(undefined)}>
             Show everything
           </button>
-          {!revealed && (
-            <button type="button" onClick={reveal}>
-              Show it anyway
-            </button>
-          )}
+          <button type="button" onClick={() => setReaders(false)}>
+            Author's view
+          </button>
         </p>
       </div>
-      {revealed && (
-        <div className="revealed" aria-label="Shown anyway, from the full view">
-          {children ?? <FullEntity universe={universe} entityKey={entityKey} positions={positions} edit={edit} />}
-        </div>
-      )}
     </div>
   )
 }
 
-/** A note's full view (no position), for "Show it anyway". */
-function FullEntity({
-  universe,
-  entityKey,
-  positions,
-  edit,
-}: {
-  universe: string
-  entityKey: string
-  positions: PositionView[]
-  edit?: { target: EditTarget | null; setTarget: (target: EditTarget | null) => void }
-}) {
-  const full = useQuery(entityQuery(universe, entityKey, undefined))
-  if (full.isPending) {
-    return <Loading what="the note" />
-  }
-
-  if (full.isError) {
-    return <ErrorState error={full.error} />
-  }
-
-  const entity = full.data.entity
-  return entity && edit ? (
-    <EditingProvider universe={universe} entityKey={entityKey} frozen={entity.frozen ?? null} target={edit.target} setTarget={edit.setTarget}>
-      <EntityArticle universe={universe} entity={entity} positions={positions} />
-    </EditingProvider>
-  ) : entity ? (
-    <EntityArticle universe={universe} entity={entity} positions={positions} />
-  ) : (
-    <p className="muted">{full.data.note}</p>
-  )
+/** True if a status is one readers can meet: the others keep their badge, and get no reader tags. */
+function reachesReaders(status: string | null): boolean {
+  return status === null || status === 'draft' || status === 'canon'
 }
 
-function EntityArticle({ universe, entity, positions }: { universe: string; entity: EntityPage; positions: PositionView[] }) {
+function EntityArticle({ universe, entity, positions, readersView = false }: { universe: string; entity: EntityPage; positions: PositionView[]; readersView?: boolean }) {
+  // An idea has no reader tags, nor does anything in a note no position places, which has the one tag.
+  const quiet = !reachesReaders(entity.status) || entity.readerMark?.kind === 'unplaced'
   const lead = stripTitle(entity.lead, entity.name)
   const editing = useEditing()
   const target = editing?.target ?? null
@@ -283,6 +234,7 @@ function EntityArticle({ universe, entity, positions }: { universe: string; enti
       <header>
         <p className="eyebrow">
           {entity.type} <StatusBadge status={entity.status} />
+          {entity.readerMark && <MarkTag mark={entity.readerMark} positions={positions} note />}
         </p>
         <h1>{entity.name}</h1>
         <p className="entry">{entryWords(entity, positions)}</p>
@@ -293,6 +245,7 @@ function EntityArticle({ universe, entity, positions }: { universe: string; enti
           </EditButton>
         </p>
         <FrozenNotice />
+        {readersView && <p className="muted">The Reader's view is read-only. Switch to the Author's view to edit.</p>}
       </header>
       <EditingStatus />
       {target?.kind === 'file' ? (
@@ -312,7 +265,7 @@ function EntityArticle({ universe, entity, positions }: { universe: string; enti
             </div>
           )}
           {(entity.fields.length > 0 || editing !== null) && (
-            <Fields universe={universe} fields={entity.fields} positions={positions} target={target} source={editing ? source.data : undefined} />
+            <Fields universe={universe} fields={entity.fields} positions={positions} target={target} source={editing ? source.data : undefined} quiet={quiet} />
           )}
           {entity.sections.map((s, i) => (
             <Section
@@ -323,6 +276,7 @@ function EntityArticle({ universe, entity, positions }: { universe: string; enti
               positions={positions}
               file={entity.path}
               target={target}
+              quiet={quiet}
             />
           ))}
           {target?.kind === 'add' ? (
@@ -423,18 +377,19 @@ function shortPosition(position: string, positions: PositionView[]): string {
   return `${oneBook ? '' : `${p.bookName} `}${p.number !== null ? `ch. ${p.number}` : chapterWords(p)}`
 }
 
-/** Where a fact starts and stops holding. An `until` readers haven't reached at the position being viewed is marked. */
-function Span({ from, until, positions }: { from: string | null; until: string | null; positions: PositionView[] }) {
+/**
+ * Where a fact starts and stops holding, and what readers at the position don't
+ * know of it: its mark, or else an `until` they haven't reached, which has no
+ * mark (design.md §9). So nothing has two tags. Something `quiet` has no tag for
+ * its `until`, as it keeps its own badge (#300).
+ */
+function Span({ from, until, positions, mark, quiet = false }: { from: string | null; until: string | null; positions: PositionView[]; mark?: ReaderMark; quiet?: boolean }) {
   const { at } = usePosition()
-  if (!from && !until) {
-    return null
-  }
-
-  const text = from && until ? `${shortPosition(from, positions)} to ${shortPosition(until, positions)}` : from ? `from ${shortPosition(from, positions)}` : `until ${shortPosition(until!, positions)}`
+  const text = from && until ? `${shortPosition(from, positions)} to ${shortPosition(until, positions)}` : from ? `from ${shortPosition(from, positions)}` : until ? `until ${shortPosition(until, positions)}` : null
   return (
     <>
-      <span className="badge span">{text}</span>
-      {until && isAheadOf(until, at, positions) && <AheadOfReaders />}
+      {text && <span className="badge span">{text}</span>}
+      {mark ? <MarkTag mark={mark} positions={positions} /> : !quiet && until && isAheadOf(until, at, positions) && <AheadOfReaders />}
     </>
   )
 }
@@ -445,6 +400,7 @@ function Fields({
   positions,
   target,
   source,
+  quiet,
 }: {
   universe: string
   fields: PageField[]
@@ -452,6 +408,8 @@ function Fields({
   target: EditTarget | null
   /** The note's source, when it can be edited: which fields have their own editor, and which the type has. */
   source: EntitySource | undefined
+  /** The note keeps its own badge, or its own tag, so its facts have no reader tags. */
+  quiet: boolean
 }) {
   // A field's entries are listed one after another; show them under one name.
   const groups: PageField[][] = []
@@ -479,7 +437,7 @@ function Fields({
                 </dd>
               ) : (
                 <>
-                  <FieldEntries universe={universe} entries={entries} positions={positions} />
+                  <FieldEntries universe={universe} entries={entries} positions={positions} quiet={quiet} />
                   {source && (
                     <dd className="field-tools">
                       <FieldTools name={entries[0].name} source={source} />
@@ -512,14 +470,20 @@ function Fields({
   )
 }
 
-function FieldEntries({ universe, entries, positions }: { universe: string; entries: PageField[]; positions: PositionView[] }) {
+function FieldEntries({ universe, entries, positions, quiet }: { universe: string; entries: PageField[]; positions: PositionView[]; quiet: boolean }) {
+  // One value of a position field can be later than the position, or not place at all. A fact with its own mark needs no more.
+  const valueTag = (f: PageField) => (value: string) =>
+    quiet || f.readerMark ? null
+    : f.aheadValues?.includes(value) ? <AheadOfReaders />
+    : f.unplacedValues?.includes(value) ? <ReaderTag words={NOT_PLACED} why={notPlacedWhy(value)} />
+    : null
   return (
     <>
-      {entries.map((f) => (
-        <dd key={f.line} className={f.live === false ? 'not-live' : undefined} title={f.live === false ? 'No view of the story shows this entry.' : undefined}>
-          <FieldValue value={f.value} links={f.links} universe={universe} />{' '}
+      {entries.map((f, i) => (
+        <dd key={`${f.line}:${f.entryIndex ?? i}`} className={f.live === false ? 'not-live' : undefined} title={f.live === false ? 'No view of the story shows this entry.' : undefined}>
+          <FieldValue value={f.value} links={f.links} universe={universe} tagValue={valueTag(f)} />{' '}
           {f.kind === 'default' && <span className="badge">type default</span>}
-          <Span from={f.from} until={f.until} positions={positions} />
+          <Span from={f.from} until={f.until} positions={positions} mark={quiet ? undefined : f.readerMark} quiet={quiet || !reachesReaders(f.status)} />
           {f.pinned && <span className="badge">pinned</span>}
           <StatusBadge status={f.status} />
         </dd>
@@ -528,8 +492,8 @@ function FieldEntries({ universe, entries, positions }: { universe: string; entr
   )
 }
 
-/** A field's value: text with its links, a list, or a mapping (such as a date's text and sort key). */
-export function FieldValue({ value, links, universe }: { value: unknown; links: LinkView[]; universe: string }) {
+/** A field's value: text with its links, a list, or a mapping (such as a date's text and sort key). `tagValue` can add a tag after a piece of text. */
+export function FieldValue({ value, links, universe, tagValue }: { value: unknown; links: LinkView[]; universe: string; tagValue?: (text: string) => ReactNode }) {
   const match = useMemo(() => createLinkMatcher(links), [links])
   const render = (v: unknown): ReactNode => {
     if (v === null || v === undefined || v === '') {
@@ -537,7 +501,12 @@ export function FieldValue({ value, links, universe }: { value: unknown; links: 
     }
 
     if (typeof v === 'string') {
-      return <LinkedText text={v} match={match} universe={universe} />
+      return (
+        <>
+          <LinkedText text={v} match={match} universe={universe} />
+          {tagValue?.(v)}
+        </>
+      )
     }
 
     if (Array.isArray(v)) {
@@ -581,6 +550,7 @@ function Section({
   positions,
   file,
   target,
+  quiet,
 }: {
   universe: string
   section: PageSection
@@ -588,6 +558,8 @@ function Section({
   positions: PositionView[]
   file: string
   target: EditTarget | null
+  /** The note keeps its own badge, or its own tag, so its sections have no reader tags. */
+  quiet: boolean
 }) {
   const Heading = `h${Math.min(Math.max(section.level, 2), 6)}` as 'h2'
   const here = target !== null && 'line' in target && target.line === section.line && target.name === section.name ? target : null
@@ -599,7 +571,13 @@ function Section({
       ) : (
         <Heading id={sectionAnchor(section.name)}>
           {section.name} <StatusBadge status={section.status} />
-          <Span from={section.from} until={section.until} positions={positions} />
+          <Span
+            from={section.from}
+            until={section.until}
+            positions={positions}
+            mark={quiet ? undefined : section.readerMark}
+            quiet={quiet || !reachesReaders(section.status) || Boolean(section.bookkeeping) || Boolean(section.leftOut)}
+          />
           {section.pinned && <span className="badge">pinned</span>}
           {section.bookkeeping && <span className="badge">bookkeeping</span>}
           {section.leftOut && <span className="badge problem">left out</span>}
@@ -665,6 +643,7 @@ function Backlinks({ universe, backlinks, positions }: { universe: string; backl
   return (
     <section className="backlinks">
       <h2>Linked from</h2>
+      {backlinks.some((b) => b.readerMark) && <p className="muted">{MARKS_LEGEND}</p>}
       {groups.size === 0 ? (
         <p className="muted">Nothing links here{backlinks.length === 0 ? ' yet' : ''}.</p>
       ) : (
@@ -693,6 +672,7 @@ function Backlinks({ universe, backlinks, positions }: { universe: string; backl
                     <li key={`${b.line}:${b.column}`}>
                       {backlinkPlace(b, positions)}
                       {b.bookkeeping && <span className="badge">bookkeeping</span>} <StatusBadge status={b.status} />
+                      {b.readerMark && <MarkList mark={b.readerMark} positions={positions} />}
                     </li>
                   ))}
                 </ul>

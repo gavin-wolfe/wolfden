@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useRouterState } from '@tanstack/react-router'
 import { positionsQuery, type PositionView } from '../api'
 import { usePosition } from '../hooks'
 import { chapterWords, ordinalOf, positionLabel } from '../story'
@@ -110,6 +111,32 @@ function UniversePositionBar({ universe }: { universe: string }) {
           Show everything
         </button>
       )}
+      {at !== undefined && <ViewSwitch />}
+    </div>
+  )
+}
+
+/**
+ * Whose view of a chosen position this is (#300): both labels are always there,
+ * and the current one is pressed, so the page always says which it is. The lists,
+ * search, and the book page have one view until later steps of #300, so it's only
+ * on a note's pages for now.
+ */
+function ViewSwitch() {
+  const { readers, setReaders } = usePosition()
+  const onNote = useRouterState({ select: (s) => s.matches.some((m) => m.routeId === '/u/$universe/e/$') })
+  if (!onNote) {
+    return null
+  }
+
+  return (
+    <div className="view-switch" role="group" aria-label="Whose view">
+      <button type="button" aria-pressed={!readers} onClick={() => setReaders(false)} title="Everything, tagged with what readers at this point don't know yet. You can edit here.">
+        Author's view
+      </button>
+      <button type="button" aria-pressed={readers} onClick={() => setReaders(true)} title="Only what readers at this point know. Read-only.">
+        Reader's view
+      </button>
     </div>
   )
 }

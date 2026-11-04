@@ -237,6 +237,13 @@ valid chapter key. A chapter key MUST NOT be `r` followed by a digit
 name that isn't a valid key (`Ilse Tarrow.md`) is a [warning]: the entity is
 indexed but has no slug, so links reach it only by id, name, or alias.
 
+A reader takes keys and slugs from the folder and file names as they are, and
+never works them out from a name. A writer making a new one from a name
+follows types.md F-TPL-6, which drops apostrophes ("Mina's Journal" is
+`minas-journal`). A folder or file with another form that's still a valid key,
+such as `mina-s-journal.md`, keeps it, and its links and positions still
+resolve.
+
 **F-KEY-5.** Book keys MUST be unique within a universe, across all of its
 series and standalone books, since positions name a book without its
 series. A series key MUST NOT equal a standalone book key in the same

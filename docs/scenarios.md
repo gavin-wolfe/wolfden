@@ -3776,12 +3776,12 @@ email. They turn on history for their den.
   --local`), never in the writer's global settings, and the first
   checkpoint is recorded under that name.
 - When git has one but not the other, only the missing one is asked for
-  and saved; the one git has is left alone, even if another was given,
-  and the output says the one given wasn't used.
+  and saved, and the one git has is left alone. To replace that one too,
+  give both (SC-HIST-21).
 - When git gives a name and email only inside a repository (`includeIf
   "gitdir:…"`), nothing is asked: they turn up once the folder is a
-  repository, and they're used. The dialog's fields are optional while
-  it can't be sure.
+  repository, and they're used unless others are given. The dialog's
+  fields are optional while it can't be sure.
 - A name or email of more than one line, with a control character, or
   with `<` or `>`, is refused, and so is a name git won't record (only
   characters it strips, such as `;`), or an email git would record as
@@ -3790,12 +3790,11 @@ email. They turn on history for their den.
 Spec: design.md §6, "Turning history on" (maintainer decision,
 2026-10-28, #195). Covered by:
 `HistorySetupTests.AMissingNameAndEmailAreAskedForAndSavedForTheDensRepositoryOnly`,
-`HistorySetupTests.OnlyTheMissingHalfIsSavedAndAnExistingSettingIsLeftAlone`,
+`HistorySetupTests.OnlyTheMissingHalfIsAskedForAndTheOneGitHasIsLeftAlone`,
 `HistorySetupTests.ANameOrEmailThatGitCantRecordIsRefused`,
 `HistorySetupTests.ANameAndEmailGitGivesOnlyInsideTheRepositoryAreUsedAndNothingIsAsked`,
-`HistorySetupTests.ANameAndEmailGivenWhenGitHasThemAfterAllAreNotUsedAndItSaysSo`,
 `HistorySetupTests.ANameGitWontRecordIsRefusedBeforeAnythingIsSaved`,
-`InitHistoryTests.ANameAndEmailGitGivesOnlyInsideTheRepositoryAreUsedAndOnesGivenSaySoIfNotUsed`,
+`InitHistoryTests.ANameAndEmailGitGivesOnlyInsideTheRepositoryAreUsedWhenNoneIsGiven`,
 `InitHistoryTests.AMissingNameAndEmailAreAskedForThenSavedForTheDenOnly`,
 `HistorySetupEndpointTests.AMissingNameAndEmailAreAskedForAndSavedForTheDenOnly`,
 `Checkpoint.test.tsx` (web).
@@ -3907,6 +3906,77 @@ Spec: design.md §11 (#34). Covered by:
 Spec: F-BOOK-1, F-GEN-2 (#50). Covered by:
 `SectionErrorToolTests.ABookWithALeftOutSectionCantBeFrozenUntilItsFixed`,
 `SectionErrorToolTests.ABadSectionInBookMdRefusesTooAndABookMarkedFinalByHandIsntSnapshotted`.
+
+### SC-HIST-21. I give a pen name, and git has my real one
+
+The writer's git has their everyday name and email, set globally. This den
+is for what they write as Ash Calloway, so they run `wolfden init --git
+--author-name "Ash Calloway" --author-email ash@example.com`.
+
+- The name and email given win, for this den only. They're saved with `git
+  config --local` before the first checkpoint, so that checkpoint, and every
+  later one, has Ash Calloway as both author and committer. The global
+  settings aren't changed, and the output doesn't repeat them.
+- The same goes for a name git gives only inside a repository (`includeIf
+  "gitdir:…"`), for global `author.name` or `committer.email` settings,
+  which git otherwise prefers to `user.name` and `user.email`, and for a
+  repository with no checkpoints yet that has a name of its own already.
+- An environment variable such as `GIT_AUTHOR_NAME` beats every setting, so
+  it would defeat what was given. That's refused, naming the variable but
+  not its value, with nothing changed.
+
+Spec: design.md §6, "Turning history on" (maintainer decision, 2026-11-03,
+#286). Covered by:
+`HistorySetupTests.AGivenNameAndEmailWinOverGitsForTheAuthorAndTheCommitter`,
+`HistorySetupTests.AGivenNameAndEmailWinOverOnesGitGivesOnlyInsideTheRepository`,
+`HistorySetupTests.AGivenNameAndEmailWinOverAuthorAndCommitterSettings`,
+`HistorySetupTests.AGivenNameAndEmailReplaceOnesInARepositoryWithNoCheckpointsYet`,
+`HistorySetupTests.AnEnvironmentVariableThatWouldBeatWhatsGivenRefusesWithNothingChanged`,
+`InitHistoryTests.AGivenNameAndEmailWinOverGitsInAnExistingOrNewDen`,
+`HistorySetupEndpointTests.ANameAndEmailInTheRequestWinOverGitsAndOneAloneIsAskedToBeCompleted`.
+
+### SC-HIST-22. I give a pen name but not an email
+
+Git has the writer's everyday name and email. They run `wolfden init --git
+--author-name "Ash Calloway"`, with no email.
+
+- It's refused, with nothing changed: the first checkpoint would have put
+  their everyday email beside the pen name. The message asks for an email
+  too, says a placeholder will do, and doesn't repeat the email git has. An
+  email without a name is refused the same way. The dialog asks for the
+  other field.
+- One given that's the same as git's changes nothing, so it's fine alone.
+  One that fills in what git lacks is what Wolfden asked for (SC-HIST-15).
+
+Spec: design.md §6, "Turning history on" (#286). Covered by:
+`HistorySetupTests.OneGivenAloneThatReplacesWhatGitHasIsRefusedWithNothingChanged`,
+`HistorySetupTests.OneGivenAloneThatIsWhatGitHasIsSavedAndChangesNothingElse`,
+`InitHistoryTests.OneGivenAloneThatReplacesWhatGitHasIsRefused`,
+`HistorySetupEndpointTests.ANameAndEmailInTheRequestWinOverGitsAndOneAloneIsAskedToBeCompleted`.
+
+### SC-HIST-23. Git signs with the key of my other name
+
+The writer's git signs every commit with a key in their everyday name
+(`commit.gpgsign`, `user.signingkey`). They turn on history under a pen name.
+
+- The den's checkpoints aren't signed. A signature would tie the pen name to
+  the other key for good, so signing is saved as off in the den's repository
+  (`commit.gpgsign`, `tag.gpgsign`, `tag.forceSignAnnotated`,
+  `push.gpgSign`), before the first checkpoint. If git was set to sign, the
+  output says so, and how to sign here with a key of this name's.
+- It stays off if signing is turned on globally later. With no signing set
+  up today, the settings are saved the same way, and nothing is said.
+- A `user.signingkey` in the den's own repository was chosen for it, so it
+  still signs. Nor does anything change when nothing is given, or when
+  what's given is what git has: those are the writer's own name and key.
+
+Spec: design.md §6, "Turning history on" (#286). Covered by:
+`HistorySetupTests.GitsKeyIsNotUsedForANameGivenAndSigningStaysOffForTheDen`,
+`HistorySetupTests.ANameGivenWithNoSigningSetUpSaysNothingOfItButStaysOffIfSigningIsTurnedOnLater`,
+`HistorySetupTests.WhatGitAlreadyHasGivenAgainLeavesSigningAlone`,
+`HistorySetupTests.NothingGivenLeavesSigningAlone`,
+`HistorySetupTests.AKeySetInTheDensOwnRepositoryIsLeftToSign`,
+`InitHistoryTests.AGivenNameTurnsSigningOffForTheDenAndSaysSo`.
 
 ## WEB: the den in a browser
 

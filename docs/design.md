@@ -622,17 +622,28 @@ den's folder; then the name and email git will use for it (below); then
 `.wolfden/` in the den's `.gitignore` (created if there's none; appended
 unless `git check-ignore` says the file already leaves it out, so a later
 `!.wolfden/` or a line with a leading space doesn't count; otherwise
-left alone); then any missing name or email saved; and a first
+left alone); then any name or email given saved; and a first
 checkpoint, "Start of history", of the whole den, unless the writer opts
 out (a checkbox, ticked by default, or `--no-checkpoint`). The name and
 email are what git itself would use for the den's repository (`git
 config user.name` and `user.email`, which count the global and system
 settings), read once the repository exists, since a setting can depend on
 where the repository is (`includeIf "gitdir:…"`), which git can't apply
-before. Only a missing one is asked for, and it's saved with `git config
---local`, in that repository only, never globally; an existing setting
-is never changed, and a name or email given when git already has one
-isn't used, and the result says so. Any name will do, a pen name
+before. Only a missing one is asked for. One given wins for this den
+(maintainer decision, 2026-11-03, #286): it's saved with `git config
+--local`, in that repository only, never globally, before the first
+checkpoint, over what git has, and also over a global `author.name` or
+`committer.email` of the kind git prefers to `user.name` and `user.email`.
+Refused with nothing changed: one given that replaces what git has while
+the other isn't given, since it would be recorded beside git's other half
+(a pen name with the everyday email), and one that an environment variable
+such as `GIT_AUTHOR_NAME` would beat. Neither message repeats what git has.
+When what's given changes the name or email git would use, signing is
+saved as off in that repository too (`commit.gpgsign`, `tag.gpgsign`,
+`tag.forceSignAnnotated`, `push.gpgSign`), since git's key belongs to git's
+name, and a signature would tie the pen name to it for good; the result
+says so if signing was on. A `user.signingkey` in the repository's own
+config was chosen for it, and is left to sign. Any name will do, a pen name
 included, and the email can be a placeholder, as long as git will record
 the pair (`git var GIT_COMMITTER_IDENT`: a name made only of characters
 git strips, such as `;`, is refused, and so is an email given that git
@@ -831,7 +842,7 @@ commands, and `wolfden <command> --help` describes each one:
 
 | Command | What it does |
 |---|---|
-| `wolfden init [<folder>] [--name <name>] [--universe <key>] [--git [--no-checkpoint] [--author-name <name>] [--author-email <email>]]` | Creates a den: a `den.yaml`, and with `--universe` a first universe with an id. It never overwrites anything, and refuses a folder inside another den or one that holds a den up to four folder levels below it (format.md F-LAY-1; the downward search skips hidden folders and folder links, and stops after 2,000 folders). The new den passes `check` with no warnings. By default the den is a plain folder; `--git` also turns on its history (maintainer decisions, #57, #122, #195; §6, "Turning history on"): `git init`, `.wolfden/` in its `.gitignore`, a name and email if git has none, and a first checkpoint, "Start of history", unless `--no-checkpoint`. A new den already inside a repository is left as it is, and `init` names the repository (§6, "A den inside a larger repository"). Without git installed, the den is still made, and `init` says the repository wasn't (exit 0); if a step fails, or git needs a name or email that wasn't given, the den is kept and `init` exits 2. On a folder that's already a den, `init` refuses (exit 2) unless `--git` is given: then it turns on that den's history, refusing `--name` and `--universe`, a den inside a larger repository, and one whose own repository already has checkpoints. |
+| `wolfden init [<folder>] [--name <name>] [--universe <key>] [--git [--no-checkpoint] [--author-name <name>] [--author-email <email>]]` | Creates a den: a `den.yaml`, and with `--universe` a first universe with an id. It never overwrites anything, and refuses a folder inside another den or one that holds a den up to four folder levels below it (format.md F-LAY-1; the downward search skips hidden folders and folder links, and stops after 2,000 folders). The new den passes `check` with no warnings. By default the den is a plain folder; `--git` also turns on its history (maintainer decisions, #57, #122, #195; §6, "Turning history on"): `git init`, `.wolfden/` in its `.gitignore`, a name and email if they're given (they win over git's for this den, #286) or git has none, and a first checkpoint, "Start of history", unless `--no-checkpoint`. A new den already inside a repository is left as it is, and `init` names the repository (§6, "A den inside a larger repository"). Without git installed, the den is still made, and `init` says the repository wasn't (exit 0); if a step fails, or git needs a name or email that wasn't given, the den is kept and `init` exits 2. On a folder that's already a den, `init` refuses (exit 2) unless `--git` is given: then it turns on that den's history, refusing `--name` and `--universe`, a den inside a larger repository, and one whose own repository already has checkpoints. |
 | `wolfden check [<den>] [--universe <key>] [--no-index] [--fix]` | The continuity lint above. It reads the files directly, not the index. It checks the whole den, every universe included, since it validates files rather than a story view; `--universe` checks only that universe's files and the den-level ones (see "Which universe" below), and `*` means the whole den. Without `--fix` it never writes the den's own files; `--universe` writes only the index (derived data, `.wolfden/`), and `--no-index` keeps it from doing even that. `--fix` first gives every container and entity file that loads without an `id` a new one (format.md F-ID-2, F-ID-6), skipping files in a final book (F-BOOK-1), and then checks the den as it is after the fix. |
 | `wolfden index [<den>] [--watch]` | Rebuilds `.wolfden/index.db` from the files and says what it holds. `--watch` then keeps it up to date as files change (#14), printing one line for each batch of changes it applies (with `--json`, one JSON object per line), until Ctrl+C. Only one watcher runs per den; a second exits 2. |
 | `wolfden query [<universe>] [--universe <key>] [--at <position>]` | Canon as of a position (format.md F-VIEW-1), from the index, of one universe (see "Which universe" below; `*` is refused, since a view is of one universe). `--series` or `--book` narrows the view, `--type` (any type an enabled pack defines, with its kinds, types.md F-TYPE-13) and `--entity` (matched as a link is, F-LINK-6, among the entities in the view, so one the reader meets later can't shadow one they've met) pick entities out of it, `--pinned` gives pinned canon (F-VIEW-2), and `--brief` lists one line per entity. |
@@ -2241,7 +2252,8 @@ docs/
     `gitIgnore` (`created`, `added`, or `present`), `identitySaved`, and
     the first checkpoint (its id, time, author, message, and file count,
     never file names). A name or email that's refused is 400
-    `bad_argument`, a missing one 400 `identity_needed`; a den in a
+    `bad_argument`, a missing one, or one given alone that replaces what
+    git has, 400 `identity_needed`; a den in a
     larger repository, one with checkpoints already, or no git is 409
     (`in_repository`, `has_repository`, `git_not_installed`); a server
     without a way to turn it on is 409 `history_unavailable`; a step that

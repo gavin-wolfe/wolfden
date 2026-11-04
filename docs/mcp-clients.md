@@ -52,8 +52,9 @@ cp -r samples/dracula <copy>
 ```
 
 `init --git` makes the copy a git repository and a first checkpoint. If
-git doesn't have your name and email yet, add `--author-name` and
-`--author-email`; they're saved for that den only
+git doesn't have your name and email yet, or you want this den under
+another name, add `--author-name` and `--author-email`; they're saved for
+that den only
 ([using-wolfden.md](using-wolfden.md#turning-on-history)).
 
 Inside the clone, the sample is part of Wolfden's own repository, so

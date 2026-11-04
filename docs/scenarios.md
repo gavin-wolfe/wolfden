@@ -6469,8 +6469,14 @@ the next step.
   page's `ahead of readers` tag is for that (SC-WEB-97).
 - An idea, undecided, candidate, or retconned note, section, or entry, a
   bookkeeping section, and a section an error leaves out keep their badges and get
-  no reader marks. Neither does a position that doesn't resolve.
-- At every position, what has no mark and no badge is what the strict view shows.
+  no reader marks.
+- A note or fact with a position that doesn't resolve, such as a thread paid off
+  in a book I haven't outlined yet, has `readerMark`, `unplaced`, at that position,
+  at every chapter. A position field's value that can't be compared is in
+  `unplacedValues`.
+- A fact whose range holds nothing (`from=ash:3 until=ash:1`, or a subsection that
+  starts after its parent ends) has `readerMark`, `never`, at every chapter.
+- At every position, what has no mark and no badge is what a reader sees.
   An entry that loses an overlap is the one exception (F-TMP-5).
 - A position that can't be read is `bad_position`, as `asOf` refuses it. An empty
   `marksAt`, or `asOf` and `marksAt` together, is `bad_argument`.

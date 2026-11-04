@@ -6,8 +6,7 @@ namespace Wolfden.Api;
 /// <summary>
 /// What a reader at one story position doesn't know, for the writer (#300,
 /// design.md §9): the marks <c>marksAt</c> adds to a whole note or a search,
-/// which show everything and say what's ahead of the position or no longer
-/// true there.
+/// which show everything and say what readers there don't see, and why.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -100,69 +99,82 @@ internal sealed class ReaderMarks
         };
     }
 
-    /// <summary>The position to name for <paramref name="point"/>: as the writer wrote it if that's where it falls, otherwise the position that's there.</summary>
-    private string? Named(string? written, long point) =>
-        written is not null && _points.TryGetValue(written, out var at) && at == point ? written : _names.GetValueOrDefault(point);
-
     /// <summary>The marks of the facts of one note.</summary>
     internal sealed class NoteMarks
     {
         private readonly ReaderMarks _marks;
         private readonly EntityRecord _note;
-        private readonly bool _placed;
+        private readonly bool _inCanon;
         private readonly Dictionary<int, SectionRecord> _sections;
         private readonly List<FieldValueRecord> _values;
+        private readonly Dictionary<long, string> _written = [];
 
         public NoteMarks(ReaderMarks marks, EntityRecord note)
         {
             _marks = marks;
             _note = note;
-
-            // An idea, or a note whose from doesn't resolve, isn't ahead of readers or behind them: readers never meet it.
-            _placed = IsInCanon(note.Status) && note.FromOrdinal is not null;
-            Note = _placed && note.FromOrdinal > marks._point
-                ? new ReaderMark(ReaderMark.Ahead, EntityPages.Entry(note, marks._containers).Position)
-                : null;
+            _inCanon = IsInCanon(note.Status);
             _sections = marks._db.Sections.Where(s => s.EntityId == note.Id).ToList().ToDictionary(s => s.Line);
             _values = marks._db.FieldValues.Where(v => v.EntityId == note.Id).ToList();
+
+            // An idea isn't ahead of readers or behind them: its status says readers don't meet it.
+            Note = !_inCanon ? null
+                : note.FromOrdinal is null ? new ReaderMark(ReaderMark.Unplaced, note.FromText)
+                : note.FromOrdinal > marks._point ? new ReaderMark(ReaderMark.Ahead, EntityPages.Entry(note, marks._containers).Position)
+                : null;
+
+            foreach (var text in WrittenPositions())
+            {
+                if (marks._points.TryGetValue(text, out var point))
+                {
+                    _written.TryAdd(point, text);
+                }
+            }
         }
 
-        /// <summary>The note's own mark, when readers meet it after the position.</summary>
+        /// <summary>The note's own mark, when readers meet it after the position, or no position places it.</summary>
         public ReaderMark? Note { get; }
 
         /// <summary>The mark of a section, by its heading's line.</summary>
         public ReaderMark? Section(int line) =>
-            _sections.GetValueOrDefault(line) is { } section && Takes(section)
-                ? Fact(section.FromOrdinal!.Value, section.UntilOrdinal!.Value, section.FromText, section.UntilText)
-                : null;
+            _sections.GetValueOrDefault(line) is { } section && Takes(section) ? Fact(section) : null;
 
         /// <summary>The mark of a field's entry, or of its plain value.</summary>
         public ReaderMark? Field(string field, int? entryIndex) =>
-            Row(field, entryIndex) is { } row ? Fact(row) : null;
+            Row(field, entryIndex) is { } row && Takes(row) ? Fact(row) : null;
 
         /// <summary>
         /// The values of a position field later than the position (format.md
-        /// F-VIEW-5), as written, or null if there are none. A value that can't
-        /// be compared isn't one, since nothing says it's ahead.
+        /// F-VIEW-5), as written, or null if there are none.
         /// </summary>
-        public IReadOnlyList<string>? AheadValues(string field, int? entryIndex, JsonElement value) =>
-            Row(field, entryIndex) is { } row ? AheadValues(row, value) : null;
+        public IReadOnlyList<string>? AheadValues(string field, int? entryIndex) =>
+            Row(field, entryIndex) is { } row ? Values(row).Ahead : null;
+
+        /// <summary>
+        /// The values of a position field that can't be compared (F-VIEW-5), as
+        /// written, or null if there are none. An assistant at a position isn't
+        /// told them either, so what's in neither list is what readers have reached.
+        /// </summary>
+        public IReadOnlyList<string>? UnplacedValues(string field, int? entryIndex) =>
+            Row(field, entryIndex) is { } row ? Values(row).Unplaced : null;
 
         /// <summary><paramref name="hit"/> with what readers at the position know of the text it found.</summary>
         public SearchPageHit Mark(SearchPageHit hit)
         {
             if (hit.Field is not null)
             {
-                // Entries written on one line can't be told apart by a hit's line, so they're marked only if they agree.
-                var rows = _values.Where(v => v.Field == hit.Field && v.Line == hit.Line).ToList();
-                var marks = rows.Select(v => Takes(v) ? Fact(v) ?? Note : null).Distinct().ToList();
-                var ahead = rows.SelectMany(AheadValues).Distinct(StringComparer.Ordinal).ToList();
-                return hit with { ReaderMark = marks.Count == 1 ? marks[0] : null, AheadValues = ahead.Count > 0 ? ahead : null };
+                if (Row(hit.Field, hit.EntryIndex) is not { } row)
+                {
+                    return hit with { ReaderMark = Note };
+                }
+
+                var (ahead, unplaced) = Values(row);
+                return hit with { ReaderMark = Takes(row) ? Fact(row) ?? Note : null, AheadValues = ahead, UnplacedValues = unplaced };
             }
 
             if (hit.Section is not null && hit.Line is { } line)
             {
-                return hit with { ReaderMark = _sections.GetValueOrDefault(line) is { } section && Takes(section) ? Section(line) ?? Note : null };
+                return hit with { ReaderMark = _sections.GetValueOrDefault(line) is { } section && Takes(section) ? Fact(section) ?? Note : null };
             }
 
             // The name, an alias, or the lead: they hold wherever the note does.
@@ -171,66 +183,156 @@ internal sealed class ReaderMarks
 
         private FieldValueRecord? Row(string field, int? entryIndex) => _values.FirstOrDefault(v => v.Field == field && v.EntryIndex == entryIndex);
 
-        private IEnumerable<string> AheadValues(FieldValueRecord row)
-        {
-            using var value = JsonDocument.Parse(row.ValueJson);
-            return AheadValues(row, value.RootElement) ?? [];
-        }
-
-        private IReadOnlyList<string>? AheadValues(FieldValueRecord row, JsonElement value)
+        private (IReadOnlyList<string>? Ahead, IReadOnlyList<string>? Unplaced) Values(FieldValueRecord row)
         {
             if (!Takes(row) || !_marks._positionFields.Contains((_note.Type, row.Field)))
             {
-                return null;
+                return (null, null);
             }
 
-            var written = value.ValueKind switch
+            var ahead = new List<string>();
+            var unplaced = new List<string>();
+            foreach (var value in ValuesOf(row))
             {
-                JsonValueKind.String => [value],
-                JsonValueKind.Array => value.EnumerateArray().Where(v => v.ValueKind == JsonValueKind.String).ToList(),
-                _ => [],
-            };
-            var ahead = written.Select(v => v.GetString()!).Where(v => _marks._points.TryGetValue(v, out var point) && point > _marks._point).ToList();
-            return ahead.Count > 0 ? ahead : null;
+                if (!_marks._points.TryGetValue(value, out var point))
+                {
+                    unplaced.Add(value);
+                }
+                else if (point > _marks._point)
+                {
+                    ahead.Add(value);
+                }
+            }
+
+            return (ahead.Count > 0 ? ahead : null, unplaced.Count > 0 ? unplaced : null);
         }
 
-        private ReaderMark? Fact(FieldValueRecord value) =>
-            Takes(value) ? Fact(value.FromOrdinal!.Value, value.UntilOrdinal!.Value, value.FromText, value.UntilText) : null;
+        /// <summary>A field's value as text: each item of a list, or the one value. An unset value has none.</summary>
+        private static List<string> ValuesOf(FieldValueRecord row)
+        {
+            using var document = JsonDocument.Parse(row.ValueJson);
+            var value = document.RootElement;
+            var items = value.ValueKind == JsonValueKind.Array ? value.EnumerateArray().ToList() : [value];
+            return items
+                .Where(i => i.ValueKind != JsonValueKind.Null)
+                .Select(i => i.ValueKind == JsonValueKind.String ? i.GetString()! : i.GetRawText())
+                .ToList();
+        }
+
+        /// <summary>Every position the note's own text names, so a mark can name a point as the writer did.</summary>
+        private IEnumerable<string> WrittenPositions()
+        {
+            foreach (var section in _sections.Values)
+            {
+                if (section.FromText is { } from)
+                {
+                    yield return from;
+                }
+
+                if (section.UntilText is { } until)
+                {
+                    yield return until;
+                }
+            }
+
+            foreach (var value in _values)
+            {
+                if (value.FromText is { } from)
+                {
+                    yield return from;
+                }
+
+                if (value.UntilText is { } until)
+                {
+                    yield return until;
+                }
+
+                if (_marks._positionFields.Contains((_note.Type, value.Field)))
+                {
+                    foreach (var text in ValuesOf(value))
+                    {
+                        yield return text;
+                    }
+                }
+            }
+        }
+
+        private ReaderMark? Fact(SectionRecord s) =>
+            Fact(s.FromOrdinal, s.UntilOrdinal, s.FromText, s.UntilText, () => NotResolving(s));
+
+        private ReaderMark? Fact(FieldValueRecord v) =>
+            Fact(v.FromOrdinal, v.UntilOrdinal, v.FromText, v.UntilText, () => FirstNotResolving(v.FromText, v.UntilText));
 
         /// <summary>
-        /// A fact past its end, or one readers reach after the position. In a
-        /// note readers meet later, a fact that starts no later than the note
-        /// has nothing to say that the note's own mark doesn't. A range that
-        /// isn't one (a warning, F-TMP-3, F-SEC-8) is never in effect, so
-        /// no position changes anything about it.
+        /// What readers at the position don't see of an in-canon fact, and why.
+        /// No position reaches one that doesn't resolve (F-POS-4), or whose
+        /// range holds nothing (F-TMP-3, F-SEC-8, F-SEC-9). Otherwise it's past
+        /// its end, or starts after the position. In a note readers meet later,
+        /// a fact that starts no later than the note has nothing to say that
+        /// the note's own mark doesn't, and in a note no position places, no
+        /// fact does.
         /// </summary>
-        private ReaderMark? Fact(long from, long until, string? fromText, string? untilText)
+        private ReaderMark? Fact(long? from, long? until, string? fromText, string? untilText, Func<string?> notResolving)
         {
-            if (from >= until)
+            if (Note?.Kind == ReaderMark.Unplaced)
             {
                 return null;
             }
 
-            if (until <= _marks._point)
+            if (from is not { } start || until is not { } end)
             {
-                return new ReaderMark(ReaderMark.Ended, _marks.Named(untilText, until));
+                return new ReaderMark(ReaderMark.Unplaced, notResolving());
             }
 
-            return from > _marks._point && !(Note is not null && from <= _note.FromOrdinal)
-                ? new ReaderMark(ReaderMark.Ahead, _marks.Named(fromText, from))
+            if (start >= end)
+            {
+                return new ReaderMark(ReaderMark.Never, Named(fromText, start));
+            }
+
+            if (end <= _marks._point)
+            {
+                return new ReaderMark(ReaderMark.Ended, Named(untilText, end));
+            }
+
+            return start > _marks._point && !(Note is not null && start <= _note.FromOrdinal)
+                ? new ReaderMark(ReaderMark.Ahead, Named(fromText, start))
                 : null;
         }
 
+        /// <summary>The position that keeps a section from resolving: its own, a thread's <c>paid_off</c> for its Payoff (F-CORE-4), or that of a section holding it (F-SEC-9).</summary>
+        private string? NotResolving(SectionRecord section)
+        {
+            if (FirstNotResolving(section.FromText, section.UntilText) is { } own)
+            {
+                return own;
+            }
+
+            if (section.ParentId is { } parentId)
+            {
+                return _sections.Values.FirstOrDefault(s => s.Id == parentId) is { } parent ? NotResolving(parent) : null;
+            }
+
+            return section.NameNormalized == "payoff" && _values.FirstOrDefault(v => v.Field == "paid_off") is { } paidOff
+                ? ValuesOf(paidOff).FirstOrDefault(v => !_marks._points.ContainsKey(v))
+                : null;
+        }
+
+        private string? FirstNotResolving(params string?[] written) =>
+            written.FirstOrDefault(w => w is not null && !_marks._points.ContainsKey(w));
+
+        /// <summary>The position to name for <paramref name="point"/>: as written on the fact if that's where it falls, else as written elsewhere in the note, else the chapter that's there.</summary>
+        private string? Named(string? written, long point) =>
+            written is not null && _marks._points.TryGetValue(written, out var at) && at == point ? written
+                : _written.GetValueOrDefault(point) ?? _marks._names.GetValueOrDefault(point);
+
         /// <summary>
         /// Whether a section can have a reader mark. An idea, a bookkeeping
-        /// section, or one an error leaves out keeps its own badge instead, and one
-        /// whose position doesn't resolve has no place in the story to compare.
+        /// section, or one an error leaves out keeps its own badge instead.
         /// </summary>
-        private bool Takes(SectionRecord s) =>
-            _placed && IsInCanon(s.Status) && !s.IsBookkeeping && s.LeftOutJson is null && s.FromOrdinal is not null && s.UntilOrdinal is not null;
+        private bool Takes(SectionRecord s) => _inCanon && IsInCanon(s.Status) && !s.IsBookkeeping && s.LeftOutJson is null;
 
-        /// <summary>Whether a field's value or entry can have a reader mark: one that isn't live (F-TMP-4) reaches a reader at no position.</summary>
-        private bool Takes(FieldValueRecord v) => _placed && v.IsLive && v.FromOrdinal is not null && v.UntilOrdinal is not null;
+        /// <summary>Whether a field's value or entry can have a reader mark. One out of canon keeps its own status instead.</summary>
+        private bool Takes(FieldValueRecord v) => _inCanon && IsInCanon(v.Status);
 
         private static bool IsInCanon(string status) => status is "draft" or "canon";
     }

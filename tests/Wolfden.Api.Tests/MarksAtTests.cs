@@ -142,7 +142,7 @@ public sealed class MarksAtTests : IDisposable
 
     private static void AssertNoMarks(JsonElement answer)
     {
-        foreach (var key in new[] { "readerMark", "aheadValues", "marksAt" })
+        foreach (var key in new[] { "readerMark", "aheadValues", "unplacedValues", "marksAt" })
         {
             Assert.DoesNotContain(key, Keys(answer));
         }
@@ -436,24 +436,155 @@ public sealed class MarksAtTests : IDisposable
 
     [Fact]
     [Trait("Scenario", "SC-WEB-100")]
-    public async Task APositionThatDoesntResolveHasNoPlaceToCompareSoNoMark()
+    public async Task WhatNoPositionReachesIsMarkedAtEveryPosition()
     {
-        _den.Write("universes/starfall/entities/notes/the-toll-bell.md", "---\ntype: thread\nname: The toll bell\nstatus: canon\nfrom: \"ember:1\"\nfields:\n  planted: [\"ember:99\", \"ash:2\", 7]\n  ringer:\n    - { value: Halloran, from: \"tide:1\" }\n    - { value: Sorrel, from: \"ash:2\", until: \"ash:99\" }\n---\n\nIt rings.\n\n## Typo\n<!-- wolfden: from=ash:99 -->\nPlanned ahead.\n\n## Backwards\n<!-- wolfden: from=ash:3 until=ash:2 -->\nEmpty.\n");
-        _den.Write("universes/starfall/entities/notes/the-lost-bell.md", "---\ntype: note\nname: The lost bell\nstatus: canon\nfrom: \"ash:99\"\n---\n\nIt's gone.\n\n## After\n<!-- wolfden: from=ash:4 -->\nFound.\n");
+        WritePlannedNotes();
+        await using var server = await Start();
+
+        foreach (var at in new[] { "ember:prologue", "ember:3", "ash:epilogue" })
+        {
+            var page = await server.GetJsonAsync($"/api/entity?universe=starfall&entity=The%20toll%20bell&marksAt={at}", HttpStatusCode.OK);
+
+            // A position that doesn't resolve: a from, an until, a thread's paid_off, and what's under them.
+            AssertMark(Section(page, "Payoff"), "unplaced", "dusk:9");
+            AssertMark(Section(page, "The last peal"), "unplaced", "dusk:9");
+            AssertMark(Section(page, "Planned"), "unplaced", "dusk:2");
+            AssertMark(Section(page, "Runs out"), "unplaced", "dusk:3");
+            AssertMark(Field(page, "ringer", "Halloran"), "unplaced", "tide:1");
+            AssertMark(Field(page, "ringer", "Sorrel"), "unplaced", "ash:99");
+
+            // Positions that resolve, and a range that holds nothing.
+            AssertMark(Section(page, "Backwards"), "never", "ash:3");
+            AssertMark(Section(page, "Too late"), "never", "ash:3");
+            AssertMark(Field(page, "ringer", "Wrenna"), "never", "ash:3");
+
+            // A value that can't be compared, beside one that can.
+            var planted = Field(page, "planted");
+            Assert.Equal(["ember:99", "7"], planted.GetProperty("unplacedValues").EnumerateArray().Select(v => v.GetString()));
+            Assert.Equal(["dusk:9"], Field(page, "paid_off").GetProperty("unplacedValues").EnumerateArray().Select(v => v.GetString()));
+        }
+
+        var early = await server.GetJsonAsync("/api/entity?universe=starfall&entity=The%20toll%20bell&marksAt=ember:3", HttpStatusCode.OK);
+        Assert.Equal(["ash:2"], Field(early, "planted").GetProperty("aheadValues").EnumerateArray().Select(v => v.GetString()));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-100")]
+    public async Task ANoteNoPositionPlacesHasTheOneMark()
+    {
+        WritePlannedNotes();
+        await using var server = await Start();
+
+        var page = await server.GetJsonAsync("/api/entity?universe=starfall&entity=The%20lost%20bell&marksAt=ember:3", HttpStatusCode.OK);
+
+        AssertMark(page.GetProperty("entity"), "unplaced", "ash:99");
+        AssertNoMark(Section(page, "After"));
+        AssertNoMark(Field(page, "keeper"));
+
+        // Out of canon, its status says it instead.
+        _den.Write("universes/starfall/entities/notes/the-lost-bell.md", _den.Read("universes/starfall/entities/notes/the-lost-bell.md").Replace("status: canon", "status: idea", StringComparison.Ordinal));
+        var idea = await server.GetJsonAsync("/api/entity?universe=starfall&entity=The%20lost%20bell&marksAt=ember:3", HttpStatusCode.OK);
+        Assert.DoesNotContain("readerMark", Keys(idea));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-100")]
+    public async Task ALaterNotesPlannedFactStillSaysSo()
+    {
+        _den.Write(HeirPath, _den.Read(HeirPath) + "\n## Planned\n<!-- wolfden: from=dusk:2 -->\nLater still.\n");
+        await using var server = await Start();
+
+        var page = await server.GetJsonAsync("/api/entity?universe=starfall&entity=The%20salt%20heir&marksAt=ember:3", HttpStatusCode.OK);
+
+        AssertMark(page.GetProperty("entity"), "ahead", "ash:3");
+        AssertMark(Section(page, "Planned"), "unplaced", "dusk:2");
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-100")]
+    public async Task ASearchMarksWhatNoPositionReaches()
+    {
+        WritePlannedNotes();
+        await using var server = await Start();
+
+        async Task<JsonElement> Find(string query) => await server.GetJsonAsync($"/api/search?query={query}&marksAt=ember:3", HttpStatusCode.OK);
+
+        AssertMark(Hit(await Find("Clapperbone"), h => InSection(h, "Payoff")), "unplaced", "dusk:9");
+        AssertMark(Hit(await Find("Halloran"), h => h.GetProperty("field").GetString() == "ringer"), "unplaced", "tide:1");
+        AssertMark(Hit(await Find("Backwardly"), h => InSection(h, "Backwards")), "never", "ash:3");
+
+        // Through the note: its name, its lead, a section, and a field.
+        AssertMark((await Find("Lost%20bell")).GetProperty("hits")[0], "unplaced", "ash:99");
+        AssertMark(Hit(await Find("Foundry"), h => InSection(h, "After")), "unplaced", "ash:99");
+        AssertMark(Hit(await Find("Gorsewick"), h => h.GetProperty("field").GetString() == "keeper"), "unplaced", "ash:99");
+
+        // A position field's value.
+        var paidOff = Hit(await Find("dusk%209"), h => h.GetProperty("field").GetString() == "paid_off");
+        Assert.Equal(["dusk:9"], paidOff.GetProperty("unplacedValues").EnumerateArray().Select(v => v.GetString()));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-100")]
+    public async Task AMarkNamesAPointAsTheNoteWritesIt()
+    {
+        _den.Write("universes/starfall/entities/notes/the-toll-bell.md", "---\ntype: thread\nname: The toll bell\nstatus: canon\nfrom: \"ember:1\"\nfields:\n  paid_off: ash\n---\n\nIt rings.\n\n## Payoff\nIt stops.\n");
         await using var server = await Start();
 
         var page = await server.GetJsonAsync("/api/entity?universe=starfall&entity=The%20toll%20bell&marksAt=ember:3", HttpStatusCode.OK);
-        AssertNoMark(Section(page, "Typo"));
-        AssertNoMark(Section(page, "Backwards"));
-        AssertNoMark(Field(page, "ringer", "Halloran"));
-        AssertNoMark(Field(page, "ringer", "Sorrel"));
-        Assert.Equal(["ash:2"], Field(page, "planted").GetProperty("aheadValues").EnumerateArray().Select(v => v.GetString()));
 
-        var lost = await server.GetJsonAsync("/api/entity?universe=starfall&entity=The%20lost%20bell&marksAt=ember:3", HttpStatusCode.OK);
-        foreach (var key in new[] { "readerMark", "aheadValues" })
-        {
-            Assert.DoesNotContain(key, Keys(lost));
-        }
+        AssertMark(Section(page, "Payoff"), "ahead", "ash");
+    }
+
+    /// <summary>Notes with what no position reaches: planned in a book the den doesn't list, or dated so nothing holds.</summary>
+    private void WritePlannedNotes()
+    {
+        _den.Write(
+            "universes/starfall/entities/notes/the-toll-bell.md",
+            """
+            ---
+            type: thread
+            name: The toll bell
+            status: canon
+            from: "ember:1"
+            fields:
+              planted: ["ember:1", "ember:99", "ash:2", 7]
+              paid_off: "dusk:9"
+              ringer:
+                - { value: Halloran, from: "tide:1" }
+                - { value: Sorrel, from: "ash:2", until: "ash:99" }
+                - { value: Wrenna, from: "ash:3", until: "ash:1" }
+            ---
+
+            It rings.
+
+            ## Payoff
+            Clapperbone falls.
+
+            ### The last peal
+            Heard once.
+
+            ## Planned
+            <!-- wolfden: from=dusk:2 -->
+            Not outlined yet.
+
+            ## Runs out
+            <!-- wolfden: from=ember:1 until=dusk:3 -->
+            Until a chapter not listed.
+
+            ## Backwards
+            <!-- wolfden: from=ash:3 until=ash:2 -->
+            Backwardly dated.
+
+            ## Short
+            <!-- wolfden: from=ember:1 until=ash:1 -->
+            Holds a while.
+
+            ### Too late
+            <!-- wolfden: from=ash:3 -->
+            Starts after its parent ends.
+
+            """);
+        _den.Write("universes/starfall/entities/notes/the-lost-bell.md", "---\ntype: note\nname: The lost bell\nstatus: canon\nfrom: \"ash:99\"\nfields:\n  keeper: Gorsewick\n---\n\nIt's gone.\n\n## After\n<!-- wolfden: from=ash:4 -->\nFoundry.\n");
     }
 
     [Fact]
@@ -478,12 +609,13 @@ public sealed class MarksAtTests : IDisposable
     [Trait("Scenario", "SC-WEB-100")]
     public async Task AtEveryPositionWhatHasNoMarkIsWhatAReaderSees()
     {
+        WritePlannedNotes();
         await using var server = await Start();
         var positions = await server.GetJsonAsync("/api/positions?universe=starfall", HttpStatusCode.OK);
 
         foreach (var at in positions.GetProperty("positions").EnumerateArray().Select(p => p.GetProperty("position").GetString()!))
         {
-            foreach (var name in new[] { Tithe, "The%20salt%20heir", "Ilse%20Tarrow", "The%20missing%20manifest" })
+            foreach (var name in new[] { Tithe, "The%20salt%20heir", "Ilse%20Tarrow", "The%20missing%20manifest", "The%20toll%20bell", "The%20lost%20bell" })
             {
                 var marked = await server.GetJsonAsync($"/api/entity?universe=starfall&entity={name}&marksAt={at}", HttpStatusCode.OK);
                 var strict = await server.GetJsonAsync($"/api/entity?universe=starfall&entity={name}&asOf={at}", HttpStatusCode.OK);
@@ -509,8 +641,7 @@ public sealed class MarksAtTests : IDisposable
             !fact.TryGetProperty("readerMark", out _)
             && fact.GetProperty("status").GetString() is "draft" or "canon"
             && !(fact.TryGetProperty("bookkeeping", out var bookkeeping) && bookkeeping.ValueKind == JsonValueKind.True)
-            && !(fact.TryGetProperty("leftOut", out var leftOut) && leftOut.ValueKind == JsonValueKind.Array)
-            && !(fact.TryGetProperty("live", out var live) && live.ValueKind == JsonValueKind.False);
+            && !(fact.TryGetProperty("leftOut", out var leftOut) && leftOut.ValueKind == JsonValueKind.Array);
     }
 
     // --- Positions that can't be read. ---
@@ -695,15 +826,15 @@ public sealed class MarksAtTests : IDisposable
 
     [Fact]
     [Trait("Scenario", "SC-WEB-100")]
-    public async Task EntriesOnOneLineThatDisagreeAreNotMarkedInASearch()
+    public async Task EntriesOnOneLineEachHaveTheirOwnMarkInASearch()
     {
         _den.Write("universes/starfall/entities/notes/the-toll-bell.md", "---\ntype: note\nname: The toll bell\nstatus: canon\nfrom: \"ember:1\"\nfields:\n  ringer: [{ value: Halloran, from: \"ember:1\", until: \"ash:2\" }, { value: Sorrel, from: \"ash:2\" }]\n---\n\nIt rings.\n");
         await using var server = await Start();
 
-        var hit = (await server.GetJsonAsync("/api/search?query=Halloran&marksAt=ember:3", HttpStatusCode.OK)).GetProperty("hits")[0];
-        AssertNoMark(hit);
+        AssertNoMark((await server.GetJsonAsync("/api/search?query=Halloran&marksAt=ember:3", HttpStatusCode.OK)).GetProperty("hits")[0]);
+        AssertMark((await server.GetJsonAsync("/api/search?query=Sorrel&marksAt=ember:3", HttpStatusCode.OK)).GetProperty("hits")[0], "ahead", "ash:2");
 
-        // On the page, each has its own.
+        // And on the page.
         var page = await server.GetJsonAsync("/api/entity?universe=starfall&entity=The%20toll%20bell&marksAt=ember:3", HttpStatusCode.OK);
         AssertNoMark(Field(page, "ringer", "Halloran"));
         AssertMark(Field(page, "ringer", "Sorrel"), "ahead", "ash:2");
@@ -735,7 +866,7 @@ public sealed class MarksAtTests : IDisposable
                 Assert.DoesNotContain(word, answer, StringComparison.Ordinal);
             }
 
-            foreach (var mark in new[] { "reader_mark", "readerMark", "ahead_values", "aheadValues", "marks_at", "marksAt", "\"ahead\"", "\"ended\"" })
+            foreach (var mark in new[] { "reader_mark", "readerMark", "ahead_values", "aheadValues", "unplaced_values", "unplacedValues", "marks_at", "marksAt", "\"ahead\"", "\"ended\"", "\"unplaced\"", "\"never\"" })
             {
                 Assert.DoesNotContain(mark, answer, StringComparison.Ordinal);
             }

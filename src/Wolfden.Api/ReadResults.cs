@@ -131,21 +131,25 @@ public sealed record LinkView(
 /// <param name="Links">The links in this value or entry.</param>
 /// <param name="ReaderMark">With <c>marksAt</c>, what readers there don't know of this value or entry; left out when there's nothing to say, and always without <c>marksAt</c>.</param>
 /// <param name="AheadValues">With <c>marksAt</c>, a position field's values later than it, as written (format.md F-VIEW-5); left out when there are none, and always without <c>marksAt</c>.</param>
+/// <param name="UnplacedValues">With <c>marksAt</c>, a position field's values that can't be compared, as written (F-VIEW-5); left out when there are none, and always without <c>marksAt</c>.</param>
 public sealed record PageField(
     string Name, JsonElement Value, string Kind, string? Status, bool Pinned, string? From, string? Until, int Line, int? EntryIndex, bool? Live,
     IReadOnlyList<LinkView> Links,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReaderMark? ReaderMark = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? AheadValues = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? AheadValues = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? UnplacedValues = null);
 
 /// <summary>
-/// What readers at the position <c>marksAt</c> names don't know about a note or
-/// a fact the writer is shown (#300, design.md §9). The words are the page's.
+/// Why readers at the position <c>marksAt</c> names don't see a note or a fact
+/// the writer is shown (#300, design.md §9). The words are the page's.
 /// </summary>
-/// <param name="Kind"><see cref="Ahead"/> or <see cref="Ended"/>.</param>
+/// <param name="Kind"><see cref="Ahead"/>, <see cref="Ended"/>, <see cref="Unplaced"/>, or <see cref="Never"/>.</param>
 /// <param name="At">
-/// The position that makes it so: where a note or fact enters, or where a fact
-/// stopped holding. It's the effective one, so it may not be written on the
-/// fact. Null only for a note filed in a series with no books yet.
+/// The position that makes it so: where it enters, where it stopped holding, the
+/// written position that doesn't resolve, or where a range that holds nothing
+/// starts. <see cref="Ahead"/> and <see cref="Ended"/> give the effective one, so
+/// it may not be written on the fact. Null for a note filed in a series with no
+/// books yet.
 /// </param>
 public sealed record ReaderMark(string Kind, string? At)
 {
@@ -154,6 +158,12 @@ public sealed record ReaderMark(string Kind, string? At)
 
     /// <summary>A fact whose end is at or before the position: <c>no longer true here</c>.</summary>
     public const string Ended = "ended";
+
+    /// <summary>A note or fact with a position that doesn't resolve (format.md F-POS-4), such as a chapter not listed yet. It has no place in story order, so no position reaches it.</summary>
+    public const string Unplaced = "unplaced";
+
+    /// <summary>A fact whose positions resolve but whose range holds nothing (F-TMP-3, F-SEC-8, F-SEC-9), so no position reaches it.</summary>
+    public const string Never = "never";
 }
 
 /// <summary>A section on an entity page: <see cref="SectionView"/>, whose <c>body</c> is markdown, with its links.</summary>
@@ -280,7 +290,9 @@ public sealed record SearchPageHit(
     EntitySummary Entity, string? Section, int? Line, string Snippet, string Status, bool InCanon, bool InComment, string? Field, string Text,
     IReadOnlyList<TextMatch> Matches, bool? LeftOut = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReaderMark? ReaderMark = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? AheadValues = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? AheadValues = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? UnplacedValues = null,
+    [property: JsonIgnore] int? EntryIndex = null);
 
 /// <summary>A search's result as the search page gets it: the MCP tool's, with <see cref="SearchPageHit"/>s.</summary>
 /// <param name="Version">The shape version.</param>

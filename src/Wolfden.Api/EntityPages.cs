@@ -74,7 +74,7 @@ internal static class EntityPages
                 (view.Fields ?? []).Select(f => new PageField(
                     f.Name, f.Value, f.Kind, f.Status, f.Pinned, f.From, f.Until, f.Line, f.EntryIndex, f.Live,
                     f.Kind == "default" ? [] : byEntry[(f.Name, f.Line)].Select(Link).ToList(),
-                    noteMarks?.Field(f.Name, f.EntryIndex), noteMarks?.AheadValues(f.Name, f.EntryIndex, f.Value))).ToList(),
+                    noteMarks?.Field(f.Name, f.EntryIndex), noteMarks?.AheadValues(f.Name, f.EntryIndex), noteMarks?.UnplacedValues(f.Name, f.EntryIndex))).ToList(),
                 (view.Sections ?? []).Select(s => new PageSection(
                     s.Name, s.Level, s.HeadingPath, s.Status, s.Pinned, s.From, s.Until, s.Line, s.Body, s.Bookkeeping,
                     bySection[s.Line].Select(Link).ToList(), s.LeftOut, noteMarks?.Section(s.Line))).ToList(),

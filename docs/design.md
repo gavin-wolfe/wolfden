@@ -1634,8 +1634,10 @@ docs/
   API's half of that. With it, `/api/entity` is the full view and `/api/search`
   finds what it finds with no position, in the universe the position settles,
   and the answer says what readers there don't know. Without it, nothing is
-  different: `asOf` is still the strict view, which the Reader's view will use,
-  and giving both is `bad_argument`. A position that can't be read is
+  different: `asOf` is still the canon view, and giving both is `bad_argument`.
+  The Reader's view starts from that view, but `asOf` gives later `until`s and
+  position values for the writer (F-VIEW-4, F-VIEW-5), which the Reader's view
+  hides, so it needs more than `asOf`. A position that can't be read is
   `bad_position`, with the message `asOf` gets, and `universe=*` doesn't go with
   one. `Wolfden.Api`'s `ReaderMarks` makes the marks, and no MCP tool can ask for
   them or reach that project (`McpStaysStrictTests`). What's added, only with
@@ -1647,13 +1649,15 @@ docs/
     "entity": {
       "name": "The salt tithe",
       "fields": [
-        { "name": "planted", "value": ["ember:1", "ash:2"], "aheadValues": ["ash:2"] },
+        { "name": "planted", "value": ["ember:1", "ash:2", "dusk:9"], "aheadValues": ["ash:2"], "unplacedValues": ["dusk:9"] },
         { "name": "keeper", "value": "Orrin Vale", "until": "ash:2" },
         { "name": "keeper", "value": "Morvane", "from": "ash:2", "readerMark": { "kind": "ahead", "at": "ash:2" } }
       ],
       "sections": [
         { "name": "Terms", "until": "ember:2", "readerMark": { "kind": "ended", "at": "ember:2" } },
-        { "name": "Payoff", "from": null, "readerMark": { "kind": "ahead", "at": "ash:3" } }
+        { "name": "Payoff", "from": null, "readerMark": { "kind": "ahead", "at": "ash:3" } },
+        { "name": "The last toll", "from": "dusk:9", "readerMark": { "kind": "unplaced", "at": "dusk:9" } },
+        { "name": "Old draft", "from": "ash:3", "until": "ash:1", "readerMark": { "kind": "never", "at": "ash:3" } }
       ]
     }
   }
@@ -1663,32 +1667,44 @@ docs/
     or a search hit. `kind` is `ahead`, for a note or fact readers reach after
     the position (the page says `enters at …` for a note, `ahead of readers` for
     a fact), or `ended`, for a fact whose end is at or before it (`no longer
-    true here`, not `ahead of readers`). `at` is the position that makes it so.
-    The words are the page's. It compares by the index's effective ranges, as
+    true here`, not `ahead of readers`). Two more say no position reaches it, at
+    any position: `unplaced`, for a note or fact with a position that doesn't
+    resolve (F-POS-4), such as a chapter of a book not outlined yet, and `never`,
+    for a fact whose positions resolve but whose range holds nothing (F-TMP-3,
+    F-SEC-8), or a subsection that starts after its parent ends (F-SEC-9). They're
+    apart because the writer does different things about them: list the chapter,
+    or fix the dates. `at` is the position that makes it so, and the words are
+    the page's. `ahead` and `ended` compare by the index's effective ranges, as
     canon views do, so `at` may not be written on the fact: a thread's
     `## Payoff` starts at `paid_off`, and an entry or section that hands over
-    (F-TMP-4, F-SEC-8) ends where the next starts.
-  - **`aheadValues`**, on a field or a hit in a field: which of a `position`
-    field's values are later than the position (F-VIEW-5), as written, since
-    only some of a list may be. The field keeps its whole `value`.
+    (F-TMP-4, F-SEC-8) ends where the next starts. `at` is as the note writes
+    that point if it does, else the chapter there. For `unplaced` it's the written
+    position that doesn't resolve, the `paid_off` of a Payoff, or a parent's.
+    For `never`, it's where the range starts.
+  - **`aheadValues`** and **`unplacedValues`**, on a field or a hit in a field:
+    which of a `position` field's values are later than the position, and which
+    can't be compared (F-VIEW-5), as written, since only some of a list may be.
+    An assistant at the position gets neither. The field keeps its whole `value`.
   - **`marksAt`** on the answer repeats the position.
   - **A later `until` on a fact in effect has no mark.** The read gives the
     `until`, and the page's `isAheadOf` tags it from the position, as it already
     does (#288), so that's still one rule.
   - **No reader marks** on what's kept out for a reason other than the position:
     a note, section, or entry out of canon, a bookkeeping section, or a section
-    an error leaves out. Each has its own badge. Nor on what has no place in the
-    story to compare (F-POS-4), or a range that isn't one (F-TMP-3, F-SEC-8):
-    `wolfden check` warns about those.
+    an error leaves out. Each has its own badge.
   - **A note readers meet later** has `readerMark` at where it enters, the same
     position as its `entry`. Its facts that start with it, or earlier, say
-    nothing more; a fact of its own that starts later still has a mark.
-  - **What has no mark and isn't badged is what the Reader's view shows,** at
-    every position, with one exception: an entry that loses an overlap (F-TMP-5,
-    which `wolfden check` warns about) isn't ahead or ended, so it has no mark,
-    though the view shows only the other.
+    nothing more; a fact of its own that starts later still has a mark, and so
+    does one that's `unplaced` or `never`. In an `unplaced` note, only the note
+    has a mark, since nothing in it can reach a reader.
+  - **What has no mark and isn't badged is what a reader sees,** at every
+    position, with one exception: an entry that loses an overlap (F-TMP-5, which
+    `wolfden check` warns about) isn't ahead or ended, so it has no mark, though
+    the canon view shows only the other.
   - **A search hit** has the mark of the text it found: its section's or entry's,
     or else the note's. Links, backlinks, and the page's `pinned` carry no marks.
+    So a field hit found through a linked note's name or alias has the mark of the
+    field, even if readers meet that note later.
 
   An `/api/entity` for a note left out is still 404 `unknown_entity`, with
   `leftOut` (`path`, `line`, `rule`, `message`), found by its path, a path under a

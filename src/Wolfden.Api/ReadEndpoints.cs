@@ -117,7 +117,7 @@ public static class ReadEndpoints
     /// </summary>
     internal static SearchPageResult SearchPage(SearchResult result) => new(
         result.Version, result.Query, result.Count, result.Truncated,
-        result.Hits.Select(h => new SearchPageHit(h.Entity, h.Section, h.Line, h.Snippet, h.Status, h.InCanon, h.InComment, h.Field, h.Text, h.Matches, h.LeftOut))
+        result.Hits.Select(h => new SearchPageHit(h.Entity, h.Section, h.Line, h.Snippet, h.Status, h.InCanon, h.InComment, h.Field, h.Text, h.Matches, h.LeftOut, EntryIndex: h.EntryIndex))
             .ToList());
 
     /// <summary>Refuses a read given both a position to read as of and a position to mark at.</summary>
@@ -134,17 +134,18 @@ public static class ReadEndpoints
     /// <summary>
     /// A search of the universe <paramref name="marksAt"/> is in, finding what
     /// it finds with no position, later material included, with what readers
-    /// there don't know marked. It reads the index twice, so a file saved in
-    /// between can leave a hit unmarked until the next search.
+    /// there don't know marked.
     /// </summary>
     private static SearchPageResult MarkedSearch(
         DenReader reader, string marksAt, string? asOf, string query, string? universe, string? type, bool canonOnly, int limit,
         string? status, string? series, string? book, string? field)
     {
         CheckOnePosition(asOf, marksAt);
-        var chosen = reader.WithIndex(index => ReaderMarks.For(reader, index, universe, marksAt).Universe);
-        var found = SearchPage(reader.Search(query, chosen, type, canonOnly, limit, status, series, book, null, field));
-        return reader.WithIndex(index => ReaderMarks.For(reader, index, chosen, marksAt).Mark(found));
+        return reader.WithIndex(index =>
+        {
+            var marks = ReaderMarks.For(reader, index, universe, marksAt);
+            return marks.Mark(SearchPage(reader.Search(index, query, marks.Universe, type, canonOnly, limit, status, series, book, null, field)));
+        });
     }
 
     /// <summary>The longest part of a revision a message repeats.</summary>

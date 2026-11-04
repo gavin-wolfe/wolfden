@@ -857,7 +857,7 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
             }
             else if (type.Namespace?.StartsWith("Wolfden", StringComparison.Ordinal) == true && !seen.ContainsKey(type.Name))
             {
-                var properties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => !p.IsDefined(typeof(JsonIgnoreAttribute))).ToList();
+                var properties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => p.GetCustomAttribute<JsonIgnoreAttribute>()?.Condition != JsonIgnoreCondition.Always).ToList();
                 seen[type.Name] = string.Join(", ", properties.Select(p => p.Name).Order(StringComparer.Ordinal));
                 foreach (var property in properties)
                 {

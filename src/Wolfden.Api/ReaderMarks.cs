@@ -6,7 +6,8 @@ namespace Wolfden.Api;
 /// <summary>
 /// What a reader at one story position doesn't know, for the writer (#300,
 /// design.md §9): the marks <c>marksAt</c> adds to a whole note or a search,
-/// which show everything and say what readers there don't see, and why.
+/// which show everything and say what readers there don't see, and why, and to
+/// a list of notes, which has each note's own mark.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -36,6 +37,7 @@ internal sealed class ReaderMarks
     private readonly IReadOnlyDictionary<string, long> _points;
     private readonly Dictionary<long, string> _names;
     private readonly long _point;
+    private readonly int _universeId;
 
     private ReaderMarks(DenIndex index, ContainerRecord universe, string position, long point)
     {
@@ -50,6 +52,7 @@ internal sealed class ReaderMarks
             .GroupBy(p => p.Value)
             .ToDictionary(g => g.Key, g => g.Last().Key);
         _point = point;
+        _universeId = universe.Id;
         Position = position;
         Universe = universe.Key;
     }
@@ -88,9 +91,43 @@ internal sealed class ReaderMarks
     public NoteMarks Of(EntityRecord note) => new(this, note);
 
     /// <summary>
+    /// The mark of a whole note, when readers meet it after the position, or no
+    /// position places it. An idea isn't ahead of readers or behind them: its
+    /// status says readers don't meet it.
+    /// </summary>
+    public ReaderMark? OfNote(EntityRecord note) =>
+        !IsInCanon(note.Status) ? null
+            : note.FromOrdinal is null ? new ReaderMark(ReaderMark.Unplaced, note.FromText)
+            : note.FromOrdinal > _point ? new ReaderMark(ReaderMark.Ahead, EntityPages.Entry(note, _containers).Position)
+            : null;
+
+    /// <summary>
+    /// A list as the Author's view shows it: <paramref name="all"/>, with the notes
+    /// in the view at the position first and then the rest, each part in the order
+    /// it came in, and each note's own mark. So a limit cuts what readers haven't
+    /// met before anything they have.
+    /// </summary>
+    /// <remarks>
+    /// Only the note's own mark, so this reads no note's facts, however long the list.
+    /// Whether a note is met comes from the view itself rather than from having no
+    /// mark, so an idea, which has none, isn't taken for one readers know.
+    /// </remarks>
+    public MarkedEntityListResult Mark(IReadOnlyList<EntitySummary> all, IReadOnlySet<string> met, int limit)
+    {
+        var notes = _db.Entities.Where(e => e.UniverseId == _universeId).ToList().ToDictionary(e => e.Path, StringComparer.Ordinal);
+        var marked = all
+            .Select(e => new MarkedEntity(e.Key, e.Id, e.Name, e.Type, e.Status, e.Universe, e.ScopeKind, e.ScopeKey, e.Path, e.From, met.Contains(e.Path), OfNote(notes[e.Path])))
+            .OrderByDescending(e => e.Met)
+            .ToList();
+        var shown = marked.Take(limit).ToList();
+        return new MarkedEntityListResult(ReadEndpoints.ResultVersion, shown.Count, marked.Count, marked.Count > limit, shown, Position);
+    }
+
+    /// <summary>
     /// The mark of a link in a chapter's fields or an outline: where it's written,
     /// as a view at a position asks. A link with no position has no mark: a
-    /// container's own text isn't in story order at all (format.md F-LINK-13), so
+    /// container's own text, an outline's notes, and a chapter value or default
+    /// that isn't held aren't in story order at all (format.md F-LINK-13), so
     /// there's nothing to fix or wait for. Bookkeeping or out of canon, it keeps
     /// its own badge instead.
     /// </summary>
@@ -134,11 +171,7 @@ internal sealed class ReaderMarks
             _sections = marks._db.Sections.Where(s => s.EntityId == note.Id).ToList().ToDictionary(s => s.Line);
             _values = marks._db.FieldValues.Where(v => v.EntityId == note.Id).ToList();
 
-            // An idea isn't ahead of readers or behind them: its status says readers don't meet it.
-            Note = !_inCanon ? null
-                : note.FromOrdinal is null ? new ReaderMark(ReaderMark.Unplaced, note.FromText)
-                : note.FromOrdinal > marks._point ? new ReaderMark(ReaderMark.Ahead, EntityPages.Entry(note, marks._containers).Position)
-                : null;
+            Note = marks.OfNote(note);
 
             foreach (var text in WrittenPositions())
             {
@@ -359,6 +392,7 @@ internal sealed class ReaderMarks
         /// <summary>Whether a field's value or entry can have a reader mark. One out of canon keeps its own status instead.</summary>
         private bool Takes(FieldValueRecord v) => _inCanon && IsInCanon(v.Status);
 
-        private static bool IsInCanon(string status) => status is "draft" or "canon";
     }
+
+    private static bool IsInCanon(string status) => status is "draft" or "canon";
 }

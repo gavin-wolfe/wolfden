@@ -29,7 +29,7 @@ namespace Wolfden.Api;
 /// it, the author's full view.
 /// </para>
 /// <para>
-/// <c>marksAt</c>, on <c>/api/entity</c> and <c>/api/search</c>, is a story
+/// <c>marksAt</c>, on <c>/api/entity</c>, <c>/api/search</c>, and <c>/api/entities</c>, is a story
 /// position too, for the writer: the full view or every hit, with what readers
 /// there don't know marked (<see cref="ReaderMarks"/>, #300). It doesn't go with
 /// <c>asOf</c>, and no MCP tool has it.
@@ -74,11 +74,13 @@ public static class ReadEndpoints
 
         api.MapGet("/hierarchy", (HttpContext c) => Answer(c, ["universe", "asOf"], q => Hierarchy(reader, q.Text("universe"), q.Position("asOf"))));
         api.MapGet("/positions", (HttpContext c) => Answer(c, ["universe"], q => Positions(reader, q.Text("universe"))));
-        api.MapGet("/entities", (HttpContext c) => Answer(
+        api.MapGet("/entities", (HttpContext c) => Answer<object>(
             c,
-            ["universe", "type", "status", "series", "book", "asOf", "limit"],
-            q => reader.ListEntities(
-                q.Text("universe"), q.Text("type"), q.Text("status"), q.Text("series"), q.Text("book"), q.Int("limit", 200), q.Position("asOf"))));
+            ["universe", "type", "status", "series", "book", "asOf", "limit", "marksAt"],
+            q => q.Position("marksAt") is { } marksAt
+                ? (object)MarkedList(reader, marksAt, q.Position("asOf"), q.Text("universe"), q.Text("type"), q.Text("status"), q.Text("series"), q.Text("book"), q.Int("limit", 200))
+                : reader.ListEntities(
+                    q.Text("universe"), q.Text("type"), q.Text("status"), q.Text("series"), q.Text("book"), q.Int("limit", 200), q.Position("asOf"))));
         api.MapGet("/entities/lookup", (HttpContext c) => Answer(
             c,
             ["query", "universe", "type", "asOf", "limit"],
@@ -151,6 +153,27 @@ public static class ReadEndpoints
         {
             var marks = ReaderMarks.For(reader, index, universe, marksAt);
             return marks.Mark(SearchPage(reader.Search(index, query, marks.Universe, type, canonOnly, limit, status, series, book, null, field)));
+        });
+    }
+
+    /// <summary>
+    /// The notes of the universe <paramref name="marksAt"/> is in, later ones
+    /// included, with what readers there have met first, and marks on the rest.
+    /// </summary>
+    private static MarkedEntityListResult MarkedList(
+        DenReader reader, string marksAt, string? asOf, string? universe, string? type, string? status, string? series, string? book, int limit)
+    {
+        CheckOnePosition(asOf, marksAt);
+        DenReader.CheckEntityLimit(limit);
+        var filter = DenReader.Filter(series, book);
+        return reader.WithIndex(index =>
+        {
+            var marks = ReaderMarks.For(reader, index, universe, marksAt);
+            var all = reader.EntitiesMatching(index, marks.Universe, type, status, filter, null);
+
+            // Who has met a note doesn't depend on which part of the den is being listed.
+            var met = reader.CanonView(index, marks.Universe, marksAt, null).Entities.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
+            return marks.Mark(all, met, limit);
         });
     }
 

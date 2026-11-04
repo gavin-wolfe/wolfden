@@ -552,47 +552,62 @@ public sealed partial class DenReader
         string? universe = null, string? type = null, string? status = null, string? series = null, string? book = null, int limit = 200,
         string? asOf = null)
     {
-        CheckLimit(limit, 1000);
+        CheckEntityLimit(limit);
         CheckStatus(status);
         var filter = Filter(series, book);
         return WithIndex(index =>
         {
-            var db = index.Context;
-            var universes = db.Containers.Where(c => c.Kind == "universe").ToDictionary(c => c.Id, c => c.Key);
-            var scopes = Scopes(db);
-
-            var one = ChooseUniverse(db, universe, asOf, allowAll: true);
-            if (one is null && filter is not null)
-            {
-                throw new DenToolException(
-                    ToolErrorCodes.BadArgument, $"A series or book belongs to one universe, so it doesn't go with '{AllUniverses}'; name the universe.");
-            }
-
-            List<ContainerRecord> chosen = one is not null
-                ? [one]
-                : db.Containers.Where(c => c.Kind == "universe").ToList().OrderBy(c => c.Key, StringComparer.Ordinal).ToList();
-            if (type is not null)
-            {
-                CheckTypes(db, one?.Id, [type], listUsed: asOf is null);
-            }
-
-            var types = TypesMatching(type);
-
-            var all = new List<EntitySummary>();
-            foreach (var u in chosen)
-            {
-                CheckFilter(db, u, filter, Words);
-                var inView = asOf is null ? null : CanonView(index, u.Key, asOf, filter).Entities.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
-                all.AddRange(index.Entities(u.Key, filter)
-                    .Where(e => inView is null || inView.Contains(e.Path))
-                    .Where(e => types is null || types.Contains(e.Type))
-                    .Where(e => status is null || e.Status == status)
-                    .Select(e => Summary(e, universes, scopes)));
-            }
-
+            var all = EntitiesMatching(index, universe, type, status, filter, asOf);
             var shown = all.Take(limit).ToList();
             return new ListEntitiesResult(ResultVersion, shown.Count, all.Count, all.Count > limit, shown);
         });
+    }
+
+    /// <summary>Refuses a limit <see cref="ListEntities(string?, string?, string?, string?, string?, int, string?)"/> wouldn't take.</summary>
+    public static void CheckEntityLimit(int limit) => CheckLimit(limit, 1000);
+
+    /// <summary>
+    /// Every entity <see cref="ListEntities(string?, string?, string?, string?, string?, int, string?)"/>
+    /// would list, in the same order and in one read of <paramref name="index"/>, with no limit.
+    /// </summary>
+    public List<EntitySummary> EntitiesMatching(DenIndex index, string? universe, string? type, string? status, CanonFilter? filter, string? asOf)
+    {
+        ArgumentNullException.ThrowIfNull(index);
+        CheckStatus(status);
+        var db = index.Context;
+        var universes = db.Containers.Where(c => c.Kind == "universe").ToDictionary(c => c.Id, c => c.Key);
+        var scopes = Scopes(db);
+
+        var one = ChooseUniverse(db, universe, asOf, allowAll: true);
+        if (one is null && filter is not null)
+        {
+            throw new DenToolException(
+                ToolErrorCodes.BadArgument, $"A series or book belongs to one universe, so it doesn't go with '{AllUniverses}'; name the universe.");
+        }
+
+        List<ContainerRecord> chosen = one is not null
+            ? [one]
+            : db.Containers.Where(c => c.Kind == "universe").ToList().OrderBy(c => c.Key, StringComparer.Ordinal).ToList();
+        if (type is not null)
+        {
+            CheckTypes(db, one?.Id, [type], listUsed: asOf is null);
+        }
+
+        var types = TypesMatching(type);
+
+        var all = new List<EntitySummary>();
+        foreach (var u in chosen)
+        {
+            CheckFilter(db, u, filter, Words);
+            var inView = asOf is null ? null : CanonView(index, u.Key, asOf, filter).Entities.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
+            all.AddRange(index.Entities(u.Key, filter)
+                .Where(e => inView is null || inView.Contains(e.Path))
+                .Where(e => types is null || types.Contains(e.Type))
+                .Where(e => status is null || e.Status == status)
+                .Select(e => Summary(e, universes, scopes)));
+        }
+
+        return all;
     }
 
     /// <summary>

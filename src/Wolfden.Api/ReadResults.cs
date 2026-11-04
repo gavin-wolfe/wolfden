@@ -166,6 +166,32 @@ public sealed record ReaderMark(string Kind, string? At)
     public const string Never = "never";
 }
 
+/// <summary>A note in a list with <c>marksAt</c>: <c>list_entities</c>' one line, with what readers at the position know of it.</summary>
+/// <param name="Key">Its key.</param>
+/// <param name="Id">Its id, or null.</param>
+/// <param name="Name">Its name.</param>
+/// <param name="Type">Its type key.</param>
+/// <param name="Status">Its status.</param>
+/// <param name="Universe">Its universe's key.</param>
+/// <param name="ScopeKind">Where it's filed: universe, series, or book.</param>
+/// <param name="ScopeKey">The key of that universe, series, or book.</param>
+/// <param name="Path">The file, relative to the den root.</param>
+/// <param name="From">Where it enters canon, as written, or null for the start of its scope.</param>
+/// <param name="Met">True if it's in the canon view at the position, so readers there know of it.</param>
+/// <param name="ReaderMark">Its mark, when readers meet it after the position, or no position places it.</param>
+public sealed record MarkedEntity(
+    string Key, string? Id, string Name, string Type, string Status, string Universe, string ScopeKind, string ScopeKey, string Path, string? From, bool Met,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReaderMark? ReaderMark = null);
+
+/// <summary>The result of <c>GET /api/entities</c> with <c>marksAt</c>.</summary>
+/// <param name="Version">The shape version.</param>
+/// <param name="Count">How many entities this result holds.</param>
+/// <param name="Total">How many entities match in all.</param>
+/// <param name="Truncated">True if more matched than <c>limit</c>.</param>
+/// <param name="Entities">What readers have met, then the rest, each in F-VIEW-3 order.</param>
+/// <param name="MarksAt">The position the marks are at.</param>
+public sealed record MarkedEntityListResult(int Version, int Count, int Total, bool Truncated, IReadOnlyList<MarkedEntity> Entities, string MarksAt);
+
 /// <summary>A section on an entity page: <see cref="SectionView"/>, whose <c>body</c> is markdown, with its links.</summary>
 /// <param name="Name">See <see cref="SectionView"/>.</param>
 /// <param name="Level">See <see cref="SectionView"/>.</param>

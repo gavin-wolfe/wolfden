@@ -58,8 +58,8 @@ public sealed partial class DenTools
     /// </summary>
     public GetChapterDefaultsResult GetChapterDefaults(string? universe = null, string? series = null, string? book = null)
     {
-        var universeKey = LocateContainer(universe, series, book);
-        var container = FindContainer(DenStructure.Load(Snapshot()), universeKey, series, book);
+        var universeKey = LocateContainer(universe, series, book, view: true);
+        var container = FindContainer(DenStructure.Load(ViewSnapshot()), universeKey, series, book);
         var view = DefaultsOf(container);
         return new GetChapterDefaultsResult(
             DenReader.ResultVersion, universeKey, view.Kind, view.Key, view.Path, HashOf(container.File.ToBytes()), container is Book { Status: BookStatus.Final },
@@ -86,7 +86,7 @@ public sealed partial class DenTools
         {
             var den = new TrackingDenSource(Snapshot());
             var structure = DenStructure.Load(den);
-            var target = FindContainer(structure, universeKey, series, book);
+            var target = Finding(den, () => FindContainer(structure, universeKey, series, book));
             var path = target.FilePath;
             var original = target.File.ToBytes();
             CheckHash(path, original, hash);
@@ -150,8 +150,13 @@ public sealed partial class DenTools
             CheckFinalBooksBelow(edit, touched);
             var unloaded = CheckUnloadedBooksBelow(den, structure, target);
             BeforeDefaultsSave?.Invoke();
-            if (below.FirstOrDefault(f => Store.TryReadFile(f.Path) is not { } now || !now.AsSpan().SequenceEqual(f.Bytes)) is { Path: not null })
+            if (below.FirstOrDefault(f => Store.TryReadFile(f.Path) is not { } now || !now.AsSpan().SequenceEqual(f.Bytes)) is { Path: not null } differs)
             {
+                if (Store.TryReadFile(differs.Path) is null && Store.FileExists(differs.Path))
+                {
+                    throw Unreadable([new UnreadablePath(differs.Path, IsFolder: false)]);
+                }
+
                 throw new DenToolException(
                     ToolErrorCodes.StaleFile,
                     $"A file below {target.Kind.ToString().ToLowerInvariant()} '{target.Key}' changed while the edit was being made, " +
@@ -181,13 +186,13 @@ public sealed partial class DenTools
     private sealed record DefaultsEdit(Container Before, Container After, Lazy<LinkResolver> BeforeLinks, Lazy<LinkResolver> AfterLinks);
 
     /// <summary>The universe a <c>chapter_defaults</c> call is about, after checking that the series or book it names is there.</summary>
-    private string LocateContainer(string? universe, string? series, string? book) => WithIndex(index =>
+    private string LocateContainer(string? universe, string? series, string? book, bool view = false) => WithIndex(index =>
     {
         var db = index.Context;
         var u = ChooseUniverse(db, universe, null, allowAll: false)!;
         CheckFilter(db, u, Filter(series?.Trim(), book?.Trim()));
         return u.Key;
-    });
+    }, view);
 
     private static Container FindContainer(DenStructure structure, string universe, string? series, string? book)
     {

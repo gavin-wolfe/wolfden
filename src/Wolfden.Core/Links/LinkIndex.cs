@@ -74,7 +74,7 @@ public sealed class LinkIndex
     public IReadOnlyList<DenDiagnostic> Diagnostics => _diagnostics;
 
     /// <summary>Loads the den at <paramref name="root"/> and resolves its links.</summary>
-    public static LinkIndex Load(string root) => Load(new FileSystemDenSource(root));
+    public static LinkIndex Load(string root) => Load(FileSystemDenSource.ForViews(root));
 
     /// <summary>Loads a den and resolves its links.</summary>
     public static LinkIndex Load(IDenSource source) => Build(EntityCatalog.Load(source), source);

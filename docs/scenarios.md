@@ -1199,8 +1199,8 @@ Spec: format.md §1.3, F-GEN-2 (#50). Covered by:
 
 ### SC-CHECK-63. Check lists what it couldn't read
 
-Another program has a note open for writing, or the writer's account may not
-list a `characters/` folder, while they run `wolfden check`.
+Another program has a note locked so nothing else can read it, or the writer's
+account may not list a `characters/` folder, while they run `wolfden check`.
 
 - The report has one more error for it, on its path with no line:
   `F-GEN-5: This file couldn't be read, so it wasn't checked, and links to it
@@ -1220,6 +1220,9 @@ list a `characters/` folder, while they run `wolfden check`.
 
 Spec: format.md F-GEN-1, F-GEN-5 (#284). Covered by:
 `LockedFileWriteTests.TheCheckToolListsALockedNoteAsAnError` (MCP),
+`SharedFileTests.AProgramHoldingAFileWithNoSharingStopsBothKindsOfRead` (Core),
+`SharedFileTests.AProgramLettingOthersWriteButNotReadStopsAViewOnWindows` (Core),
+`SharedFileTests.AnExclusiveLockOnTheFilesBytesStopsAViewOnWindows` (Core),
 `LockedFileWriteTests.TheCheckToolListsAFolderThatCantBeListed` (MCP),
 `TrackingDenSourceTests.CheckReportsAFolderThatCantBeListed` (Core),
 `TrackingDenSourceTests.ACheckOfOneUniverseReportsOnlyItsOwnUnreadableFiles` (Core),
@@ -1229,6 +1232,24 @@ Spec: format.md F-GEN-1, F-GEN-5 (#284). Covered by:
 `UnreadableFileTests.AFileThatCantBeReadIsCheckedAsIfItWerentThere` (Core),
 `UnreadableFileTests.ANoteThatCantBeReadIsLeftOutAndTheCommandsStillWork` (CLI),
 `UnlistableFolderTests.AFolderThatCantBeListedIsLeftOutAndTheCommandsStillWork` (CLI).
+
+### SC-CHECK-64. Check reads a note another program has open
+
+Another program has a note open to write, and lets others read it, while the
+writer runs `wolfden check`.
+
+- The note is checked like any other, and there's no F-GEN-5 for it. A rename would
+  still be refused while it's open (SC-MCP-43), so a refusal can name a file `check`
+  calls fine.
+- If it's caught part way through a save, what's checked is the part saved so far,
+  which can give errors for a moment. The next check is right.
+
+Spec: format.md F-GEN-5 (#298). Covered by:
+`SharedFileTests.AViewReadsAFileAProgramIsWritingAndLettingOthersRead` (Core),
+`SharedFileTests.CheckDoesntListAHeldNoteWhenItsSharedAndDoesWhenItIsnt` (Core),
+`SharedFileWriteTests.PagesAndCheckSeeANoteOpenElsewhereAndAWrongNameDoesntBlameIt` (MCP),
+`SharedFileWriteTests.ReadToolsSeeABookFileOpenElsewhere` (MCP),
+`SharedFileWriteTests.AWrongNameInEveryReadLookupDoesntBlameANoteOpenElsewhere` (MCP).
 
 ## RT: saving a note keeps what the writer wrote
 
@@ -3202,8 +3223,9 @@ Spec: F-GEN-2, F-RT-5 (#50). Covered by:
 
 ### SC-MCP-38. A rename while another program holds a note
 
-The writer has a note open for writing in another program, and asks the
-assistant to rename Mr. Swales. That note links to him.
+The writer has a note locked against reading in another program, and asks the
+assistant to rename Mr. Swales. That note links to him. (A note only open to
+write gets the same refusal: SC-MCP-43.)
 
 - The rename is refused as a whole with `den_unreadable`. The error names
   the file, says nothing was changed, and says to close it there and try
@@ -3253,20 +3275,24 @@ Spec: format.md F-GEN-5, F-RT-5 (#284). Covered by:
 `LockedFileWriteTests.ALockedSeriesFileRefusesANewSeries`,
 `LockedFileWriteTests.AFolderThatCantBeListedRefusesADenWideWriteAndIsNamed`,
 `LockedFileWriteTests.AWriteToOneFileIsntStoppedByALockedNoteElsewhere`,
-`LockedFileWriteTests.AFileDeletedBetweenListingAndReadingIsntAFailure`.
+`LockedFileWriteTests.AFileDeletedBetweenListingAndReadingIsntAFailure`,
+`SharedFileWriteTests.AWriteToOneFileIsntStoppedByANoteOpenElsewhere`,
+`SharedFileWriteTests.ALockWithNoSharingStillRefusesAndIsStillListed`.
 
 ### SC-MCP-39. A locked file can't get a write past a frozen book
 
 A book is final. A note in it links to Mr. Swales, and another program holds
-that note, or the book's own `book.md`, open for writing. The assistant asks
-to rename Mr. Swales.
+that note, or the book's own `book.md`, locked against reading. The assistant asks
+to rename Mr. Swales. (A file only open to write is refused too, naming it:
+SC-MCP-43.)
 
 - It's refused with `den_unreadable`, naming the file, and nothing is
   written. With the file treated as absent, the rename would have seen no
   link in a final book and gone ahead.
 - Once the file is closed, the same call gets the usual `frozen` refusal.
-- A note in that book whose `book.md` is held gets `unknown_entity`, which
-  names that `book.md` as what couldn't be read and may be why.
+- A note in that book whose `book.md` is locked against reading gets
+  `unknown_entity`, which names that `book.md` as what couldn't be read and may be
+  why. If `book.md` is only open to write, it's `den_unreadable`, naming it.
 - A change to a universe's `chapter_defaults` while a final book's `book.md`
   below it is held is refused the same way, and is `frozen` once it's closed.
 
@@ -3354,6 +3380,82 @@ Spec: types.md F-TPL-6, format.md F-KEY-4, F-KEY-5 (#289). Covered by:
 `CreateContainerTests.TwoNamesThatReachOneKeyAreAClash`,
 `CreateContainerTests.ABookWithAnOldHyphenKeyKeepsItAndItsPositionsStillResolve`,
 `ImageEndpointTests.AnImagesNameDropsAnApostropheAsASlugDoes`.
+
+### SC-MCP-43. My assistant writes while another program has a note open
+
+On Windows, another program has a note open to write, letting others read it. It
+may be part way through saving: it has cut the old text, written the first part,
+and stalled. The part still to come links to Mr. Swales. The assistant asks to
+rename him.
+
+- A read tool or a page can see the note, including the part saved so far, or say
+  it has an error. Its next read shows the whole note, and the index catches up
+  the same way. `check` doesn't list it.
+- The rename is refused with `den_unreadable`, naming the note, and nothing is
+  written. Once the save has finished, the note is whole, the same call goes
+  through, and the link follows. That holds for a save already under way when the
+  write reads the note; see the last point here for one that starts after.
+- The same goes for `change_alias`, `rename_section`, `move_entity`, `copy_entity`,
+  `create_entity`, and an `add_idea` that makes a new note, for a freeze that will
+  checkpoint, and for a freeze of the book a note is in. A new book or series is
+  refused while a `book.md`, `series.md`, or `universe.md` it reads for the story
+  order is open.
+- An edit of the note itself is refused the same way, naming it, and so is a
+  whole-file save. `check --fix` skips adding an id to it.
+- An edit of a note whose `book.md`, `series.md`, or `universe.md`, or `den.yaml`,
+  is open names that file. It doesn't say the note has errors. A write to `book.md`,
+  such as adding a chapter, a chapter's fields, its defaults, or freezing, names
+  `book.md`, and doesn't say the book is gone. If the save has stopped inside the
+  frontmatter, the index can't load what it read, so the lookup fails. Then it's
+  still `den_unreadable`, with the lookup's own error first, such as "has no book",
+  and then "Couldn't read `book.md` right now, which may be why."
+- Adding an image is refused the same way if what's above the note is open, since
+  that's how it knows whether the book is final. So an image can't reach a final
+  book this way. The note itself being open doesn't stop it: an image doesn't read
+  or change the note.
+- If a file the write read becomes open just before it saves, it's named as open.
+  If it changed, it's `stale_file`, naming it.
+- A note open elsewhere doesn't stop an edit of a different note.
+- A wrong name in a write, while something is open to write, is `den_unreadable`,
+  since Wolfden can't tell which is the cause. The message says both, the wrong name
+  first, with any hint such as "Its books: dracula", then the file: "No entity
+  matches 'Mr. Swalez'. Couldn't read X right now, which may be why." Once it's
+  closed, the same call is `unknown_entity`. A read tool's wrong name doesn't name
+  it: a read can see that file.
+- On Linux and macOS, Wolfden can't tell a program has a file open, so none of
+  these refusals come, and a write can build on part of a save, as it always could.
+- **What it can't catch, for now:** a save that starts after the write has read the
+  file. On Windows, if it stalls for a moment, about 100–250 ms in the measurements,
+  the store's retry keeps trying and replaces the file once the program closes it.
+  The write reports success, and that save is gone. #323 will compare the file again
+  before each retry. Linux and macOS have no such retry, and this wasn't measured there.
+
+Spec: format.md F-GEN-5, F-RT-5, F-BOOK-1 (#298). Covered by:
+`SharedFileWriteTests.ARenameIsRefusedByAStalledSaveInAnotherProcessAndTheNoteIsLeftWhole`,
+`SharedFileWriteTests.AFreezeIsRefusedByAStalledSaveInAnotherProcessAndTagsNothing`,
+`SharedFileWriteTests.AddingAChapterDuringAStalledSaveOfBookMdNamesIt`,
+`SharedFileWriteTests.EditingANoteDuringAStalledSaveOfItsBookMdNamesThat`,
+`SharedFileWriteTests.EditingANoteDuringAStalledSaveOfItNamesIt`,
+`SharedFileWriteTests.AnImageCantReachAFrozenBookDuringAStalledSaveOfItsBookMd`,
+`SharedFileWriteTests.AnImageCantReachAFrozenBookWhileWhatsAboveTheNoteIsOpenElsewhereOnWindows`,
+`SharedFileWriteTests.AnImageIsntStoppedByItsOwnNoteOrAnotherOpenElsewhere`,
+`SharedFileWriteTests.AWrongNameInAWriteSaysSoAndNamesAFileOpenElsewhereOnWindows`,
+`SharedFileWriteTests.AWrongBookInAWriteKeepsItsHintAndNamesAFileOpenElsewhereOnWindows`,
+`NewChapterCommandTests.AddingAChapterPartWayThroughASaveOfBookMdNamesIt` (CLI),
+`SharedFileWriteTests.AWriteThatReadsTheWholeDenIsRefusedNamingTheNoteOpenElsewhereOnWindows`,
+`SharedFileWriteTests.ANewBookOrSeriesIsRefusedNamingTheFileThatsOpenInItsStoryOrderOnWindows`,
+`SharedFileWriteTests.AnEditIsRefusedNamingItsNoteWhileThatsOpenElsewhereOnWindows`,
+`SharedFileWriteTests.AnEditNamesTheFileOpenAboveItsNoteAndDoesntBlameTheNoteOnWindows`,
+`SharedFileWriteTests.AWriteToABooksFileNamesItWhileItsOpenElsewhereOnWindows`,
+`SharedFileWriteTests.AnUnfreezeNamesTheBookFileOpenElsewhereOnWindows`,
+`SharedFileWriteTests.AFreezeWithoutHistoryIsRefusedWhileANoteInThatBookIsOpenElsewhereOnWindows`,
+`SharedFileWriteTests.AnotherNoteChangingBeforeTheSaveIsNamedAsWhatChanged`,
+`SharedFileWriteTests.AnotherNoteOpenedBeforeTheSaveIsNamedAsOpenRatherThanChangedOnWindows`,
+`SharedFileTests.AReadForAWriteIsRefusedWhileAProgramHasTheFileOpenToWriteOnWindows` (Core),
+`SharedFileTests.AProgramOnlyReadingAFileDoesntStopAReadForAWrite` (Core),
+`SharedFileTests.AViewDuringASaveSeesPartOfItAndTheNextReadSeesItAll` (Core),
+`SharedFileTests.ChecksFixDoesntAddAnIdToANoteThatsOpenToWriteOnWindows` (Core),
+`IncrementalUpdateTests.ANoteCaughtPartWayThroughASaveIsPutRightByTheNextChange` (index).
 
 ### SC-MCP-44. My assistant writes a character who knows more than the reader
 
@@ -6222,7 +6324,7 @@ Spec: F-VIEW-1, F-GEN-2 (#280). Covered by:
 
 ### SC-WEB-96. Another program holds a file while I'm fixing problems
 
-I have a note open for writing in another program, with the den's page open.
+I have a note locked against reading in another program, with the den's page open.
 
 - Within a minute, the top bar counts it. Its entry is the same as in
   `wolfden check` (F-GEN-5): it couldn't be read, and how to fix that. It has no
@@ -6279,6 +6381,27 @@ A section of a note holds until chapter 5, and I'm reading at chapter 3.
 
 Spec: F-VIEW-4 (#288). Covered by: `ReadEndpointTests.AFactsFutureUntilStaysForTheWriter`,
 `web/src/AheadOfReaders.test.tsx`.
+
+### SC-WEB-98. A file open in another program while I edit
+
+On Windows, I have a note open in another program that lets others read it.
+
+- Its page and Edit file open as usual, and the top bar doesn't count it.
+- Saving it says it wasn't saved, names the note, and says to close it there and
+  try again. My text stays in the editor.
+- If what's open is that note's `book.md`, the message names `book.md`. It doesn't
+  say the note has errors. Adding a chapter says the same, and so does adding an
+  image, which is refused rather than risk reaching a final book. If a save has
+  stopped inside the frontmatter, the page's lookup can fail too: the message then
+  starts with that error, and goes on to name the file that may be why.
+- A wrong name on a read, such as a book that isn't there, says only that. It doesn't
+  name a note open elsewhere, or say nothing was changed.
+- If a rename or section rename is stopped because a different note changed, the
+  message names that note. It doesn't say this note changed, or offer it as what
+  changed.
+
+Spec: format.md F-GEN-5 (#298). Covered by: `SharedReadEndpointTests`,
+`web/src/Editing.test.tsx` ("when another file stopped the save").
 
 ### SC-WEB-99. I use a different name for this den when I turn on history
 

@@ -126,7 +126,7 @@ public sealed class DenStructure
     public const int SupportedFormat = 1;
 
     /// <summary>Loads the den whose root folder is <paramref name="root"/>.</summary>
-    public static DenStructure Load(string root) => Load(new FileSystemDenSource(root));
+    public static DenStructure Load(string root) => Load(FileSystemDenSource.ForViews(root));
 
     /// <summary>Loads a den's structure. Never throws for bad content: problems come back as <see cref="Diagnostics"/>.</summary>
     public static DenStructure Load(IDenSource source)

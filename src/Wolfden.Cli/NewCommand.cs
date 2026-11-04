@@ -429,6 +429,13 @@ internal static class NewCommand
     /// </summary>
     private static bool TryBook(string root, string value, out string? universe, out string book, out string problem)
     {
+        var found = FindBook(root, value, out universe, out book, out problem);
+        problem = found ? problem : HeldFiles.Added(root, problem);
+        return found;
+    }
+
+    private static bool FindBook(string root, string value, out string? universe, out string book, out string problem)
+    {
         universe = null;
         problem = "";
         var structure = Wolfden.Core.Structure.DenStructure.Load(root);
@@ -491,6 +498,13 @@ internal static class NewCommand
     /// book is refused.
     /// </summary>
     private static bool TryPlace(string root, string value, bool series, out string? universe, out string? inSeries, out string problem)
+    {
+        var found = FindPlace(root, value, series, out universe, out inSeries, out problem);
+        problem = found ? problem : HeldFiles.Added(root, problem);
+        return found;
+    }
+
+    private static bool FindPlace(string root, string value, bool series, out string? universe, out string? inSeries, out string problem)
     {
         universe = inSeries = null;
         problem = "";

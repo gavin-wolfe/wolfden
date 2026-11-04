@@ -53,7 +53,7 @@ internal sealed class IndexWriter
     /// and <paramref name="tree"/> taken before anything was read.
     /// </summary>
     public static IndexState Load(string root, DenFileTree tree, string fingerprint) =>
-        Load(root, new FileSystemDenSource(root), tree, fingerprint);
+        Load(root, FileSystemDenSource.ForViews(root), tree, fingerprint);
 
     /// <summary>
     /// <see cref="Load(string, DenFileTree, string)"/>, reading the den

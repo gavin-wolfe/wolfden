@@ -266,6 +266,34 @@ public sealed class IncrementalUpdateTests
         AssertSameAsFullRebuild(den, "after the retry");
     }
 
+    [Fact]
+    [Trait("Scenario", "SC-MCP-43")]
+    public void ANoteCaughtPartWayThroughASaveIsPutRightByTheNextChange()
+    {
+        using var den = TempDen.Starfall();
+        var updater = new IndexUpdater(den.Root);
+        updater.Rebuild("start");
+        const string ilse = "universes/starfall/series/long-dark/entities/characters/ilse-tarrow.md";
+        var full = Path.Combine(den.Root, ilse);
+        var whole = File.ReadAllBytes(full);
+
+        using (var saving = new FileStream(full, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
+        {
+            saving.SetLength(0);
+            saving.Write(whole.AsSpan(0, whole.Length / 2));
+            saving.Flush();
+
+            // Read shared, so it's seen as it is now, rather than tried again later.
+            Assert.NotNull(updater.Apply(Batch(den, (WatcherChangeTypes.Changed, ilse, null)), out var retry));
+            Assert.Empty(retry);
+
+            saving.Write(whole.AsSpan(whole.Length / 2));
+        }
+
+        Assert.NotNull(updater.Apply(Batch(den, (WatcherChangeTypes.Changed, ilse, null)), out _));
+        AssertSameAsFullRebuild(den, "after the save finished");
+    }
+
     [Theory]
     [Trait("Scenario", "SC-WATCH-3")]
     [InlineData("create", "universes/starfall/books/ghost", null)]

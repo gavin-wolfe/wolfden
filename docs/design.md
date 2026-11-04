@@ -2403,7 +2403,8 @@ docs/
   - **Where it goes and what it's called.** A universe's page makes a
     series or a standalone book, and a series' page a book of the
     series. The folder's name, the key, is made from the name as a
-    note's slug is (types.md F-TPL-6), but a key that's taken, by a
+    note's slug is (types.md F-TPL-6, so "Mina's Journal" is
+    `minas-journal`), but a key that's taken, by a
     folder of any case or by a clash F-KEY-5 forbids (a book key
     anywhere in the universe, or a series key and a standalone book
     key), is refused (`already_exists`) rather than given `-2`, since

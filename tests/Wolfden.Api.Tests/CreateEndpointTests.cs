@@ -64,7 +64,7 @@ public sealed class CreateEndpointTests : IDisposable
         var (code, made) = await PostAsync(server, "/api/entity/create", new { type = "character", name = "Mina's Aunt", universe = "dracula", book = "dracula" });
 
         Assert.Equal(HttpStatusCode.Created, code);
-        const string Path = "universes/dracula/books/dracula/entities/characters/mina-s-aunt.md";
+        const string Path = "universes/dracula/books/dracula/entities/characters/minas-aunt.md";
         Assert.Equal(Path, made.GetProperty("path").GetString());
         var entity = made.GetProperty("entity");
         Assert.Equal("Mina's Aunt", entity.GetProperty("name").GetString());
@@ -87,9 +87,9 @@ public sealed class CreateEndpointTests : IDisposable
         // The same name again gets -2; the universe is the default, and a position sets 'from'.
         var (again, second) = await PostAsync(server, "/api/entity/create", new { type = "character", name = "Mina's Aunt", from = "dracula:5" });
         Assert.Equal(HttpStatusCode.Created, again);
-        Assert.Equal("universes/dracula/entities/characters/mina-s-aunt.md", second.GetProperty("path").GetString());
+        Assert.Equal("universes/dracula/entities/characters/minas-aunt.md", second.GetProperty("path").GetString());
         Assert.Equal("dracula:5", second.GetProperty("entity").GetProperty("from").GetString());
-        Assert.Contains("\nstatus: draft\nfrom: ", den.Read("universes/dracula/entities/characters/mina-s-aunt.md"), StringComparison.Ordinal);
+        Assert.Contains("\nstatus: draft\nfrom: ", den.Read("universes/dracula/entities/characters/minas-aunt.md"), StringComparison.Ordinal);
 
         // An empty 'from' is no 'from' (F-ENT-6).
         var (empty, emptyJson) = await PostAsync(server, "/api/entity/create", new { type = "note", name = "Empty from", from = "  " });
@@ -98,7 +98,7 @@ public sealed class CreateEndpointTests : IDisposable
 
         var (third, thirdJson) = await PostAsync(server, "/api/entity/create", new { type = "character", name = "Mina's Aunt", book = "dracula" });
         Assert.Equal(HttpStatusCode.Created, third);
-        Assert.Equal("universes/dracula/books/dracula/entities/characters/mina-s-aunt-2.md", thirdJson.GetProperty("path").GetString());
+        Assert.Equal("universes/dracula/books/dracula/entities/characters/minas-aunt-2.md", thirdJson.GetProperty("path").GetString());
     }
 
     [Fact]

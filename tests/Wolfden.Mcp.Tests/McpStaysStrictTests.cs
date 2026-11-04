@@ -694,6 +694,28 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
 
     [Fact]
     [Trait("Scenario", "SC-MCP-47")]
+    public async Task ADenWithNoErrorsAnswersByTheSameRules()
+    {
+        // An answer without a den_notice goes back as the tool made it, not rebuilt with the notice, so it's another route to the client, _meta included.
+        File.Delete(Path.Combine(_den.Root, BrinePath));
+        _den.Write(TithePath, TitheText.Replace("status=maybe pin=true", "status=idea", StringComparison.Ordinal));
+
+        var entity = await Call("get_entity", new() { ["entity"] = Tithe, ["as_of"] = "ember:3" });
+        var canon = await Call("canon_as_of", new() { ["position"] = "ember:3" });
+
+        foreach (var reply in new[] { entity, canon })
+        {
+            Assert.DoesNotContain("den_notice", reply.Keys);
+            AssertNothingLater(reply);
+            AssertNoMarks(reply);
+        }
+
+        AssertOnlyKeys(EntityResultKeys, entity);
+        AssertOnlyKeys(CanonResultKeys, canon);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-47")]
     public void TheServerOffersNoPromptsOrResources()
     {
         // Either would be a way to hand an assistant later content that no check on a tool's answer sees. Call checks each answer's _meta.

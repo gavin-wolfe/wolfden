@@ -35,7 +35,8 @@ namespace Wolfden.Cli;
 /// Without git installed, a new den is still made, and the output says the
 /// repository wasn't (exit 0). If git is there but a step fails, or git
 /// needs a name or email that wasn't given, the new den is kept and the
-/// command exits 2.
+/// command exits 2. A name or email given for a new den in a repository
+/// refuses (exit 2) before anything is made, since it wouldn't be applied.
 /// </para>
 /// <para>
 /// On an existing den, <c>--git</c> refuses (exit 2, nothing changed) a den
@@ -166,6 +167,18 @@ internal static class InitCommand
             return Fail($"'{folder}' already holds the den at '{inner}', and dens don't nest (F-LAY-1). Choose a folder that doesn't hold one, or first move that den's den.yaml out of the way, or into a hidden folder such as .old/, which Wolfden ignores.");
         }
 
+        // A new den in a repository is left as it is, so a name given for it wouldn't be applied,
+        // and that repository's settings aren't this den's to change (#286).
+        if (withGit && (authorName is not null || authorEmail is not null) && RepositoryAround(root, git) is { } around)
+        {
+            return Fail(
+                string.Equals(Path.TrimEndingDirectorySeparator(around), Path.TrimEndingDirectorySeparator(root), OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase)
+                    ? $"'{folder}' is already a git repository, and 'init --git' leaves a new den's repository as it is, so the name and email given weren't applied. Nothing was created. " +
+                        "To save them, make the den first with 'wolfden init', then run 'wolfden init --git --author-name <name> --author-email <email>' in it."
+                    : $"'{folder}' is inside the git repository at '{around}', whose settings a den there shares, so the name and email given weren't applied, and later checkpoints would stay under what git has for that repository. " +
+                        "Nothing was created. To use that, run this again without --author-name and --author-email; to keep this den under the name given, choose a folder outside it.");
+        }
+
         var created = new List<string>();
         // Everything this run creates, folders included, so a failure part way can undo it.
         var made = new List<string>();
@@ -246,6 +259,19 @@ internal static class InitCommand
     /// <c>--git</c> for a new den: turns on its history, unless it's already
     /// inside a repository (#122, #195). Nothing here undoes the den.
     /// </summary>
+    private static string? RepositoryAround(string root, GitOptions git)
+    {
+        // The folder may not exist yet: git is asked from the nearest one that does.
+        var folder = root;
+        while (!Directory.Exists(folder) && Path.GetDirectoryName(folder) is { } parent)
+        {
+            folder = parent;
+        }
+
+        var location = GitRepository.Locate(folder, git);
+        return location.Kind == GitLocationKind.InRepository ? location.Root : null;
+    }
+
     private static InitGitReport MakeRepository(string root, HistorySetupRequest request, GitOptions git)
     {
         var location = GitRepository.Locate(root, git);

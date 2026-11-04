@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
@@ -16,21 +17,40 @@ namespace Wolfden.Git;
 /// <paramref name="Output"/> may be cut short, and a caller that uses it
 /// must not trust it.
 /// </param>
-internal sealed record GitRun(int ExitCode, string Output, string Error, bool OutputComplete = true)
+internal sealed partial record GitRun(int ExitCode, string Output, string Error, bool OutputComplete = true)
 {
     /// <summary>True if it exited 0.</summary>
     public bool Succeeded => ExitCode == 0;
 
-    /// <summary>What git said about a failure, on one line, for a message.</summary>
+    /// <summary>
+    /// What git said about a failure, on one line, for a message. A config
+    /// file's path is left out: it can be in the user's home folder, which
+    /// names them, and the message can end up anywhere (#286).
+    /// </summary>
     public string Said
     {
         get
         {
             var text = string.Join(" ", (Error.Length > 0 ? Error : Output)
-                .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(line => ConfigFilePath().Replace(line, "$1 a git config file")));
             return text.Length == 0 ? $"git exited with code {ExitCode}" : text;
         }
     }
+
+    /// <summary>
+    /// <see cref="Said"/>, unless it's about signing: gpg's and ssh-keygen's
+    /// words can name who a key belongs to, so those aren't repeated (#286).
+    /// </summary>
+    public string SaidWithoutSigner => SigningOutput().IsMatch(Error.Length > 0 ? Error : Output)
+        ? "git couldn't sign it, and what it said isn't repeated here, since that can name who the key belongs to: run 'git commit' in the den's folder to see it"
+        : Said;
+
+    [GeneratedRegex(@"(bad config (?:line \d+ )?in) (?:file|blob) .*$")]
+    private static partial Regex ConfigFilePath();
+
+    [GeneratedRegex("gpg|ssh-keygen|failed to sign", RegexOptions.IgnoreCase)]
+    private static partial Regex SigningOutput();
 }
 
 /// <summary>Git can't be run at all: it isn't installed, or isn't on the PATH.</summary>

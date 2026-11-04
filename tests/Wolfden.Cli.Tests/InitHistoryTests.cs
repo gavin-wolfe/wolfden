@@ -143,6 +143,62 @@ public class InitHistoryTests
         Assert.Equal(text, File.ReadAllText(global));
     }
 
+    [Theory]
+    [Trait("Scenario", "SC-HIST-17")]
+    [Trait("Scenario", "SC-CLI-12")]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ANewDenInALargerRepositoryIsRefusedWithANameGivenAndNothingIsMade(bool folderExists)
+    {
+        using var writing = TempDen.Empty();
+        using var config = TempDen.Empty();
+        var global = Path.Combine(config.Root, "gitconfig");
+        File.WriteAllText(global, "[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n", new UTF8Encoding(false));
+        var git = NoIdentity(global);
+        TestGit.Run(writing.Root, "init", "--quiet");
+        var before = File.ReadAllText(Path.Combine(writing.Root, ".git", "config"));
+        var folder = Path.Combine(writing.Root, "outer", "vael-notes");
+        if (folderExists)
+        {
+            Directory.CreateDirectory(folder);
+        }
+
+        var output = new StringWriter();
+        var error = new StringWriter();
+        var exitCode = InitCommand.Run([folder, "--git", "--author-name", "Ash Calloway", "--author-email", "ash@example.invalid"], output, error, git);
+
+        Assert.Equal(CliApp.ExitUsage, exitCode);
+        Assert.Empty(output.ToString());
+        Assert.Contains("weren't applied", error.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("marek", error.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(folderExists, Directory.Exists(folder));
+        Assert.False(File.Exists(Path.Combine(folder, "den.yaml")));
+        Assert.Equal(before, File.ReadAllText(Path.Combine(writing.Root, ".git", "config")));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-17")]
+    public void ANewDenInAFolderThatIsARepositoryIsRefusedWithANameGivenAndSaysHowToGiveIt()
+    {
+        using var folder = TempDen.Empty();
+        using var config = TempDen.Empty();
+        var global = Path.Combine(config.Root, "gitconfig");
+        File.WriteAllText(global, "[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n", new UTF8Encoding(false));
+        TestGit.Run(folder.Root, "init", "--quiet");
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var refused = InitCommand.Run([folder.Root, "--git", "--author-name", "Ash Calloway", "--author-email", "ash@example.invalid"], output, error, NoIdentity(global));
+
+        Assert.Equal(CliApp.ExitUsage, refused);
+        Assert.False(File.Exists(Path.Combine(folder.Root, "den.yaml")));
+
+        // What it says works: the den first, then its history, under the name given.
+        Assert.Equal(CliApp.ExitOk, InitCommand.Run([folder.Root], new StringWriter(), new StringWriter(), NoIdentity(global)));
+        Assert.Equal(CliApp.ExitOk, InitCommand.Run([folder.Root, "--git", "--author-name", "Ash Calloway", "--author-email", "ash@example.invalid"], new StringWriter(), new StringWriter(), NoIdentity(global)));
+        Assert.Equal("Ash Calloway|ash@example.invalid|Ash Calloway|ash@example.invalid\n", TestGit.Run(folder.Root, "log", "-1", "--format=%an|%ae|%cn|%ce"));
+    }
+
     [Fact]
     [Trait("Scenario", "SC-HIST-22")]
     public void OneGivenAloneThatReplacesWhatGitHasIsRefused()
@@ -323,10 +379,6 @@ public class InitHistoryTests
         var environment = new Dictionary<string, string?>(TestGit.Options.Environment)
         {
             ["GIT_CONFIG_GLOBAL"] = global,
-            ["GIT_AUTHOR_NAME"] = null,
-            ["GIT_AUTHOR_EMAIL"] = null,
-            ["GIT_COMMITTER_NAME"] = null,
-            ["GIT_COMMITTER_EMAIL"] = null,
             ["EMAIL"] = null,
         };
         return TestGit.Options with { Environment = environment };

@@ -566,7 +566,7 @@ public sealed partial class GitHistory : IHistoryProvider
             // Put the new files back as they were: untracked, not marked.
             Unmark(untracked);
             throw new HistoryException(
-                $"Git refused the checkpoint, so nothing was recorded ({commit.Said}). A pre-commit or commit-msg hook, commit signing, " +
+                $"Git refused the checkpoint, so nothing was recorded ({commit.SaidWithoutSigner}). A pre-commit or commit-msg hook, commit signing, " +
                 "or a merge or rebase in progress can do this. The den's files and what was staged are as they were.");
         }
 
@@ -1719,7 +1719,7 @@ public sealed partial class GitHistory : IHistoryProvider
         }
     }
 
-    private static HistoryException Failed(string command, GitRun run) => new($"git {command} failed: {run.Said}");
+    private static HistoryException Failed(string command, GitRun run) => new($"git {command} failed: {run.SaidWithoutSigner}");
 
     /// <summary>What to tell the writer when git didn't finish in time (#143).</summary>
     /// <param name="e">The timeout.</param>

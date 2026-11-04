@@ -8,9 +8,9 @@ namespace Wolfden.Core.History;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>The steps, in order:</b> make the den's folder a repository; make sure
-/// its <c>.gitignore</c> leaves out <c>.wolfden/</c>; save a name and email
-/// for the repository if they're given or git has none; and, unless asked not to, make a
+/// <b>The steps, in order:</b> make the den's folder a repository; save a name
+/// and email for the repository if they're given; make sure its
+/// <c>.gitignore</c> leaves out <c>.wolfden/</c>; and, unless asked not to, make a
 /// first checkpoint, <see cref="FirstCheckpointMessage"/>. A step that fails
 /// stops the rest, and the result says what was done and what wasn't.
 /// </para>

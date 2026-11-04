@@ -63,6 +63,7 @@ public sealed class McpServerTests : IAsyncLifetime
         Assert.Equal("wolfden", Client.ServerInfo!.Name);
         Assert.Contains("story position", Client.ServerInstructions!, StringComparison.Ordinal);
         Assert.Contains("checkpoint", Client.ServerInstructions!, StringComparison.Ordinal);
+        Assert.Contains("Read without as_of before changing a fact", Client.ServerInstructions!, StringComparison.Ordinal);
 
         // The traps an agent must know before its first write (#206): each refusal code it can meet, and what to do.
         Assert.All(

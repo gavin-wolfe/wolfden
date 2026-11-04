@@ -974,6 +974,13 @@ same code (§9):
   matches does it ask all the entities, to tell one the reader hasn't met
   (`in_view: false`, and nothing about it) from one that doesn't exist
   (`unknown_entity`). Aliases aren't positional (format.md §9.5).
+- **A future `until` is left out** (maintainer decision on #288). With a
+  position, `canon_as_of` and `get_entity` leave out each fact's `until`
+  (format.md F-VIEW-4), since it tells an assistant drafting that chapter
+  that a "truth" gets overturned, and it could write toward that. To plan
+  ahead, an assistant reads `get_entity` without `as_of`. It's done in the
+  MCP layer (`AsOfReads`), so it's a place these tools differ from
+  the web API and `query`, which keep the date for the writer.
 - **Pinned first.** Results of `canon_as_of` and `get_entity` start with
   `pinned`, the pinned canon view (F-VIEW-2), and list the same facts in
   place too, so each entity is complete.
@@ -1586,6 +1593,16 @@ docs/
     note at that position: navigation, a change of position, or a
     reload hides it again. What it shows follows the full view, so its
     links to other notes the reader hasn't met may resolve.
+  - **`ahead of readers`** (maintainer decision on #288). The writer
+    still sees a fact's `until` at a position, and when it's later than
+    the position it has a small muted text tag, `ahead of readers`, with
+    the tooltip "Readers at this point in the story don't know this yet."
+    It's a button that also shows that sentence in place, since a tooltip
+    only comes on hover, which a keyboard or a touch can't do.
+    An `until` the position has reached has no tag, which can only be
+    seen where the page shows the full view at a position (editing, or
+    "Show it anyway"). The tag is its own component, `AheadOfReaders`, for
+    the wider question in #300.
 
   The rest is v0 behaviour, not a recorded decision.
   - **Routes and URLs.** The UI routes with TanStack Router:

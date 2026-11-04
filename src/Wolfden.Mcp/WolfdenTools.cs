@@ -280,6 +280,7 @@ public sealed class WolfdenTools
     [Description(
         "Renames a section of an entity, and in the same change rewrites every link to it by heading ([[entity#Old name]]) in any " +
         "file of the den, so they name the new heading. If a file that links to it is in a final (frozen) book, nothing is renamed. " +
+        "A rename that changes only which apostrophes the name uses (straight or curly) rewrites no links, since they still match, so a final book doesn't stop it. " +
         "The result lists every file written, with its new hash." + WriteHelp)]
     public CallToolResult RenameSection(
         [Description("The entity: its name, an alias, its file name, its id, its key, or its path.")] string entity,
@@ -407,7 +408,7 @@ public sealed class WolfdenTools
     [Description(
         "Changes a chapter's own fields in book.md. 'changes' is a list of {\"op\": \"set\", \"field\": \"tense\", \"value\": \"present\"}, " +
         "{\"op\": \"add\", \"field\": \"pov\", \"value\": \"[[mina-harker]]\"}, {\"op\": \"remove\", \"field\": \"pov\", \"item\": 0} (or \"value\": the " +
-        "item's text, compared ignoring case and spacing; a link matches only if it's written the same way, so [[Mina]] doesn't match " +
+        "item's text, compared ignoring case, spacing, and which apostrophe is used; a link matches only if it's written the same way, so [[Mina]] doesn't match " +
         "[[mina-harker]]: use 'item' from get_chapter if unsure), {\"op\": \"replace\", \"field\": \"pov\", \"item\": 1, \"value\": \"[[jonathan-harker]]\"} " +
         "and {\"op\": \"move\", \"field\": \"pov\", \"item\": 2, \"index\": 0} (change or move one item in place, keeping its comments; taking it out " +
         "and adding it again drops them), and {\"op\": \"clear\", \"field\": \"pov\"}. Removing a list's last item leaves [], 'none here', which stops the chapter " +

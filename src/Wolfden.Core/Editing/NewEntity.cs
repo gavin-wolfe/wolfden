@@ -509,8 +509,14 @@ public static class NewEntity
         }
     }
 
-    /// <summary>True for a straight or curly apostrophe (U+0027, U+2019), a left single quote typed as one (U+2018), or the modifier letter (U+02BC).</summary>
-    public static bool IsApostrophe(char c) => c is (char)0x27 or (char)0x2019 or (char)0x2018 or (char)0x02BC;
+    /// <summary>
+    /// True for a straight or curly apostrophe (U+0027, U+2019), a left single
+    /// quote typed as one (U+2018), the modifier letter (U+02BC), or a fullwidth
+    /// apostrophe (U+FF07). The one definition: keys drop these (F-TPL-6, where
+    /// NFKD has already made a fullwidth one straight), and links match them as
+    /// one character (<see cref="Links.LinkText.Normalize"/>, F-LINK-4).
+    /// </summary>
+    public static bool IsApostrophe(char c) => c is (char)0x27 or (char)0x2019 or (char)0x2018 or (char)0x02BC or (char)0xFF07;
 
     /// <summary>Cuts <paramref name="slug"/> to <paramref name="max"/> characters, at a word boundary where there is one, without a trailing <c>-</c>.</summary>
     private static string Cut(string slug, int max)

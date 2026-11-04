@@ -3308,6 +3308,9 @@ until `ash:3`. My assistant is drafting a chapter.
   a fact, so a change doesn't drop a date it wasn't shown.
 - A field of my own that's a mapping with a key named `until`, and no `value`,
   isn't a dated fact (F-TMP-1), so it comes through as I wrote it.
+- A field that was an entry or a list item only to hold its `until` reads as
+  `plain`, so `kind` doesn't hint at it. One with a `from`, a `pin`, or its own
+  status keeps its kind.
 - The web API gives the date at the same position, for me (SC-WEB-97).
 
 Spec: F-VIEW-4 (#288). Covered by: `FutureUntilTests`.
@@ -3470,12 +3473,13 @@ The web UI is going to show me everything and tag what readers don't know yet
   `pinned`, or `brief`, with or without a filter. Neither is a pinned fact that
   enters later.
 - As Wolfden sets them, no `until` and no later value of a position field is in
-  the answer. That doesn't cover what I wrote myself: a lead or section comes
-  through as written, with its HTML comments and `[[links]]`, and so does a field
-  the type doesn't define, a `ref` field's value, and a mapping with its own
-  `until` key. `line` numbers leave gaps where something's hidden, `kind: temporal`
-  shows that a field changes over time, and `in_view: false`, unlike
-  `unknown_entity`, confirms a note exists.
+  the answer, and neither are the HTML comments in a lead or section, misplaced
+  wolfden ones included (SC-MCP-48). That doesn't cover the rest of what I wrote
+  myself: a lead or section comes through with its `[[links]]` and any comment
+  shown as code, and so does a field the type doesn't define, a `ref` field's value,
+  and a mapping with its own `until` key. `line` numbers leave gaps where something's
+  hidden, `kind: temporal` shows that a dated field changes over time, and
+  `in_view: false`, unlike `unknown_entity`, confirms a note exists.
 - No tag such as `ahead of readers` is in the answer or its `_meta`, and the answer
   has only the members it has today. A new one fails a test, so showing an assistant
   more is a decision and not a side effect. The server offers no prompts or resources.
@@ -3487,8 +3491,37 @@ The web UI is going to show me everything and tag what readers don't know yet
   someone has checked that.
 - Wolfden.Mcp can't reach the web API's project, so it can't use its marks.
 
-Spec: F-GEN-2, F-VIEW-1, F-VIEW-2, F-VIEW-4, F-VIEW-5 (#300). Covered by:
+Spec: F-GEN-2, F-VIEW-1, F-VIEW-2, F-VIEW-4, F-VIEW-5, F-VIEW-6 (#300). Covered by:
 `McpStaysStrictTests`.
+
+### SC-MCP-48. My comments stay away from an assistant drafting a chapter
+
+I keep notes to myself in HTML comments, such as `<!-- She dies at ash:4 -->`.
+My assistant is drafting `ember:3`, and reads at that position.
+
+- `get_entity` and `canon_as_of` have no comment in any lead or section, in place,
+  in `pinned`, or in `brief`, and nothing says one was there. A wolfden comment two
+  blank lines under its heading, mid-section, or in the lead goes the same way, so
+  its date doesn't show. So does a comment in the middle of a heading.
+- The text reads as if I'd never written one: no stray blank lines, no doubled
+  spaces. A section with only a comment reads like an empty one, and stays listed.
+  A lead with only a comment reads like no lead. `line` numbers are still the file's.
+- A comment I show in a code span or code block stays, and so does one I escape with a
+  backslash. A `<!--` in a field's value is text too.
+- If I forget the `-->`, what follows doesn't reach the assistant, up to the end of the
+  block: the rest of the text for a comment on its own line, and the rest of the
+  paragraph for one inside it. Closed in a later paragraph, all of it goes. A comment
+  that looks nested goes up to the `-->` that balances it, if there is one.
+- With no position, `get_entity` and `canon_as_of` keep every comment, and so does the
+  code the web UI reads from.
+- `append_section` after a read at a position leaves my comments where they are, and no
+  tool can replace a section's text. If the assistant can edit the file another way, its
+  instructions tell it to read with no position first, or it deletes comments it never saw.
+- To get guidance to the assistant while it drafts, I write visible text, or ask it to
+  read with no position.
+
+Spec: F-SEC-11, F-VIEW-6 (#306). Covered by: `CommentsAtAPositionTests`,
+`MarkdownCommentsTests`, `McpStaysStrictTests`.
 
 ## STORE: Wolfden saves, moves, and deletes notes
 

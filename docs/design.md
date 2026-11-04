@@ -1021,6 +1021,14 @@ same code (§9):
   can't be compared goes too. It's in `AsOfReads` as well, so the web API and
   `query` keep every value. The index keeps which fields of each type are
   `position` fields, since a field's type isn't in its value.
+- **Comments are left out at a position** (maintainer decision on #306). With a
+  position, `canon_as_of` and `get_entity` leave out every HTML comment in a lead
+  or section (format.md F-VIEW-6), since a comment can name a later fact, and a
+  misplaced wolfden comment names a date. A comment shown as code stays. It's in
+  `AsOfReads` too, so the web API, `query`, and reads with no position keep them.
+  No MCP tool replaces a section's or lead's text, so no tool can delete a comment
+  a read at a position didn't show. `append_section` leaves them in place. An
+  assistant editing a file by other means is told to read with no position first.
 - **Pinned first.** Results of `canon_as_of` and `get_entity` start with
   `pinned`, the pinned canon view (F-VIEW-2), and list the same facts in
   place too, so each entity is complete.

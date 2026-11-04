@@ -15,6 +15,7 @@ import {
   type PageSection,
   type PositionView,
 } from '../api'
+import { AheadOfReaders } from '../components/AheadOfReaders'
 import { EntityTabs } from '../components/EntityTabs'
 import { EntityLink, LinkedText, createLinkMatcher, sectionAnchor } from '../components/Links'
 import { Markdown } from '../components/Markdown'
@@ -36,7 +37,7 @@ import { denErrorsQuery } from '../denErrorsApi'
 import { sourceQuery, type EntitySource } from '../editApi'
 import { ErrorState, Loading, StatusBadge } from '../components/States'
 import { useDocumentTitle, useEntitiesInView, usePosition } from '../hooks'
-import { chapterWords, describePosition, entryOf, ordinalOf } from '../story'
+import { chapterWords, describePosition, entryOf, isAheadOf, ordinalOf } from '../story'
 import { useReveal } from '../reveal'
 
 const route = getRouteApi('/u/$universe/e/$')
@@ -422,13 +423,20 @@ function shortPosition(position: string, positions: PositionView[]): string {
   return `${oneBook ? '' : `${p.bookName} `}${p.number !== null ? `ch. ${p.number}` : chapterWords(p)}`
 }
 
+/** Where a fact starts and stops holding. An `until` readers haven't reached at the position being viewed is marked. */
 function Span({ from, until, positions }: { from: string | null; until: string | null; positions: PositionView[] }) {
+  const { at } = usePosition()
   if (!from && !until) {
     return null
   }
 
   const text = from && until ? `${shortPosition(from, positions)} to ${shortPosition(until, positions)}` : from ? `from ${shortPosition(from, positions)}` : `until ${shortPosition(until!, positions)}`
-  return <span className="badge span">{text}</span>
+  return (
+    <>
+      <span className="badge span">{text}</span>
+      {until && isAheadOf(until, at, positions) && <AheadOfReaders />}
+    </>
+  )
 }
 
 function Fields({

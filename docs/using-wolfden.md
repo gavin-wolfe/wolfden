@@ -812,6 +812,14 @@ entry** gives a field a new value from a later chapter; the one before
 it holds until then. A fact that doesn't change can still have a
 **Known from**, for a reveal the reader only learns later.
 
+When you read a note at a story position, a value or section that stops
+holding later still shows its date, with a small **ahead of readers** beside
+it: `until Ash ch. 5` is your plan, and readers at this point don't know it
+yet. Hover over it or click it to see that said in full. A date the position has reached
+has no tag. An AI assistant reading at that position isn't told the date at
+all, so it can't write toward it. When you're planning with one, ask it to
+read the note with no position, and it sees every date.
+
 A typed From or Until has to be a chapter (or book) your universe has.
 A typo, such as `dracula:999`, is refused rather than saved, since the
 fact would drop out of every story-position view. So is one in a field

@@ -138,6 +138,26 @@ public sealed class SharedReadEndpointTests
     }
 
     [Theory]
+    [InlineData("/api/chapter-defaults?book=no-such-book")]
+    [InlineData("/api/works?universe=no-such-universe")]
+    [Trait("Scenario", "SC-WEB-98")]
+    public async Task AWrongNameOnAReadDoesntBlameANoteOpenElsewhere(string path)
+    {
+        using var den = TempDen.Dracula();
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+
+        using (OpenToWrite(den, Swales))
+        {
+            using var response = await server.Client.GetAsync(path, Token);
+            var text = await response.Content.ReadAsStringAsync(Token);
+
+            Assert.NotEqual(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+            Assert.DoesNotContain("den_unreadable", text, StringComparison.Ordinal);
+            Assert.DoesNotContain(Swales, text, StringComparison.Ordinal);
+        }
+    }
+
+    [Theory]
     [InlineData(BookFile)]
     [InlineData("universes/dracula/universe.md")]
     [InlineData("den.yaml")]

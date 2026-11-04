@@ -249,7 +249,7 @@ public sealed partial class DenTools
             .Concat(db.Containers.Where(c => c.Ulid != null).Select(c => c.Ulid!))
             .ToHashSet(StringComparer.Ordinal);
         return (u.Key, used);
-    });
+    }, view);
 
     /// <summary>The universe, or its series <paramref name="series"/>, as the files say now.</summary>
     private static Container Holder(DenStructure structure, string universe, string? series)

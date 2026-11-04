@@ -405,7 +405,50 @@ public sealed class SharedFileWriteTests : IDisposable
 
     [Fact]
     [Trait("Scenario", "SC-MCP-43")]
-    public void AWrongNameInAWriteNamesAFileOpenElsewhereThenSaysItsWrongOnWindows()
+    public void AWrongBookInAWriteKeepsItsHintAndNamesAFileOpenElsewhereOnWindows()
+    {
+        SkipUnlessWindows();
+
+        using (OpenToWrite(Elsewhere))
+        {
+            var refused = Assert.Throws<DenToolException>(() => Tools.AddChapter("no-such-book", "A chapter"));
+            Assert.Equal(ToolErrorCodes.DenUnreadable, refused.Code);
+            Assert.Contains("no-such-book", refused.Message, StringComparison.Ordinal);
+            Assert.Contains("Its books: dracula", refused.Message, StringComparison.Ordinal);
+            Assert.Contains(Elsewhere, refused.Message, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-CHECK-64")]
+    public void AWrongNameInEveryReadLookupDoesntBlameANoteOpenElsewhere()
+    {
+        using (OpenToWrite(Elsewhere))
+        {
+            var tools = Tools;
+            foreach (var read in new Action[]
+            {
+                () => tools.GetChapterDefaults(book: "no-such-book"),
+                () => tools.GetChapterDefaults(series: "no-such-series"),
+                () => tools.GetChapterDefaultsSource(book: "no-such-book"),
+                () => tools.GetWorks(universe: "no-such-universe"),
+                () => tools.GetWorks(series: "no-such-series"),
+                () => tools.GetChapter("no-such-book"),
+                () => tools.GetBookFreeze("no-such-book"),
+                () => tools.GetSource("Nobody at all"),
+            })
+            {
+                var wrong = Assert.Throws<DenToolException>(read);
+                Assert.NotEqual(ToolErrorCodes.DenUnreadable, wrong.Code);
+                Assert.DoesNotContain(Elsewhere, wrong.Message, StringComparison.Ordinal);
+                Assert.DoesNotContain("nothing was changed", wrong.Message, StringComparison.Ordinal);
+            }
+        }
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-43")]
+    public void AWrongNameInAWriteSaysSoAndNamesAFileOpenElsewhereOnWindows()
     {
         SkipUnlessWindows();
 
@@ -413,7 +456,11 @@ public sealed class SharedFileWriteTests : IDisposable
         {
             var refused = Assert.Throws<DenToolException>(() => Tools.ReplaceLead("Nobody at all", "Text.\n", new string('0', 64)));
             Assert.Equal(ToolErrorCodes.DenUnreadable, refused.Code);
-            Assert.Contains(Elsewhere, refused.Message, StringComparison.Ordinal);
+
+            // The original error comes first, so the wrong name isn't lost behind a file that's nothing to do with it.
+            Assert.StartsWith(Assert.Throws<DenToolException>(() => Tools.GetSource("Nobody at all")).Message, refused.Message, StringComparison.Ordinal);
+            Assert.Contains("Nobody at all", refused.Message, StringComparison.Ordinal);
+            Assert.Contains($"Couldn't read {Elsewhere} right now, which may be why.", refused.Message, StringComparison.Ordinal);
         }
 
         Assert.Equal(ToolErrorCodes.UnknownEntity, Assert.Throws<DenToolException>(() => Tools.ReplaceLead("Nobody at all", "Text.\n", new string('0', 64))).Code);
@@ -456,7 +503,7 @@ public sealed class SharedFileWriteTests : IDisposable
 
     [Fact]
     [Trait("Scenario", "SC-MCP-43")]
-    public async Task AddingAChapterDuringAStalledSaveOfBookMdNamesItAndDoesntSayTheBookIsGone()
+    public async Task AddingAChapterDuringAStalledSaveOfBookMdNamesIt()
     {
         SkipUnlessWindows();
         var hash = Tools.GetBookFreeze("dracula").Hash;
@@ -467,7 +514,6 @@ public sealed class SharedFileWriteTests : IDisposable
             var refused = Assert.Throws<DenToolException>(() => Tools.AddChapter("dracula", "A new chapter", expectedHash: hash));
             Assert.Equal(ToolErrorCodes.DenUnreadable, refused.Code);
             Assert.Contains(BookFile, refused.Message, StringComparison.Ordinal);
-            Assert.DoesNotContain("has no book", refused.Message, StringComparison.Ordinal);
             await saving.FinishAsync();
         }
 
@@ -500,7 +546,7 @@ public sealed class SharedFileWriteTests : IDisposable
     [InlineData("Whitby dialect")]
     [InlineData(Note)]
     [Trait("Scenario", "SC-MCP-43")]
-    public async Task EditingANoteDuringAStalledSaveOfItNamesItAndDoesntBlameIt(string named)
+    public async Task EditingANoteDuringAStalledSaveOfItNamesIt(string named)
     {
         SkipUnlessWindows();
         var hash = Tools.GetEntity("Whitby dialect").Entity!.Hash!;
@@ -510,7 +556,6 @@ public sealed class SharedFileWriteTests : IDisposable
             var refused = Assert.Throws<DenToolException>(() => Tools.ReplaceLead(named, "New text.\n", hash));
             Assert.Equal(ToolErrorCodes.DenUnreadable, refused.Code);
             Assert.Contains(Note, refused.Message, StringComparison.Ordinal);
-            Assert.DoesNotContain("left out", refused.Message, StringComparison.Ordinal);
             await saving.FinishAsync();
         }
 

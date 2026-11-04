@@ -192,7 +192,7 @@ public sealed partial class DenTools
         var u = ChooseUniverse(db, universe, null, allowAll: false)!;
         CheckFilter(db, u, Filter(series?.Trim(), book?.Trim()));
         return u.Key;
-    });
+    }, view);
 
     private static Container FindContainer(DenStructure structure, string universe, string? series, string? book)
     {

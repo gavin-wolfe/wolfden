@@ -228,10 +228,11 @@ public sealed partial class DenTools
         {
             var unreadable = InThisUniverse(UnreadableToViews());
 
-            // The index may have read part of a save. A write can't read that file at all, so it says so (#298).
+            // The index may have read part of a save, or the name may simply be wrong: Wolfden can't tell.
+            // A write can't read that file at all, so its error says both, and what to do (#298).
             if (!view && InThisUniverse(LoadTracked().Den.Unreadable) is { } forWrite && forWrite.Except(unreadable).Any())
             {
-                throw Unreadable(forWrite);
+                throw new DenToolException(ToolErrorCodes.DenUnreadable, $"{e.Message} {MayBeWhy(forWrite)}", e.Candidates) { LeftOut = e.LeftOut };
             }
 
             if (unreadable.Count == 0)

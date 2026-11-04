@@ -727,8 +727,8 @@ With git as the backend:
   `checkpoint` then has those files no more).
 - **Remotes:** optional, and never required. Wolfden doesn't push or pull
   yet; a den's repository works with `git remote` and `git push` like any
-  other. The maintainer has decided Wolfden should handle backup to a
-  private remote for the common path (#312).
+  other. **Decided (maintainer, 2026-11-04, #312):** Wolfden will handle
+  backup to a private remote for the common path.
 
 With or without a backend, **the index is never the only copy of
 anything.** Deleting it loses nothing (§7).

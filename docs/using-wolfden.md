@@ -1050,8 +1050,11 @@ A few things to know:
 - **Not in a synced folder.** Don't turn on history for a den in Dropbox,
   OneDrive, or iCloud: two machines syncing while git writes can corrupt
   it. Use a private remote for a backup instead. Wolfden doesn't push to
-  one for you yet (#312), so add it and push with git in the den's folder:
-  `git remote add origin <url>`, then `git push -u origin HEAD`.
+  one for you yet (#312). For a den with its own repository, after your
+  first checkpoint, run `git remote add origin <url>` in the den's folder,
+  then `git push -u origin HEAD --tags`. A backup only has what you've
+  pushed, so run `git push origin HEAD --tags` again after later
+  checkpoints. `--tags` includes your freeze tags.
 - **A den that's part of a bigger repository** already has history there,
   so there's nothing to turn on, and Wolfden says so.
 - **If a step fails** (a git hook refuses the first checkpoint, say),

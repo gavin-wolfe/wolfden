@@ -17,7 +17,7 @@ public sealed partial class DenTools
         DenStructure structure;
         try
         {
-            structure = DenStructure.Load(Snapshot());
+            structure = DenStructure.Load(ViewSnapshot());
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {

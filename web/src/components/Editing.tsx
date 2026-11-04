@@ -857,8 +857,9 @@ function staleAgain(
   opened: Piece | null,
   setPiece: (p: Piece | null) => void,
 ): Error {
-  if (e instanceof EditError && e.code === 'stale_file') {
-    const now = e.current ? pieceOf(e.current, target, opened) : null
+  // With no file to go on, it may be another file that changed: the server's message says which.
+  if (e instanceof EditError && e.code === 'stale_file' && e.current) {
+    const now = pieceOf(e.current, target, opened)
     if (now) {
       setPiece(now)
       return new Error('The note changed meanwhile, perhaps edited by an agent or in another editor. Check it, then try again.')

@@ -79,7 +79,7 @@ public sealed partial class DenTools
     /// <summary>A file as Edit file needs it, by its path, read from the file. See the remarks on this part of the class for which paths it takes.</summary>
     public FileSourceResult GetFileSource(string path)
     {
-        var den = Snapshot();
+        var den = ViewSnapshot();
         var structure = DenStructure.Load(den);
         var kind = CheckEditable(den, structure, path, opening: true);
         var bytes = den.TryReadFile(path) ?? throw UnreadableOrNoFile(den, path, opening: true);

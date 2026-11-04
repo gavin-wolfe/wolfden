@@ -262,12 +262,23 @@ public static partial class WriteEndpoints
         }
         catch (DenToolException e) when (e.Code == ToolErrorCodes.StaleFile)
         {
-            return Results.Json(new ApiError(e.Code, e.Message, Current: Current(tools, entity!, universe)), statusCode: ReadEndpoints.StatusOf(e.Code));
+            return Results.Json(new ApiError(e.Code, e.Message, Current: CurrentIfItsThisFile(tools, e, entity!, universe)), statusCode: ReadEndpoints.StatusOf(e.Code));
         }
         catch (DenToolException e)
         {
             return Results.Json(new ApiError(e.Code, e.Message, e.Candidates), statusCode: ReadEndpoints.StatusOf(e.Code));
         }
+    }
+
+    /// <summary>
+    /// The file being edited as it is now, for a <c>stale_file</c> error about that
+    /// file. Null if the error is about another file a rename or move read, so the
+    /// page shows the message naming it, rather than offering this note as what changed (#298).
+    /// </summary>
+    internal static EntitySourceResult? CurrentIfItsThisFile(DenTools tools, DenToolException e, string entity, string? universe)
+    {
+        var current = Current(tools, entity, universe);
+        return e.StalePath is null || current?.Entity.Path == e.StalePath ? current : null;
     }
 
     /// <summary>The file as it is now, for a <c>stale_file</c> error, or null if it can't be read (it was moved or deleted, or has errors).</summary>

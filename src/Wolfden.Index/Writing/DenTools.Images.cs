@@ -1,3 +1,4 @@
+using Wolfden.Core.Entities;
 using Wolfden.Core.Editing;
 using Wolfden.Core.Structure;
 using Wolfden.Index.Reading;
@@ -70,7 +71,7 @@ public sealed partial class DenTools
         var noteFolder = DenPaths.Parent(path);
         using (EnterWrite())
         {
-            var den = Snapshot();
+            var den = new TrackingDenSource(Snapshot());
             if (!den.FileExists(path))
             {
                 throw Gone(path);
@@ -104,6 +105,16 @@ public sealed partial class DenTools
 
             var folder = Join(noteFolder, folderName);
             var structure = DenStructure.Load(den);
+
+            // The image goes in a final book or it doesn't, and that takes reading what's above
+            // the note. The index reads as a view, so it can find a note this load can't place (#298).
+            RefuseHeldAbove(den, structure, path);
+            if (EntityCatalog.EntityFileScope(structure, path) is null)
+            {
+                throw new DenToolException(
+                    ToolErrorCodes.InvalidEdit, $"An error in what holds {path} leaves it out too, so an image can't be added to it here. {ToolWords.Cap(Words.CheckFile(path))} to see it.");
+            }
+
             var frozen = structure.Universes.SelectMany(u => u.Books)
                 .FirstOrDefault(b => b.Status == BookStatus.Final && IsAtOrUnder(folder, b.Path));
             if (frozen is not null)

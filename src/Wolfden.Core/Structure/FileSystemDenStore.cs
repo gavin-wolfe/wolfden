@@ -91,6 +91,12 @@ public sealed class FileSystemDenStore : IDenStore, IDenChangeFeed
     /// </summary>
     public FileSystemDenSource Snapshot() => new(Root);
 
+    /// <summary>
+    /// <see cref="Snapshot"/> for a view rather than a write: it can read a file
+    /// another program has open to write (<see cref="FileSystemDenSource.ForViews"/>).
+    /// </summary>
+    public FileSystemDenSource ViewSnapshot() => FileSystemDenSource.ForViews(Root);
+
     private IDenSource Reads => Snapshot();
 
     /// <inheritdoc />

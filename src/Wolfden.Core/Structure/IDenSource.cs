@@ -109,12 +109,35 @@ public interface IDenSource
 /// <summary>A den on disk.</summary>
 public sealed class FileSystemDenSource : IDenSource
 {
-    /// <summary>Reads the den whose root folder is <paramref name="root"/>.</summary>
+    private readonly bool _shared;
+
+    /// <summary>
+    /// Reads the den whose root folder is <paramref name="root"/>, for a write
+    /// to build on: a file another program has open to write can't be read,
+    /// so a write doesn't build on part of its save (#298). Not all reads default
+    /// to this: the overloads that take a folder, such as
+    /// <see cref="DenStructure.Load(string)"/>, read for a view.
+    /// </summary>
     public FileSystemDenSource(string root)
+        : this(root, shared: false)
+    {
+    }
+
+    private FileSystemDenSource(string root, bool shared)
     {
         ArgumentNullException.ThrowIfNull(root);
         Root = Path.GetFullPath(root);
+        _shared = shared;
     }
+
+    /// <summary>
+    /// Reads the den for a view: a page, a read tool, the index, or a check.
+    /// A file another program has open to write can be read, unless it keeps
+    /// others from reading, and may be part of a save, which the next read
+    /// corrects (<see cref="SharedFile"/>, #298). Nothing a write builds on
+    /// reads through this.
+    /// </summary>
+    public static FileSystemDenSource ForViews(string root) => new(root, shared: true);
 
     /// <summary>The den root's full path.</summary>
     public string Root { get; }
@@ -137,7 +160,7 @@ public sealed class FileSystemDenSource : IDenSource
     public bool FileExists(string path) => ExactPathExists(path, file: true);
 
     /// <inheritdoc />
-    public byte[] ReadFile(string path) => File.ReadAllBytes(Full(path));
+    public byte[] ReadFile(string path) => _shared ? SharedFile.ReadAllBytes(Full(path)) : File.ReadAllBytes(Full(path));
 
     /// <summary>
     /// The folders directly in <paramref name="path"/>, by their names on

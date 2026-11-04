@@ -210,7 +210,7 @@ internal sealed class DenFileTree
     {
         try
         {
-            return File.ReadAllBytes(file);
+            return SharedFile.ReadAllBytes(file);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {

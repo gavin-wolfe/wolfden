@@ -57,7 +57,7 @@ public sealed partial class DenTools
     /// </summary>
     public WorksView GetWorks(string? universe = null, string? series = null)
     {
-        var (universeKey, _) = PlaceFor(universe, series);
+        var (universeKey, _) = PlaceFor(universe, series, view: true);
         var holder = Holder(DenStructure.Load(ViewSnapshot()), universeKey, series);
         var works = holder is Universe u
             ? u.Works.Select(w => new WorkView(w.Kind == ContainerKind.Series ? "series" : "book", w.Key, w.Name))
@@ -238,7 +238,7 @@ public sealed partial class DenTools
     }
 
     /// <summary>The universe and the den's ids, after checking that the universe (and the series, if one is named) is there.</summary>
-    private (string Universe, HashSet<string> Ids) PlaceFor(string? universe, string? series) => WithIndex(index =>
+    private (string Universe, HashSet<string> Ids) PlaceFor(string? universe, string? series, bool view = false) => WithIndex(index =>
     {
         var db = index.Context;
         var u = ChooseUniverse(db, universe, null, allowAll: false)!;

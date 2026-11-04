@@ -27,7 +27,7 @@ public sealed partial class DenTools
             throw new DenToolException(ToolErrorCodes.BadArgument, "Give the book's key in 'book'.");
         }
 
-        var (universeKey, _) = LocateBook(book.Trim(), universe);
+        var (universeKey, _) = LocateBook(book.Trim(), universe, view: true);
         var den = ViewSnapshot();
         var structure = DenStructure.Load(den);
         var found = FindBook(structure, universeKey, book.Trim());
@@ -52,7 +52,7 @@ public sealed partial class DenTools
     /// <summary>A universe's, series', or book's <c>chapter_defaults</c>, each field's value as written, what its books get, and the hash of its file.</summary>
     public ChapterDefaultsSourceResult GetChapterDefaultsSource(string? universe = null, string? series = null, string? book = null)
     {
-        var universeKey = LocateContainer(universe, series, book);
+        var universeKey = LocateContainer(universe, series, book, view: true);
         var den = ViewSnapshot();
         var structure = DenStructure.Load(den);
         var container = FindContainer(structure, universeKey, series, book);

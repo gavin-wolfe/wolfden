@@ -18,6 +18,13 @@ internal sealed record ScopeOption(string Option, string Into, string Done)
     /// <summary>Reads the option's value, <paramref name="value"/>, for the den at <paramref name="root"/>.</summary>
     public bool TryParse(string root, string value, out string? universe, out string? series, out string? book, out string problem)
     {
+        var found = Find(root, value, out universe, out series, out book, out problem);
+        problem = found ? problem : HeldFiles.Added(root, problem);
+        return found;
+    }
+
+    private bool Find(string root, string value, out string? universe, out string? series, out string? book, out string problem)
+    {
         universe = series = book = null;
         problem = "";
         var structure = DenStructure.Load(root);

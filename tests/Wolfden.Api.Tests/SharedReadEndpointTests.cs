@@ -137,6 +137,38 @@ public sealed class SharedReadEndpointTests
         Assert.NotNull(WriteEndpoints.CurrentIfItsThisFile(tools, hashOnly, Swales, null));
     }
 
+    [Theory]
+    [InlineData(BookFile)]
+    [InlineData("universes/dracula/universe.md")]
+    [InlineData("den.yaml")]
+    [Trait("Scenario", "SC-WEB-98")]
+    public async Task AnImageCantReachAFrozenBookWhileWhatsAboveTheNoteIsOpenElsewhere(string held)
+    {
+        SkipUnlessWindows();
+        using var den = TempDen.Dracula();
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+        var freeze = await server.GetJsonAsync("/api/book/freeze?book=dracula", HttpStatusCode.OK);
+        var (frozen, _) = await PostAsync(server, "/api/book/freeze", new { book = "dracula", expectedHash = freeze.GetProperty("hash").GetString() });
+        Assert.Equal(HttpStatusCode.OK, frozen);
+        byte[] png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2];
+        var images = Path.Combine(den.Root, Swales.Replace('/', Path.DirectorySeparatorChar));
+        images = Path.Combine(Path.GetDirectoryName(images)!, "images");
+
+        using (OpenToWrite(den, held))
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/entity/image?entity={Uri.EscapeDataString(Swales)}&name=map.png") { Content = new ByteArrayContent(png) };
+            request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+            using var response = await server.Client.SendAsync(request, Token);
+            var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(Token)).RootElement;
+
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+            Assert.Equal("den_unreadable", json.GetProperty("code").GetString());
+            Assert.Contains(held, json.GetProperty("message").GetString(), StringComparison.Ordinal);
+        }
+
+        Assert.False(Directory.Exists(images));
+    }
+
     [Fact]
     [Trait("Scenario", "SC-WEB-98")]
     public async Task AddingAChapterNamesTheBookFileOpenElsewhere()

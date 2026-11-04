@@ -38,7 +38,7 @@ public sealed partial class DenTools
     /// </summary>
     public EntitySourceResult GetSource(string entity, string? universe = null)
     {
-        var (path, _) = Locate(entity, universe);
+        var (path, _) = Locate(entity, universe, view: true);
         var den = ViewSnapshot();
         var structure = DenStructure.Load(den);
         var bytes = den.TryReadFile(path) ?? throw GoneOrUnreadable(den, path);

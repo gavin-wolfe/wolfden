@@ -55,7 +55,7 @@ public sealed partial class DenTools
     /// </summary>
     public BookFreezeView GetBookFreeze(string book, string? universe = null)
     {
-        var (universeKey, key) = BookArgument(book, universe);
+        var (universeKey, key) = BookArgument(book, universe, view: true);
         var target = FindBook(DenStructure.Load(ViewSnapshot()), universeKey, key);
         var history = History();
         var canCheckpoint = history.CheckpointUnavailable is null;
@@ -302,7 +302,7 @@ public sealed partial class DenTools
     }
 
     /// <summary>The universe and key of the book named <paramref name="book"/>, after checking that it's there.</summary>
-    private (string Universe, string Key) BookArgument(string book, string? universe)
+    private (string Universe, string Key) BookArgument(string book, string? universe, bool view = false)
     {
         if (string.IsNullOrWhiteSpace(book))
         {
@@ -310,7 +310,7 @@ public sealed partial class DenTools
         }
 
         var key = book.Trim();
-        var (universeKey, _) = LocateBook(key, universe);
+        var (universeKey, _) = LocateBook(key, universe, view);
         return (universeKey, key);
     }
 

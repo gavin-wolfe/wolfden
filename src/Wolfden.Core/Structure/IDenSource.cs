@@ -114,7 +114,9 @@ public sealed class FileSystemDenSource : IDenSource
     /// <summary>
     /// Reads the den whose root folder is <paramref name="root"/>, for a write
     /// to build on: a file another program has open to write can't be read,
-    /// so a write never builds on part of its save (#298).
+    /// so a write doesn't build on part of its save (#298). Not all reads default
+    /// to this: the overloads that take a folder, such as
+    /// <see cref="DenStructure.Load(string)"/>, read for a view.
     /// </summary>
     public FileSystemDenSource(string root)
         : this(root, shared: false)

@@ -58,7 +58,7 @@ public sealed partial class DenTools
     /// </summary>
     public GetChapterDefaultsResult GetChapterDefaults(string? universe = null, string? series = null, string? book = null)
     {
-        var universeKey = LocateContainer(universe, series, book);
+        var universeKey = LocateContainer(universe, series, book, view: true);
         var container = FindContainer(DenStructure.Load(ViewSnapshot()), universeKey, series, book);
         var view = DefaultsOf(container);
         return new GetChapterDefaultsResult(
@@ -186,7 +186,7 @@ public sealed partial class DenTools
     private sealed record DefaultsEdit(Container Before, Container After, Lazy<LinkResolver> BeforeLinks, Lazy<LinkResolver> AfterLinks);
 
     /// <summary>The universe a <c>chapter_defaults</c> call is about, after checking that the series or book it names is there.</summary>
-    private string LocateContainer(string? universe, string? series, string? book) => WithIndex(index =>
+    private string LocateContainer(string? universe, string? series, string? book, bool view = false) => WithIndex(index =>
     {
         var db = index.Context;
         var u = ChooseUniverse(db, universe, null, allowAll: false)!;

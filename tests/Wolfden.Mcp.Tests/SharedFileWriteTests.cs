@@ -32,6 +32,8 @@ public sealed class SharedFileWriteTests : IDisposable
     private const string Tail = "See [[Mr. Swales]], [[Mr. Swales#Voice]], and [[the Count]].\n\nThe last words of the save.\n";
     private const string LastWords = "The last words of the save.";
 
+    private static readonly byte[] Png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2];
+
     private readonly TempDen _den = TempDen.Dracula();
 
     public SharedFileWriteTests()
@@ -362,6 +364,61 @@ public sealed class SharedFileWriteTests : IDisposable
         Assert.Equal(before, Files());
     }
 
+    [Theory]
+    [InlineData(BookFile)]
+    [InlineData(UniverseFile)]
+    [InlineData("den.yaml")]
+    [Trait("Scenario", "SC-MCP-43")]
+    public void AnImageCantReachAFrozenBookWhileWhatsAboveTheNoteIsOpenElsewhereOnWindows(string held)
+    {
+        SkipUnlessWindows();
+        var tools = Tools;
+        tools.FreezeBook("dracula", tools.GetBookFreeze("dracula").Hash);
+        var before = Files();
+
+        DenToolException refused;
+        using (OpenToWrite(held))
+        {
+            refused = Assert.Throws<DenToolException>(() => Tools.AddImage("Mr. Swales", "map.png", Png));
+        }
+
+        Assert.Equal(ToolErrorCodes.DenUnreadable, refused.Code);
+        Assert.Contains(held, refused.Message, StringComparison.Ordinal);
+        Assert.Equal(before, Files());
+        Assert.Equal(ToolErrorCodes.Frozen, Assert.Throws<DenToolException>(() => Tools.AddImage("Mr. Swales", "map.png", Png)).Code);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-43")]
+    public void AnImageIsntStoppedByItsOwnNoteOrAnotherOpenElsewhere()
+    {
+        using (OpenToWrite(Swales))
+        {
+            Assert.EndsWith("map.png", Tools.AddImage("Mr. Swales", "map.png", Png).Path, StringComparison.Ordinal);
+        }
+
+        using (OpenToWrite(Elsewhere))
+        {
+            Assert.EndsWith("map-2.png", Tools.AddImage("Mr. Swales", "map.png", Png).Path, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-43")]
+    public void AWrongNameInAWriteNamesAFileOpenElsewhereThenSaysItsWrongOnWindows()
+    {
+        SkipUnlessWindows();
+
+        using (OpenToWrite(Elsewhere))
+        {
+            var refused = Assert.Throws<DenToolException>(() => Tools.ReplaceLead("Nobody at all", "Text.\n", new string('0', 64)));
+            Assert.Equal(ToolErrorCodes.DenUnreadable, refused.Code);
+            Assert.Contains(Elsewhere, refused.Message, StringComparison.Ordinal);
+        }
+
+        Assert.Equal(ToolErrorCodes.UnknownEntity, Assert.Throws<DenToolException>(() => Tools.ReplaceLead("Nobody at all", "Text.\n", new string('0', 64))).Code);
+    }
+
     // A real separate process, stalled in the middle of a save.
 
     [Fact]
@@ -394,50 +451,92 @@ public sealed class SharedFileWriteTests : IDisposable
         Assert.Contains(LastWords, after, StringComparison.Ordinal);
     }
 
-    /// <summary>
-    /// Stalls short enough for a save's retries to outlast them, which is how a
-    /// write built on a part read overwrote the finished save (review of #307).
-    /// Whether a write is refused or goes ahead after the save finishes depends
-    /// on timing, so this asserts what must hold either way: the save's text is there.
-    /// </summary>
-    [Theory]
-    [InlineData("rename_entity", 100)]
-    [InlineData("rename_entity", 700)]
-    [InlineData("add_chapter", 100)]
-    [InlineData("add_chapter", 700)]
-    [InlineData("append_section", 100)]
-    [InlineData("append_section", 700)]
+    /// <summary>A save stalled inside the frontmatter: the index's read of it doesn't load, so a lookup fails before a write reads anything.</summary>
+    private const int InsideFrontmatter = 12;
+
+    [Fact]
     [Trait("Scenario", "SC-MCP-43")]
-    public async Task AShortStallNeverLosesTheRestOfTheSave(string tool, int stallMs)
+    public async Task AddingAChapterDuringAStalledSaveOfBookMdNamesItAndDoesntSayTheBookIsGone()
     {
         SkipUnlessWindows();
-        var tools = Tools;
-        var noteHash = tools.GetEntity("Whitby dialect").Entity!.Hash!;
-        var swales = tools.GetEntity("Mr. Swales").Entity!.Hash!;
-        var path = tool == "add_chapter" ? BookFile : Note;
-        var whole = tool == "add_chapter" ? _den.Read(BookFile) + "\n" + LastWords + "\n" : Head + Tail;
+        var hash = Tools.GetBookFreeze("dracula").Hash;
+        var whole = _den.Read(BookFile);
 
-        await using (var saving = await StalledWriter.StartAsync(Full(path), whole, whole.Length / 2, stallMs))
+        await using (var saving = await StalledWriter.StartAsync(Full(BookFile), whole, InsideFrontmatter))
         {
-            try
-            {
-                _ = tool switch
-                {
-                    "rename_entity" => (object)tools.RenameEntity("Mr. Swales", "Old Swales", swales),
-                    "add_chapter" => tools.AddChapter("dracula", "A new chapter"),
-                    "append_section" => tools.AppendSection("Whitby dialect", "Later", "More.\n", noteHash, newSection: true),
-                    _ => throw new ArgumentException(tool),
-                };
-            }
-            catch (DenToolException e) when (e.Code is ToolErrorCodes.DenUnreadable or ToolErrorCodes.StaleFile or ToolErrorCodes.WriteFailed or ToolErrorCodes.UnknownEntity or ToolErrorCodes.UnknownScope)
-            {
-                // Refused: fine.
-            }
-
+            var refused = Assert.Throws<DenToolException>(() => Tools.AddChapter("dracula", "A new chapter", expectedHash: hash));
+            Assert.Equal(ToolErrorCodes.DenUnreadable, refused.Code);
+            Assert.Contains(BookFile, refused.Message, StringComparison.Ordinal);
+            Assert.DoesNotContain("has no book", refused.Message, StringComparison.Ordinal);
             await saving.FinishAsync();
         }
 
-        Assert.Contains(LastWords, _den.Read(path), StringComparison.Ordinal);
+        Assert.Equal(whole, _den.Read(BookFile));
+        Assert.Equal("A new chapter", Tools.AddChapter("dracula", "A new chapter", expectedHash: hash).Title);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-43")]
+    public async Task EditingANoteDuringAStalledSaveOfItsBookMdNamesThat()
+    {
+        SkipUnlessWindows();
+        var hash = Tools.GetEntity("Mr. Swales").Entity!.Hash!;
+        var whole = _den.Read(BookFile);
+        var note = _den.Read(Swales);
+
+        await using (var saving = await StalledWriter.StartAsync(Full(BookFile), whole, InsideFrontmatter))
+        {
+            var refused = Assert.Throws<DenToolException>(() => Tools.AppendSection("Mr. Swales", "Voice", "More.\n", hash));
+            Assert.Equal(ToolErrorCodes.DenUnreadable, refused.Code);
+            Assert.Contains(BookFile, refused.Message, StringComparison.Ordinal);
+            await saving.FinishAsync();
+        }
+
+        Assert.Equal(whole, _den.Read(BookFile));
+        Assert.Equal(note, _den.Read(Swales));
+    }
+
+    [Theory]
+    [InlineData("Whitby dialect")]
+    [InlineData(Note)]
+    [Trait("Scenario", "SC-MCP-43")]
+    public async Task EditingANoteDuringAStalledSaveOfItNamesItAndDoesntBlameIt(string named)
+    {
+        SkipUnlessWindows();
+        var hash = Tools.GetEntity("Whitby dialect").Entity!.Hash!;
+
+        await using (var saving = await StalledWriter.StartAsync(Full(Note), Head + Tail, InsideFrontmatter))
+        {
+            var refused = Assert.Throws<DenToolException>(() => Tools.ReplaceLead(named, "New text.\n", hash));
+            Assert.Equal(ToolErrorCodes.DenUnreadable, refused.Code);
+            Assert.Contains(Note, refused.Message, StringComparison.Ordinal);
+            Assert.DoesNotContain("left out", refused.Message, StringComparison.Ordinal);
+            await saving.FinishAsync();
+        }
+
+        Assert.Equal(Head + Tail, _den.Read(Note));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-43")]
+    public async Task AnImageCantReachAFrozenBookDuringAStalledSaveOfItsBookMd()
+    {
+        SkipUnlessWindows();
+        var tools = Tools;
+        tools.FreezeBook("dracula", tools.GetBookFreeze("dracula").Hash);
+        var whole = _den.Read(BookFile);
+        var before = Files();
+
+        await using (var saving = await StalledWriter.StartAsync(Full(BookFile), whole, InsideFrontmatter))
+        {
+            var refused = Assert.Throws<DenToolException>(() => Tools.AddImage("Mr. Swales", "map.png", Png));
+            Assert.Equal(ToolErrorCodes.DenUnreadable, refused.Code);
+            Assert.Contains(BookFile, refused.Message, StringComparison.Ordinal);
+            await saving.FinishAsync();
+        }
+
+        Assert.Equal(before, Files());
+        Assert.Equal(ToolErrorCodes.Frozen, Assert.Throws<DenToolException>(() => Tools.AddImage("Mr. Swales", "map.png", Png)).Code);
     }
 
     [Fact]

@@ -217,7 +217,7 @@ public sealed partial class DenTools
     /// it's in. It can also just be a wrong name, so the error keeps its code,
     /// and adds that a file couldn't be read and may be why (#284).
     /// </remarks>
-    private T WithIndex<T>(Func<DenIndex, T> query)
+    private T WithIndex<T>(Func<DenIndex, T> query, bool view = false)
     {
         try
         {
@@ -227,6 +227,13 @@ public sealed partial class DenTools
             or ToolErrorCodes.NoUniverse or ToolErrorCodes.DenNotLoaded)
         {
             var unreadable = InThisUniverse(UnreadableToViews());
+
+            // The index may have read part of a save. A write can't read that file at all, so it says so (#298).
+            if (!view && InThisUniverse(LoadTracked().Den.Unreadable) is { } forWrite && forWrite.Except(unreadable).Any())
+            {
+                throw Unreadable(forWrite);
+            }
+
             if (unreadable.Count == 0)
             {
                 throw;

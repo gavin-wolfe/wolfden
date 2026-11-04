@@ -487,7 +487,7 @@ public sealed partial class DenTools
             throw new DenToolException(ToolErrorCodes.BadArgument, "Give the book's key in 'book'.");
         }
 
-        var (universeKey, _) = LocateBook(book.Trim(), universe);
+        var (universeKey, _) = LocateBook(book.Trim(), universe, view: true);
         var den = ViewSnapshot();
         var structure = DenStructure.Load(den);
         var found = FindBook(structure, universeKey, book.Trim());
@@ -1169,7 +1169,7 @@ public sealed partial class DenTools
         new(DenReader.ResultVersion, false, path, HashOf(bytes), Summary(entity), ["Nothing changed: the file already says that."], [], []);
 
     /// <summary>The entity's path in the index, and every id the den uses (for a missing id, F-ID-6).</summary>
-    private (string Path, HashSet<string> Ids) Locate(string entity, string? universe)
+    private (string Path, HashSet<string> Ids) Locate(string entity, string? universe, bool view = false)
     {
         if (string.IsNullOrWhiteSpace(entity))
         {
@@ -1193,16 +1193,16 @@ public sealed partial class DenTools
                 .Concat(db.Containers.Where(c => c.Ulid != null).Select(c => c.Ulid!))
                 .ToHashSet(StringComparer.Ordinal);
             return (path, ids);
-        });
+        }, view);
     }
 
-    private (string Universe, string Path) LocateBook(string book, string? universe) => WithIndex(index =>
+    private (string Universe, string Path) LocateBook(string book, string? universe, bool view = false) => WithIndex(index =>
     {
         var db = index.Context;
         var u = ChooseUniverse(db, universe, null, allowAll: false)!;
         CheckFilter(db, u, CanonFilter.ForBook(book));
         return (u.Key, db.Containers.Single(c => c.UniverseId == u.Id && c.Kind == "book" && c.Key == book).Path);
-    });
+    }, view);
 
     private static Book FindBook(DenStructure structure, string universe, string book) =>
         structure.FindUniverse(universe)?.FindBook(book)

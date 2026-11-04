@@ -208,7 +208,7 @@ public sealed class WriteToolTests : IDisposable
     }
 
     [Theory]
-    [Trait("Scenario", "SC-MCP-41")]
+    [Trait("Scenario", "SC-MCP-42")]
     [InlineData("Mina's Journal", "minas-journal")]
     [InlineData("O'Brien's War", "obriens-war")]
     [InlineData("Mina’s Journal", "minas-journal")] // U+2019, a curly apostrophe
@@ -218,8 +218,8 @@ public sealed class WriteToolTests : IDisposable
     [InlineData("Mina＇s Journal", "minas-journal")] // U+FF07, which NFKD makes straight
     [InlineData("The Long Dark", "the-long-dark")]
     [InlineData("The Count's End", "the-counts-end")]
-    [InlineData("'Salem's Lot", "salems-lot")]
-    [InlineData("The Boys' Own Paper", "the-boys-own-paper")]
+    [InlineData("'Twas Mina's Lot", "twas-minas-lot")]
+    [InlineData("The Sailors' Rest", "the-sailors-rest")]
     [InlineData("Rock 'n' Roll", "rock-n-roll")]
     [InlineData("Mina 's Journal", "mina-s-journal")] // A space still ends a word.
     [InlineData("'''", "")]
@@ -227,7 +227,7 @@ public sealed class WriteToolTests : IDisposable
         Assert.Equal(slug, NewEntity.Slugify(name));
 
     [Fact]
-    [Trait("Scenario", "SC-MCP-41")]
+    [Trait("Scenario", "SC-MCP-42")]
     public void TwoNamesThatReachOneSlugDontShareAFile()
     {
         const string Characters = Book + "/entities/characters";
@@ -242,7 +242,7 @@ public sealed class WriteToolTests : IDisposable
     }
 
     [Fact]
-    [Trait("Scenario", "SC-MCP-41")]
+    [Trait("Scenario", "SC-MCP-42")]
     public void ANoteWithAnOldHyphenSlugKeepsItAndItsLinksStillReachIt()
     {
         const string Old = "universes/dracula/entities/locations/mina-s-house.md";
@@ -267,6 +267,87 @@ public sealed class WriteToolTests : IDisposable
         Assert.Equal(Old, Tools.GetEntity("mina-s-house").Entity!.Path);
         Assert.Equal(made.Path, Tools.GetEntity("minas-house").Entity!.Path);
         Assert.DoesNotContain(Tools.Check(limit: 5000).Diagnostics, d => d.Message.Contains("mina-s-house", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-42")]
+    public void ANewNoteOfAnOldFormsNameThatWouldTakeALinkIsRefusedUnlessAllowed()
+    {
+        const string Linker = "universes/dracula/entities/locations/seward-asylum.md";
+        WriteOldFormHouse(Linker);
+        _den.Write(Linker, _den.Read(Linker).TrimEnd() + "\n\nSee [[Mina's House]].\n");
+
+        var refused = Assert.Throws<DenToolException>(() => Tools.CreateEntity("location", "Mina's House"));
+
+        Assert.Equal(ToolErrorCodes.BadArgument, refused.Code);
+        Assert.False(File.Exists(Path.Combine(_den.Root, "universes", "dracula", "entities", "locations", "minas-house.md")));
+
+        var made = Tools.CreateEntity("location", "Mina's House", allowRelinks: true);
+        Assert.Equal("universes/dracula/entities/locations/minas-house.md", made.Path);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-42")]
+    public void NamesThatShareASlugInDifferentFoldersOnlyClashOverLinks()
+    {
+        const string Linker = "universes/dracula/entities/locations/seward-asylum.md";
+        var text = _den.Read(Linker);
+        Tools.CreateEntity("location", "Minas");
+        _den.Write(Linker, text.TrimEnd() + "\n\nSee [[Minas]].\n");
+
+        // The new slug would come before the name the link reaches now (F-LINK-6).
+        Assert.Equal(ToolErrorCodes.BadArgument, Assert.Throws<DenToolException>(() => Tools.CreateEntity("character", "Mina's")).Code);
+
+        // With no such link it's made, and a link by that slug is the usual ambiguous one.
+        _den.Write(Linker, text);
+        Assert.Equal("universes/dracula/entities/characters/minas.md", Tools.CreateEntity("character", "Mina's").Path);
+        _den.Write(Linker, text.TrimEnd() + "\n\nSee [[minas]].\n");
+        Assert.Contains(Tools.Check(path: Linker, limit: 5000).Diagnostics, d => d.Message.Contains("'minas' is ambiguous", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-MCP-42")]
+    [InlineData("'''")]
+    [InlineData("’")]
+    public void ANameOfOnlyApostrophesUsesTheTypeKeyAndReadsBack(string name)
+    {
+        var made = Tools.CreateEntity("location", name);
+
+        Assert.Equal("universes/dracula/entities/locations/location.md", made.Path);
+        Assert.Equal(name, made.Entity!.Name);
+        Assert.Equal(0, Tools.Check(path: made.Path).Errors);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-42")]
+    public void RenamingOrMovingAnOldFormNoteKeepsItsSlugAndLinks()
+    {
+        const string Old = "universes/dracula/entities/locations/mina-s-house.md";
+        const string Linker = "universes/dracula/entities/locations/seward-asylum.md";
+        WriteOldFormHouse(Linker);
+        _den.Write(Linker, _den.Read(Linker).TrimEnd() + "\n\nSee [[mina-s-house]].\n");
+
+        var renamed = Tools.RenameEntity("mina-s-house", "Mina's Cottage", Tools.GetEntity("mina-s-house").Entity!.Hash!);
+
+        Assert.Equal(Old, renamed.Path);
+        Assert.Equal("Mina's Cottage", Tools.GetEntity("mina-s-house").Entity!.Name);
+
+        var moved = Tools.MoveEntity("mina-s-house", renamed.Hash!, toBook: "dracula");
+
+        Assert.Equal(Book + "/entities/locations/mina-s-house.md", moved.Path);
+        Assert.Equal(moved.Path, Tools.GetEntity("mina-s-house").Entity!.Path);
+        Assert.Contains("[[mina-s-house]]", _den.Read(Linker), StringComparison.Ordinal);
+        Assert.DoesNotContain(Tools.Check(limit: 5000).Diagnostics, d => d.Message.Contains("mina-s-house", StringComparison.Ordinal));
+    }
+
+    /// <summary>A note named "Mina's House" under the old form of its slug, as a den made before #289 has it.</summary>
+    private void WriteOldFormHouse(string from)
+    {
+        var entity = Tools.GetEntity("seward-asylum").Entity!;
+        _den.Write(
+            "universes/dracula/entities/locations/mina-s-house.md",
+            _den.Read(from).Replace(entity.Id!, "01M4TF5F0EKGGWD5FNVBAEY9B2", StringComparison.Ordinal)
+                .Replace($"name: {entity.Name}", "name: Mina's House", StringComparison.Ordinal));
     }
 
     [Fact]

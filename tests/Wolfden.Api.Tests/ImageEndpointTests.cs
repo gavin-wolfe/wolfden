@@ -156,7 +156,7 @@ public class ImageEndpointTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-MCP-41")]
+    [Trait("Scenario", "SC-MCP-42")]
     public async Task AnImagesNameDropsAnApostropheAsASlugDoes()
     {
         using var den = TempDen.Dracula();
@@ -166,6 +166,12 @@ public class ImageEndpointTests
 
         Assert.Equal(HttpStatusCode.Created, status);
         Assert.Equal($"{Images}/minas-map.png", json.GetProperty("path").GetString());
+
+        // A name of only apostrophes has nothing to make a name from.
+        var (onlyStatus, only) = await UploadAsync(server, Query(Castle, "'''.png"), Png);
+
+        Assert.Equal(HttpStatusCode.Created, onlyStatus);
+        Assert.Equal($"{Images}/image.png", only.GetProperty("path").GetString());
     }
 
     [Fact]

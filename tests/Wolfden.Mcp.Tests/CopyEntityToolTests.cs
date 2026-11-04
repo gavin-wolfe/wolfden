@@ -337,7 +337,7 @@ public sealed class CopyEntityToolTests : IDisposable
     }
 
     [Fact]
-    [Trait("Scenario", "SC-MCP-41")]
+    [Trait("Scenario", "SC-MCP-42")]
     public void ACopysSlugDropsAnApostropheAndTwoNamesThatReachOneSlugDontShareAFile()
     {
         Assert.Equal(Book + "/entities/characters/obriens-mate.md", Tools.CopyEntity("Mr. Swales", "O'Brien's Mate").Path);

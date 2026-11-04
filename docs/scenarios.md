@@ -3294,7 +3294,7 @@ Spec: F-GEN-2 (#280). Covered by:
 `McpServerTests.AResultCarriesAShortNoticeWhileTheDenHasErrors`,
 `McpServerTests.ANoteLeftOutSaysWhyButNotAtAPosition`.
 
-### SC-MCP-41. My assistant adds a note with an apostrophe in its name
+### SC-MCP-42. My assistant adds a note with an apostrophe in its name
 
 The writer asks for "Mina's Journal", typed with a straight apostrophe or a
 curly one.
@@ -3305,17 +3305,33 @@ curly one.
   image's file name follows the same rule (`minas-map.png`).
 - "Minas Journal" reaches the same key, so they clash. A second note or copy
   in that folder gets `minas-journal-2.md`, and `minas-journal` asked for as
-  a slug is refused (`already_exists`). A second book or series is refused
-  (`already_exists`), since positions name a book by its key alone.
+  a slug is refused (`already_exists`). A book whose key another book in the
+  universe has is refused (`already_exists`), since positions name a book by
+  its key alone, and so is a series whose key another series or a standalone
+  book has (F-KEY-5). A series can share a key with a book inside a series.
+- A name of only apostrophes has nothing to make a key from: a note uses the
+  type key, an image is `image.png`, and a book or series is refused.
 - A den made before this keeps its keys. `mina-s-house.md` and its
   `[[mina-s-house]]` links work, and so do positions in a book folder
-  `mina-s-journal`. A new note or book of the same name gets the new form
-  beside the old one, and the old one's file doesn't change.
+  `mina-s-journal`. Renaming or moving the note keeps the slug. A new note or
+  book of the same name gets the new form beside the old one, and the old
+  one's file doesn't change, unless a link by that name would become
+  ambiguous: with a `[[Mina's House]]` link elsewhere, a new "Mina's House" is
+  refused unless `allow_relinks` is given.
+- "Mina's" and "Minas" share a slug across folders too. With a `[[Minas]]`
+  link, a new "Mina's" is refused, since its slug would take the link. With no
+  such link it's made, and a later `[[minas]]` gets the usual ambiguous-link
+  warning, as for identical names.
 
 Spec: types.md F-TPL-6, format.md F-KEY-4, F-KEY-5 (#289). Covered by:
 `WriteToolTests.AnApostropheIsDroppedFromASlugAndALeadingTheStays`,
 `WriteToolTests.TwoNamesThatReachOneSlugDontShareAFile`,
 `WriteToolTests.ANoteWithAnOldHyphenSlugKeepsItAndItsLinksStillReachIt`,
+`WriteToolTests.ANewNoteOfAnOldFormsNameThatWouldTakeALinkIsRefusedUnlessAllowed`,
+`WriteToolTests.NamesThatShareASlugInDifferentFoldersOnlyClashOverLinks`,
+`WriteToolTests.ANameOfOnlyApostrophesUsesTheTypeKeyAndReadsBack`,
+`WriteToolTests.RenamingOrMovingAnOldFormNoteKeepsItsSlugAndLinks`,
+`CreateContainerTests.ANameOfOnlyApostrophesMakesNoKeyAndALeadingOneIsLeftOutOfTheSuggestion`,
 `CopyEntityToolTests.ACopysSlugDropsAnApostropheAndTwoNamesThatReachOneSlugDontShareAFile`,
 `CreateContainerTests.TwoNamesThatReachOneKeyAreAClash`,
 `CreateContainerTests.ABookWithAnOldHyphenKeyKeepsItAndItsPositionsStillResolve`,

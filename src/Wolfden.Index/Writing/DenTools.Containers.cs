@@ -144,7 +144,7 @@ public sealed partial class DenTools
                     ToolErrorCodes.BadArgument,
                     key.Length > 0
                         ? $"A {what}'s key, its folder's name, is made from its name, and must start with a letter (F-KEY-2), so '{name}' can't be used: it would be '{key}'. " +
-                          $"Start the name with a word, such as 'Book {name}'; {afterwards}."
+                          $"Start the name with a word, such as 'Book {string.Concat(name.SkipWhile(NewEntity.IsApostrophe))}'; {afterwards}."
                         : name.Any(char.IsLetterOrDigit)
                             ? $"A {what}'s key, its folder's name, is made from its name, and keys use only the letters a–z and the digits 0–9 for now, so '{name}' gives no key. " +
                               $"Give it a name in Latin letters, such as a transliteration; {afterwards}, so it can be '{name}' again."

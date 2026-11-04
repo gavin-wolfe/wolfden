@@ -514,8 +514,8 @@ Wolfden refuses a name whose key another book or series already has,
 since a story position names a book by its key alone: two books called
 "Ember" in one universe, even in different series, would make `ember:3`
 mean nothing. "Minas Journal" and "Mina's Journal" clash the same way, since
-both make `minas-journal`. Choose another name, then change the name in `book.md`
-afterwards if you want it back. A name that starts with a digit
+both make `minas-journal`. Choose another name, then change the name in
+`book.md` afterwards if you want it back. A name that starts with a digit
 ("1984") can't make a key, since keys start with a letter: start it with
 a word, and change it afterwards the same way. Keys use only the letters
 a–z and the digits 0–9 for now, so a name written entirely in another
@@ -896,9 +896,9 @@ When you edit a note's opening, a section, or the whole file in
   picture shows: it's what shows if the picture can't, and what screen
   readers say.
 - The file name is made simple: lowercase, with apostrophes dropped and
-  `-` for spaces and other characters, so the path needs no `%20`. If the folder already
-  has a file by that name, the new one gets a number (`castle-map-2.png`)
-  and the page says so. Wolfden never replaces an image that's there.
+  `-` for spaces and other characters, so the path needs no `%20`. If the
+  folder already has a file by that name, the new one gets a number
+  (`castle-map-2.png`) and the page says so. Wolfden never replaces an image that's there.
 - It takes `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.avif`, and `.svg`
   files of up to 10 MB, and checks that the file really is the kind of
   image its name says. A photo that's too big needs making smaller in an

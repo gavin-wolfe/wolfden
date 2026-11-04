@@ -510,7 +510,7 @@ public static class NewEntity
     }
 
     /// <summary>True for a straight or curly apostrophe (U+0027, U+2019), a left single quote typed as one (U+2018), or the modifier letter (U+02BC).</summary>
-    private static bool IsApostrophe(char c) => c is (char)0x27 or (char)0x2019 or (char)0x2018 or (char)0x02BC;
+    public static bool IsApostrophe(char c) => c is (char)0x27 or (char)0x2019 or (char)0x2018 or (char)0x02BC;
 
     /// <summary>Cuts <paramref name="slug"/> to <paramref name="max"/> characters, at a word boundary where there is one, without a trailing <c>-</c>.</summary>
     private static string Cut(string slug, int max)

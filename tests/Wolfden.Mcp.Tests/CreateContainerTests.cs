@@ -338,7 +338,21 @@ public sealed class CreateContainerTests : IDisposable
     }
 
     [Fact]
-    [Trait("Scenario", "SC-MCP-41")]
+    [Trait("Scenario", "SC-MCP-42")]
+    public void ANameOfOnlyApostrophesMakesNoKeyAndALeadingOneIsLeftOutOfTheSuggestion()
+    {
+        var den = Den(TempDen.Dracula());
+        var tools = new DenTools(den.Root);
+
+        Assert.Contains("no letters or digits", Assert.Throws<DenToolException>(() => tools.CreateBook("'''", "dracula")).Message, StringComparison.Ordinal);
+
+        var digits = Assert.Throws<DenToolException>(() => tools.CreateBook("'1984", "dracula"));
+        Assert.Equal(ToolErrorCodes.BadArgument, digits.Code);
+        Assert.Contains("such as 'Book 1984'", digits.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-42")]
     public void TwoNamesThatReachOneKeyAreAClash()
     {
         var den = Den(TempDen.Dracula());
@@ -363,7 +377,7 @@ public sealed class CreateContainerTests : IDisposable
     }
 
     [Fact]
-    [Trait("Scenario", "SC-MCP-41")]
+    [Trait("Scenario", "SC-MCP-42")]
     public void ABookWithAnOldHyphenKeyKeepsItAndItsPositionsStillResolve()
     {
         const string OldBook = "universes/dracula/books/mina-s-journal/book.md";

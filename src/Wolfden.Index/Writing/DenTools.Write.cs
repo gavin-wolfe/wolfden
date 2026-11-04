@@ -1581,14 +1581,73 @@ public sealed partial class DenTools
     /// <summary>
     /// What to say when the store left a file alone because it changed while the
     /// write was going on (#323): <c>stale_file</c>, naming it, and what became of
-    /// anything written before it.
+    /// anything written before it. If all of it couldn't be put back, reading again
+    /// and retrying isn't the answer, and a page mustn't put its own words in place
+    /// of the list, so it's <c>write_failed</c>, as any write left part way is.
     /// </summary>
-    private static DenToolException ChangedWhileSaving(DenStoreException changed, string what, string outcome, bool canRetry) => new(
-        ToolErrorCodes.StaleFile,
-        $"{changed.Path} changed while the {what} was being saved.{outcome}{(canRetry ? " Read it again and retry." : "")}")
+    private static DenToolException ChangedWhileSaving(DenStoreException changed, string what, string outcome, bool leftPartWay)
     {
-        StalePath = changed.Path,
-    };
+        var said = $"{changed.Path} changed while the {what} was being saved.{outcome}";
+        return leftPartWay
+            ? new DenToolException(ToolErrorCodes.WriteFailed, said)
+            : new DenToolException(ToolErrorCodes.StaleFile, $"{said} Read it again and retry.") { StalePath = changed.Path };
+    }
+
+    /// <summary>
+    /// What a stopped write says of the files it couldn't put back (<paramref name="left"/>,
+    /// each with what the write put there, more than once for a file a move wrote twice),
+    /// by what's in each now. Only a file that holds the edit can be restored from history:
+    /// one another program has saved since holds that save, and restoring it would lose it.
+    /// </summary>
+    private string CouldntPutBack(IReadOnlyList<(string Path, byte[] Holds)> left, int putBack)
+    {
+        var holdingTheEdit = new List<string>();
+        var savedElsewhere = new List<string>();
+        var cantTell = new List<string>();
+        foreach (var file in left.GroupBy(f => f.Path, StringComparer.Ordinal).OrderBy(f => f.Key, StringComparer.Ordinal))
+        {
+            var now = Store.TryReadFile(file.Key);
+            if (now is null && Store.FileExists(file.Key))
+            {
+                cantTell.Add(file.Key);
+            }
+            else if (now is not null && file.Any(f => now.AsSpan().SequenceEqual(f.Holds)))
+            {
+                holdingTheEdit.Add(file.Key);
+            }
+            else
+            {
+                savedElsewhere.Add(file.Key);
+            }
+        }
+
+        var said = "";
+        if (holdingTheEdit.Count > 0)
+        {
+            said += $" Some files written before it failed couldn't be put back, and hold the edit: {string.Join(", ", holdingTheEdit)}. Check them, or restore them from history.";
+        }
+
+        if (savedElsewhere.Count > 0)
+        {
+            said += $" Another program saved or removed these since Wolfden wrote them, so they're left as that program left them, and may have old links: {string.Join(", ", savedElsewhere)}. Don't restore them from history: that would lose that save.";
+        }
+
+        if (cantTell.Count > 0)
+        {
+            said += $" These couldn't be put back, and another program may have them open, so Wolfden can't tell what's in them: {string.Join(", ", cantTell)}. Check them once they're closed.";
+        }
+
+        if (putBack > 0)
+        {
+            said += " The other files written were put back as they were.";
+        }
+
+        return said;
+    }
+
+    /// <summary>The first few of <paramref name="paths"/> for a message, and how many more there are.</summary>
+    private static string FirstFew(IReadOnlyCollection<string> paths) =>
+        string.Join(", ", paths.Take(ListedLinkChanges)) + (paths.Count > ListedLinkChanges ? $", and {paths.Count - ListedLinkChanges} more" : "");
 
     /// <summary>
     /// Writes the files, after checking that none changed since it was read
@@ -1640,25 +1699,25 @@ public sealed partial class DenTools
             {
                 if (stuck.Count > 0)
                 {
-                    throw new DenToolException(
-                        ToolErrorCodes.WriteFailed,
-                        $"Writing stopped ({e.GetType().Name}: {e.Message}), and some files written before it couldn't be put back, and hold the edit: {string.Join(", ", stuck)}. Check them, or restore them from history.");
+                    throw new DenToolException(ToolErrorCodes.WriteFailed, $"Writing stopped ({e.GetType().Name}: {e.Message}).{Left()}");
                 }
 
                 throw;
             }
 
             var outcome = written.Count == 0 ? " Nothing was written."
-                : stuck.Count == 0 ? $" The files already written ({string.Join(", ", written)}) were put back as they were, so nothing changed."
-                : $" Some files written before it failed couldn't be put back, and hold the edit: {string.Join(", ", stuck)}. Check them, or restore them from history.";
+                : stuck.Count == 0 ? $" The files already written ({FirstFew(written)}) were put back as they were, so nothing changed."
+                : Left();
             if (e is DenStoreException { Error: DenStoreError.Changed } changed)
             {
-                throw ChangedWhileSaving(changed, "edit", outcome, stuck.Count == 0);
+                throw ChangedWhileSaving(changed, "edit", outcome, leftPartWay: stuck.Count > 0);
             }
 
             var code = e is DenStoreException { Error: DenStoreError.AlreadyExists } ? ToolErrorCodes.AlreadyExists : ToolErrorCodes.WriteFailed;
             var said = e is DenStoreException ? e.Message : $"Couldn't write {failed}: {e.Message}";
             throw new DenToolException(code, said + outcome);
+
+            string Left() => CouldntPutBack(stuck.Select(p => (p, files[p])).ToList(), written.Count - stuck.Count);
         }
     }
 

@@ -1603,13 +1603,22 @@ in it, which Wolfden calls a checkpoint.
   It looks at the note again just before each try at saving. If your save got there
   first, or is still under way, Wolfden leaves it alone and says the note changed, so
   read it again and retry. A change that touches several notes puts back what it had
-  already written, or says which ones it couldn't.
-- **A save can still be lost in a very small gap.** If another program saves in the
-  instant between Wolfden's last look and its save, Wolfden's change replaces it and
-  reports success. In tries aimed at that moment on Windows, none of 300 was lost, but
-  that doesn't mean it can't happen. It hasn't been measured on Linux or macOS. Avoid
-  saving a note elsewhere while your assistant or a page is changing it, and checkpoint
-  often: history keeps what you checkpointed.
+  already written. If it can't put a note back, it says which, and what to do: a note
+  that holds Wolfden's change can be restored from history, but one another program
+  saved since holds that save, so don't restore that one. It may have old links, and
+  `wolfden check` will list them.
+- **A save can still be lost in a very small gap.** If another program saves all at
+  once in the instant between Wolfden's last look and its save, Wolfden's change
+  replaces it and reports success. Many editors save that way, by writing a temporary
+  file and renaming it. On Windows, tries aimed at that moment still lost 1 or 2 saves
+  in 100, against 6 to 21 in 100 before Wolfden looked again, and everyday saves aren't
+  timed like that. A note deleted in that instant can come back the same way. This
+  hasn't been measured on Linux or macOS.
+- **A save that comes after Wolfden's replaces Wolfden's change.** Wolfden has already
+  reported success by then, and can't know. This is how it's always been: the last save
+  wins, and the other program doesn't know about Wolfden's change. So avoid saving a
+  note elsewhere while your assistant or a page is changing it, reload it in that
+  program afterwards, and checkpoint often: history keeps what you checkpointed.
 - **`wolfden check` won't list a note that's only open to write,** so a refusal can
   name a file `check` calls fine. That's expected.
 - **A program that locks a note against reading goes further.** `wolfden check`

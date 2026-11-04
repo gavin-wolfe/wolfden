@@ -538,7 +538,7 @@ public sealed class MoveEntityToolTests : IDisposable
 
         public bool FolderExists(string path) => _disk.FolderExists(path);
 
-        public void WriteFile(string path, byte[] bytes, Core.Structure.DenWriteMode mode = Core.Structure.DenWriteMode.CreateOrReplace, byte[]? builtOn = null)
+        public void WriteFile(string path, byte[] bytes, Core.Structure.DenWriteMode mode, byte[]? builtOn)
         {
             if (path == failWrite)
             {
@@ -549,13 +549,13 @@ public sealed class MoveEntityToolTests : IDisposable
             Look();
         }
 
-        public void DeleteFile(string path, byte[]? builtOn = null)
+        public void DeleteFile(string path, byte[]? builtOn)
         {
             _disk.DeleteFile(path, builtOn);
             Look();
         }
 
-        public void MoveFile(string from, string to, byte[]? builtOn = null)
+        public void MoveFile(string from, string to, byte[]? builtOn)
         {
             if (failMove)
             {

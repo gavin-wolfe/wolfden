@@ -3758,7 +3758,7 @@ open, and it tries again for a moment.
 
 - Before each try, the first one too, Wolfden compares the note with what its change
   was built on. If it differs, even by part of a save still under way, or if the note
-  is gone, nothing replaces it: the write is `stale_file`, naming the note. Reading it
+  is gone, the try isn't made: the write is `stale_file`, naming the note. Reading it
   again and retrying builds on the other program's save.
 - A note that's only open, unchanged, as a virus scanner or indexer has it, is tried
   again as before, and saved once it's let go. If it's still held after the last try,
@@ -3766,16 +3766,27 @@ open, and it tries again for a moment.
 - A note locked against reading can't be compared, so that try isn't made. The next
   look decides once it's let go.
 - A rename, a move, or anything else that writes several files puts back what it had
-  written and says nothing changed. A file saved elsewhere meanwhile is
-  never put back over: it's listed as holding the edit or left as saved, and the
-  message says to check it. The same goes for the steps of a move.
-- **What it can't catch:** a save made in the moment between the last comparison and
-  Wolfden's save is still replaced, and the write reports success. On Windows, a real
-  separate process saving a note, on saves timed to overlap a section add (starting
-  0–120 ms in, stalling 100–250 ms), lost 5 and 7–8 of 150 before this and 0 and 0 of
-  150 after. Those rates aren't everyday use, and 0 doesn't mean it can't happen.
-  Linux and macOS have no retry, and weren't measured. They do compare before the one
-  try. `check --fix` doesn't go through this: it writes in place.
+  written and says nothing changed, naming the first few files. The same goes for the
+  steps of a move.
+- If a file can't be put back, the write is `write_failed`, not `stale_file`, since
+  reading again and retrying isn't the answer, and the page shows the message. It says
+  what's in each file now. One that holds the edit can be checked or restored from
+  history. One another program saved since is left as that program left it, may have
+  old links, and the message says not to restore it, since that would lose the save.
+  One still open can't be told, so it says to check it once closed. If a move leaves
+  the note at its new path, it says so.
+- **What it can't catch:** a save made all at once, in the moment between the last
+  comparison and Wolfden's save, is still replaced, and the write reports success. A
+  save that stalls can't land there, since the file is open and the move is refused.
+  A temp-and-rename save can. On Windows, with real processes, on saves aimed across
+  the call: 6 of 300 lost by `append_section`, 4 of 300 by a web save, and 2 of 300 by
+  `rename_entity`, against 18, 21, and 63 of 300 before this. Stalled in place, it's 0
+  of 300 against 12–13. A file deleted in that moment can come back the same way (2
+  and 5 of 100, against 65 and 84). Those rates aren't everyday use. Linux and macOS
+  have no retry, and weren't measured. They do compare before the one try.
+  `check --fix` has no retry, and compares just before its one write.
+- A program's save that lands after Wolfden's replaces Wolfden's change, and Wolfden
+  has already reported success. That's the other order, and isn't new.
 
 Spec: format.md F-GEN-5, F-RT-5, design.md §6 (#323). Covered by:
 `DenStoreTests.ASaveMadeWhileTheStoreWaitsIsntReplaced`,
@@ -3790,7 +3801,12 @@ Spec: format.md F-GEN-5, F-RT-5, design.md §6 (#323). Covered by:
 `SaveDuringWriteTests.AnEditLeavesASaveMadeJustBeforeItsWrite`,
 `SaveDuringWriteTests.AddingAChapterLeavesASaveOfBookMdMadeJustBeforeItsWrite`,
 `SaveDuringWriteTests.ARenameLeftByASavePartWayPutsBackWhatItWroteAndKeepsTheSave`,
-`SaveDuringWriteTests.ARenameSaysWhatHoldsTheEditWhenThePuttingBackIsLeftByASaveToo`,
+`SaveDuringWriteTests.ARenameLeftPartWaySaysAFileSavedDuringThePuttingBackIsntToBeRestored`,
+`SaveDuringWriteTests.ARealSaveFromAnotherProcessDuringThePuttingBackIsKeptAndNotToBeRestored`,
+`SaveDuringWriteTests.AFileStillBeingSavedDuringThePuttingBackIsNamedAsOneToCheckOnceClosed`,
+`SaveDuringWriteTests.AFileThatStillHoldsTheEditCanBeRestoredFromHistory`,
+`SaveDuringWriteTests.AMoveLeftAtItsNewPathBySaveSaysWhereTheNoteIs`,
+`SaveDuringWriteTests.AWholeDenWriteStoppedLateListsOnlyTheFirstFewItPutBack`,
 `SaveDuringWriteTests.AMoveLeftByASavePartWayPutsBackWhatItWroteAndKeepsTheSave`,
 `SaveDuringWriteTests.AMoveDoesntReplaceASaveOfTheNoteMadeJustBeforeItIsMoved`,
 `SharedFileWriteTests.ASaveInAnotherProcessThatStartsJustAfterTheComparisonIsLeftAlone`.
@@ -6492,9 +6508,13 @@ On Windows, I have a note open in another program that lets others read it.
 - If a rename or section rename is stopped because a different note changed, the
   message names that note. It doesn't say this note changed, or offer it as what
   changed.
+- If a write stops part way and some file can't be put back (SC-STORE-6), the page
+  shows what the server says of each file, even if it stopped at this note. A new
+  book or series doesn't say it wasn't created.
 
-Spec: format.md F-GEN-5 (#298). Covered by: `SharedReadEndpointTests`,
-`web/src/Editing.test.tsx` ("when another file stopped the save").
+Spec: format.md F-GEN-5 (#298, #323). Covered by: `SharedReadEndpointTests`,
+`web/src/Editing.test.tsx` ("when another file stopped the save"),
+`web/src/NewContainer.test.tsx` ("a write left part way").
 
 ### SC-WEB-99. I use a different name for this den when I turn on history
 

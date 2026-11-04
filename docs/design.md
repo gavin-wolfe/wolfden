@@ -850,14 +850,25 @@ from the files:
   retries as ever. One that can't be read uses up a try without a move, and the next
   look decides. If the tries run out, it's the refusal for a file in use, as before. In a
   whole-den write, what was already written is put back, each file only if it still
-  holds what was written, and the message says what became of them. Putting back and
-  each step of a move compare too. Measured on Windows only, with `wolfden mcp`
-  and a separate process saving a note, on the same tries in turn (starting 0–120 ms
-  into a section add, stalling 100–250 ms): 5 and 7–8 of 150 lost before, 0 and 0 of
-  150 after. **The gap isn't closed:** a program can save in the moment between the last
-  comparison and the move, and Wolfden can't tell. Linux and macOS have no retries,
-  but do compare before the one try. `check --fix` writes in place without the store,
-  so it has neither.
+  holds what was written. Putting back and each step of a move compare too. If
+  everything was put back, it's `stale_file`. If not, reading again and retrying isn't
+  the answer, so it's `write_failed`, as a write left part way always is, with no
+  `current`, so a page shows the message. The message sorts what's left by what's in
+  it now: a file that holds the edit can be restored from history, and one another
+  program saved since holds that save, so it says not to.
+  `builtOn` has no default, so a write has to say `null` on purpose.
+  **The gap isn't closed:** a program can save in the moment between the last
+  comparison and the move, and Wolfden can't tell. A save that stalls can't land there,
+  since the file is open and the move is refused, but a temp-and-rename save, or one
+  that opens, writes, and closes at once, can. Measured on Windows only, with real
+  processes and the same delays on both builds, on saves aimed at the call. Stalled in
+  place (starting 0–120 ms in, stalling 100–250 ms): 0 of 300 lost by section adds, and
+  12–13 of 300 on `main`. Temp-and-rename, aimed across the call: 6 of 300 lost by
+  `append_section`, 4 of 300 by a web save, and 2 of 300 by `rename_entity`, against
+  18, 21, and 63 on `main`. A file deleted in the gap can come back in the same way:
+  2 and 5 of 100, against 65 and 84. Those aren't everyday rates. Linux and macOS have
+  no retries, but do compare before the one try. `check --fix` doesn't use the store,
+  so it has no retry, but it compares just before its one write and skips a file that differs.
 - **Watched** (#14; v0 behaviour, not a recorded decision). The file
   watcher collects a burst of saves (an editor's temporary file and
   rename, a git checkout) into one batch, and ignores hidden paths such as

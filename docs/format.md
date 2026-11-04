@@ -130,7 +130,7 @@ history backend, which reads them itself, so it can record part of a save. (#298
 A write that replaces a file MUST compare it with what it read just before each
 try, and leave it alone and say so if it differs, so a try can't replace another
 program's save. A save made in the moment between the last comparison and the
-replacing can still be lost. (#323.)
+replacing can still be lost, and a file deleted in that moment can come back. (#323.)
 
 ### 1.4 Notation and terms
 

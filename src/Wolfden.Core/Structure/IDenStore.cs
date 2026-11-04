@@ -57,7 +57,8 @@ public interface IDenStore : IDenSource
     /// is compared with this just before each try, and left alone if it differs
     /// (<see cref="DenStoreError.Changed"/>), so a try can't replace a save another
     /// program made meanwhile (#323). Another program can still save in the moment
-    /// between the last comparison and the write.
+    /// between the last comparison and the write. Null says, on purpose, that
+    /// there's nothing to compare: it has no default, so a write can't forget it.
     /// </param>
     /// <exception cref="DenStoreException">
     /// The path is refused (<see cref="DenStoreError.InvalidPath"/>, <see cref="DenStoreError.CaseConflict"/>),
@@ -66,11 +67,11 @@ public interface IDenStore : IDenSource
     /// (<see cref="DenStoreError.NotFound"/>), a folder is in the way (<see cref="DenStoreError.NotAFile"/>),
     /// or the file isn't <paramref name="builtOn"/> any more (<see cref="DenStoreError.Changed"/>).
     /// </exception>
-    void WriteFile(string path, byte[] bytes, DenWriteMode mode = DenWriteMode.CreateOrReplace, byte[]? builtOn = null);
+    void WriteFile(string path, byte[] bytes, DenWriteMode mode, byte[]? builtOn);
 
     /// <summary>Deletes the file at <paramref name="path"/>, unless it isn't <paramref name="builtOn"/> any more (see <see cref="WriteFile"/>).</summary>
     /// <exception cref="DenStoreException">The path is refused, the store is read-only, there's no file there (<see cref="DenStoreError.NotFound"/>), or it changed (<see cref="DenStoreError.Changed"/>).</exception>
-    void DeleteFile(string path, byte[]? builtOn = null);
+    void DeleteFile(string path, byte[]? builtOn);
 
     /// <summary>
     /// Moves or renames the file at <paramref name="from"/> to <paramref name="to"/>,
@@ -79,7 +80,7 @@ public interface IDenStore : IDenSource
     /// alone if it isn't <paramref name="builtOn"/> any more (see <see cref="WriteFile"/>).
     /// </summary>
     /// <exception cref="DenStoreException">A path is refused, the store is read-only, <paramref name="from"/> isn't a file, <paramref name="to"/> exists, or it changed (<see cref="DenStoreError.Changed"/>).</exception>
-    void MoveFile(string from, string to, byte[]? builtOn = null);
+    void MoveFile(string from, string to, byte[]? builtOn);
 
     /// <summary>
     /// Moves or renames the folder at <paramref name="from"/>, with

@@ -337,6 +337,10 @@ docs. The writer's own list is in
   again (`get_entity`, `get_chapter`, or `get_chapter_defaults`), and
   make the edit on what's there now. Never resend the old text over the
   writer's change.
+- **`write_failed` listing files means tell the writer, and don't retry yet.** A
+  write stopped part way, and those files couldn't be put back. Pass on what it says
+  of each. Only a file it says holds the edit can be restored from history. One it
+  says another program saved holds that save: restoring it would lose it.
 - **`den_busy` means wait a moment, then retry.** Another Wolfden
   (`wolfden serve`, another assistant's session, or a command) was
   writing to the den for the whole 30 seconds a write waits. Nothing of

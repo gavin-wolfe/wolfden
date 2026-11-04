@@ -1316,3 +1316,17 @@ public sealed class DenStoreTests : IDisposable
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern uint GetShortPathName(string longPath, StringBuilder shortPath, int bufferLength);
 }
+
+/// <summary>
+/// The store's calls with nothing to compare, for tests of everything else it does.
+/// <c>builtOn</c> has no default in the store, so a real write can't forget it (#323).
+/// </summary>
+internal static class StoreWithoutComparing
+{
+    public static void WriteFile(this IDenStore store, string path, byte[] bytes, DenWriteMode mode = DenWriteMode.CreateOrReplace) =>
+        store.WriteFile(path, bytes, mode, builtOn: null);
+
+    public static void DeleteFile(this IDenStore store, string path) => store.DeleteFile(path, builtOn: null);
+
+    public static void MoveFile(this IDenStore store, string from, string to) => store.MoveFile(from, to, builtOn: null);
+}

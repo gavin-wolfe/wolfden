@@ -516,14 +516,14 @@ public sealed partial class DenTools
                 }
             }
 
-            var left = stuck.Select(s => s.Path).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
+            // A note left at its new path isn't missing from its old one by anyone's doing but this move's.
+            var leftMoved = !Store.FileExists(from) && Store.FileExists(to) && stuck.Any(s => s.Path == to);
+            var left = stuck.Where(s => !(leftMoved && s.Path == from)).ToList();
             if (e is not (IOException or UnauthorizedAccessException))
             {
                 if (left.Count > 0)
                 {
-                    throw new DenToolException(
-                        ToolErrorCodes.WriteFailed,
-                        $"The move stopped ({e.GetType().Name}: {e.Message}), and some files couldn't be put back, and hold the edit: {string.Join(", ", left)}. Check them, or restore them from history.");
+                    throw new DenToolException(ToolErrorCodes.WriteFailed, $"The move stopped ({e.GetType().Name}: {e.Message}).{Left()}");
                 }
 
                 throw;
@@ -531,15 +531,19 @@ public sealed partial class DenTools
 
             var outcome = made.Count == 0 ? " Nothing was written."
                 : left.Count == 0 ? $" What was already written was put back as it was, and {from} is where it was, so nothing changed."
-                : $" Some files couldn't be put back, and hold the edit: {string.Join(", ", left)}. Check them, or restore them from history.";
+                : Left();
             if (e is DenStoreException { Error: DenStoreError.Changed } changed)
             {
-                throw ChangedWhileSaving(changed, "move", outcome, left.Count == 0);
+                throw ChangedWhileSaving(changed, "move", outcome, leftPartWay: left.Count > 0);
             }
 
             var code = e is DenStoreException { Error: DenStoreError.AlreadyExists or DenStoreError.CaseConflict } ? ToolErrorCodes.AlreadyExists : ToolErrorCodes.WriteFailed;
             var said = e is DenStoreException ? e.Message : $"The move failed: {e.Message}";
             throw new DenToolException(code, said + outcome);
+
+            string Left() =>
+                CouldntPutBack(left, made.Select(m => m.Path).Except(stuck.Select(s => s.Path), StringComparer.Ordinal).Count())
+                + (leftMoved ? $" The note is at {to} now, not {from}." : "");
         }
     }
 

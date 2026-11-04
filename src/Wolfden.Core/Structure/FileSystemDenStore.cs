@@ -127,7 +127,7 @@ public sealed class FileSystemDenStore : IDenStore, IDenChangeFeed
     public IEnumerable<string> GetFolderLinks(string path) => Reads.GetFolderLinks(path);
 
     /// <inheritdoc />
-    public void WriteFile(string path, byte[] bytes, DenWriteMode mode = DenWriteMode.CreateOrReplace, byte[]? builtOn = null)
+    public void WriteFile(string path, byte[] bytes, DenWriteMode mode, byte[]? builtOn)
     {
         ArgumentNullException.ThrowIfNull(bytes);
         DenPaths.CheckWritable(path);
@@ -174,7 +174,7 @@ public sealed class FileSystemDenStore : IDenStore, IDenChangeFeed
     }
 
     /// <inheritdoc />
-    public void DeleteFile(string path, byte[]? builtOn = null)
+    public void DeleteFile(string path, byte[]? builtOn)
     {
         DenPaths.CheckWritable(path);
         switch (Lookup(path))
@@ -190,7 +190,7 @@ public sealed class FileSystemDenStore : IDenStore, IDenChangeFeed
     }
 
     /// <inheritdoc />
-    public void MoveFile(string from, string to, byte[]? builtOn = null)
+    public void MoveFile(string from, string to, byte[]? builtOn)
     {
         DenPaths.CheckWritable(from);
         DenPaths.CheckWritable(to);

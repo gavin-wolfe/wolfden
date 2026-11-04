@@ -17,9 +17,7 @@ namespace Wolfden.Mcp.Tests;
 /// What an assistant can see, end to end, before the web UI changes to show
 /// everything and tag it (#300). A real MCP client calls the real server over
 /// a pair of pipes, against an invented den where everything a reader at the
-/// position doesn't know is a word nothing else in the den uses. The tests
-/// look at the whole of each response, so a new member that carries later
-/// content fails them whatever it's called.
+/// position doesn't know is a word nothing else in the den uses.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -29,8 +27,26 @@ namespace Wolfden.Mcp.Tests;
 /// change to what agents see, which the maintainer decided against on #300.
 /// </para>
 /// <para>
+/// <b>What's looked at.</b> Each answer's text, structured content, and
+/// <c>_meta</c>, the tools and their arguments, and that the server offers no
+/// prompts or resources. A new member of a position read's answer fails whatever
+/// it's called, but what's inside a field's <c>value</c> is the writer's, so
+/// it isn't checked by member. The checks on the code's names are a tripwire for
+/// the names expected: the checks on the answers are the real guard.
+/// </para>
+/// <para>
+/// <b>What a read at a position doesn't keep out,</b> as designed (format.md
+/// §9.5): text the writer put in a lead or section, including their HTML comments
+/// and <c>[[links]]</c> to notes the reader hasn't met; a field the type doesn't
+/// define, a <c>ref</c> field's value, and a mapping with its own <c>until</c>
+/// key; <c>line</c> numbers, which leave gaps where something's hidden; and
+/// <c>kind: temporal</c>, which shows that a field changes over time. And
+/// <c>in_view: false</c>, unlike <c>unknown_entity</c>, confirms a note exists.
+/// </para>
+/// <para>
 /// <b>Tools with no position aren't filtered, and that's on purpose.</b> They
-/// aren't story views, and each tool's description says so:
+/// aren't story views. The descriptions of <c>search</c> and <c>get_history</c>
+/// say so, and <c>list_entities</c>' only implies it:
 /// </para>
 /// <list type="bullet">
 /// <item><c>search</c> finds text of every status at any point in the story,
@@ -43,8 +59,8 @@ namespace Wolfden.Mcp.Tests;
 /// written, so it has later facts, <c>until</c>s, and sections an error leaves
 /// out.</item>
 /// <item><c>check</c>, <c>get_chapter</c>, and <c>get_chapter_defaults</c> take
-/// no position either. They're read tools over the files, and only the argument
-/// lists pin them here.</item>
+/// no position either. Only their argument lists are pinned here: what they
+/// return isn't looked at.</item>
 /// </list>
 /// <para>
 /// So they stay as they are, with no marks: only <c>get_entity</c> with
@@ -78,6 +94,10 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
             - { value: Orrin Vale, from: "ember:1", until: "ash:2", pin: true }
             - { value: Morvane, from: "ash:2" }
           rumor: { value: Cinderlace, status: idea }
+          seal:
+            - { value: Brackwater, from: "ash:3", pin: true }
+          omen: { value: Larkspire, status: candidate }
+          old_name: { value: Quillfeather, status: retconned }
         ---
 
         # The salt tithe
@@ -85,7 +105,7 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
         Every ship pays it at the Reach.
 
         ## Overview
-        A toll in salt.
+        A toll in salt, until the ambush. The fleet enters at dawn, and what she says is no longer true.
 
         ### The audit
         <!-- wolfden: from=ash:2 -->
@@ -109,6 +129,22 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
         ### Ostrelline
         Under the reveal.
 
+        ## The reckoning
+        <!-- wolfden: from=ash:3 pin=true -->
+        Fenwraith closes the toll.
+
+        ## The ending
+        <!-- wolfden: status=undecided -->
+        Wyrmsedge is one way.
+
+        ### Another way
+        <!-- wolfden: status=candidate -->
+        Elderwane is another.
+
+        ## Old terms
+        <!-- wolfden: status=retconned -->
+        Gallowmere struck them.
+
         ## Session notes
         Pellucid drafts ahead.
 
@@ -120,7 +156,11 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
         "Morvane", // A later entry of a field.
         "Sablewick", "The audit", // A later subsection.
         "Drennick", // A thread's Payoff, which enters at paid_off.
-        "Cinderlace", // A field entry that's an idea.
+        "Cinderlace", "Larkspire", "Quillfeather", // Field entries out of canon: an idea, a candidate, retconned.
+        "Brackwater", // A pinned field entry that enters later.
+        "The reckoning", "Fenwraith", // A pinned section that enters later.
+        "The ending", "Wyrmsedge", "Another way", "Elderwane", // An undecided section and a candidate under it.
+        "Old terms", "Gallowmere", // A retconned section.
         "Tamsin", "Hallowmere", // A section that's an idea.
         "Zanthic", "Vespergale", "Ostrelline", // A section and subsection an error leaves out.
         "Pellucid", "Session notes", // A bookkeeping section.
@@ -132,15 +172,18 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
         "ash:", "a-quiet-moon:", // Every position later than the first book.
     ];
 
-    /// <summary>Whatever a marked view might say or be called, in the spellings a member or a tag would use.</summary>
-    private static readonly string[] Marks =
+    /// <summary>What a marked view might be called, in the spellings a member or a tag would use. None of these is ordinary prose, so they're searched for anywhere.</summary>
+    private static readonly string[] MarkPhrases =
     [
         "ahead of readers", "ahead_of_readers", "aheadofreaders", "ahead-of-readers",
-        "no longer true", "no_longer_true", "nolongertrue",
-        "enters at", "enters_at", "entersat",
-        "marks_at", "marksat", "marks-at", "reader_marks", "readermarks", "reader-marks",
-        "include_ahead", "ahead_of", "aheadof", "reader's view", "author's view",
+        "no_longer_true", "nolongertrue", "enters_at", "entersat",
+        "marks_at", "marksat", "marks-at", "reader_marks", "readermarks", "reader-marks", "include_ahead",
     ];
+
+    /// <summary>The whole words of a member's name that would make it a mark. "Bookmark" and "markdown" aren't.</summary>
+    private static readonly string[] MarkWords = ["mark", "marks", "marked", "ahead"];
+
+    private const string DenNotice = "This den has 2 errors, so some notes or sections may be missing from this answer. Call check with severity 'error' to see them.";
 
     private readonly TempDen _den = TempDen.Starfall();
     private readonly StringWriter _log = new();
@@ -242,7 +285,7 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
     {
         var full = await Call("get_entity", new() { ["entity"] = Tithe });
 
-        foreach (var word in new[] { "Morvane", "Sablewick", "Drennick", "Cinderlace", "Tamsin", "Zanthic", "Vespergale", "Ostrelline", "Pellucid", "ash:2", "ash:3", "ash:4" })
+        foreach (var word in new[] { "Morvane", "Sablewick", "Drennick", "Cinderlace", "Larkspire", "Quillfeather", "Brackwater", "Fenwraith", "Wyrmsedge", "Elderwane", "Gallowmere", "Tamsin", "Zanthic", "Vespergale", "Ostrelline", "Pellucid", "ash:2", "ash:3", "ash:4" })
         {
             Assert.Contains(word, full.Whole, StringComparison.Ordinal);
         }
@@ -295,7 +338,7 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
                     { "name": "keeper", "value": "Orrin Vale", "kind": "temporal", "status": "canon", "pinned": true, "from": "ember:1", "line": 13 }
                   ],
                   "sections": [
-                    { "name": "Terms", "level": 2, "heading_path": ["Terms"], "status": "canon", "pinned": true, "from": "ember:1", "line": 29, "body": "Paid each season." }
+                    { "name": "Terms", "level": 2, "heading_path": ["Terms"], "status": "canon", "pinned": true, "from": "ember:1", "line": 33, "body": "Paid each season." }
                   ]
                 },
                 "fields": [
@@ -303,17 +346,76 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
                   { "name": "keeper", "value": "Orrin Vale", "kind": "temporal", "status": "canon", "pinned": true, "from": "ember:1", "line": 13 }
                 ],
                 "sections": [
-                  { "name": "Overview", "level": 2, "heading_path": ["Overview"], "status": "canon", "pinned": false, "line": 22, "body": "A toll in salt." },
-                  { "name": "Terms", "level": 2, "heading_path": ["Terms"], "status": "canon", "pinned": true, "from": "ember:1", "line": 29, "body": "Paid each season." }
+                  { "name": "Overview", "level": 2, "heading_path": ["Overview"], "status": "canon", "pinned": false, "line": 26, "body": "A toll in salt, until the ambush. The fleet enters at dawn, and what she says is no longer true." },
+                  { "name": "Terms", "level": 2, "heading_path": ["Terms"], "status": "canon", "pinned": true, "from": "ember:1", "line": 33, "body": "Paid each season." }
                 ],
                 "hash": "{{reply.Json.GetProperty("entity").GetProperty("hash").GetString()}}"
               },
-              "den_notice": "This den has 2 errors, so some notes or sections may be missing from this answer. Call check with severity 'error' to see them."
+              "den_notice": "{{DenNotice}}"
             }
             """);
 
-        var actual = JsonNode.Parse(reply.Text);
-        Assert.True(JsonNode.DeepEquals(expected, actual), $"The response was:\n{actual}");
+        AssertIsExactly(expected, reply);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-47")]
+    public async Task CanonAsOfAtAPositionIsExactlyThis()
+    {
+        // As for get_entity, so a member that's allowed can't carry a hint either. The manifest goes first, so the answer is only this class's note, whatever the shared den says.
+        File.Delete(Path.Combine(_den.Root, "universes/starfall/entities/threads/the-missing-manifest.md"));
+        var reply = await Call("canon_as_of", new() { ["position"] = "ember:3", ["type"] = "thread" });
+
+        var expected = JsonNode.Parse(
+            $$"""
+            {
+              "version": 1,
+              "universe": "starfall",
+              "position": "ember:3",
+              "at": "as of ember:3",
+              "count": 1,
+              "pinned": [
+                {
+                  "key": "{{TitheId}}",
+                  "name": "The salt tithe",
+                  "type": "thread",
+                  "fields": [
+                    { "name": "planted", "value": ["ember:1"], "kind": "entry", "status": "canon", "pinned": true, "line": 9 },
+                    { "name": "keeper", "value": "Orrin Vale", "kind": "temporal", "status": "canon", "pinned": true, "from": "ember:1", "line": 13 }
+                  ],
+                  "sections": [
+                    { "name": "Terms", "level": 2, "heading_path": ["Terms"], "status": "canon", "pinned": true, "from": "ember:1", "line": 33, "body": "Paid each season." }
+                  ]
+                }
+              ],
+              "entities": [
+                {
+                  "key": "{{TitheId}}",
+                  "id": "{{TitheId}}",
+                  "name": "The salt tithe",
+                  "type": "thread",
+                  "status": "canon",
+                  "universe": "starfall",
+                  "scope_kind": "universe",
+                  "scope_key": "starfall",
+                  "path": "{{TithePath}}",
+                  "from": "ember:1",
+                  "lead": "# The salt tithe\n\nEvery ship pays it at the Reach.",
+                  "fields": [
+                    { "name": "planted", "value": ["ember:1"], "kind": "entry", "status": "canon", "pinned": true, "line": 9 },
+                    { "name": "keeper", "value": "Orrin Vale", "kind": "temporal", "status": "canon", "pinned": true, "from": "ember:1", "line": 13 }
+                  ],
+                  "sections": [
+                    { "name": "Overview", "level": 2, "heading_path": ["Overview"], "status": "canon", "pinned": false, "line": 26, "body": "A toll in salt, until the ambush. The fleet enters at dawn, and what she says is no longer true." },
+                    { "name": "Terms", "level": 2, "heading_path": ["Terms"], "status": "canon", "pinned": true, "from": "ember:1", "line": 33, "body": "Paid each season." }
+                  ]
+                }
+              ],
+              "den_notice": "{{DenNotice}}"
+            }
+            """);
+
+        AssertIsExactly(expected, reply);
     }
 
     [Theory]
@@ -329,8 +431,6 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
         AssertNothingLater(reply);
         AssertNoMarks(reply);
         AssertOnlyKeys(EntityResultKeys, reply);
-        Assert.DoesNotContain("until", reply.Whole, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("left out", reply.Json.GetProperty("entity").GetRawText(), StringComparison.OrdinalIgnoreCase);
     }
 
     [Theory]
@@ -347,7 +447,7 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
         AssertNothingLater(reply);
         AssertNoMarks(reply);
         AssertOnlyKeys(CanonResultKeys, reply);
-        Assert.DoesNotContain("until", reply.Whole, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(reply.Json.GetProperty("entities").GetArrayLength(), reply.Json.GetProperty("count").GetInt32());
     }
 
     [Theory]
@@ -403,7 +503,7 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
 
         foreach (var reply in new[] { entity, canon, brief })
         {
-            foreach (var later in new[] { "ash:3", "ash:4", "ash:epilogue", "a-quiet-moon:", "Drennick", "Ysmerine", "The salt heir", "Zanthic", "Vespergale", "Ostrelline", "Pellucid", "Tamsin", "Hallowmere", "Cinderlace" })
+            foreach (var later in new[] { "ash:3", "ash:4", "ash:epilogue", "a-quiet-moon:", "Drennick", "Ysmerine", "The salt heir", "Brackwater", "The reckoning", "Fenwraith", "Zanthic", "Vespergale", "Ostrelline", "Pellucid", "Tamsin", "Hallowmere", "Cinderlace" })
             {
                 Assert.DoesNotContain(later, reply.Whole, StringComparison.Ordinal);
             }
@@ -434,6 +534,7 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
             Assert.Equal("bad_position", reply.Json.GetProperty("error").GetProperty("code").GetString());
             AssertNothingLater(reply);
             AssertNoMarks(reply);
+            AssertOnlyKeys(ErrorResultKeys, reply);
         }
     }
 
@@ -461,11 +562,10 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
               "position": "ember:3",
               "in_view": false,
               "note": "'{{name}}' isn't in canon as of ember:3: the reader hasn't met it by then, or it isn't draft or canon.",
-              "den_notice": "This den has 2 errors, so some notes or sections may be missing from this answer. Call check with severity 'error' to see them."
+              "den_notice": "{{DenNotice}}"
             }
             """);
-        var actual = JsonNode.Parse(reply.Text);
-        Assert.True(JsonNode.DeepEquals(expected, actual), $"The response was:\n{actual}");
+        AssertIsExactly(expected, reply);
     }
 
     [Fact]
@@ -477,10 +577,20 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
 
         Assert.Equal("unknown_entity", oath.Json.GetProperty("error").GetProperty("code").GetString());
 
-        // Only what was asked for differs from a name no note has.
-        Assert.Equal(
-            nothing.Text.Replace("The brine oat", "The brine oath", StringComparison.Ordinal),
-            oath.Text);
+        // The message is exact, so it can't go on to suggest notes the reader hasn't met, and only what was asked for differs from a name no note has.
+        foreach (var (reply, name) in new[] { (oath, "The brine oath"), (nothing, "The brine oat") })
+        {
+            var message = reply.Json.GetProperty("error").GetProperty("message").GetString();
+            Assert.Equal($"No entity in universe 'starfall' matches '{name}' by id, path, file name, name, or alias. Use search or list_entities to find it.", message);
+            AssertOnlyKeys(ErrorResultKeys, reply);
+            AssertNoMarks(reply);
+        }
+
+        AssertNothingLater(nothing);
+        foreach (var word in LaterWords.Where(w => w != "The brine oath"))
+        {
+            Assert.DoesNotContain(word, oath.Whole, StringComparison.Ordinal);
+        }
     }
 
     [Theory]
@@ -528,6 +638,7 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
         Assert.Equal("ambiguous_entity", error.GetProperty("code").GetString());
         Assert.Equal(["The reach toll", Tithe], error.GetProperty("candidates").EnumerateArray().Select(c => c.GetProperty("name").GetString()!).Order(StringComparer.Ordinal));
         AssertNothingLater(reply);
+        AssertOnlyKeys(ErrorResultKeys, reply);
     }
 
     // --- The keys. ---
@@ -547,27 +658,23 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
 
     [Fact]
     [Trait("Scenario", "SC-MCP-47")]
-    public async Task OnlyTheTwoStoryViewsTakeAPositionAndNoToolTakesAMark()
+    public async Task OnlyTheTwoStoryViewsTakeAPosition()
     {
         var tools = await Client.ListToolsAsync(cancellationToken: TestContext.Current.CancellationToken);
 
-        var arguments = tools.ToDictionary(
-            t => t.Name,
-            t => t.JsonSchema.GetProperty("properties").EnumerateObject().Select(p => p.Name).ToList());
+        var actual = tools
+            .Select(t => $"{t.Name}({string.Join(", ", t.JsonSchema.GetProperty("properties").EnumerateObject().Select(p => p.Name))})")
+            .Order(StringComparer.Ordinal)
+            .ToList();
+        Assert.True(
+            ToolsAndArguments.SequenceEqual(actual),
+            "The tools or their arguments changed. Before updating the list in McpStaysStrictTests, check: does the new tool or argument let an assistant read as of a " +
+            "story position, however it's named, or read anything later without saying so? Only get_entity (as_of) and canon_as_of (position) do, and they go through " +
+            "AsOfReads. Showing an assistant more is a decision for the maintainer (#300). If it doesn't, add it to the list. The tools now:\n" + string.Join("\n", actual));
 
-        Assert.Equal(["entity", "universe", "as_of"], arguments["get_entity"]);
-        Assert.Equal(["position", "universe", "series", "book", "type", "brief"], arguments["canon_as_of"]);
-        Assert.Equal(["query", "universe", "type", "canon_only", "limit", "field"], arguments["search"]);
-        Assert.Equal(["universe", "type", "status", "series", "book", "limit"], arguments["list_entities"]);
-        Assert.Equal(["entity", "universe", "limit", "before", "diff", "diff_from"], arguments["get_history"]);
-        Assert.Equal(["severity", "path", "limit", "universe"], arguments["check"]);
-        Assert.Equal(["book", "chapter", "universe"], arguments["get_chapter"]);
-        Assert.Equal(["universe", "series", "book"], arguments["get_chapter_defaults"]);
-
-        Assert.Equal(["as_of", "position"], arguments.Values.SelectMany(a => a).Where(IsPositionArgument).Distinct().Order(StringComparer.Ordinal));
-        Assert.DoesNotContain(arguments.Values.SelectMany(a => a), a => a.Contains("mark", StringComparison.OrdinalIgnoreCase) || a.Contains("ahead", StringComparison.OrdinalIgnoreCase) || a.Contains("reader", StringComparison.OrdinalIgnoreCase));
-
-        static bool IsPositionArgument(string name) => name is "as_of" or "at" or "position";
+        Assert.Equal(
+            ["canon_as_of", "check", "get_chapter", "get_chapter_defaults", "get_entity", "get_history", "list_entities", "search"],
+            tools.Where(t => t.ProtocolTool.Annotations?.ReadOnlyHint == true).Select(t => t.Name).Order(StringComparer.Ordinal));
     }
 
     [Fact]
@@ -578,12 +685,20 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
 
         foreach (var text in tools.Select(t => t.Description).Append(Client.ServerInstructions))
         {
-            // "enters at" is everyday wording in a description, and only a mark in a response.
-            foreach (var mark in Marks.Where(m => m != "enters at"))
+            foreach (var mark in MarkPhrases)
             {
                 Assert.DoesNotContain(mark, text ?? "", StringComparison.OrdinalIgnoreCase);
             }
         }
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-47")]
+    public void TheServerOffersNoPromptsOrResources()
+    {
+        // Either would be a way to hand an assistant later content that no check on a tool's answer sees. Call checks each answer's _meta.
+        Assert.Null(Client.ServerCapabilities.Prompts);
+        Assert.Null(Client.ServerCapabilities.Resources);
     }
 
     // --- Tools with no position stay as they are: see the remarks on this class. ---
@@ -665,13 +780,77 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
     public void TheMcpProjectDoesntReachTheWebApiThroughAnyProject()
     {
         // The web API's marks (marksAt, ReaderMarks) go in Wolfden.Api, so a Wolfden.Mcp that can't see that project can't serve them.
-        var reached = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        Walk(Path.Combine(TempDen.RepoRoot, "src", "Wolfden.Mcp", "Wolfden.Mcp.csproj"));
+        var reached = ReachableProjects();
 
         Assert.Contains("Wolfden.Core", reached);
         Assert.Contains("Wolfden.Index", reached);
         Assert.DoesNotContain("Wolfden.Api", reached);
         Assert.DoesNotContain("Wolfden.Cli", reached);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-47")]
+    public void WhatAnAssistantRunsOnDoesntReferenceTheWebApi()
+    {
+        foreach (var assembly in AssistantAssemblies())
+        {
+            Assert.DoesNotContain(assembly.GetReferencedAssemblies(), a => a.Name is "Wolfden.Api" or "Wolfden.Cli");
+        }
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-47")]
+    public void TheCodeAnAssistantRunsOnHasNoMarkedViewByTheNamesExpected()
+    {
+        // A tripwire for the names expected, in whatever Wolfden.Mcp reaches: a new name gets past this, and is caught by the checks on results and answers.
+        var types = AssistantAssemblies().SelectMany(a => a.GetTypes());
+        Assert.DoesNotContain(types, t => t.Name.Contains("ReaderMarks", StringComparison.OrdinalIgnoreCase) || t.Name.Contains("MarksAt", StringComparison.OrdinalIgnoreCase) || t.Name.Contains("AheadOfReaders", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-47")]
+    public void WhatAResultCanHoldIsExactlyThis()
+    {
+        // The types, not an answer, so a member that stays null on MCP's route, where the checks on answers can't see it, still has to be looked at here.
+        var seen = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        foreach (var result in new[] { typeof(GetEntityResult), typeof(CanonAsOfResult), typeof(SearchResult), typeof(ListEntitiesResult), typeof(GetHistoryResult), typeof(ToolErrorResult) })
+        {
+            Walk(result);
+        }
+
+        var actual = seen.Select(t => $"{t.Key}: {t.Value}").ToList();
+        Assert.True(
+            ResultMembers.SequenceEqual(actual),
+            "A type in the results of the read tools changed. If the new member can hold anything later than a position, or a mark, serving it to an assistant is a decision for " +
+            "the maintainer (#300): keep it out of what MCP returns. If it can't, add it to the list in McpStaysStrictTests. The types now:\n" + string.Join("\n", actual));
+
+        void Walk(Type type)
+        {
+            if (type.IsGenericType)
+            {
+                foreach (var argument in type.GetGenericArguments())
+                {
+                    Walk(argument);
+                }
+            }
+            else if (type.Namespace?.StartsWith("Wolfden", StringComparison.Ordinal) == true && !seen.ContainsKey(type.Name))
+            {
+                var properties = type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => !p.IsDefined(typeof(JsonIgnoreAttribute))).ToList();
+                seen[type.Name] = string.Join(", ", properties.Select(p => p.Name).Order(StringComparer.Ordinal));
+                foreach (var property in properties)
+                {
+                    Walk(property.PropertyType);
+                }
+            }
+        }
+    }
+
+    /// <summary>The projects <c>Wolfden.Mcp</c> reaches, following project references all the way.</summary>
+    private static HashSet<string> ReachableProjects()
+    {
+        var reached = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        Walk(Path.Combine(TempDen.RepoRoot, "src", "Wolfden.Mcp", "Wolfden.Mcp.csproj"));
+        return reached;
 
         void Walk(string project)
         {
@@ -686,70 +865,85 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
         }
     }
 
-    [Fact]
-    [Trait("Scenario", "SC-MCP-47")]
-    public void WhatAnAssistantRunsOnDoesntReferenceTheWebApi()
+    /// <summary><c>Wolfden.Mcp</c> and every assembly of ours it reaches, by project or as compiled.</summary>
+    private static List<Assembly> AssistantAssemblies()
     {
-        foreach (var assembly in AssistantAssemblies)
+        var assemblies = new Dictionary<string, Assembly>(StringComparer.OrdinalIgnoreCase);
+        foreach (var name in ReachableProjects().Append("Wolfden.Mcp"))
         {
-            Assert.DoesNotContain(assembly.GetReferencedAssemblies(), a => a.Name is "Wolfden.Api" or "Wolfden.Cli");
+            Add(new AssemblyName(name));
         }
-    }
 
-    [Fact]
-    [Trait("Scenario", "SC-MCP-47")]
-    public void TheCodeAnAssistantRunsOnHasNoMarkedView()
-    {
-        // If marks move into shared code they could reach MCP's results, so that takes a decision, not just a move.
-        var types = AssistantAssemblies.SelectMany(a => a.GetTypes()).Where(t => !t.IsDefined(typeof(System.Runtime.CompilerServices.CompilerGeneratedAttribute), false));
-        Assert.DoesNotContain(types, t => t.Name.Contains("ReaderMarks", StringComparison.OrdinalIgnoreCase) || t.Name.Contains("MarksAt", StringComparison.OrdinalIgnoreCase) || t.Name.Contains("AheadOfReaders", StringComparison.OrdinalIgnoreCase));
-    }
+        return [.. assemblies.Values];
 
-    [Theory]
-    [Trait("Scenario", "SC-MCP-47")]
-    [InlineData(typeof(GetEntityResult))]
-    [InlineData(typeof(CanonAsOfResult))]
-    [InlineData(typeof(SearchResult))]
-    [InlineData(typeof(ListEntitiesResult))]
-    [InlineData(typeof(GetHistoryResult))]
-    public void NoResultCanCarryAMark(Type result)
-    {
-        var seen = new HashSet<Type>();
-        var names = new List<string>();
-        Walk(result);
-
-        Assert.NotEmpty(names);
-        Assert.DoesNotContain(names, n => n.Contains("mark", StringComparison.OrdinalIgnoreCase) || n.Contains("ahead", StringComparison.OrdinalIgnoreCase) || n.Contains("reader", StringComparison.OrdinalIgnoreCase));
-
-        void Walk(Type type)
+        void Add(AssemblyName name)
         {
-            if (type.IsGenericType)
+            if (name.Name!.StartsWith("Wolfden.", StringComparison.Ordinal) && !assemblies.ContainsKey(name.Name))
             {
-                foreach (var argument in type.GetGenericArguments())
+                var assembly = Assembly.Load(name);
+                assemblies[name.Name] = assembly;
+                foreach (var reference in assembly.GetReferencedAssemblies())
                 {
-                    Walk(argument);
+                    Add(reference);
                 }
-
-                return;
-            }
-
-            if (type.Namespace is null || !type.Namespace.StartsWith("Wolfden", StringComparison.Ordinal) || !seen.Add(type))
-            {
-                return;
-            }
-
-            foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => !p.IsDefined(typeof(JsonIgnoreAttribute))))
-            {
-                names.Add(property.Name);
-                Walk(property.PropertyType);
             }
         }
     }
-
-    private static Assembly[] AssistantAssemblies =>
-        [typeof(WolfdenTools).Assembly, typeof(DenTools).Assembly, typeof(Wolfden.Core.Types.TypeDefinition).Assembly];
 
     // --- What the responses may hold. ---
+
+    /// <summary>
+    /// Every tool and its arguments. A write tool's <c>from</c> and <c>until</c>
+    /// set where a fact starts and ends: they don't read as of a position.
+    /// </summary>
+    private static readonly string[] ToolsAndArguments =
+    [
+        "add_idea(text, entity, section, expected_hash, name, type, universe, series, book, fields, allow_relinks)",
+        "append_section(entity, section, text, expected_hash, universe, under, section_line, new_section, from, until, status, pin)",
+        "canon_as_of(position, universe, series, book, type, brief)",
+        "change_alias(entity, alias, expected_hash, new_alias, keep_old_alias, universe, allow_relinks)",
+        "check(severity, path, limit, universe)",
+        "checkpoint(message, co_author, paths)",
+        "copy_entity(entity, new_name, universe, to_universe, to_series, to_book, slug, allow_relinks, expected_hash)",
+        "create_entity(type, name, universe, series, book, slug, aliases, status, from, fields, text, allow_relinks)",
+        "get_chapter(book, chapter, universe)",
+        "get_chapter_defaults(universe, series, book)",
+        "get_entity(entity, universe, as_of)",
+        "get_history(entity, universe, limit, before, diff, diff_from)",
+        "list_entities(universe, type, status, series, book, limit)",
+        "move_entity(entity, expected_hash, to_series, to_book, keep_entry, enter_at_new_scope, universe, allow_relinks)",
+        "rename_entity(entity, new_name, expected_hash, keep_old_name, universe, allow_relinks)",
+        "rename_section(entity, section, new_name, expected_hash, universe, section_line)",
+        "search(query, universe, type, canon_only, limit, field)",
+        "update_chapter_defaults(expected_hash, changes, universe, series, book)",
+        "update_chapter_fields(book, chapter, expected_hash, changes, universe)",
+        "update_fields(entity, expected_hash, changes, universe)",
+    ];
+
+    /// <summary>Every member a read tool's result can have, by type. <see cref="AsOfReads"/> and the view leave some of these out at a position.</summary>
+    private static readonly string[] ResultMembers =
+    [
+        "CanonAsOfResult: At, Count, Entities, Filter, Pinned, Position, Universe, Version",
+        "EntitySummary: From, Id, Key, Name, Path, ScopeKey, ScopeKind, Status, Type, Universe",
+        "EntityView: Aliases, Fields, From, Hash, Id, Key, Lead, Name, Path, Pinned, ScopeKey, ScopeKind, Sections, Status, Type, Universe",
+        "FieldView: EntryIndex, From, Kind, Line, Live, Name, Pinned, Status, Until, Value",
+        "GetEntityResult: Entity, InView, Note, Position, Version, View",
+        "GetHistoryResult: Available, Backend, Count, Diff, Entity, Entries, NextBefore, Note, Reason, Truncated, Version",
+        "HistoryChangeView: Kind, OldPath, Path",
+        "HistoryDiffView: Files, From, To",
+        "HistoryEntryView: Author, Changes, Id, Message, When",
+        "HistoryFileDiffView: Change, Patch",
+        "ListEntitiesResult: Count, Entities, Total, Truncated, Version",
+        "PinnedEntity: Fields, Key, Name, Sections, Type",
+        "PinnedFacts: Fields, Sections",
+        "ScopeFilter: Key, Kind",
+        "SearchHitView: Entity, Field, InCanon, InComment, LeftOut, Line, Section, Snippet, Status",
+        "SearchResult: Count, Hits, Query, Truncated, Version",
+        "SectionProblem: Line, Message, Rule",
+        "SectionView: Body, Bookkeeping, From, HeadingPath, LeftOut, Level, Line, Name, Pinned, Status, Until",
+        "ToolError: Candidates, Code, Message",
+        "ToolErrorResult: Error, Version",
+    ];
 
     private static readonly string[] SummaryKeys = ["key", "id", "name", "type", "status", "universe", "scope_kind", "scope_key", "path", "from"];
 
@@ -806,6 +1000,12 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
         .. Under("entities", SummaryKeys),
     ];
 
+    private static readonly string[] ErrorResultKeys =
+    [
+        "version", "den_notice", "error", "error.code", "error.message", "error.candidates",
+        .. Under("error.candidates", SummaryKeys),
+    ];
+
     private static readonly string[] HistoryChangeKeys = ["kind", "path", "old_path"];
 
     private static readonly string[] HistoryResultKeys =
@@ -819,7 +1019,22 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
         .. Under("diff.files.change", HistoryChangeKeys),
     ];
 
-    private static void AssertOnlyKeys(string[] allowed, Reply reply) => Assert.Empty(reply.Keys.Except(allowed, StringComparer.Ordinal));
+    private static void AssertOnlyKeys(string[] allowed, Reply reply)
+    {
+        var extra = reply.Keys.Except(allowed, StringComparer.Ordinal).ToList();
+        Assert.True(
+            extra.Count == 0,
+            $"The answer has a new member: {string.Join(", ", extra)}. If it can hold anything later than the position, or a mark, showing it to an assistant is a decision " +
+            "for the maintainer (#300). If it can't, add it to the list in McpStaysStrictTests.");
+    }
+
+    private static void AssertIsExactly(JsonNode? expected, Reply reply)
+    {
+        var actual = JsonNode.Parse(reply.Text);
+        Assert.True(
+            JsonNode.DeepEquals(expected, actual),
+            $"This answer changed. If what's new can hold anything later than the position, or a mark, showing it to an assistant is a decision for the maintainer (#300). The answer was:\n{actual}");
+    }
 
     private static void AssertNothingLater(Reply reply)
     {
@@ -829,14 +1044,31 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
         }
     }
 
+    /// <summary>Looks for a mark's phrases, a member named for one, and a value that's only a tag. A note's prose can say "no longer true" or "enters at dawn".</summary>
     private static void AssertNoMarks(Reply reply)
     {
-        foreach (var mark in Marks)
+        foreach (var mark in MarkPhrases)
         {
             Assert.DoesNotContain(mark, reply.Whole, StringComparison.OrdinalIgnoreCase);
         }
 
-        Assert.DoesNotContain(reply.Keys, k => k.Contains("mark", StringComparison.OrdinalIgnoreCase) || k.Contains("ahead", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(reply.Keys, k => k.Split('.', '_').Any(w => MarkWords.Contains(w, StringComparer.OrdinalIgnoreCase)));
+        Assert.DoesNotContain(Strings(reply.Json), IsATag);
+
+        static bool IsATag(string value) =>
+            value.Equals("no longer true", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("Reader's view", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("Author's view", StringComparison.OrdinalIgnoreCase)
+            || value.StartsWith("enters at chapter", StringComparison.OrdinalIgnoreCase)
+            || value.StartsWith("enters at ch.", StringComparison.OrdinalIgnoreCase);
+
+        static IEnumerable<string> Strings(JsonElement element) => element.ValueKind switch
+        {
+            JsonValueKind.String => [element.GetString()!],
+            JsonValueKind.Array => element.EnumerateArray().SelectMany(Strings),
+            JsonValueKind.Object => element.EnumerateObject().SelectMany(p => Strings(p.Value)),
+            _ => [],
+        };
     }
 
     private async Task<Reply> Call(string tool, Dictionary<string, object?> args, bool error = false)
@@ -845,16 +1077,23 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
         args.TryAdd("universe", "starfall");
         var result = await Client.CallToolAsync(tool, args, cancellationToken: TestContext.Current.CancellationToken);
         Assert.Equal(error, result.IsError == true);
-        var text = Assert.IsType<TextContentBlock>(Assert.Single(result.Content)).Text;
+        var block = Assert.IsType<TextContentBlock>(Assert.Single(result.Content));
+        var text = block.Text;
         using var document = JsonDocument.Parse(text);
 
         // The two forms of the answer are the same, so looking at one looks at both.
         var structured = Assert.IsType<JsonElement>(result.StructuredContent);
         Assert.True(JsonNode.DeepEquals(JsonNode.Parse(text), JsonNode.Parse(structured.GetRawText())), "The text and the structured content differ.");
+
+        // Nothing beside the answer: only the SDK's own note of the server, which comes from the server's name and version.
+        Assert.Null(block.Meta);
+        Assert.Null(block.Annotations);
+        var meta = result.Meta?.ToJsonString() ?? "";
+        Assert.Empty((result.Meta?.Select(m => m.Key) ?? []).Except(["io.modelcontextprotocol/serverInfo"], StringComparer.Ordinal));
         var json = document.RootElement.Clone();
         var keys = new HashSet<string>(StringComparer.Ordinal);
         CollectKeys(json, "", keys);
-        return new Reply(json, text, text + "\n" + structured.GetRawText(), keys);
+        return new Reply(json, text, $"{text}\n{structured.GetRawText()}\n{meta}", keys);
     }
 
     /// <summary>Every member's dotted path in <paramref name="element"/>, leaving out what's inside a field's <c>value</c>, which is the writer's.</summary>
@@ -909,6 +1148,6 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
         return output;
     }
 
-    /// <summary>A tool's answer: its JSON, its text, its text and structured content together, and its members.</summary>
+    /// <summary>A tool's answer: its JSON, its text, its text, structured content, and <c>_meta</c> together, and its members.</summary>
     private sealed record Reply(JsonElement Json, string Text, string Whole, HashSet<string> Keys);
 }

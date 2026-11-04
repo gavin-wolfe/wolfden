@@ -3465,17 +3465,26 @@ The web UI is going to show me everything and tag what readers don't know yet
   view, by any of its names, and the answer says nothing else. A note an error
   leaves out is an unknown name, and given by its path or id, the answer says
   only that it can't be shown. A name a later note shares doesn't match it.
-- A section that's later, an idea, bookkeeping, or left out by an error isn't
-  shown or mentioned, in `get_entity`, `canon_as_of`, `pinned`, or `brief`, with
-  or without a filter.
-- No `until` and no later value of a position field is anywhere in the answer.
-- No tag such as `ahead of readers` or `no longer true` is anywhere in the
-  answer, and it has only the members it has today. A new one fails a test, so
-  showing an assistant more is a decision and not a side effect.
+- A section that's later, an idea, undecided, a candidate, retconned, bookkeeping,
+  or left out by an error isn't shown or mentioned, in `get_entity`, `canon_as_of`,
+  `pinned`, or `brief`, with or without a filter. Neither is a pinned fact that
+  enters later.
+- As Wolfden sets them, no `until` and no later value of a position field is in
+  the answer. That doesn't cover what I wrote myself: a lead or section comes
+  through as written, with its HTML comments and `[[links]]`, and so does a field
+  the type doesn't define, a `ref` field's value, and a mapping with its own
+  `until` key. `line` numbers leave gaps where something's hidden, `kind: temporal`
+  shows that a field changes over time, and `in_view: false`, unlike
+  `unknown_entity`, confirms a note exists.
+- No tag such as `ahead of readers` is in the answer or its `_meta`, and the answer
+  has only the members it has today. A new one fails a test, so showing an assistant
+  more is a decision and not a side effect. The server offers no prompts or resources.
 - A position that can't be read is refused, and doesn't fall back to a full read.
+  An error at a position names no note the reader hasn't met.
 - `search`, `list_entities`, and `get_history` still take no position, and show
   later material as it's written, unmarked. Only `get_entity` and `canon_as_of`
-  read at a position.
+  read at a position, and a new tool or argument, on any tool, fails a test until
+  someone has checked that.
 - Wolfden.Mcp can't reach the web API's project, so it can't use its marks.
 
 Spec: F-GEN-2, F-VIEW-1, F-VIEW-2, F-VIEW-4, F-VIEW-5 (#300). Covered by:

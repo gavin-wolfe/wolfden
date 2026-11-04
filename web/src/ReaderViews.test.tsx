@@ -80,6 +80,24 @@ describe('SC-WEB-103: the Author’s view and the Reader’s view', () => {
     expect((await screen.findByRole('button', { name: "Author's view" })).getAttribute('aria-pressed')).toBe('true')
   })
 
+  it('says what it doesn’t cover yet, beside read-only, on both tabs', async () => {
+    stubApi()
+    const note = renderApp('/u/dracula/e/E-MINA?at=dracula:3&readers=1')
+    expect(await screen.findByText(/The sidebar, search, and other pages aren't part of the Reader's view yet/)).toBeTruthy()
+    note.unmount()
+
+    renderApp('/u/dracula/e/E-MINA?view=history&at=dracula:3&readers=1')
+    expect(await screen.findByText(/The sidebar, search, and other pages aren't part of the Reader's view yet/)).toBeTruthy()
+  })
+
+  it('doesn’t say so in the Author’s view', async () => {
+    stubApi()
+    renderApp('/u/dracula/e/E-MINA?at=dracula:3')
+    await screen.findByRole('heading', { level: 1, name: 'Mina Harker' })
+
+    expect(screen.queryByText(/aren't part of the Reader's view yet/)).toBeNull()
+  })
+
   it('switches back, leaving the position alone', async () => {
     stubApi()
     const { history } = renderApp('/u/dracula/e/E-MINA?at=dracula:3&readers=1')
@@ -319,8 +337,16 @@ describe('SC-WEB-102: what readers don’t know is tagged in the Author’s view
       expect(tag.tagName).toBe('SPAN')
       expect(tag.getAttribute('title')).toContain('Dracula chapter 5')
       expect(within(main).getByText(/in “Journal”/).querySelector('.ahead-of-readers')).toBeNull()
-      expect(within(main).getByText(/Tags say what readers/)).toBeTruthy()
+      expect(within(main).getByText(/Tags say what readers/).textContent).not.toMatch(/hover/i)
       expect(main.querySelector('.backlinks button')).toBeNull()
+    })
+
+    it('gives a link in a section left out the left-out badge, and no reader tag', async () => {
+      const main = await open({ backlinks: [backlink({ leftOut: true })] })
+
+      const places = await within(main).findByText(/in “Letters”/)
+      expect(within(places).getByText('left out').className).toContain('problem')
+      expect(places.querySelector('.ahead-of-readers')).toBeNull()
     })
 
     it('has no explaining line when nothing is marked', async () => {

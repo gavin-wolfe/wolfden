@@ -227,6 +227,8 @@ export interface BacklinkView {
   bookkeeping: boolean
   /** In the Author's view, what readers at the position don't know of what holds this link. */
   readerMark?: ReaderMark
+  /** True for a link in a section an error leaves out, which only the writer's views list. */
+  leftOut?: boolean
 }
 
 export interface EntityPage {

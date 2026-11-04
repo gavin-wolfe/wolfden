@@ -173,6 +173,34 @@ public sealed class ReadersViewTests : IDisposable
         Assert.Equal("Audits", Assert.Single(places).GetProperty("section").GetString());
     }
 
+    [Fact]
+    [Trait("Scenario", "SC-WEB-101")]
+    public async Task ACommentInAHeadingDoesntComeThroughABacklinkOrALink()
+    {
+        _den.Write(
+            "universes/starfall/entities/notes/the-toll-book.md",
+            "---\ntype: note\nname: The toll book\nstatus: canon\nfrom: \"ember:1\"\n---\n\nKept by clerks.\n\n" +
+            "## Heading <!-- Morvane did it --> place\nSee [[The salt tithe]] and [[The salt ledger]].\n");
+        _den.Write(
+            "universes/starfall/entities/notes/the-toll-map.md",
+            "---\ntype: note\nname: The toll map\nstatus: canon\nfrom: \"ember:1\"\n---\n\nSee [[The toll book#Heading place]] and [[The toll book#Heading <!-- Morvane did it --> place]].\n");
+        await using var server = await Start();
+
+        foreach (var entity in new[] { Tithe, "The%20toll%20map", "The%20toll%20book" })
+        {
+            var readers = await server.GetJsonAsync(Readers(entity, "ember:1"), HttpStatusCode.OK);
+            Assert.DoesNotContain("Morvane", readers.GetRawText(), StringComparison.Ordinal);
+        }
+
+        var tithe = await server.GetJsonAsync(Readers(Tithe, "ember:1"), HttpStatusCode.OK);
+        var place = Backlinks(tithe).Single(b => b.GetProperty("path").GetString() == "universes/starfall/entities/notes/the-toll-book.md");
+        Assert.DoesNotContain("<!--", place.GetProperty("section").GetString(), StringComparison.Ordinal);
+
+        // The writer's read keeps the name as written.
+        var author = await server.GetJsonAsync($"/api/entity?universe=starfall&entity={Tithe}&marksAt=ember:1", HttpStatusCode.OK);
+        Assert.Contains("Morvane did it", author.GetRawText(), StringComparison.Ordinal);
+    }
+
     [Theory]
     [Trait("Scenario", "SC-WEB-101")]
     [InlineData("&readers=true")]
@@ -255,6 +283,40 @@ public sealed class ReadersViewTests : IDisposable
 
     [Fact]
     [Trait("Scenario", "SC-WEB-102")]
+    public async Task ABacklinkInASectionLeftOutSaysSoForTheWriterAndIsntInAReadersPage()
+    {
+        const string Path = "universes/starfall/entities/notes/the-toll-book.md";
+        _den.Write(Path, "---\ntype: note\nname: The toll book\nstatus: canon\nfrom: \"ember:1\"\n---\n\nKept by clerks.\n\n## A rumor\n<!-- wolfden: status=maybe -->\nSee [[The salt tithe]].\n\n## Plain\nSee [[The salt tithe]].\n");
+        await using var server = await Start();
+
+        var author = await server.GetJsonAsync($"/api/entity?universe=starfall&entity={Tithe}&marksAt=ember:1", HttpStatusCode.OK);
+        var rumor = Backlinks(author).Single(b => b.GetProperty("path").GetString() == Path && b.GetProperty("section").GetString() == "A rumor");
+        Assert.True(rumor.GetProperty("leftOut").GetBoolean());
+        Assert.False(rumor.TryGetProperty("readerMark", out _));
+        var plain = Backlinks(author).Single(b => b.GetProperty("path").GetString() == Path && b.GetProperty("section").GetString() == "Plain");
+        Assert.False(plain.TryGetProperty("leftOut", out _));
+
+        var readers = await server.GetJsonAsync(Readers(Tithe, "ember:1"), HttpStatusCode.OK);
+        Assert.Equal("Plain", Assert.Single(Backlinks(readers), b => b.GetProperty("path").GetString() == Path).GetProperty("section").GetString());
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-102")]
+    public async Task ABacklinkInAContainersOwnTextHasNoMark()
+    {
+        var universe = _den.Read("universes/starfall/universe.md");
+        _den.Write("universes/starfall/universe.md", universe.TrimEnd() + "\n\nThe calendar turns on [[The salt tithe]].\n");
+        await using var server = await Start();
+
+        var page = await server.GetJsonAsync($"/api/entity?universe=starfall&entity={Tithe}&marksAt=ember:1", HttpStatusCode.OK);
+
+        var link = Backlinks(page).Single(b => b.GetProperty("path").GetString() == "universes/starfall/universe.md");
+        Assert.Equal("container_body", link.GetProperty("site").GetString());
+        Assert.False(link.TryGetProperty("readerMark", out _));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-102")]
     public async Task WithoutMarksAtABacklinkHasNoMark()
     {
         await using var server = await Start();
@@ -294,6 +356,8 @@ public sealed class ReadersViewTests : IDisposable
 
         static bool ReachesAReader(JsonElement b) =>
             !b.TryGetProperty("readerMark", out _)
+            && !b.TryGetProperty("leftOut", out _)
+            && b.GetProperty("site").GetString() != "container_body"
             && !b.GetProperty("bookkeeping").GetBoolean()
             && (b.GetProperty("status").ValueKind == JsonValueKind.Null || b.GetProperty("status").GetString() is "draft" or "canon");
     }

@@ -76,7 +76,7 @@ internal static class EntityPages
                         .Where(e => canon is null || canon.ContainsKey(e.Path)).Select(Ref).ToList();
                 return new LinkView(
                     l.Text, l.Target, l.Heading, l.Label, l.Line, l.Column, l.Outcome, reached is null ? null : Ref(reached),
-                    reached is null ? null : l.TargetSection, matches, Problem(l, view.Universe, canon is not null, reader.PinnedUniverse is not null, matches, all.Count), inView);
+                    reached is null ? null : readers && l.TargetSection is { } aimed ? MarkdownComments.Strip(aimed) : l.TargetSection, matches, Problem(l, view.Universe, canon is not null, reader.PinnedUniverse is not null, matches, all.Count), inView);
             }
 
             var bySection = links.Where(l => l.SourceSectionId is not null).ToLookup(l => sectionLines.GetValueOrDefault(l.SourceSectionId!.Value));
@@ -163,7 +163,7 @@ internal static class EntityPages
         var sourceIds = links.Select(l => l.SourceEntityId).OfType<int>().Distinct().ToList();
         var sources = db.Entities.Where(e => sourceIds.Contains(e.Id)).ToList().ToDictionary(e => e.Id);
         var sectionIds = links.Select(l => l.SourceSectionId).OfType<int>().Distinct().ToList();
-        var sections = db.Sections.Where(s => sectionIds.Contains(s.Id)).Select(s => new { s.Id, s.Name, s.Line }).ToList().ToDictionary(s => s.Id);
+        var sections = db.Sections.Where(s => sectionIds.Contains(s.Id)).Select(s => new { s.Id, s.Name, s.Line, s.LeftOutJson }).ToList().ToDictionary(s => s.Id);
         var chapterIds = links.Select(l => l.ChapterId).OfType<int>().Distinct().ToList();
         var chapters = db.Chapters.Where(c => chapterIds.Contains(c.Id)).ToList().ToDictionary(c => c.Id);
         var entries = db.FieldValues.Where(v => sourceIds.Contains(v.EntityId)).Select(v => new { v.EntityId, v.Field, v.Line, v.EntryIndex }).ToList();
@@ -235,9 +235,10 @@ internal static class EntityPages
                 l.SourceEntityId is { } id ? Ref(sources[id]) : null,
                 l.SourceEntityId is null ? Container(containers[l.ScopeId]) : null,
                 l.Site, l.Path, l.Line, l.Column, l.Text, l.Field,
-                l.SourceSectionId is { } s ? sections[s].Name : null,
+                // The index keeps a heading's name as written, and a comment in one is part of it (F-SEC-3, F-VIEW-6).
+                l.SourceSectionId is { } s ? (readers ? MarkdownComments.Strip(sections[s].Name) : sections[s].Name) : null,
                 l.ChapterId is { } c ? $"{containers[chapters[c].BookId].Key}:{chapters[c].Key}" : null,
-                l.OutlineRow, l.Status, l.IsBookkeeping, Mark(l)))
+                l.OutlineRow, l.Status, l.IsBookkeeping, Mark(l), l.SourceSectionId is { } held && sections[held].LeftOutJson is not null ? true : null))
             .ToList();
     }
 

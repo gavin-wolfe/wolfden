@@ -833,7 +833,9 @@ note's page has a two-way switch in the position bar: **Author's view** and
     dates.
 
   Ideas, bookkeeping, and sections with an error keep their own badges instead.
-  **Linked from** has the same tags, as plain words, for a link in something later.
+  **Linked from** has the same tags, as plain words, for a link in something later,
+  and a **left out** badge for a link in a section with an error. A link in a universe,
+  series, or book's own text has no tag, as that text isn't at a point in the story.
 - **The Reader's view** shows what a reader at that chapter knows, and nothing else:
   no tags, no later dates, no comments, and no sections with an error. A note they
   haven't met says where they first meet it. It's read-only, and it has no history,
@@ -844,8 +846,16 @@ note's page has a two-way switch in the position bar: **Author's view** and
 
 The Reader's view stays while you follow links and change chapters, and its link
 keeps it (`?readers=1`), but Wolfden doesn't remember it: opening Wolfden fresh starts
-in the Author's view. For now this covers a note's Note and History tabs. Lists,
-search, and the book page still show only what readers know at a position.
+in the Author's view.
+
+**What the Reader's view doesn't cover yet.** It's about one note's Note and History
+tabs, and says so on the page. The rest of the screen isn't filtered the same way,
+so don't take it as what a reader would see: the sidebar's "more appear later" names
+later notes, search finds comments and later values, and the book page and the position
+bar's chapter menu list later chapters' titles. "Read-only" also means only that
+page: the **New** buttons, checkpoints, the ⚠ list's **Edit file**, and the book and
+chapter pages' controls still work. Edit file shows the whole source, so it's the
+Author's view whichever you came from, and it keeps your position.
 
 An AI assistant reading at a position gets the Reader's view of a note, so it isn't
 told a later date at all, and can't write toward it. When you're planning with one,

@@ -12,7 +12,13 @@ export const NOT_PLACED = 'not placed in the story yet'
 export const NEVER_TRUE = "never true (its dates don't overlap)"
 
 /** The line above a list with tags in it, which are plain text there (#302). */
-export const MARKS_LEGEND = "Tags say what readers at this point in the story don't see. Hover over one for more."
+export const MARKS_LEGEND = "Tags say what readers at this point in the story don't see. Each note's page has the details."
+
+/**
+ * What the Reader's view doesn't cover yet. Remove this, and where it's shown,
+ * when steps 4 to 6 of #300 give lists, search, and the book page the two views.
+ */
+export const READERS_VIEW_REACH = "This covers this note's page. The sidebar, search, and other pages aren't part of the Reader's view yet."
 
 /** Why a position isn't placed, naming it if there's one to name. */
 export function notPlacedWhy(position: string | null): string {

@@ -141,7 +141,8 @@ export interface FilePageSearch extends StorySearch {
 }
 
 export function validateFilePageSearch(search: Record<string, unknown>): FilePageSearch {
-  return { at: validateStorySearch(search).at, path: typeof search.path === 'string' ? search.path : undefined }
+  // Edit file is the writer's, whatever the view: it's the whole source, with a Save button, so it never says Reader's view.
+  return { at: validateStorySearch(search).at, readers: undefined, path: typeof search.path === 'string' ? search.path : undefined }
 }
 
 const fileRoute = createRoute({

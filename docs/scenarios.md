@@ -6539,7 +6539,8 @@ A page asks `/api/entity` with `asOf` and `readers=true` (#300).
   `get_entity` gives there: no later `until`, no later position value, no comment,
   and no section an error leaves out. Neither says anything's gone.
 - A note the reader hasn't met is `inView: false`, and nothing of it.
-- A link or backlink in text the filter takes for a comment is gone too.
+- A link or backlink in text the filter takes for a comment is gone too, and a
+  comment in a heading isn't in a backlink's section name or a link's section.
 - A plain `asOf` still has the `until`s and later values, for the writer.
 - `readers=true` without `asOf`, or with `marksAt`, is `bad_argument`, as is any
   value but true or false. `readers=false` is the same as leaving it out.
@@ -6569,7 +6570,9 @@ I'm at chapter 3 in the Author's view, on a note's page.
   error leaves out keep their badges and get no tags. In a note no position places,
   only the note has a tag.
 - "Linked from" says the same of what holds each link, in plain text with a tooltip
-  rather than a button, with one line above the list to say what they are.
+  rather than a button, with one line above the list to say what they are. A link in
+  a section an error leaves out has the **left out** badge. A link in a universe's,
+  series', or book's own text has no tag, since that text isn't in story order.
 - A type's field defaults aren't listed, as in Everything mode, since they aren't
   in the note. The Reader's view lists them, with their `type default` badge.
 - I can edit from here. The save goes to the real note, the page reads the same way
@@ -6591,8 +6594,11 @@ Spec: F-VIEW-4, F-VIEW-5, design.md §9 (#300). Covered by: `web/src/ReaderViews
   it, and following a link, changing the chapter, or changing tab does too. A fresh
   start opens the Author's view, and nothing is remembered.
 - **Show everything** ends it, and `?readers=1` with no position means nothing.
-- The Reader's view shows only what readers know (SC-WEB-101), with no tags, and
-  has no way to edit: no Edit buttons, and it says so.
+- The Reader's view of a note's page shows only what readers know (SC-WEB-101), with
+  no tags, and has no way to edit: no Edit buttons, and it says so. It also says the
+  sidebar, search, and other pages aren't part of it yet.
+- The ⚠ list's **Edit file** leaves the Reader's view behind and keeps the position,
+  since it's the whole source, for the writer.
 - A note readers haven't met there has only the banner (SC-WEB-13), and the History
   tab fetches no saved version, since one can hold anything. It says so.
 - With an unsaved edit open, switching asks first, as moving the position does.

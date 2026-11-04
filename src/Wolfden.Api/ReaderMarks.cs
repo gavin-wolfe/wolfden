@@ -88,10 +88,11 @@ internal sealed class ReaderMarks
     public NoteMarks Of(EntityRecord note) => new(this, note);
 
     /// <summary>
-    /// The mark of a link in a container's file or a chapter's fields, or in an
-    /// outline: where it's written, as a view at a position asks. One with no
-    /// position, which no view reaches, is <see cref="ReaderMark.Unplaced"/>.
-    /// Bookkeeping or out of canon, it keeps its own badge instead.
+    /// The mark of a link in a chapter's fields or an outline: where it's written,
+    /// as a view at a position asks. A link with no position has no mark: a
+    /// container's own text isn't in story order at all (format.md F-LINK-13), so
+    /// there's nothing to fix or wait for. Bookkeeping or out of canon, it keeps
+    /// its own badge instead.
     /// </summary>
     public ReaderMark? OfContainerLink(LinkRecord link)
     {
@@ -100,9 +101,7 @@ internal sealed class ReaderMarks
             return null;
         }
 
-        return link.PositionOrdinal is not { } at ? new ReaderMark(ReaderMark.Unplaced, null)
-            : at > _point ? new ReaderMark(ReaderMark.Ahead, _names.GetValueOrDefault(at))
-            : null;
+        return link.PositionOrdinal is { } at && at > _point ? new ReaderMark(ReaderMark.Ahead, _names.GetValueOrDefault(at)) : null;
     }
 
     /// <summary><paramref name="page"/> with each hit's marks.</summary>

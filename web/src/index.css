@@ -232,10 +232,12 @@ code {
   color: var(--text);
 }
 
+/* An action, plainly not one of the two views beside it: text, where the pressed view is filled. */
 .position-bar .reset {
-  background: var(--accent);
-  color: var(--accent-text);
-  border-color: var(--accent);
+  background: none;
+  border-color: transparent;
+  color: var(--link);
+  text-decoration: underline;
 }
 
 .view-switch {

@@ -39,7 +39,7 @@ import { sourceQuery, type EntitySource } from '../editApi'
 import { ErrorState, Loading, StatusBadge } from '../components/States'
 import { useDocumentTitle, useEntitiesInView, usePosition } from '../hooks'
 import { chapterWords, describePosition, entryOf, isAheadOf, ordinalOf } from '../story'
-import { NOT_PLACED, MARKS_LEGEND, notPlacedWhy } from '../readerWords'
+import { NOT_PLACED, MARKS_LEGEND, READERS_VIEW_REACH, notPlacedWhy } from '../readerWords'
 
 const route = getRouteApi('/u/$universe/e/$')
 
@@ -245,7 +245,12 @@ function EntityArticle({ universe, entity, positions, readersView = false }: { u
           </EditButton>
         </p>
         <FrozenNotice />
-        {readersView && <p className="muted">The Reader's view is read-only. Switch to the Author's view to edit.</p>}
+        {readersView && (
+          <>
+            <p className="muted">The Reader's view is read-only. Switch to the Author's view to edit.</p>
+            <p className="muted">{READERS_VIEW_REACH}</p>
+          </>
+        )}
       </header>
       <EditingStatus />
       {target?.kind === 'file' ? (
@@ -672,6 +677,7 @@ function Backlinks({ universe, backlinks, positions }: { universe: string; backl
                     <li key={`${b.line}:${b.column}`}>
                       {backlinkPlace(b, positions)}
                       {b.bookkeeping && <span className="badge">bookkeeping</span>} <StatusBadge status={b.status} />
+                      {b.leftOut && <span className="badge problem">left out</span>}
                       {b.readerMark && <MarkList mark={b.readerMark} positions={positions} />}
                     </li>
                   ))}

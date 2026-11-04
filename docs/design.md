@@ -1719,9 +1719,11 @@ docs/
     even if readers meet that note later. (The page shows pinned facts in place,
     where each has its own mark, and doesn't list `pinned`.)
   - **A backlink** has the mark of what holds it, as a search hit does: its
-    section's or entry's, or else the note's. One in a container's file, a
-    chapter's fields, or an outline compares where it's written, and one with no
-    position, which no view reaches, is `unplaced`.
+    section's or entry's, or else the note's. One in a chapter's fields or an
+    outline compares where it's written. One with no position, such as in a
+    container's own text (F-LINK-13), has no mark: there's nothing to fix or wait
+    for, so it's a second exception to "no mark means a reader sees it". One in a
+    section an error leaves out has `leftOut`, for the page's badge, and no mark.
 
   **The Reader's view** (#300). `readers=true` beside `asOf` on `/api/entity` gives
   the page as an AI assistant's read at that position has it, since `asOf` alone
@@ -1730,7 +1732,8 @@ docs/
   `AsOfReads` in `Wolfden.Index`, so a page's fields, sections, and `pinned` at every
   position equal `get_entity`'s (`ReadersViewTests`), and neither project references
   the other. A link or backlink in text the filter leaves out as a comment is gone
-  too. It goes only with `asOf`: without it, or with `marksAt`, it's `bad_argument`,
+  too, and a heading's comment doesn't come through a backlink's section name or a
+  link's `section`, which the index keeps as written. It goes only with `asOf`: without it, or with `marksAt`, it's `bad_argument`,
   and `readers=false` is the same as leaving it out. `/api/canon` doesn't take it,
   since no page needs it yet.
 
@@ -1792,7 +1795,12 @@ docs/
       type's field defaults aren't listed, as with no position, since they aren't
       in the note.
     - **The Reader's view** asks `asOf` with `readers=true`, so it holds what an
-      AI assistant reads there, a type's defaults included, badged. It's read-only.
+      AI assistant reads there, a type's defaults included, badged. The note's page
+      is read-only. The rest of the screen isn't part of it yet, and the page says so
+      until later steps of #300 land: the sidebar, search, and the book page and
+      chapter menu aren't filtered as it is, and the New buttons, checkpoints, and the
+      book and chapter pages' controls still work. Edit file by path drops `readers`,
+      so it's plainly the writer's. The API's writes know nothing of views.
       A note the reader hasn't met shows the banner, for example "Readers first
       meet Quincey Morris in chapter 11", with the Author's view as a way to see
       it. Saved versions can hold anything, so its History tab fetches none of

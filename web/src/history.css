@@ -157,18 +157,6 @@ mark.diff-word {
   color: inherit;
 }
 
-/* A note's history shown anyway (#26): greyed, like a note shown anyway. */
-.revealed .checkpoints,
-.revealed .diff-pane,
-.revealed .history-note {
-  filter: grayscale(1);
-  opacity: 0.8;
-}
-
-.revealed button.checkpoint-open {
-  color: var(--later);
-}
-
 .diff-file h3 {
   font-size: 0.95rem;
   margin: 1rem 0 0.4rem;

@@ -206,11 +206,13 @@ public sealed record EntryView(string? Position, bool Inherited, string Descript
 /// <param name="OutlineRow">For a link in an outline row, the row's id; otherwise null.</param>
 /// <param name="Status">The effective status of what holds it, or null where there's none.</param>
 /// <param name="Bookkeeping">True for a link in a bookkeeping section.</param>
-/// <param name="ReaderMark">With <c>marksAt</c>, what readers there don't know of what holds the link: its entry's or section's mark, else its note's, or for a container or outline, where it's written; left out when there's nothing to say, and always without <c>marksAt</c>.</param>
+/// <param name="ReaderMark">With <c>marksAt</c>, what readers there don't know of what holds the link: its entry's or section's mark, else its note's, or for a chapter or outline, where it's written; left out when there's nothing to say, and always without <c>marksAt</c>.</param>
+/// <param name="LeftOut">True for a link in a section an error leaves out (format.md F-GEN-2), which only a read for the writer lists; otherwise left out.</param>
 public sealed record BacklinkView(
     EntityRef? Source, ContainerRef? Container, string Site, string Path, int Line, int Column, string Text, string? Field, string? Section,
     string? Chapter, string? OutlineRow, string? Status, bool Bookkeeping,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReaderMark? ReaderMark = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReaderMark? ReaderMark = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? LeftOut = null);
 
 /// <summary>
 /// An entity's page: what <c>get_entity</c> gives (<see cref="EntityView"/>),

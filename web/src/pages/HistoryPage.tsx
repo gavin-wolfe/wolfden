@@ -9,6 +9,7 @@ import { ErrorState, Loading } from '../components/States'
 import type { EntitySearch } from '../entitySearch'
 import { useDocumentTitle, useEntitiesInView, usePosition } from '../hooks'
 import { historyDiffQuery, historyQuery, type DiffSelection, type HistoryDiffResult, type HistoryEntry, type HistoryResult } from '../historyApi'
+import { READERS_VIEW_REACH } from '../readerWords'
 import { Breadcrumb, NotInView } from './EntityPageView'
 import '../history.css'
 
@@ -68,6 +69,7 @@ export function HistoryPage() {
           <h1>{entity.name}</h1>
         </header>
         <p className="muted history-note">History isn't part of the Reader's view, since saved versions can hold what readers don't know yet. Switch to the Author's view to see it.</p>
+        <p className="muted history-note">{READERS_VIEW_REACH}</p>
       </div>
     )
   }

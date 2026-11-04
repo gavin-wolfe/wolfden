@@ -207,6 +207,18 @@ describe('the top bar’s problems', () => {
     expect(links[2]).toContain('at=dracula:1')
   })
 
+  it('SC-WEB-103: Edit file is the writer’s, so it leaves the Reader’s view behind, and keeps the position', async () => {
+    stubApi({ override: (path) => (path === '/api/den/errors' ? list(error()) : undefined) })
+    const { history } = renderApp('/u/dracula/e/E-MINA?at=dracula:1&readers=1')
+
+    fireEvent.click(await screen.findByRole('button', { name: /1 problem/ }))
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('link', { name: 'Edit file' }))
+
+    await waitFor(() => expect(history.location.pathname).toBe('/file'))
+    await waitFor(() => expect(new URLSearchParams(history.location.search).get('readers')).toBeNull())
+    expect(new URLSearchParams(history.location.search).get('at')).toBe('dracula:1')
+  })
+
   it('SC-WEB-96: a file that can’t be read has no Edit file, and a folder doesn’t ask for a file that’s there', async () => {
     const book = 'universes/dracula/books/dracula'
     stubApi({

@@ -172,7 +172,7 @@ public sealed partial class DenTools
             catch (HistoryException e)
             {
                 return Frozen(FreezeSnapshot.TagFailed, at, null,
-                    $"{said} is final{(at is null ? "" : $" and checkpointed ({Short(at)})")}, but the tag failed: {e.Message} " +
+                    $"{said} is final{(at is null ? "" : $" and checkpointed ({Short(at)})")}, but the tag failed: {Sentence(e.Message)} " +
                     "The checkpoint stands. Once that's fixed, freeze the book again to add the tag.");
             }
         }
@@ -415,6 +415,13 @@ public sealed partial class DenTools
     };
 
     private static string Short(string id) => id.Length > 7 ? id[..7] : id;
+
+    /// <summary><paramref name="text"/> ending as a sentence does, for a message with more after it.</summary>
+    private static string Sentence(string text)
+    {
+        var trimmed = text.TrimEnd();
+        return trimmed.Length > 0 && trimmed[^1] is '.' or '!' or '?' ? trimmed : trimmed + ".";
+    }
 
     private static string StatusWord(BookStatus status) => status == BookStatus.Final ? "final" : "draft";
 }

@@ -1040,12 +1040,27 @@ start with none. The page picks it up straight away: no restart.
 
 Git records a name and email with each checkpoint. If it doesn't have
 them yet, Wolfden asks: fields in the dialog, or `--author-name` and
-`--author-email` on the command line. On the command line you can also
-give them when git has its own, to keep this den under a pen name:
+`--author-email` on the command line. You can also give them when git has
+its own, to keep this den under a pen name. In the dialog, choose **Use a
+different name for this den**, which is closed until you open it, and fill
+in both. Or, from the command line:
 
 ```text
 wolfden init --git --author-name "Ash Calloway" --author-email ash@example.com
 ```
+
+The dialog doesn't show what git has, and it sends a different name only
+while that part is open: if you close it, what you typed isn't used, and it
+says so. Open it again and your typing is still there. If Wolfden refuses,
+the dialog says why and keeps what you typed. Pressing Enter on the first
+checkpoint's checkbox, where the dialog starts, does nothing, so a stray key
+can't turn history on before you've read it.
+
+This choice is only in the **Turn on history** dialog. A den whose folder is
+already a repository with no checkpoints (you ran `git init`, or turned history
+on with no first checkpoint or one that stopped) gets the checkpoint dialog
+instead, which records what git has. For a different name there, use the command
+line: `wolfden init --git` with `--author-name` and `--author-email`.
 
 Any name will do, a pen name included, and the email can be a
 placeholder. They're saved for this den only, before the first
@@ -1061,7 +1076,8 @@ for just what's missing, only if they're really needed.)
 If git signs your commits, the key it uses may belong to another name, and
 Wolfden can't always tell. So when you give a name and email, signing stays
 off for this den, always, even if they're what git already has or the den's
-repository names its own key: Wolfden says so, and a signature can't tie your
+repository names its own key: Wolfden says so, in the dialog's list of what it
+did or the command's output, and a signature can't tie your
 pen name to the other key. To sign with a key
 of this name's, run `git config --local user.signingkey <key>` and `git
 config --local commit.gpgsign true` in the den's folder, and `git config
@@ -1078,6 +1094,17 @@ A pen name given this way has limits worth knowing:
 - **An environment variable still beats it.** If `GIT_AUTHOR_NAME` or one of
   its relatives is set when `wolfden serve` or a later checkpoint runs, git
   uses that, as it does in any repository.
+- **A signing setting added later can still sign under this name.** Wolfden
+  checks for one only while it turns history on. If a setting that turns
+  signing on is added later in the den's own `.git` folder (an `[include]` in
+  its `config` file, or a `config.worktree`) or in the environment
+  (`GIT_CONFIG_COUNT`, `GIT_CONFIG_PARAMETERS`) when `wolfden serve` or a
+  checkpoint runs, the next checkpoint is signed with that key under the den's
+  name, with no warning, and that can't be undone. The same goes after a
+  turn-on that stopped part way: the name stays saved, even if a later try to
+  finish is refused because of that setting, and the next checkpoint signs
+  under it. Turning signing on globally later doesn't do this, since the den's
+  own setting beats it. See #311.
 - **It can't be added this way once there are checkpoints, or in a bigger
   repository.** Wolfden refuses, and says the name wasn't applied. With
   checkpoints, the commands below change it from then on; earlier
@@ -1115,7 +1142,11 @@ A few things to know:
 - **If a step fails** (a git hook refuses the first checkpoint, say),
   Wolfden says what it did and what it didn't. History is on by then, so
   make the first checkpoint from the dialog once the problem is fixed, or
-  run `wolfden init --git` again: it picks up where it stopped.
+  run `wolfden init --git` again: it picks up where it stopped. A name and
+  email you gave stay saved, so they're what's recorded even if you close
+  **Use a different name for this den** or leave them off the command. Until
+  the first checkpoint, giving others replaces them, while the dialog is still
+  open or with `--author-name` and `--author-email`.
 - **A new den** can start with history: `wolfden init my-notes --git`.
 - **For scripts:** `wolfden init` exits 0 when its main job is done. For
   a new den that job is making the den, so a new den inside a larger

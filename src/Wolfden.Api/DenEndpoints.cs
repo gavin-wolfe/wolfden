@@ -52,6 +52,7 @@ public sealed record UniverseResult(string Key, string Name, string? Id, int Ser
 /// <param name="NeedsEmail">For a turn-on refused with <c>identity_needed</c>, true if git still needs an email that wasn't given (#207); left out otherwise.</param>
 /// <param name="LeftOut">For an <c>unknown_entity</c> that's a note an error leaves out, what's known of it, with nothing in it as of a story position (#280); left out otherwise.</param>
 /// <param name="CurrentFile">For a save by path refused with <c>stale_file</c>, the file as it is now, if it can still be read (#280); left out otherwise.</param>
+/// <param name="IdentitySaved">For a turn-on that stopped part way, the settings that try saved and left saved (<c>user.name</c>, <c>user.email</c>), by key only (#314); left out otherwise.</param>
 public sealed record ApiError(
     string Code, string Message, [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<EntitySummary>? Candidates = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] EntitySourceResult? Current = null,
@@ -59,7 +60,8 @@ public sealed record ApiError(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? NeedsName = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? NeedsEmail = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] LeftOutNote? LeftOut = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] FileSourceResult? CurrentFile = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] FileSourceResult? CurrentFile = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? IdentitySaved = null);
 
 /// <summary>
 /// The API's endpoints, under <c>/api</c> (#23). They read the index the

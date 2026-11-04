@@ -3552,6 +3552,40 @@ F-TPL-6 (#308). Covered by: `LinkTextTests.EveryApostropheIsTheSameCharacter`,
 `ApostropheLinkToolTests`, and in the web tests, `linkFor`'s check in
 `FieldEditing.test.tsx`.
 
+### SC-MCP-47. My assistant's reads stay strict whatever the web UI shows me
+
+The web UI is going to show me everything and tag what readers don't know yet
+(#300). My assistant is drafting `ember:3`, and reads at that position.
+
+- A note the reader meets later, an idea, or a retconned note reads as not in
+  view, by any of its names, and the answer says nothing else. A note an error
+  leaves out is an unknown name, and given by its path or id, the answer says
+  only that it can't be shown. A name a later note shares doesn't match it.
+- A section that's later, an idea, undecided, a candidate, retconned, bookkeeping,
+  or left out by an error isn't shown or mentioned, in `get_entity`, `canon_as_of`,
+  `pinned`, or `brief`, with or without a filter. Neither is a pinned fact that
+  enters later.
+- As Wolfden sets them, no `until` and no later value of a position field is in
+  the answer. That doesn't cover what I wrote myself: a lead or section comes
+  through as written, with its HTML comments and `[[links]]`, and so does a field
+  the type doesn't define, a `ref` field's value, and a mapping with its own
+  `until` key. `line` numbers leave gaps where something's hidden, `kind: temporal`
+  shows that a field changes over time, and `in_view: false`, unlike
+  `unknown_entity`, confirms a note exists.
+- No tag such as `ahead of readers` is in the answer or its `_meta`, and the answer
+  has only the members it has today. A new one fails a test, so showing an assistant
+  more is a decision and not a side effect. The server offers no prompts or resources.
+- A position that can't be read is refused, and doesn't fall back to a full read.
+  An error at a position names no note the reader hasn't met.
+- `search`, `list_entities`, and `get_history` still take no position, and show
+  later material as it's written, unmarked. Only `get_entity` and `canon_as_of`
+  read at a position, and a new tool or argument, on any tool, fails a test until
+  someone has checked that.
+- Wolfden.Mcp can't reach the web API's project, so it can't use its marks.
+
+Spec: F-GEN-2, F-VIEW-1, F-VIEW-2, F-VIEW-4, F-VIEW-5 (#300). Covered by:
+`McpStaysStrictTests`.
+
 ## STORE: Wolfden saves, moves, and deletes notes
 
 Background: the den store (design.md §6, #121) is how Wolfden writes a
@@ -4075,9 +4109,12 @@ the den's folder by hand, and made no commit.
   If saving them fails in a repository this run made, the repository is
   taken away again. In one that was already there, what was saved is taken
   back, and if that can't be done, the output names the settings still
-  saved. Every one of these asks for the same `--author-name` and
+  saved. Each of those asks for the same `--author-name` and
   `--author-email` again, without repeating them, and doesn't offer the web
-  UI's dialog.
+  UI's dialog. When they were saved and a later step stopped it, the output says
+  they stay, so finishing without them records them, not what git has, and
+  that giving others before the first checkpoint replaces them. It doesn't
+  offer the dialog either.
 
 Spec: design.md §6, "Turning history on" (#195, #286). Covered by:
 `HistorySetupTests.AFailedSaveInARepositoryThisRunMadeTakesTheRepositoryAway`,
@@ -4224,10 +4261,11 @@ is for what they write as Ash Calloway, so they run `wolfden init --git
   reads later still beats them (`GIT_CONFIG_COUNT`, `GIT_CONFIG_PARAMETERS`,
   `extensions.worktreeConfig`, an `[include]` in the repository's config),
   no checkpoint is made and the value isn't repeated. A repository this run
-  made is taken away again. In one that was already there, what was saved is
-  taken back, so the next commit from anywhere is under git's own name, not
-  the pen name signed by another key. The output names anything that couldn't
-  be taken back.
+  made is taken away again. In one that was already there, what this try saved
+  is put back as it was, so the next commit from anywhere isn't the pen name
+  signed by another key, unless an earlier try that stopped part way had
+  saved it (`docs/using-wolfden.md`'s limits, #311). The output names anything that couldn't
+  be put back.
 
 Spec: design.md §6, "Turning history on" (maintainer decision, 2026-11-03,
 #286). Covered by:
@@ -5307,7 +5345,8 @@ on…**, then **Turn on history**.
 - The dialog says what a checkpoint is, and not to turn history on for
   a den in a synced folder. A checkbox, ticked, makes a first
   checkpoint, "Start of history". When git has no name or email, the
-  dialog asks for them (SC-HIST-15); otherwise it doesn't.
+  dialog asks for them (SC-HIST-15); otherwise it doesn't, and offers a
+  different name instead (SC-WEB-99).
 - Once it's on, the dialog lists what was done, and the top bar goes
   quiet: the server uses the new history at once, without a restart, for
   the indicator, the History tab, the next checkpoint, and freezing.
@@ -6353,3 +6392,49 @@ On Windows, I have a note open in another program that lets others read it.
 
 Spec: format.md F-GEN-5 (#298). Covered by: `SharedReadEndpointTests`,
 `web/src/Editing.test.tsx` ("when another file stopped the save").
+
+### SC-WEB-99. I use a different name for this den when I turn on history
+
+Git on this computer has the writer's everyday name and email. They're turning
+on history for a den they write under a pen name, from **No history · Turn
+on…**.
+
+- The dialog has **Use a different name for this den**, closed. It's a button
+  that says whether it's open (`aria-expanded`), so a keyboard and a screen
+  reader can use it. Nothing changes if it's left closed: checkpoints record
+  what git has, and the dialog says that much without saying what git has.
+- Opened, it shows a name and an email, both required, and what that does to
+  signing. One alone, or one of only spaces, is refused in the page, with
+  focus on the one that's missing, as #286's rule goes: both or neither.
+- They're sent as `--author-name` and `--author-email` are, and do what they
+  do (SC-HIST-21, SC-HIST-23). The list of what was done says signing was
+  turned off, if git was set to sign, and how to turn it back on.
+- Closed again after typing, what's typed isn't sent, and the dialog says so.
+  Opened again, it's still there. If git turns out to need a name and email
+  after all, the usual fields appear with what was typed, so it's sent only
+  once it can be seen.
+- A den that has checkpoints by then, one inside a larger repository, or a
+  value git won't record: the dialog shows the refusal, keeps what's typed,
+  and stays open. Nothing is changed (SC-HIST-17).
+- If it stops part way (a hook refuses the first checkpoint), the dialog says
+  what was done, and trying again sends the name again (SC-HIST-16). If the
+  try left the name saved and the writer closes this part, the dialog says that
+  name stays and is what's recorded, not what git has, and that opening this and
+  giving both replaces it.
+- Enter on the first checkpoint's checkbox, where focus starts, doesn't submit,
+  so one stray key can't record git's name before the writer has read the dialog.
+  A held Enter does nothing anywhere in it. Enter in a field, or on a button, does what it usually does.
+- The heading follows a refusal: "History is already on", or "Turning on history
+  stopped", rather than "History is off" above a message saying otherwise.
+- A complaint about a missing field goes once it's filled in.
+- A repository with no commits gets the checkpoint dialog, not this one, so
+  there's no different name there; the command line still has it.
+- The browser isn't asked to fill in these two fields, since its saved name is
+  likely to be the one being kept apart.
+
+Spec: design.md §6, "Turning history on", §9 (maintainer decision, #314). Step 2,
+a picker of the den's authors, waits for #311. Covered by:
+`HistorySetupEndpointTests.ADifferentNameFromTheDialogGetsTheSameSigningNoticeAndNoSignature`,
+`HistorySetupEndpointTests.ADifferentNameIsRefusedInADenWithCheckpointsOrInALargerRepositoryWithNothingChanged`,
+`HistorySetupEndpointTests.ADifferentNameThatStopsPartWayIsKeptOnARetryFromTheDialog`,
+`Checkpoint.test.tsx` (web).

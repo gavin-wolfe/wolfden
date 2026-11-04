@@ -192,6 +192,24 @@
   margin-top: 0.75rem;
 }
 
+.turn-on-different {
+  margin-top: 0.75rem;
+}
+
+button.turn-on-disclosure {
+  padding: 0.1rem 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-decoration: underline dotted;
+}
+
+.turn-on-different-note {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+}
+
 .turn-on-steps {
   margin: 0.25rem 0 0.5rem;
   padding-left: 1.1rem;

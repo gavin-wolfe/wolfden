@@ -289,6 +289,8 @@ described in [Pick a den](#2-pick-a-den).
 |---|---|
 | "Which characters has the reader met by chapter 9? Just the names." | `canon_as_of` |
 | "What does the reader know about Renfield as of chapter 8? No spoilers from later chapters." | `get_entity` with `as_of` |
+| "Where could I foreshadow Renfield letting the Count in? Read ahead." | `get_entity` with no `as_of` |
+| "Draft a short scene with Renfield at chapter 20. He has already let the Count in, which the reader learns in chapter 21, so let that show in how he behaves without saying it." | `get_entity` with `as_of`, then with no `as_of` |
 | "Where do my notes mention the bloofer lady?" | `search` |
 | "Which characters are physicians?" | `search` with `field: occupation` |
 | "Whose point of view is chapter 4, and when and where is it set?" | `get_chapter` |
@@ -383,6 +385,22 @@ docs. The writer's own list is in
   view, ideas and later reveals included. To draft or review a chapter,
   use `canon_as_of` at that chapter, or `get_entity` with `as_of`.
   `search` and `get_history` have no position.
+- **Read ahead when the work needs what's coming.** Read the note with
+  `get_entity` and no `as_of` for planning, outlining, foreshadowing, and
+  continuity checks, or whenever the writer asks. A full read has ideas as
+  well as canon, so check a fact's status before you rely on it.
+- **Read ahead to write a character who knows more than the reader.** A read
+  at a position leaves out what the reader hasn't learned, and that can be
+  something a character already knows. Say the reader knows a stranger only as
+  the Magpie, and her friend learned her real name in an earlier scene the
+  narrator didn't hear. At that chapter the name isn't in the view, so an
+  assistant reading only the view writes the friend as not knowing it.
+- **Use both reads, and keep later facts out of the prose.** The view at the
+  chapter is what the reader knows, and the full note is what's coming. Later
+  facts shape what's hinted at and how a character behaves: the friend can
+  avoid the alias, or go quiet when someone asks who the Magpie is. Don't state
+  those facts, and don't have a narrator or point-of-view character reveal
+  them. If you aren't sure which read applies, ask the writer.
 - **A read at a position doesn't say when a fact ends.** A fact's `until`
   tells what the reader doesn't know yet, so `canon_as_of` and `get_entity`
   leave it out at a position, and nothing says it's gone: in the result, the

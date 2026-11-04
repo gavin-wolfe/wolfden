@@ -66,6 +66,17 @@ export function ordinalOf(position: string, positions: readonly PositionView[]):
 }
 
 /**
+ * True if `position` comes after `at` in story order, so readers at `at`
+ * haven't got there. False with no position being viewed, or for a position
+ * the list doesn't have, since nothing can be said about it.
+ */
+export function isAheadOf(position: string, at: string | undefined, positions: readonly PositionView[]): boolean {
+  const here = at === undefined ? null : ordinalOf(at, positions)
+  const there = ordinalOf(position, positions)
+  return here !== null && there !== null && there > here
+}
+
+/**
  * Where an entity enters canon, as a position: its own `from`, or the start
  * of the scope it's filed in (format.md F-ENT-6). Null for the start of the
  * story (an entity filed in the universe) or a series with no books yet.

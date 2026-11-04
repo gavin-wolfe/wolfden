@@ -415,6 +415,17 @@ button.peek {
   font-variant-numeric: tabular-nums;
 }
 
+.ahead-of-readers {
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 400;
+  font-style: italic;
+  margin-left: 0.3rem;
+  color: var(--text-muted);
+  vertical-align: middle;
+  cursor: help;
+}
+
 .status-idea,
 .status-undecided,
 .status-candidate {

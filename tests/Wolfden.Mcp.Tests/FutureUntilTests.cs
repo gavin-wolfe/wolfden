@@ -135,6 +135,29 @@ public sealed class FutureUntilTests : IDisposable
 
     [Fact]
     [Trait("Scenario", "SC-MCP-41")]
+    public void AMappingOfTheWritersOwnWithAKeyNamedUntilIsNotAFactsUntil()
+    {
+        _den.Write(
+            "universes/starfall/entities/notes/the-ledger.md",
+            """
+            ---
+            type: note
+            name: The ledger
+            status: canon
+            fields:
+              plainmap: { name: inner, until: "ash:2" }
+            ---
+
+            # The ledger
+            """);
+
+        using var json = Read(_tools.GetEntity("The ledger", "starfall", "ember:1"));
+
+        Assert.Equal("ash:2", Field(json, "plainmap").GetProperty("value").GetProperty("until").GetString());
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-41")]
     public void AReaderWhoHasntMetTheEntityStillGetsNothing()
     {
         using var json = Read(_tools.GetEntity("Halden Pike", "starfall", "ember:3"));

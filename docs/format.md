@@ -1359,20 +1359,21 @@ order.
 **F-VIEW-4.** A fact past its `until` isn't in a view at that position
 (F-TMP-3, F-SEC-8), so every `until` in a canon-as-of view at `p` is later
 than `p`. It says when the fact stops holding, which a reader at `p`
-doesn't know yet. An AI assistant's read at a position (design.md §8) MUST
-leave it out, and doesn't say it did, since saying so would hint that the
-fact ends. For the same reason, a field that was an entry or a list item only
-to hold its `until`, with no `from`, `pin`, or status of its own, reads as
-`plain`. The assistant reads it without a position. A view for the writer,
-who may be checking their own plan, keeps it, and the web UI marks it (design.md §9).
+doesn't know yet. An AI assistant's read at a position (design.md §8) and the
+web UI's Reader's view (§9) MUST leave it out, and don't say they did, since
+saying so would hint that the fact ends. For the same reason, a field that was
+an entry or a list item only to hold its `until`, with no `from`, `pin`, or
+status of its own, reads as `plain`. The assistant reads it without a position.
+A view for the writer, who may be checking their own plan, such as the web UI's
+Author's view, keeps it and marks it (design.md §9).
 The view at the end of the story has no `until` to leave out: it holds only
 the facts still in effect when the story ends.
 
 **F-VIEW-5.** The value of a `position` field (types.md F-FT-10), such as a
 thread's `paid_off`, can point past `p`, and that says what a reader at `p`
-doesn't know yet. An AI assistant's read at a position MUST leave out each
-such value that's later than `p` in story order (F-ORD-2), and doesn't say
-it did. This covers every field the entity's type defines as `position`,
+doesn't know yet. An AI assistant's read at a position and the web UI's
+Reader's view MUST leave out each such value that's later than `p` in story
+order (F-ORD-2), and don't say they did. This covers every field the entity's type defines as `position`,
 written plain or as an entry (F-TMP-1). A value at `p` isn't later, and a bare
 book is the same point as its first chapter (F-POS-7). In a list, only the
 later items go, a list that had items and has none left goes entirely, and a
@@ -1381,9 +1382,9 @@ position that doesn't resolve, F-POS-4) goes too. A view without a position,
 and a view for the writer, leave out nothing under this rule.
 
 **F-VIEW-6.** An HTML comment can say anything, including what a reader at `p`
-doesn't know yet. An AI assistant's read at a position MUST leave every HTML
-comment out of a lead, and out of a section's text and heading, and doesn't say
-it did. That covers the writer's own comments and wolfden comments that do
+doesn't know yet. An AI assistant's read at a position and the web UI's Reader's
+view MUST leave every HTML comment out of a lead, and out of a section's text and
+heading, and don't say they did. That covers the writer's own comments and wolfden comments that do
 nothing (F-SEC-10). A view without a position, and a view for the writer, leave
 out nothing under this rule. Since a badly formed comment may still be meant to
 hide what it holds, this rule reads comments more widely than CommonMark does:

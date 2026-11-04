@@ -4,8 +4,8 @@ using Wolfden.Core.Documents;
 namespace Wolfden.Index.Reading;
 
 /// <summary>
-/// What an AI assistant's read at a story position leaves out beyond the
-/// canon view itself: a fact's <c>until</c> (format.md F-VIEW-4, #288), the
+/// What a read at a story position for an AI assistant, or for the web UI's
+/// Reader's view, leaves out beyond the canon view itself: a fact's <c>until</c> (format.md F-VIEW-4, #288), the
 /// values of position fields later than the position (F-VIEW-5, #305), and the
 /// HTML comments in a lead or section (F-VIEW-6, #306). Each can say what the
 /// reader doesn't know yet, such as when a thread pays off, and an assistant
@@ -19,18 +19,19 @@ namespace Wolfden.Index.Reading;
 /// goes too, since nothing says it isn't ahead. A comment can say anything, so
 /// all of them go, and the text reads as if none was there. A view of the end of the
 /// story has nothing ahead of it, and the full view is where a planning
-/// assistant reads all of this, so neither is touched. This is in the MCP
-/// layer because the web API answers from the same <see cref="DenReader"/>
-/// and keeps it all for the writer.
+/// assistant reads all of this, so neither is touched. This is apart from
+/// <see cref="DenReader"/> because the writer's reads keep it all: the web API
+/// applies it only for <c>readers=true</c>, and the MCP tools always do, so
+/// there's one rule for the two (#300).
 /// </remarks>
 public static class AsOfReads
 {
-    /// <summary><paramref name="result"/> as an assistant gets it.</summary>
-    public static GetEntityResult ForAssistant(GetEntityResult result, StoryHorizon? horizon) =>
+    /// <summary><paramref name="result"/> with only what a reader at its position knows.</summary>
+    public static GetEntityResult ForReaders(GetEntityResult result, StoryHorizon? horizon) =>
         result.Position is null || result.Entity is null ? result : result with { Entity = AsKnown(result.Entity, Required(horizon)) };
 
-    /// <summary><paramref name="result"/> as an assistant gets it.</summary>
-    public static CanonAsOfResult ForAssistant(CanonAsOfResult result, StoryHorizon? horizon)
+    /// <summary><paramref name="result"/> with only what a reader at its position knows.</summary>
+    public static CanonAsOfResult ForReaders(CanonAsOfResult result, StoryHorizon? horizon)
     {
         if (result.Position is null)
         {

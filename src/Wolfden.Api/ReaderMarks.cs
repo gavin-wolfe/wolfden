@@ -87,6 +87,24 @@ internal sealed class ReaderMarks
     /// <summary>The marks of one note.</summary>
     public NoteMarks Of(EntityRecord note) => new(this, note);
 
+    /// <summary>
+    /// The mark of a link in a container's file or a chapter's fields, or in an
+    /// outline: where it's written, as a view at a position asks. One with no
+    /// position, which no view reaches, is <see cref="ReaderMark.Unplaced"/>.
+    /// Bookkeeping or out of canon, it keeps its own badge instead.
+    /// </summary>
+    public ReaderMark? OfContainerLink(LinkRecord link)
+    {
+        if (link.IsBookkeeping || link.Status is not (null or "draft" or "canon"))
+        {
+            return null;
+        }
+
+        return link.PositionOrdinal is not { } at ? new ReaderMark(ReaderMark.Unplaced, null)
+            : at > _point ? new ReaderMark(ReaderMark.Ahead, _names.GetValueOrDefault(at))
+            : null;
+    }
+
     /// <summary><paramref name="page"/> with each hit's marks.</summary>
     public SearchPageResult Mark(SearchPageResult page)
     {
@@ -157,6 +175,14 @@ internal sealed class ReaderMarks
         /// </summary>
         public IReadOnlyList<string>? UnplacedValues(string field, int? entryIndex) =>
             Row(field, entryIndex) is { } row ? Values(row).Unplaced : null;
+
+        /// <summary>The mark of a link in a section, by its heading's line: the section's, or the note's.</summary>
+        public ReaderMark? OfSectionLink(int line) =>
+            _sections.GetValueOrDefault(line) is { } section ? (Takes(section) ? Fact(section) ?? Note : null) : Note;
+
+        /// <summary>The mark of a link in a field's value or entry: its own, or the note's.</summary>
+        public ReaderMark? OfFieldLink(string field, int? entryIndex) =>
+            Row(field, entryIndex) is { } row ? (Takes(row) ? Fact(row) ?? Note : null) : Note;
 
         /// <summary><paramref name="hit"/> with what readers at the position know of the text it found.</summary>
         public SearchPageHit Mark(SearchPageHit hit)

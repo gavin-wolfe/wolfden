@@ -445,7 +445,7 @@ public sealed partial class DenReader
     }
 
     /// <summary>What a reader at <paramref name="position"/> has reached, in universe <paramref name="universeKey"/>.</summary>
-    private static StoryHorizon Horizon(DenIndex index, string universeKey, string position)
+    public static StoryHorizon Horizon(DenIndex index, string universeKey, string position)
     {
         var db = index.Context;
         return new StoryHorizon(

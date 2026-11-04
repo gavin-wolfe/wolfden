@@ -83,7 +83,7 @@ public sealed class GitHistorySetup : IHistorySetup
 
     private static readonly string[] IgnoreSpellings = [".wolfden", ".wolfden/", "/.wolfden", "/.wolfden/", ".wolfden/*", "/.wolfden/*", ".wolfden/**", "/.wolfden/**"];
 
-    /// <summary>What's saved as off in the den's repository when the name or email given isn't git's.</summary>
+    /// <summary>What's saved as off in the den's repository when a name and email are given.</summary>
     private static readonly string[] SigningSettings = ["commit.gpgsign", "tag.gpgsign", "tag.forcesignannotated", "push.gpgsign"];
 
     /// <summary>The settings that make a commit or tag signed, so that signing is on if any is.</summary>
@@ -316,18 +316,7 @@ public sealed class GitHistorySetup : IHistorySetup
                     return Undo(HistorySetupCodes.HistoryFailed, problem);
                 }
 
-                // In a repository that was already there: as it was, if git lets it be.
-                var leftover = TakeBack(written);
-                saved.RemoveAll(key => !leftover.Contains(key));
-                signingOff = signingOff && SigningSettings.All(leftover.Contains);
-                AddSavedSteps();
-                var checkpointNotDone = request.FirstCheckpoint ? " No first checkpoint was made." : "";
-                return Stop(
-                    HistorySetupCodes.HistoryFailed,
-                    problem,
-                    leftover.Count == 0
-                        ? $"What had been saved was taken back.{checkpointNotDone}"
-                        : $"These couldn't be taken back, and are still saved for this den: {string.Join(", ", leftover)}.{checkpointNotDone}");
+                return Stop(HistorySetupCodes.HistoryFailed, problem, TakeBackWhatWasSaved());
             }
 
             if (beatenAfterSaving is not null)
@@ -337,8 +326,9 @@ public sealed class GitHistorySetup : IHistorySetup
                     return Undo(HistorySetupCodes.BadArgument, beatenAfterSaving);
                 }
 
-                AddSavedSteps();
-                return Stop(HistorySetupCodes.BadArgument, beatenAfterSaving, "No first checkpoint was made.");
+                // Left saved, the next commit from anywhere would record the name given, and sign it
+                // with whatever beat signing's being off. Taken back, it's under git's own name.
+                return Stop(HistorySetupCodes.BadArgument, beatenAfterSaving, TakeBackWhatWasSaved());
             }
 
             AddSavedSteps();
@@ -459,9 +449,22 @@ public sealed class GitHistorySetup : IHistorySetup
             {
                 steps.Add(
                     "Turned signing off for this den's repository only: git is set to sign, and Wolfden can't tell whose key that would use. " +
-                    "To sign here with a key of this name's, run 'git config --local user.signingkey <key>' and 'git config --local commit.gpgsign true' in the den's folder. " +
+                    "To sign here with a key of this name's, run 'git config --local user.signingkey <key>' and 'git config --local commit.gpgsign true' in the den's folder, and 'git config --local tag.gpgsign true' to sign tags too. " +
                     "If your gpg.conf has a 'local-user' line, gpg adds that key's signature too, so take that into account first.");
             }
+        }
+
+        // In a repository that was already there: as it was, if git lets it be. Says what's left.
+        string TakeBackWhatWasSaved()
+        {
+            var leftover = TakeBack(written);
+            saved.RemoveAll(key => !leftover.Contains(key));
+            signingOff = signingOff && SigningSettings.All(leftover.Contains);
+            AddSavedSteps();
+            var checkpointNotDone = request.FirstCheckpoint ? " No first checkpoint was made." : "";
+            return leftover.Count == 0
+                ? $"What had been saved was taken back.{checkpointNotDone}"
+                : $"These couldn't be taken back, and are still saved for this den: {string.Join(", ", leftover)}.{checkpointNotDone}";
         }
 
         void Save(string key, string value)
@@ -573,13 +576,13 @@ public sealed class GitHistorySetup : IHistorySetup
                 || (name is not null && WithoutMark(text[..open].TrimEnd(' ')) != WithoutCrud(name))
                 || (email is not null && WithoutMark(text[(open + 1)..close]) != WithoutCrud(email)))
             {
-                return $"Git wouldn't record the name and email given, though they're saved. {Causes}";
+                return $"Git wouldn't record the name and email given, even with them saved for this den. {Causes}";
             }
         }
 
         if (SigningSettings.Any(key => Run(["config", "--type=bool", "--get", key], cancellationToken).Output.Trim() != "false"))
         {
-            return $"Git would still sign with a key that isn't tied to the name and email given, though signing is saved as off for this den. {Causes}";
+            return $"Git would still sign, with a key that isn't tied to the name and email given, even with signing saved as off for this den. {Causes}";
         }
 
         return null;

@@ -646,7 +646,9 @@ repeats what git has. A save that fails in a repository the run
 made takes the repository away again; in one that was there, what was saved
 is taken back if it can be, and the result names what couldn't be. Once saved, git is asked what it would
 record (`git var GIT_AUTHOR_IDENT` and `GIT_COMMITTER_IDENT`) and whether
-it would sign; anything that still beats them refuses before any commit.
+it would sign; anything that still beats them refuses before any commit, with
+what was saved taken back as for a failed save, since left saved, the next
+commit would record the name given and sign it with another key.
 A later `GIT_AUTHOR_NAME`, when `wolfden serve` or a checkpoint runs, still
 wins, and a clone has none of this, as with any git setting. When a name and
 email are given, signing is saved as off in that repository too, always

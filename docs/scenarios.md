@@ -4044,7 +4044,10 @@ is for what they write as Ash Calloway, so they run `wolfden init --git
   reads later still beats them (`GIT_CONFIG_COUNT`, `GIT_CONFIG_PARAMETERS`,
   `extensions.worktreeConfig`, an `[include]` in the repository's config),
   no checkpoint is made and the value isn't repeated. A repository this run
-  made is taken away again.
+  made is taken away again. In one that was already there, what was saved is
+  taken back, so the next commit from anywhere is under git's own name, not
+  the pen name signed by another key. The output names anything that couldn't
+  be taken back.
 
 Spec: design.md §6, "Turning history on" (maintainer decision, 2026-11-03,
 #286). Covered by:
@@ -4055,6 +4058,7 @@ Spec: design.md §6, "Turning history on" (maintainer decision, 2026-11-03,
 `HistorySetupTests.AnEnvironmentVariableThatWouldBeatWhatsGivenRefusesWithNothingChanged`,
 `HistorySetupTests.ASettingFromTheEnvironmentThatBeatsWhatsSavedRefusesBeforeTheFirstCheckpoint`,
 `HistorySetupTests.ALaterSettingInTheRepositoryThatBeatsWhatsSavedStopsBeforeTheFirstCheckpoint`,
+`HistorySetupTests.WhatBeatsSigningBeingOffGetsItAllTakenBackSoNoLaterCommitSignsTheNameGiven`,
 `HistorySetupTests.CharactersGitStripsFromWhatsGivenArentTakenForSomethingBeatingIt`,
 `HistorySetupTests.UnusualSpacesAndMarksArentTakenForSomethingBeatingWhatsGiven`,
 `HistorySetupTests.ABadDateInTheEnvironmentIsntBlamedOnTheNameBeingBeaten`,
@@ -4100,7 +4104,8 @@ The writer's git signs every commit, with a key in their everyday name
   saved as off in the den's repository (`commit.gpgsign`, `tag.gpgsign`,
   `tag.forceSignAnnotated`, `push.gpgSign`), before the first checkpoint. If
   git was set to sign, the output says so, and how to sign here with a key of
-  this name's, and that a `local-user` line in `gpg.conf` adds its key too.
+  this name's, for commits and for tags, and that a `local-user` line in
+  `gpg.conf` adds its key too.
 - That's so even when what's given is what git has already. The key git
   uses needn't have anything to do with the name, and Wolfden can't see every
   way it's chosen, so someone giving their own name again loses signing in
@@ -4114,8 +4119,9 @@ The writer's git signs every commit, with a key in their everyday name
 - Nothing changes when nothing is given.
 - If a commit or tag fails while git's settings say that call would sign,
   git's output isn't repeated, whatever it was, since a signing program's
-  words can name who the key belongs to. The message says to run `git commit`
-  or `git tag` to see it. That holds at every checkpoint and tag, with or without
+  words can name who the key belongs to. The message says what shows it: `git add -A` then
+  `git commit -m <message>`, or `git tag -m <message> <name>`, and that either
+  makes the commit or tag if it succeeds. That holds at every checkpoint and tag, with or without
   a name given. When that call wouldn't sign, git's output is repeated as
   usual, even if it mentions signing.
 - A signing setting that stays on after saving (`GIT_CONFIG_COUNT`, say)
@@ -4131,6 +4137,7 @@ Spec: design.md §6, "Turning history on" (#286). Covered by:
 `HistorySetupTests.WithSigningOffWhatGitSaidIsRepeatedEvenIfItMentionsSigning`,
 `HistorySetupTests.AKeyFromATemplateInARepositoryThisRunMadeIsNotChosenForIt`,
 `HistorySetupTests.ASigningSettingFromTheEnvironmentThatStaysOnRefusesBeforeTheFirstCheckpoint`,
+`HistorySetupTests.WhatBeatsSigningBeingOffGetsItAllTakenBackSoNoLaterCommitSignsTheNameGiven`,
 `InitHistoryTests.AGivenNameTurnsSigningOffForTheDenAndSaysSo`.
 
 ## WEB: the den in a browser

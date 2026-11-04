@@ -1054,7 +1054,8 @@ off for this den, always, even if they're what git already has or the den's
 repository names its own key: Wolfden says so, and a signature can't tie your
 pen name to the other key. To sign with a key
 of this name's, run `git config --local user.signingkey <key>` and `git
-config --local commit.gpgsign true` in the den's folder. A `local-user` line
+config --local commit.gpgsign true` in the den's folder, and `git config
+--local tag.gpgsign true` to sign tags too. A `local-user` line
 in your `gpg.conf` adds that key's signature as well, so check for one first.
 
 A pen name given this way has limits worth knowing:

@@ -437,13 +437,13 @@ public sealed partial class DenTools
     /// </summary>
     private void SaveMove(string from, string to, byte[] interim, Dictionary<string, byte[]> files, IReadOnlyDictionary<string, byte[]> originals)
     {
+        BeforeSaveComparison?.Invoke();
         foreach (var (path, before) in originals)
         {
             var now = Store.TryReadFile(path);
             if (now is null || !now.AsSpan().SequenceEqual(before))
             {
-                throw new DenToolException(
-                    ToolErrorCodes.StaleFile, $"{path} changed while the move was being made, so nothing was written. Read it again and retry.");
+                throw ChangedOrHeld(path, now, "move");
             }
         }
 

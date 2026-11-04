@@ -75,9 +75,9 @@ public sealed partial class DenTools
         var (universeKey, _) = LocateBook(key, universe);
         using (EnterWrite())
         {
-            var den = Snapshot();
+            var den = new TrackingDenSource(Snapshot());
             var structure = DenStructure.Load(den);
-            var target = FindBook(structure, universeKey, key);
+            var target = Finding(den, () => FindBook(structure, universeKey, key));
             var path = target.FilePath;
             var original = target.File.ToBytes();
             if (hash is not null)

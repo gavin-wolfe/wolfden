@@ -805,6 +805,44 @@ from the files:
   section rename, alias change, copy, create, `chapter_defaults`, a new book
   or series, and a freeze or unfreeze that will checkpoint) is refused as a
   whole. A write to one file isn't stopped by another that can't be read.
+- **Views share a file with programs writing it; writes don't** (#298;
+  maintainer decision, 2026-11-04). Pages, read tools, the index, and `check` read
+  through `FileSystemDenSource.ForViews`, with `FileShare.ReadWrite | Delete`
+  (`SharedFile`), so a note open elsewhere doesn't vanish, unless the program
+  keeps others from reading. Such a read can land part way through a save, and the
+  next read corrects it. Everything a write builds on reads through `Snapshot()`,
+  or the store, with `FileShare.Read`, so on Windows it's refused while another
+  program has the file open to write. That's the default for
+  `new FileSystemDenSource`, so a source made that way fails safe. But the
+  overloads that take a folder (`DenStructure.Load(string)`,
+  `EntityCatalog.Load(string)`, `LinkIndex.Load(string)`, `DenCheck.Run(string)`)
+  read as views, since today's callers only look things up or report: a write must
+  not build on one. Sharing reads with
+  writes too was tried and rejected: a stalled save could be read in part, then
+  overwritten once the save finished and the store's retry went through, losing
+  text silently (review of #307). A refusal is visible, and clears on retry; the
+  cost is that a write is refused while a note is open to write, even one that
+  program won't change again. To revisit while dogfooding. A write's lookup still
+  goes through the index, so it can find what its own read then can't, or miss
+  what the index read part of. Either way it names what's open, as `den_unreadable`,
+  rather than call the note broken or the book gone. That holds for adding an image
+  too, which reads what's above the note to know whether the book is final.
+  The limits: on Linux and macOS, .NET takes the same shared `flock` for any
+  sharing, and a program writing a file doesn't normally take a lock, so both kinds
+  of read behave the same and a write there can read part of a save, as it always
+  could. And on Windows **a program can still lose a save without a word,** as on
+  `main`: if it starts saving after a write has read that file and stalls briefly,
+  the store's retry of about 300 ms, which only runs on Windows, keeps trying while
+  the file is open, then replaces it once the program closes it, and the write
+  reports success. The review of #307 measured this on Windows, with saves timed to
+  overlap a call (starting 0–120 ms in, stalling 100–250 ms): 5 and 13 lost of 150 on
+  this branch, 3 and 8 of 150 on `main`, and 0 of 60 with stalls of 500 ms or more.
+  An ordinary temp-and-rename save can hit the same gap. Linux and macOS weren't
+  measured. The maintainer has decided the fix, in #323: compare the file again
+  before each retry.
+  `checkpoint` hands files to git, which reads them itself, so a
+  checkpoint can record part of a save; a freeze refuses first but can't stop
+  a save that starts after that look.
 - **Watched** (#14; v0 behaviour, not a recorded decision). The file
   watcher collects a burst of saves (an editor's temporary file and
   rename, a git checkout) into one batch, and ignores hidden paths such as

@@ -516,7 +516,7 @@ public static class IndexBuilder
             ? format.Text
             : "";
 
-    private static string DenFormatStamp(string root) => DenFormatStamp(((IDenSource)new FileSystemDenSource(root)).TryReadFile("den.yaml"));
+    private static string DenFormatStamp(string root) => DenFormatStamp(((IDenSource)FileSystemDenSource.ForViews(root)).TryReadFile("den.yaml"));
 
     /// <summary>
     /// <c>.wolfden/</c> SHOULD be gitignored (F-LAY-2). A <c>.gitignore</c>

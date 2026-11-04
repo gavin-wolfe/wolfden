@@ -178,7 +178,7 @@ internal sealed class IndexUpdater
                 var full = Path.Combine(_root, path.Replace('/', Path.DirectorySeparatorChar));
                 try
                 {
-                    bytes = File.ReadAllBytes(full);
+                    bytes = SharedFile.ReadAllBytes(full);
                 }
                 catch (Exception e) when (e is FileNotFoundException or DirectoryNotFoundException || e is IOException && FileSystemDenSource.IsBrokenLink(new FileInfo(full)))
                 {
@@ -255,7 +255,7 @@ internal sealed class IndexUpdater
         }
         else
         {
-            var source = new OverlayDenSource(new FileSystemDenSource(_root), overlay);
+            var source = new OverlayDenSource(FileSystemDenSource.ForViews(_root), overlay);
             next = IndexWriter.Update(state, source, entities, outlines, tree);
         }
 

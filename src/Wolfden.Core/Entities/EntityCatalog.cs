@@ -71,7 +71,7 @@ public sealed partial class EntityCatalog
     public IReadOnlyList<DenDiagnostic> Diagnostics => _diagnostics;
 
     /// <summary>Loads the den whose root folder is <paramref name="root"/>: its structure, then its entities.</summary>
-    public static EntityCatalog Load(string root) => Load(new FileSystemDenSource(root));
+    public static EntityCatalog Load(string root) => Load(FileSystemDenSource.ForViews(root));
 
     /// <summary>Loads a den's structure, then its entities.</summary>
     public static EntityCatalog Load(IDenSource source) => Load(DenStructure.Load(source), source);

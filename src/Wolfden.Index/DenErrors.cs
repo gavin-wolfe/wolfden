@@ -231,7 +231,7 @@ public sealed class DenErrorWatch(string root, TimeSpan watcherWait, string? pin
     private DenErrorList Read()
     {
         IndexBuilder.EnsureUpToDate(root, watcherWait);
-        var tracked = new TrackingDenSource(new FileSystemDenSource(root));
+        var tracked = new TrackingDenSource(FileSystemDenSource.ForViews(root));
         _ = DenCheck.Run(tracked, pinned);
 
         // Even pinned, the other universes' container files are read, for story order.

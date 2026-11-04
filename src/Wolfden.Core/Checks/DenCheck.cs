@@ -63,14 +63,14 @@ public sealed class DenCheck
     }
 
     /// <summary>Checks the den whose root folder is <paramref name="root"/>.</summary>
-    public static DenCheck Run(string root) => Run(new FileSystemDenSource(root));
+    public static DenCheck Run(string root) => Run(FileSystemDenSource.ForViews(root));
 
     /// <summary>
     /// Checks one universe of the den at <paramref name="root"/>, or the whole
     /// den when <paramref name="universeKey"/> is null. See <see cref="Run(IDenSource, string?)"/>.
     /// </summary>
     public static DenCheck Run(string root, string? universeKey, IReadOnlyDictionary<string, IReadOnlyList<string>>? idsElsewhere = null) =>
-        Run(new FileSystemDenSource(root), universeKey, idsElsewhere);
+        Run(FileSystemDenSource.ForViews(root), universeKey, idsElsewhere);
 
     /// <summary>
     /// Checks one universe of a den (maintainer decision, 2026-10-23): its

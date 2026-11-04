@@ -55,8 +55,8 @@ public sealed partial class DenTools
     /// </summary>
     public BookFreezeView GetBookFreeze(string book, string? universe = null)
     {
-        var (universeKey, key) = BookArgument(book, universe);
-        var target = FindBook(DenStructure.Load(Snapshot()), universeKey, key);
+        var (universeKey, key) = BookArgument(book, universe, view: true);
+        var target = FindBook(DenStructure.Load(ViewSnapshot()), universeKey, key);
         var history = History();
         var canCheckpoint = history.CheckpointUnavailable is null;
         var canTag = canCheckpoint && history.Capabilities.HasFlag(HistoryCapabilities.Tag);
@@ -256,7 +256,9 @@ public sealed partial class DenTools
         using (EnterWrite())
         {
             // A book that isn't final isn't written or checkpointed, so nothing needs reading.
-            if (FindBook(DenStructure.Load(Snapshot()), universeKey, key).Status == BookStatus.Final)
+            var tracked = new TrackingDenSource(Snapshot());
+            var structure = DenStructure.Load(tracked);
+            if (Finding(tracked, () => FindBook(structure, universeKey, key)).Status == BookStatus.Final)
             {
                 RefuseUnreadableBeforeCheckpoint();
             }
@@ -300,7 +302,7 @@ public sealed partial class DenTools
     }
 
     /// <summary>The universe and key of the book named <paramref name="book"/>, after checking that it's there.</summary>
-    private (string Universe, string Key) BookArgument(string book, string? universe)
+    private (string Universe, string Key) BookArgument(string book, string? universe, bool view = false)
     {
         if (string.IsNullOrWhiteSpace(book))
         {
@@ -308,7 +310,7 @@ public sealed partial class DenTools
         }
 
         var key = book.Trim();
-        var (universeKey, _) = LocateBook(key, universe);
+        var (universeKey, _) = LocateBook(key, universe, view);
         return (universeKey, key);
     }
 
@@ -334,9 +336,9 @@ public sealed partial class DenTools
     private (Book Book, byte[] Bytes, bool Changed, string? IdAdded, IReadOnlyList<DiagnosticView> Warnings) SetStatus(
         string universeKey, string key, string? expectedHash, BookStatus status)
     {
-        var den = Snapshot();
+        var den = new TrackingDenSource(Snapshot());
         var structure = DenStructure.Load(den);
-        var target = FindBook(structure, universeKey, key);
+        var target = Finding(den, () => FindBook(structure, universeKey, key));
         var path = target.FilePath;
         var original = target.File.ToBytes();
         if (expectedHash is not null)
@@ -368,7 +370,7 @@ public sealed partial class DenTools
     {
         var den = new TrackingDenSource(Snapshot());
         var structure = DenStructure.Load(den);
-        var target = FindBook(structure, universeKey, key);
+        var target = Finding(den, () => FindBook(structure, universeKey, key));
         var diagnostics = structure.Diagnostics.Concat(EntityCatalog.Load(structure, den).Diagnostics).ToList();
 
         // A note of this book that can't be read may have a bad section comment too (#284).

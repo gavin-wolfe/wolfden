@@ -58,6 +58,27 @@ public sealed class NewChapterCommandTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "SC-MCP-43")]
+    public void AddingAChapterPartWayThroughASaveOfBookMdNamesIt()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Skip("Only Windows can refuse a program that's writing a file: on Linux and macOS it doesn't normally say so.");
+        }
+
+        var full = Path.Combine(_den.Root, Book.Replace('/', Path.DirectorySeparatorChar));
+        using var saving = new FileStream(full, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+        saving.SetLength(0);
+        saving.Write("---\nid: 01"u8);
+        saving.Flush();
+
+        var (exitCode, _, error) = New("chapter", "Title", "--in", "dracula");
+
+        Assert.Equal(CliApp.ExitUsage, exitCode);
+        Assert.Contains(Book, error, StringComparison.Ordinal);
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-CLI-17")]
     public void ARefusedAddExitsTwoAndWritesNothing()
     {

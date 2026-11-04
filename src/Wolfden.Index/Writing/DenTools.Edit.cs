@@ -38,8 +38,8 @@ public sealed partial class DenTools
     /// </summary>
     public EntitySourceResult GetSource(string entity, string? universe = null)
     {
-        var (path, _) = Locate(entity, universe);
-        var den = Snapshot();
+        var (path, _) = Locate(entity, universe, view: true);
+        var den = ViewSnapshot();
         var structure = DenStructure.Load(den);
         var bytes = den.TryReadFile(path) ?? throw GoneOrUnreadable(den, path);
         var read = EntityCatalog.ReadEntityFile(structure, path, bytes);
@@ -260,7 +260,7 @@ public sealed partial class DenTools
         });
 
         // The index leaves out a file it can't read, so its links aren't in the list above (#284).
-        var unread = LoadTracked().Den.Unreadable;
+        var unread = UnreadableToViews();
 
         return EditEntity(entity, universe, hash, (file, _, pinned) =>
         {

@@ -103,6 +103,31 @@ internal static class CanonQuery
         return Point(db, db.Containers.Where(c => c.UniverseId == universe.Id).ToList(), universe, position);
     }
 
+    /// <summary>
+    /// The ordinal of every position that resolves in universe
+    /// <paramref name="universeKey"/>, by its text: each bare book and each
+    /// chapter, as <see cref="Point"/> finds them. A book key used twice
+    /// (F-KEY-5), like a chapter key used twice, doesn't resolve, so isn't here.
+    /// </summary>
+    public static Dictionary<string, long> PointsOf(IndexDbContext db, string universeKey)
+    {
+        var universe = Universe(db, universeKey);
+        var books = db.Containers.Where(c => c.UniverseId == universe.Id && c.Kind == "book").ToList()
+            .GroupBy(b => b.Key, StringComparer.Ordinal)
+            .Where(g => g.Count() == 1)
+            .Select(g => g.Single())
+            .ToDictionary(b => b.Id);
+        var points = books.Values.ToDictionary(b => b.Key, b => b.StartOrdinal, StringComparer.Ordinal);
+        var chapters = db.Chapters.Where(c => c.UniverseId == universe.Id).ToList().Where(c => books.ContainsKey(c.BookId));
+        foreach (var same in chapters.GroupBy(c => (c.BookId, c.Key)).Where(g => g.Count() == 1))
+        {
+            var chapter = same.Single();
+            points[$"{books[chapter.BookId].Key}:{chapter.Key}"] = chapter.Ordinal;
+        }
+
+        return points;
+    }
+
     private static ContainerRecord Universe(IndexDbContext db, string universeKey) =>
         db.Containers.Where(c => c.Kind == "universe" && c.Key == universeKey).ToList() switch
         {

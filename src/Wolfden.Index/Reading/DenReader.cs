@@ -401,6 +401,35 @@ public sealed partial class DenReader
         return WithIndex(index => GetEntity(index, entity, universe, asOf));
     }
 
+    /// <summary>
+    /// <see cref="GetEntity(string, string?, string?)"/>, also giving the
+    /// <see cref="StoryHorizon"/> of <paramref name="asOf"/> from the same
+    /// read of the index, or null when there's no position or no entity in view.
+    /// </summary>
+    public GetEntityResult GetEntity(string entity, string? universe, string? asOf, out StoryHorizon? horizon)
+    {
+        CheckEntityName(entity);
+        StoryHorizon? read = null;
+        var result = WithIndex(index =>
+        {
+            var found = GetEntity(index, entity, universe, asOf);
+            read = asOf is not null && found.Entity is { } inView ? Horizon(index, inView.Universe, asOf) : null;
+            return found;
+        });
+        horizon = read;
+        return result;
+    }
+
+    /// <summary>What a reader at <paramref name="position"/> has reached, in universe <paramref name="universeKey"/>.</summary>
+    private static StoryHorizon Horizon(DenIndex index, string universeKey, string position)
+    {
+        var db = index.Context;
+        return new StoryHorizon(
+            db.PositionFields.Select(p => new { p.TypeKey, p.Field }).AsEnumerable().Select(p => (p.TypeKey, p.Field)).ToHashSet(),
+            CanonQuery.PointsOf(db, universeKey),
+            index.PointOf(universeKey, position));
+    }
+
     /// <summary>Refuses an entity name that's missing or blank.</summary>
     public static void CheckEntityName([NotNull] string? entity)
     {
@@ -641,10 +670,20 @@ public sealed partial class DenReader
     /// field values and sections in effect (F-VIEW-1).
     /// </summary>
     public CanonAsOfResult CanonAsOf(
-        string? universe = null, string? position = null, string? series = null, string? book = null, string? type = null, bool brief = false)
+        string? universe = null, string? position = null, string? series = null, string? book = null, string? type = null, bool brief = false) =>
+        CanonAsOf(universe, position, series, book, type, brief, out _);
+
+    /// <summary>
+    /// <see cref="CanonAsOf(string?, string?, string?, string?, string?, bool)"/>, also giving
+    /// the <see cref="StoryHorizon"/> of <paramref name="position"/> from the same
+    /// read of the index, or null without a position.
+    /// </summary>
+    public CanonAsOfResult CanonAsOf(
+        string? universe, string? position, string? series, string? book, string? type, bool brief, out StoryHorizon? horizon)
     {
         var filter = Filter(series, book);
-        return WithIndex(index =>
+        StoryHorizon? read = null;
+        var result = WithIndex(index =>
         {
             var db = index.Context;
             var u = ChooseUniverse(db, universe, position, allowAll: false)!;
@@ -659,6 +698,7 @@ public sealed partial class DenReader
                 view = view with { Entities = view.Entities.Where(e => types.Contains(e.Type)).ToList() };
             }
 
+            read = position is null ? null : Horizon(index, u.Key, position);
             var pinned = view.Pinned().Entities
                 .Select(e => new PinnedEntity(e.Key, e.Name, e.Type, e.Fields.Select(CanonField).ToList(), e.Sections.Select(CanonSection).ToList()))
                 .ToList();
@@ -672,6 +712,8 @@ public sealed partial class DenReader
                 pinned,
                 view.Entities.Select(e => CanonEntityView(e, u.Key, includeContent: !brief)).ToList());
         });
+        horizon = read;
+        return result;
     }
 
     /// <summary>Brings the index up to date, opens it, and runs <paramref name="query"/>, turning failures into <see cref="DenToolException"/>s.</summary>

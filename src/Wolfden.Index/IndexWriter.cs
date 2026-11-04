@@ -197,6 +197,7 @@ internal sealed class IndexWriter
             });
             WriteContainers(structure);
             WriteFieldDefaults(structure);
+            WritePositionFields(structure);
         }
         else
         {
@@ -206,7 +207,7 @@ internal sealed class IndexWriter
                 _rows.Meta[key] = value;
             }
 
-            foreach (var type in new[] { typeof(DenRecord), typeof(ContainerRecord), typeof(ChapterRecord), typeof(FieldDefaultRecord) })
+            foreach (var type in new[] { typeof(DenRecord), typeof(ContainerRecord), typeof(ChapterRecord), typeof(FieldDefaultRecord), typeof(PositionFieldRecord) })
             {
                 _rows.ShareTable(type, _previous.Rows);
             }
@@ -341,6 +342,19 @@ internal sealed class IndexWriter
                         Line = field.Line,
                     });
                 }
+            }
+        }
+    }
+
+    /// <summary>The fields every enabled type defines as <c>position</c> (types.md F-FT-10), for reads at a position (format.md F-VIEW-5).</summary>
+    private void WritePositionFields(DenStructure structure)
+    {
+        var id = 0;
+        foreach (var type in structure.Types.Types.OrderBy(t => t.Key, StringComparer.Ordinal))
+        {
+            foreach (var field in type.PositionFields.Order(StringComparer.Ordinal))
+            {
+                _rows.Add(new PositionFieldRecord { Id = ++id, TypeKey = type.Key, Field = field });
             }
         }
     }

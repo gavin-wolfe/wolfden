@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Wolfden.Core.Documents;
 
-namespace Wolfden.Mcp;
+namespace Wolfden.Index.Reading;
 
 /// <summary>
 /// What an AI assistant's read at a story position leaves out beyond the
@@ -23,7 +23,7 @@ namespace Wolfden.Mcp;
 /// layer because the web API answers from the same <see cref="DenReader"/>
 /// and keeps it all for the writer.
 /// </remarks>
-internal static class AsOfReads
+public static class AsOfReads
 {
     /// <summary><paramref name="result"/> as an assistant gets it.</summary>
     public static GetEntityResult ForAssistant(GetEntityResult result, StoryHorizon? horizon) =>

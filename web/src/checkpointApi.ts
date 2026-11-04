@@ -147,6 +147,12 @@ export class IdentityNeededError extends ApiRequestError {
   }
 }
 
+/**
+ * Turning history on stopped part way, with a name and email saved for the den
+ * by that try. They stay, so a retry without them records those, not what git has.
+ */
+export class NameSavedError extends ApiRequestError {}
+
 /** Turns history on for a den that has none: a git repository, its .gitignore, and a first checkpoint (#195). */
 export function turnOnHistory(request: TurnOnRequest): Promise<HistoryTurnedOn> {
   return postJson<HistoryTurnedOn>('/api/history/turn-on', request, 'turning history on')
@@ -160,14 +166,19 @@ async function postJson<T>(path: string, request: unknown, what: string): Promis
   })
   const body: unknown = await response.json().catch(() => undefined)
   if (!response.ok) {
-    const error = typeof body === 'object' && body !== null ? (body as Partial<ApiError> & { needsName?: unknown; needsEmail?: unknown }) : null
+    const error = typeof body === 'object' && body !== null ? (body as Partial<ApiError> & { needsName?: unknown; needsEmail?: unknown; identitySaved?: unknown }) : null
     const message = typeof error?.message === 'string' ? error.message : `The server answered ${response.status}.`
     if (error?.code === 'identity_needed') {
       const said = typeof error.needsName === 'boolean' && typeof error.needsEmail === 'boolean' && (error.needsName || error.needsEmail)
       throw new IdentityNeededError(message, said ? (error.needsName as boolean) : true, said ? (error.needsEmail as boolean) : true)
     }
 
-    throw new ApiRequestError(typeof error?.code === 'string' ? error.code : 'http_error', message)
+    const code = typeof error?.code === 'string' ? error.code : 'http_error'
+    if (Array.isArray(error?.identitySaved) && error.identitySaved.length > 0) {
+      throw new NameSavedError(code, message)
+    }
+
+    throw new ApiRequestError(code, message)
   }
 
   if (typeof body !== 'object' || body === null) {

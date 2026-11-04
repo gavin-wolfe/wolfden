@@ -951,6 +951,8 @@ public sealed class HistorySetupTests : IDisposable
 
         Assert.Equal(HistorySetupStatus.Incomplete, failed.Status);
         Assert.Contains("--author-name", failed.Problem, StringComparison.Ordinal);
+        Assert.Contains("stay saved for this den", failed.Problem, StringComparison.Ordinal);
+        Assert.DoesNotContain("can be recorded under what git has", failed.Problem, StringComparison.Ordinal);
         Assert.DoesNotContain("checkpoint dialog", failed.Problem, StringComparison.Ordinal);
         Assert.False(RepositoryHasCommits(den, options));
     }

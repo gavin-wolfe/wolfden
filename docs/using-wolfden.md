@@ -1052,7 +1052,15 @@ wolfden init --git --author-name "Ash Calloway" --author-email ash@example.com
 The dialog doesn't show what git has, and it sends a different name only
 while that part is open: if you close it, what you typed isn't used, and it
 says so. Open it again and your typing is still there. If Wolfden refuses,
-the dialog says why and keeps what you typed.
+the dialog says why and keeps what you typed. Pressing Enter on the first
+checkpoint's checkbox, where the dialog starts, does nothing, so a stray key
+can't turn history on before you've read it.
+
+This choice is only in the **Turn on history** dialog. A den whose folder is
+already a repository with no checkpoints (you ran `git init`, or turned history
+on with no first checkpoint or one that stopped) gets the checkpoint dialog
+instead, which records what git has. For a different name there, use the command
+line: `wolfden init --git` with `--author-name` and `--author-email`.
 
 Any name will do, a pen name included, and the email can be a
 placeholder. They're saved for this den only, before the first
@@ -1134,7 +1142,11 @@ A few things to know:
 - **If a step fails** (a git hook refuses the first checkpoint, say),
   Wolfden says what it did and what it didn't. History is on by then, so
   make the first checkpoint from the dialog once the problem is fixed, or
-  run `wolfden init --git` again: it picks up where it stopped.
+  run `wolfden init --git` again: it picks up where it stopped. A name and
+  email you gave stay saved, so they're what's recorded even if you close
+  **Use a different name for this den** or leave them off the command. Until
+  the first checkpoint, giving others replaces them, while the dialog is still
+  open or with `--author-name` and `--author-email`.
 - **A new den** can start with history: `wolfden init my-notes --git`.
 - **For scripts:** `wolfden init` exits 0 when its main job is done. For
   a new den that job is making the den, so a new den inside a larger

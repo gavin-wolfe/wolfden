@@ -2297,6 +2297,8 @@ docs/
     them, **Use a different name for this den**, closed by default, opens
     the same two fields, both required, and what that does to signing;
     they're sent only while it's open, and what git has isn't shown (#314).
+    Enter on the first-checkpoint box, which has focus at first, doesn't
+    submit, and a held Enter does nothing in the dialog.
     `POST /api/history/turn-on` takes `{"authorName"?, "authorEmail"?,
     "firstCheckpoint"?}` (it defaults to true), with the same guards as
     the checkpoint POST (cross-site, `application/json`, no query, 64 KB),
@@ -2309,7 +2311,8 @@ docs/
     (`in_repository`, `has_repository`, `git_not_installed`); a server
     without a way to turn it on is 409 `history_unavailable`; a step that
     fails part way is 500 `history_failed` (or `write_failed` for
-    `.gitignore`), with what was done and what wasn't. Two requests take
+    `.gitignore`), with what was done and what wasn't, and `identitySaved`
+    if that try left a name and email saved. Two requests take
     turns, and automatic checkpoints skip their poll meanwhile. The
     status's git calls stop when the request is aborted. The first checkpoint goes through the server's
     `CheckpointLedger`. After it, the page asks for everything again.

@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { count } from '../api'
+import { ApiRequestError, count } from '../api'
 import {
   CHECKPOINT_STATUS_KEY,
   changeWord,
@@ -8,6 +8,7 @@ import {
   groupChanges,
   IdentityNeededError,
   makeCheckpoint,
+  NameSavedError,
   turnOnHistory,
   type CheckpointMade,
   type CheckpointStatus,
@@ -450,6 +451,9 @@ function TurnOnDialog({ status, onClose }: { status: CheckpointStatus; onClose: 
   const [email, setEmail] = useState('')
   const [first, setFirst] = useState(true)
   const [differentOpen, setDifferentOpen] = useState(false)
+  // A try that gave a name stopped part way, and the name stayed saved for the den. It stays true:
+  // a later try that's put back goes back to that name, not to what git has.
+  const [nameSaved, setNameSaved] = useState(false)
   const [missing, setMissing] = useState<'name' | 'email' | null>(null)
   // What the server asked for when it refused with identity_needed (#207). Kept in state, not read
   // from the mutation's error, so the fields don't go and come back while a retry is pending.
@@ -460,6 +464,10 @@ function TurnOnDialog({ status, onClose }: { status: CheckpointStatus; onClose: 
     // Whether or not every step was done, the den may have history now: everything that shows it looks again.
     onSettled: () => client.invalidateQueries(),
     onError: (error) => {
+      if (error instanceof NameSavedError) {
+        setNameSaved(true)
+      }
+
       // With a different name open, both fields are there already, and both were sent.
       if (error instanceof IdentityNeededError && !different) {
         // Git needs a name or email after all (it can depend on where the repository is): ask for
@@ -540,8 +548,28 @@ function TurnOnDialog({ status, onClose }: { status: CheckpointStatus; onClose: 
       }
     } else if (e.key === 'Tab') {
       trapTab(e, dialogRef.current)
+    } else if (e.key === 'Enter' && e.repeat) {
+      // A key held down from whatever opened the dialog does nothing here, wherever focus landed.
+      e.preventDefault()
     }
   }
+
+  // The first checkpoint's name can't be changed afterwards, so a stray Enter on the box that has
+  // focus at first doesn't submit, before the writer has read the dialog.
+  const onFirstKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+    }
+  }
+
+  const refusedCode = mutation.error instanceof ApiRequestError ? mutation.error.code : null
+  const formTitle =
+    refusedCode === 'has_repository' || refusedCode === 'in_repository'
+      ? 'History is already on'
+      : refusedCode === 'history_failed' || refusedCode === 'write_failed'
+        ? 'Turning on history stopped'
+        : 'History is off'
+  const typedDifferent = name.trim() !== '' || email.trim() !== ''
 
   // One set of fields, whether git needs them or the writer opened a different name, so what's
   // typed carries over if git turns out to need them. A browser's saved name isn't offered for a
@@ -564,7 +592,12 @@ function TurnOnDialog({ status, onClose }: { status: CheckpointStatus; onClose: 
             aria-describedby={missing === 'name' ? errorId : undefined}
             value={name}
             disabled={busy}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => {
+              setName(e.target.value)
+              if (missing === 'name' && e.target.value.trim() !== '') {
+                setMissing(null)
+              }
+            }}
           />
         </>
       )}
@@ -585,7 +618,12 @@ function TurnOnDialog({ status, onClose }: { status: CheckpointStatus; onClose: 
             aria-describedby={missing === 'email' ? errorId : undefined}
             value={email}
             disabled={busy}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value)
+              if (missing === 'email' && e.target.value.trim() !== '') {
+                setMissing(null)
+              }
+            }}
           />
         </>
       )}
@@ -632,7 +670,7 @@ function TurnOnDialog({ status, onClose }: { status: CheckpointStatus; onClose: 
           </>
         ) : turnOn?.possible ? (
           <form onSubmit={submit} noValidate>
-            <h2 id={titleId}>History is off</h2>
+            <h2 id={titleId}>{formTitle}</h2>
             <div id={descriptionId}>
               <p>
                 A checkpoint saves a version of the den's notes that you can look back at or compare with later. Turn on history to start
@@ -657,7 +695,7 @@ function TurnOnDialog({ status, onClose }: { status: CheckpointStatus; onClose: 
               </fieldset>
             )}
             <label htmlFor={firstId} className="turn-on-first">
-              <input id={firstId} type="checkbox" checked={first} disabled={busy} onChange={(e) => setFirst(e.target.checked)} /> Make a first
+              <input id={firstId} type="checkbox" checked={first} disabled={busy} onKeyDown={onFirstKeyDown} onChange={(e) => setFirst(e.target.checked)} /> Make a first
               checkpoint, “Start of history”, of the den as it is now
             </label>
             {differentOffered && (
@@ -681,7 +719,7 @@ function TurnOnDialog({ status, onClose }: { status: CheckpointStatus; onClose: 
                     <p className="muted">
                       Checkpoints record this name and email instead of the ones git has, and each keeps the name it was made with. Give both: any
                       name will do, a pen name included, and the email can be a placeholder, such as you@example.com. They're saved for this den
-                      only.
+                      only.{nameSaved && " They replace the name and email the last try saved."}
                     </p>
                     <p className="muted">
                       Signing goes off for this den when you give them, so that git's key can't sign under this name and tie the two together for
@@ -691,9 +729,11 @@ function TurnOnDialog({ status, onClose }: { status: CheckpointStatus; onClose: 
                   </fieldset>
                 ) : (
                   <p className="muted turn-on-different-note">
-                    {name.trim() !== '' || email.trim() !== ''
-                      ? "What you typed isn't used while this is closed: checkpoints will record the name and email git has."
-                      : 'Otherwise, checkpoints record the name and email git has.'}
+                    {nameSaved
+                      ? `${typedDifferent ? "What you typed isn't used while this is closed. " : ''}The name and email the last try saved stay: checkpoints will record those, not what git has. To replace them, open this and give both.`
+                      : typedDifferent
+                        ? "What you typed isn't used while this is closed: checkpoints will record the name and email git has."
+                        : 'Otherwise, checkpoints record the name and email git has.'}
                   </p>
                 )}
               </div>

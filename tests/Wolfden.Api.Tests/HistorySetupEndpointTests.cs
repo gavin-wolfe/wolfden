@@ -475,6 +475,14 @@ public sealed class HistorySetupEndpointTests : IDisposable
         var message = json.GetProperty("message").GetString()!;
         Assert.Contains("Saved your name and email for this den's repository only.", message, StringComparison.Ordinal);
         Assert.Contains("--author-name", message, StringComparison.Ordinal);
+        Assert.Contains("stay saved for this den", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("can be recorded under what git has", message, StringComparison.Ordinal);
+        Assert.Equal(["user.name", "user.email"], json.GetProperty("identitySaved").EnumerateArray().Select(e => e.GetString()));
+
+        // A try with no name that stops again saved nothing itself, and doesn't say otherwise.
+        var (again, repeated) = await Post(server, "/api/history/turn-on", "{}");
+        Assert.Equal(HttpStatusCode.InternalServerError, again);
+        Assert.False(repeated.TryGetProperty("identitySaved", out _));
 
         // The dialog stays open and sends them again, once the problem is fixed.
         File.Delete(hook);

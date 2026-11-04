@@ -3979,9 +3979,12 @@ the den's folder by hand, and made no commit.
   If saving them fails in a repository this run made, the repository is
   taken away again. In one that was already there, what was saved is taken
   back, and if that can't be done, the output names the settings still
-  saved. Every one of these asks for the same `--author-name` and
+  saved. Each of those asks for the same `--author-name` and
   `--author-email` again, without repeating them, and doesn't offer the web
-  UI's dialog.
+  UI's dialog. When they were saved and a later step stopped it, the output says
+  they stay, so finishing without them records them, not what git has, and
+  that giving others before the first checkpoint replaces them. It doesn't
+  offer the dialog either.
 
 Spec: design.md §6, "Turning history on" (#195, #286). Covered by:
 `HistorySetupTests.AFailedSaveInARepositoryThisRunMadeTakesTheRepositoryAway`,
@@ -6267,7 +6270,18 @@ on…**.
   value git won't record: the dialog shows the refusal, keeps what's typed,
   and stays open. Nothing is changed (SC-HIST-17).
 - If it stops part way (a hook refuses the first checkpoint), the dialog says
-  what was done, and trying again sends the name again (SC-HIST-16).
+  what was done, and trying again sends the name again (SC-HIST-16). If the
+  try left the name saved and the writer closes this part, the dialog says that
+  name stays and is what's recorded, not what git has, and that opening this and
+  giving both replaces it.
+- Enter on the first checkpoint's checkbox, where focus starts, doesn't submit,
+  so one stray key can't record git's name before the writer has read the dialog.
+  A held Enter does nothing anywhere in it. Enter in a field, or on a button, does what it usually does.
+- The heading follows a refusal: "History is already on", or "Turning on history
+  stopped", rather than "History is off" above a message saying otherwise.
+- A complaint about a missing field goes once it's filled in.
+- A repository with no commits gets the checkpoint dialog, not this one, so
+  there's no different name there; the command line still has it.
 - The browser isn't asked to fill in these two fields, since its saved name is
   likely to be the one being kept apart.
 

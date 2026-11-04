@@ -854,6 +854,107 @@ describe('SC-WEB-99: I use a different name for this den when I turn on history'
     await screen.findByRole('dialog', { name: 'History is on' })
   })
 
+  it('doesn’t submit on Enter on the checkbox that has focus at first, held or not, and the checkbox still works', async () => {
+    const { sent } = stubTurnOn(() => noHistory())
+    const dialog = await openTurnOn()
+    const first = within(dialog).getByLabelText(/Make a first checkpoint/) as HTMLInputElement
+
+    expect(document.activeElement).toBe(first)
+    // fireEvent answers false when the event's default was prevented; jsdom doesn't submit by itself.
+    expect(fireEvent.keyDown(first, { key: 'Enter' })).toBe(false)
+    expect(fireEvent.keyDown(first, { key: 'Enter', repeat: true })).toBe(false)
+    expect(fireEvent.keyDown(first, { key: ' ' })).toBe(true)
+    expect(sent).toEqual([])
+  })
+
+  it('still lets Enter act in the fields and on the buttons, but not while it’s held', async () => {
+    stubTurnOn(() => noHistory())
+    const dialog = await openTurnOn()
+    openDifferent(dialog)
+
+    for (const control of [
+      within(dialog).getByLabelText('Name'),
+      within(dialog).getByLabelText('Email'),
+      within(dialog).getByRole('button', { name: DIFFERENT }),
+      within(dialog).getByRole('button', { name: 'Turn on history' }),
+    ]) {
+      expect(fireEvent.keyDown(control, { key: 'Enter' })).toBe(true)
+      expect(fireEvent.keyDown(control, { key: 'Enter', repeat: true })).toBe(false)
+    }
+  })
+
+  it('after a try stops with the name saved, says it stays once it’s closed, and how to replace it, even after a later try', async () => {
+    let answer: () => Response | HistoryTurnedOn = () =>
+      new Response(JSON.stringify({ code: 'history_failed', message: 'A hook refused it.', identitySaved: ['user.name', 'user.email'] }), { status: 500 })
+    const { sent } = stubTurnOn(
+      () => noHistory(),
+      () => answer(),
+    )
+    const dialog = await openTurnOn()
+    openDifferent(dialog)
+    fill(dialog, 'Ash Calloway', 'ash@example.invalid')
+    submit(dialog)
+
+    await within(dialog).findByRole('alert')
+    expect(within(dialog).getByRole('heading').textContent).toBe('Turning on history stopped')
+    expect(dialog.textContent).toMatch(/They replace the name and email the last try saved/)
+    openDifferent(dialog)
+
+    expect(dialog.textContent).toMatch(/What you typed isn't used while this is closed\. The name and email the last try saved stay: checkpoints will record those, not what git has\. To replace them, open this and give both\./)
+    expect(dialog.textContent).not.toMatch(/will record the name and email git has/)
+
+    // A later try with it closed saves nothing itself, but the name is still there.
+    answer = refusal('history_failed', 'A hook refused it again.', 500)
+    await waitFor(() => expect((within(dialog).getByRole('button', { name: 'Turn on history' }) as HTMLButtonElement).disabled).toBe(false))
+    submit(dialog)
+    expect((await within(dialog).findByRole('alert')).textContent).toMatch(/again/)
+    expect(sent[1]).toEqual({ firstCheckpoint: true })
+    expect(dialog.textContent).toMatch(/The name and email the last try saved stay/)
+  })
+
+  it('after a try stops with nothing left saved, still says git’s name and email are what’s recorded', async () => {
+    stubTurnOn(() => noHistory(), refusal('history_failed', 'What this try saved was put back as it was.', 500))
+    const dialog = await openTurnOn()
+    openDifferent(dialog)
+    fill(dialog, 'Ash Calloway', 'ash@example.invalid')
+    submit(dialog)
+    await within(dialog).findByRole('alert')
+    await waitFor(() => expect((within(dialog).getByRole('button', { name: DIFFERENT }) as HTMLButtonElement).disabled).toBe(false))
+    openDifferent(dialog)
+
+    expect(dialog.textContent).toMatch(/will record the name and email git has/)
+  })
+
+  it.each([
+    ['has_repository', 409, 'History is already on'],
+    ['in_repository', 409, 'History is already on'],
+    ['history_failed', 500, 'Turning on history stopped'],
+    ['write_failed', 500, 'Turning on history stopped'],
+    ['bad_argument', 400, 'History is off'],
+  ])('after a refusal with %s, the heading matches it', async (code, status, heading) => {
+    stubTurnOn(() => noHistory(), refusal(code, 'What the server said.', status))
+    const dialog = await openTurnOn()
+    submit(dialog)
+
+    await within(dialog).findByRole('alert')
+    expect(within(dialog).getByRole('heading').textContent).toBe(heading)
+  })
+
+  it('takes back a complaint about a missing field once it’s filled in', async () => {
+    stubTurnOn(() => noHistory())
+    const dialog = await openTurnOn()
+    openDifferent(dialog)
+    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Ash Calloway' } })
+    submit(dialog)
+    await within(dialog).findByRole('alert')
+
+    fireEvent.change(within(dialog).getByLabelText('Email'), { target: { value: ' ' } })
+    expect(within(dialog).queryByRole('alert')).toBeTruthy()
+    fireEvent.change(within(dialog).getByLabelText('Email'), { target: { value: 'ash@example.invalid' } })
+    expect(within(dialog).queryByRole('alert')).toBeNull()
+    expect(within(dialog).getByLabelText('Email').getAttribute('aria-invalid')).toBe('false')
+  })
+
   it('stays inside the dialog’s Tab order, and Tab from the last control comes round', async () => {
     stubTurnOn(() => noHistory())
     const dialog = await openTurnOn()

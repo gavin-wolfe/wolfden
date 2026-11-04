@@ -171,6 +171,8 @@ public sealed class McpServerTests : IAsyncLifetime
 
         var renfieldAhead = Text(await Call("get_entity", new() { ["entity"] = "Renfield" }));
         Assert.Contains("how he let the Count in", renfieldAhead, StringComparison.Ordinal);
+        Assert.Contains("\"died\"", renfieldAhead, StringComparison.Ordinal);
+        Assert.Contains("turns on his master", renfieldAhead, StringComparison.Ordinal);
 
         var eventAhead = Text(await Call("get_entity", new() { ["entity"] = "Renfield lets the Count in" }));
         Assert.Contains("Lord and Master", eventAhead, StringComparison.Ordinal);

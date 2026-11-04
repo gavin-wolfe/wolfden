@@ -3318,7 +3318,7 @@ I ask my assistant to draft a scene with Renfield at `dracula:20`. He has
 already let the Count in, and the reader learns that at `dracula:21`.
 
 - `get_entity` for Renfield with `as_of` `dracula:20` has him in view, with
-  nothing about his death, his turn on his master, or how he let the Count in,
+  nothing about his death, that he turns on his master, or how he let the Count in,
   and the event *Renfield lets the Count in* isn't in view at all.
 - `get_entity` with no `as_of` has all of it, so the assistant can read the two
   together: what the reader knows, and what the note holds beyond that.

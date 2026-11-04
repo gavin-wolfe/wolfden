@@ -369,7 +369,7 @@ public sealed partial class DenTools
             : $"Changed the alias '{c.OldText}' to '{c.NewText}'";
         if (c.SameForLinks)
         {
-            return $"{change}. Links match it ignoring case and spacing (F-LINK-4), so the links that use '{c.OldText}' still reach it, and none were changed.";
+            return $"{change}. Links match it ignoring case, spacing, and which apostrophe is used (F-LINK-4), so the links that use '{c.OldText}' still reach it, and none were changed.";
         }
 
         if (c.Kept is not null)

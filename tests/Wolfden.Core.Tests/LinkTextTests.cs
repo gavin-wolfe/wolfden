@@ -32,6 +32,39 @@ public class LinkTextTests
     }
 
     [Theory]
+    [InlineData("Mina's Journal", "Mina’s Journal")]
+    [InlineData("Mina‘s Journal", "Minaʼs Journal")]
+    [InlineData("Mina＇s Journal", "MINA'S JOURNAL")]
+    public void EveryApostropheIsTheSameCharacter(string a, string b)
+    {
+        Assert.True(LinkText.Matches(a, b));
+    }
+
+    [Theory]
+    [InlineData("Mina's Journal", "Minas Journal")]
+    [InlineData("Mina's Journal", "Mina s Journal")]
+    [InlineData("Mina's Journal", "Mina`s Journal")]
+    [InlineData("Mina's Journal", "Minaʻs Journal")]
+    public void WhatIsNotAnApostropheStaysDistinct(string a, string b)
+    {
+        Assert.False(LinkText.Matches(a, b));
+    }
+
+    [Fact]
+    public void AnEnumsCaseFoldLeavesApostrophesAlone()
+    {
+        Assert.Equal("mina’s", LinkText.CaseFold("MINA’S"));
+    }
+
+    [Fact]
+    public void TheLetterWithABuiltInApostropheFoldsToTheSameText()
+    {
+        // ŉ folds to ʼn, whose apostrophe is folded with the others.
+        Assert.True(LinkText.Matches("ŉ", "'n"));
+        Assert.True(LinkText.Matches("ŉ", "’N"));
+    }
+
+    [Theory]
     [InlineData("Change log", true)]
     [InlineData("Changelog 2026", true)]
     [InlineData("**Change log**", true)]

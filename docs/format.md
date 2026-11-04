@@ -1335,6 +1335,16 @@ book, and a series with no books yet at its own place in story order.
 Within an entity, fields come in frontmatter order and sections in file
 order.
 
+**F-VIEW-4.** A fact past its `until` isn't in a view at that position
+(F-TMP-3, F-SEC-8), so every `until` in a canon-as-of view at `p` is later
+than `p`. It says when the fact stops holding, which a reader at `p`
+doesn't know yet. An AI assistant's read at a position (design.md §8) MUST
+leave it out, and doesn't say it did, since saying so would hint that the
+fact ends. The assistant reads it without a position. A view for the writer,
+who may be checking their own plan, keeps it, and the web UI marks it (design.md §9).
+The view at the end of the story has no `until` to leave out: it holds only
+the facts still in effect when the story ends.
+
 ### 9.5 Keeping reveals in place
 
 This section has no rules. It describes how to write notes whose

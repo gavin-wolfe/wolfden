@@ -198,9 +198,9 @@ prompts. This list is for knowing what the assistant can do.
 | Tool | What it does |
 |---|---|
 | `search` | Full-text search over names, aliases, leads, section text, and field values (a link in a field matches its note's name and aliases too); `field` searches one field's values. A hit in a field has `field` (its name) and `line` (the entry's line), with no `section`, such as `{"field": "occupation", "line": 10, "snippet": "[physician], professor", …}`. A query's words match anywhere in any order; words in double quotes (`"silver key"`) match as a phrase, side by side and in order. A hit in a section a bad comment leaves out has `left_out: true` and `in_canon: false`, so `canon_only` drops it. |
-| `get_entity` | One entity, by name, alias, file name, id, key, or path; with `as_of`, only what the reader knows at that position. Without `as_of`, a section a bad comment leaves out comes in its place with `left_out` (each error's `line`, `rule`, and `message`). With `as_of` it isn't there at all, and nothing says so, since a heading can give away a reveal. |
+| `get_entity` | One entity, by name, alias, file name, id, key, or path; with `as_of`, only what the reader knows at that position. Without `as_of`, a section a bad comment leaves out comes in its place with `left_out` (each error's `line`, `rule`, and `message`). With `as_of` it isn't there at all, and nothing says so, since a heading can give away a reveal. With `as_of`, a fact's `until` is left out too. |
 | `list_entities` | Entities by type, status, series, or book. A type includes its kinds here and in `search` and `canon_as_of`: `location` also finds a den's worlds ([types.md F-TYPE-13](types.md#3-type-definitions)), and each result says its own type. |
-| `canon_as_of` | Canon at a story position (or the end of the story), pinned canon first. Sections a bad comment leaves out aren't in it, at any position. |
+| `canon_as_of` | Canon at a story position (or the end of the story), pinned canon first. Sections a bad comment leaves out aren't in it, at any position. At a position, a fact's `until` is left out. |
 | `get_chapter` | A book's chapters and their fields, with each value's source (the chapter, or `chapter_defaults` above it), and each chapter's `heading`: its title, then the fields a `chapter_heading` lists, such as `"Ardent — Vesta Yards, 2350-04-12"`. A field the chapter writes with a value that's ignored is listed in the chapter's `ignored`, as written and why, such as `{"field": "setting", "as_written": "Whitby harbour", "reason": "setting is a link to one entity, …"}`; a list item that's left out has its number in `item`. A field written with no value (null) isn't a fault, so it isn't listed. |
 | `get_chapter_defaults` | A universe's, series', or book's `chapter_defaults`, and the books they reach. A default written with a value that's ignored has `ignored: true`, the value in `written`, and why in `reason`. |
 | `check` | The continuity check, as `wolfden check` runs it. |
@@ -383,6 +383,13 @@ docs. The writer's own list is in
   view, ideas and later reveals included. To draft or review a chapter,
   use `canon_as_of` at that chapter, or `get_entity` with `as_of`.
   `search` and `get_history` have no position.
+- **A read at a position doesn't say when a fact ends.** A fact's `until`
+  tells what the reader doesn't know yet, so `canon_as_of` and `get_entity`
+  leave it out at a position, and nothing says it's gone: in the result, the
+  fact just holds, as it does for the reader. To plan ahead, read the note
+  with `get_entity` and no `as_of`, which has every `from` and `until`.
+  `canon_as_of` with no position won't do, since it's the end of the story,
+  and a fact that ends before then isn't in it.
 - **Writes land at once; only `checkpoint` records them.** An open page
   in the web UI shows each write within about 5 seconds, or once the
   writer closes an editor or form they have open there. If they save a

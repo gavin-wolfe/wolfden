@@ -4078,10 +4078,11 @@ is for what they write as Ash Calloway, so they run `wolfden init --git
   reads later still beats them (`GIT_CONFIG_COUNT`, `GIT_CONFIG_PARAMETERS`,
   `extensions.worktreeConfig`, an `[include]` in the repository's config),
   no checkpoint is made and the value isn't repeated. A repository this run
-  made is taken away again. In one that was already there, what was saved is
-  taken back, so the next commit from anywhere is under git's own name, not
-  the pen name signed by another key. The output names anything that couldn't
-  be taken back.
+  made is taken away again. In one that was already there, what this try saved
+  is put back as it was, so the next commit from anywhere isn't the pen name
+  signed by another key, unless an earlier try that stopped part way had
+  saved it (`docs/using-wolfden.md`'s limits, #311). The output names anything that couldn't
+  be put back.
 
 Spec: design.md §6, "Turning history on" (maintainer decision, 2026-11-03,
 #286). Covered by:

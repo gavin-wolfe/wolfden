@@ -1082,6 +1082,17 @@ A pen name given this way has limits worth knowing:
 - **An environment variable still beats it.** If `GIT_AUTHOR_NAME` or one of
   its relatives is set when `wolfden serve` or a later checkpoint runs, git
   uses that, as it does in any repository.
+- **A signing setting added later can still sign under this name.** Wolfden
+  checks for one only while it turns history on. If a setting that turns
+  signing on is added later in the den's own `.git` folder (an `[include]` in
+  its `config` file, or a `config.worktree`) or in the environment
+  (`GIT_CONFIG_COUNT`, `GIT_CONFIG_PARAMETERS`) when `wolfden serve` or a
+  checkpoint runs, the next checkpoint is signed with that key under the den's
+  name, with no warning, and that can't be undone. The same goes after a
+  turn-on that stopped part way: the name stays saved, even if a later try to
+  finish is refused because of that setting, and the next checkpoint signs
+  under it. Turning signing on globally later doesn't do this, since the den's
+  own setting beats it. See #311.
 - **It can't be added this way once there are checkpoints, or in a bigger
   repository.** Wolfden refuses, and says the name wasn't applied. With
   checkpoints, the commands below change it from then on; earlier

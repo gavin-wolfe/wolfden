@@ -454,7 +454,8 @@ public sealed class GitHistorySetup : IHistorySetup
             }
         }
 
-        // In a repository that was already there: as it was, if git lets it be. Says what's left.
+        // In a repository that was already there: as it was before this try, if git lets it be, which
+        // keeps a name an earlier try saved. So it says "put back", not that nothing's left. Says what is.
         string TakeBackWhatWasSaved()
         {
             var leftover = TakeBack(written);
@@ -463,8 +464,8 @@ public sealed class GitHistorySetup : IHistorySetup
             AddSavedSteps();
             var checkpointNotDone = request.FirstCheckpoint ? " No first checkpoint was made." : "";
             return leftover.Count == 0
-                ? $"What had been saved was taken back.{checkpointNotDone}"
-                : $"These couldn't be taken back, and are still saved for this den: {string.Join(", ", leftover)}.{checkpointNotDone}";
+                ? $"What this try saved was put back as it was.{checkpointNotDone}"
+                : $"These couldn't be put back as they were, and are still saved for this den: {string.Join(", ", leftover)}.{checkpointNotDone}";
         }
 
         void Save(string key, string value)

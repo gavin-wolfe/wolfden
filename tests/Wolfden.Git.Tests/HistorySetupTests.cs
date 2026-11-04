@@ -760,7 +760,7 @@ public sealed class HistorySetupTests : IDisposable
         Assert.Equal(HistorySetupStatus.Incomplete, failed.Status);
         Assert.Empty(failed.IdentitySaved);
         Assert.DoesNotContain(failed.Steps, s => s.Contains("signing", StringComparison.OrdinalIgnoreCase) || s.StartsWith("Saved", StringComparison.Ordinal));
-        Assert.Contains("What had been saved was taken back.", failed.Problem, StringComparison.Ordinal);
+        Assert.Contains("What this try saved was put back as it was.", failed.Problem, StringComparison.Ordinal);
         Assert.Contains("--author-name", failed.Problem, StringComparison.Ordinal);
         Assert.DoesNotContain("checkpoint dialog", failed.Problem, StringComparison.Ordinal);
         Assert.DoesNotContain("Ash", failed.Problem, StringComparison.Ordinal);
@@ -782,7 +782,7 @@ public sealed class HistorySetupTests : IDisposable
 
         var failed = setup.TurnOn(new HistorySetupRequest("Ash Calloway", "ash@example.invalid"), Token);
 
-        Assert.Contains("What had been saved was taken back.", failed.Problem, StringComparison.Ordinal);
+        Assert.Contains("What this try saved was put back as it was.", failed.Problem, StringComparison.Ordinal);
 
         // No value means true, and git can't write that, so it comes back as what it means.
         Assert.Equal("true\n", RunGit(den, options, "config", "--local", "--type=bool", "--get", "commit.gpgsign"));
@@ -1163,7 +1163,7 @@ public sealed class HistorySetupTests : IDisposable
         Assert.Equal(HistorySetupStatus.Incomplete, failed.Status);
         Assert.Equal(HistorySetupCodes.BadArgument, failed.Code);
         Assert.Contains("Git would still sign", failed.Problem, StringComparison.Ordinal);
-        Assert.Contains("What had been saved was taken back.", failed.Problem, StringComparison.Ordinal);
+        Assert.Contains("What this try saved was put back as it was.", failed.Problem, StringComparison.Ordinal);
         Assert.Empty(failed.IdentitySaved);
         Assert.DoesNotContain(failed.Steps, s => s.StartsWith("Saved", StringComparison.Ordinal) || s.StartsWith("Turned signing off", StringComparison.Ordinal));
         Assert.False(RepositoryHasCommits(den, options));

@@ -3406,6 +3406,31 @@ The missing manifest has `planted: ["ember:2", "ash:1"]` and
 Spec: F-VIEW-5 (#305). Covered by: `FuturePositionFieldTests`,
 `ReadEndpointTests.APositionFieldsLaterValuesStayForTheWriter`.
 
+### SC-MCP-47. My assistant's reads stay strict whatever the web UI shows me
+
+The web UI is going to show me everything and tag what readers don't know yet
+(#300). My assistant is drafting `ember:3`, and reads at that position.
+
+- A note the reader meets later, an idea, or a retconned note reads as not in
+  view, by any of its names, and the answer says nothing else. A note an error
+  leaves out is an unknown name, and given by its path or id, the answer says
+  only that it can't be shown. A name a later note shares doesn't match it.
+- A section that's later, an idea, bookkeeping, or left out by an error isn't
+  shown or mentioned, in `get_entity`, `canon_as_of`, `pinned`, or `brief`, with
+  or without a filter.
+- No `until` and no later value of a position field is anywhere in the answer.
+- No tag such as `ahead of readers` or `no longer true` is anywhere in the
+  answer, and it has only the members it has today. A new one fails a test, so
+  showing an assistant more is a decision and not a side effect.
+- A position that can't be read is refused, and doesn't fall back to a full read.
+- `search`, `list_entities`, and `get_history` still take no position, and show
+  later material as it's written, unmarked. Only `get_entity` and `canon_as_of`
+  read at a position.
+- Wolfden.Mcp can't reach the web API's project, so it can't use its marks.
+
+Spec: F-GEN-2, F-VIEW-1, F-VIEW-2, F-VIEW-4, F-VIEW-5 (#300). Covered by:
+`McpStaysStrictTests`.
+
 ## STORE: Wolfden saves, moves, and deletes notes
 
 Background: the den store (design.md §6, #121) is how Wolfden writes a

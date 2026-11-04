@@ -3393,7 +3393,14 @@ The missing manifest has `planted: ["ember:2", "ash:1"]` and
 - A string field that happens to look like a position, or a field the type
   doesn't define, comes through as I wrote it.
 - When the assistant is helping me plan, `get_entity` with no `as_of` gives
-  every value, and so does `canon_as_of` with no position.
+  every value. `canon_as_of` with no position leaves none out for being later,
+  though it's the end of the story, so it has only each field's entry in effect then.
+- `update_fields` and every `expected_hash` say to read without `as_of` before
+  changing a field, since a read at a position can hide a value or shift a
+  list's item numbers. It's advice: the hash is the same from both reads, so a
+  write based on a read at a position isn't refused.
+- A section or lead I wrote, or a field the type doesn't define, can still mention
+  a later event, and the tool's description says so.
 - The web API gives every value at the same position, for me.
 
 Spec: F-VIEW-5 (#305). Covered by: `FuturePositionFieldTests`,

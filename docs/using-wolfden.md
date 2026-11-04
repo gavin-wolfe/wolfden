@@ -821,7 +821,10 @@ all, so it can't write toward it. When you're planning with one, ask it to
 read the note with no position, and it sees every date. A thread's `planted`
 and `paid_off`, and any other field that holds a story position, work the same
 way for it: at a position, it isn't told a value later than that, or one that
-isn't a chapter or book your universe has. You still see them all. Its instructions also
+isn't a chapter or book your universe has. You still see them all. This goes by
+positions only: text you put in a section or lead, or a field the note's type
+doesn't define, reaches the assistant as written, so it can still mention later
+events. Its instructions also
 tell it to read ahead for planning, foreshadowing, and reviewing continuity
 across chapters, and when writing a character who knows more than the reader,
 without letting later facts reach the prose. It can still tell you anything you

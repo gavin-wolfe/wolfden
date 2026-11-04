@@ -106,8 +106,9 @@ public sealed class WolfdenTools
     [Description(
         "What's canon at a point in the story: every entity the reader has met by then, at any scope of the universe, with the " +
         "field values and sections in effect there. Ideas, undecided questions, retconned material, and bookkeeping sections are " +
-        "left out, and draft material is marked draft. Nothing the reader meets later is included, so it's safe for drafting a " +
-        "chapter without spoilers. So at a position a fact's 'until' is left out, and so are a position field's values later than the position " +
+        "left out, and draft material is marked draft. Nothing the reader meets later is included, going by its position, so it's safe for " +
+        "drafting a chapter as far as positions go; text the writer put in a section or lead, or a field the note's type doesn't define, can " +
+        "still mention later events. At a position a fact's 'until' is left out, and so are a position field's values later than the position " +
         "(such as a thread's paid_off), since when a fact stops holding or a thread pays off is something the reader " +
         "doesn't know yet: to plan ahead, use get_entity without as_of. Pinned canon (the hard facts) comes first, under 'pinned', and is also listed in place. " +
         "Without position, the view is the end of the story: all canon so far. " + PositionHelp)]
@@ -171,7 +172,8 @@ public sealed class WolfdenTools
 
     private const string HashHelp =
         "The hash of the file your edit is based on: 'hash' from get_entity, or from your last write's result. If the file has changed " +
-        "since (say, the writer edited it), the write is refused with stale_file: read it again.";
+        "since (say, the writer edited it), the write is refused with stale_file: read it again. A read with as_of gives the same hash, but it can " +
+        "leave values out, so it doesn't show all of what a change to a field replaces: read without as_of before changing a field.";
 
     /// <summary>The <c>create_entity</c> tool.</summary>
     [McpServerTool(Name = "create_entity", Title = "Create an entity", ReadOnly = false, Idempotent = false, Destructive = false, OpenWorld = false)]
@@ -212,7 +214,9 @@ public sealed class WolfdenTools
         "'fields.rank.1.from' (item numbers from 0). An entry is {\"value\": x, \"from\": \"book:chapter\", \"until\": ..., \"status\": ..., \"pin\": true}. " +
         "The id never changes. Aliases can be added and moved here; to rename the entity, or change or remove an alias, use rename_entity or " +
         "change_alias, which rewrite the links that used the old text. A 'from', 'until', or position field value you set must be a position the " +
-        "universe has (bad_position otherwise); null leaves it out." + WriteHelp)]
+        "universe has (bad_position otherwise); null leaves it out. Read without as_of before changing a field: a read with as_of leaves out a position " +
+        "field's later values, so a field missing from it may be set in the note, and its list item numbers may not match the note's, " +
+        "which can overwrite a value you weren't shown or change the wrong item." + WriteHelp)]
     public CallToolResult UpdateFields(
         [Description("The entity: its name, an alias, its file name, its id, its key, or its path.")] string entity,
         [Description(HashHelp)] string expected_hash,

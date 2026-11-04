@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Reflection;
 using System.Text.Json;
 using ModelContextProtocol.Protocol;
 
@@ -343,6 +345,39 @@ public sealed class FuturePositionFieldTests : IDisposable
         Assert.Contains("position field's values later", WolfdenMcpServer.Instructions, StringComparison.Ordinal);
     }
 
+    [Fact]
+    [Trait("Scenario", "SC-MCP-45")]
+    public void AWriteToolSaysToReadWithoutAPositionFirst()
+    {
+        Assert.Contains("item numbers", Description(nameof(WolfdenTools.UpdateFields)), StringComparison.Ordinal);
+        var hash = typeof(WolfdenTools).GetMethod(nameof(WolfdenTools.UpdateFields))!.GetParameters().Single(p => p.Name == "expected_hash");
+        Assert.Contains("read without as_of", hash.GetCustomAttribute<DescriptionAttribute>()!.Description, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-45")]
+    public void CanonAsOfSaysWhatItCantKeepOut()
+    {
+        Assert.Contains("section or lead", Description(nameof(WolfdenTools.CanonAsOf)), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-45")]
+    public void AWriteBasedOnAReadAtAPositionCanStillReplaceAHiddenItem()
+    {
+        // Pins the gap the descriptions warn about (the hash is the same from both reads), so a guard changes this test on purpose.
+        Thread("the-shifted", "planted: [\"ash:1\", \"ember:2\"]");
+        var tools = new DenTools(_den.Root);
+        var hash = tools.GetEntity("The shifted", "starfall", "ember:3").Entity!.Hash!;
+        Assert.Equal(tools.GetEntity("The shifted", "starfall").Entity!.Hash, hash);
+
+        using var changes = JsonDocument.Parse("""[{ "op": "set", "path": "fields.planted.0", "value": "ember:3" }]""");
+        Assert.NotEqual(true, _tools.UpdateFields("The shifted", hash, changes.RootElement.Clone(), "starfall", TestContext.Current.CancellationToken).IsError);
+
+        using var full = Read(_tools.GetEntity("The shifted", "starfall"));
+        Assert.Equal(["ember:3", "ember:2"], Strings(Field(full, "planted").GetProperty("value")));
+    }
+
     /// <summary>A canon thread in the Starfall universe, in view from the start of the story.</summary>
     private void Thread(string file, string fields)
     {
@@ -350,6 +385,9 @@ public sealed class FuturePositionFieldTests : IDisposable
         var lines = string.Join('\n', fields.Split('\n').Select(l => "  " + l.TrimEnd('\r')));
         _den.Write($"universes/starfall/entities/threads/{file}.md", $"---\ntype: thread\nname: {name}\nstatus: canon\nfields:\n{lines}\n---\n\n## Overview\nA thread.\n");
     }
+
+    private static string Description(string method) =>
+        typeof(WolfdenTools).GetMethod(method)!.GetCustomAttribute<DescriptionAttribute>()!.Description;
 
     private static JsonDocument Read(CallToolResult result) => JsonDocument.Parse(Text(result));
 

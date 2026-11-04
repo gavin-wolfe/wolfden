@@ -424,9 +424,17 @@ docs. The writer's own list is in
   or before it: a later `paid_off` isn't there at all, and `planted` lists only
   what's been planted so far. A value that isn't a position the universe has
   can't be compared, so it's left out too. Nothing says any of them are gone.
-  `canon_as_of` with no position and `get_entity` with no `as_of` have them all.
-  Read without `as_of` before setting one of these fields, or the change can
-  drop a value you weren't shown.
+  `get_entity` with no `as_of` has them all. `canon_as_of` with no position
+  leaves none out for being later, but it's the end of the story, so it holds
+  only each field's entry in effect then.
+- **Read without `as_of` before changing a position field.** A field missing
+  from a read at a position may be set in the note, and a list's item numbers
+  may not match the note's. With `planted: ["ash:1", "ember:2"]`, a read at
+  `ember:3` gives `["ember:2"]`, and `set` on `fields.planted.0` then replaces
+  `ash:1`. The hash is the same from both reads, so the write isn't refused.
+- **A read at a position only goes by positions.** Text the writer put in a
+  section or lead, or a field the note's type doesn't define, can still mention
+  later events.
 - **Writes land at once; only `checkpoint` records them.** An open page
   in the web UI shows each write within about 5 seconds, or once the
   writer closes an editor or form they have open there. If they save a

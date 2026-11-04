@@ -2569,7 +2569,7 @@ The book's `chapter_defaults` give every chapter Mina's POV, and chapter
   book's `chapter_defaults`. Clearing the field goes back to that
   default; clearing a field the chapter doesn't set is refused. An item
   can go in at a given place, and come out by its text, compared
-  ignoring case and spacing: `[[Mina]]` doesn't match
+  ignoring case, spacing, and which apostrophe is used: `[[Mina]]` doesn't match
   `[[mina-harker]]`. A field named like the chapter's own keys (`key`)
   is refused (types.md F-CHAP-1). An item can also move (`move`) or be
   changed (`replace`) in place, keeping its comments (SC-RT-17). Either
@@ -2738,8 +2738,8 @@ renames him Old Swales.
   link changes, which suits a name that changes in the story. If
   another character in the book goes by "Mr. Swales" too, the result
   says that links by it are now ambiguous (F-LINK-7), naming the link
-  in the note. A new name that only changes case or spacing changes no
-  link.
+  in the note. A new name that only changes case, spacing, or which
+  apostrophe is used changes no link.
 - If a note in a final book uses the old name, nothing is renamed
   (`frozen`), and the error suggests `keep_old_name`, which leaves the
   frozen book alone. Swales in a final book isn't renamed at all. A new
@@ -3405,6 +3405,56 @@ The missing manifest has `planted: ["ember:2", "ash:1"]` and
 
 Spec: F-VIEW-5 (#305). Covered by: `FuturePositionFieldTests`,
 `ReadEndpointTests.APositionFieldsLaterValuesStayForTheWriter`.
+
+### SC-MCP-46. A link and a name use different apostrophes
+
+A note is named "Mina's Journal", typed with a straight apostrophe, and another
+note links `[[Mina’s Journal]]`, as a word processor writes it, or the reverse.
+
+- The link reaches the note. So does a heading (`[[Mina’s Journal#Mina’s
+  Notes]]` reaches the section "Mina's Notes"), a link by an alias, a `ref`
+  field, and a backlink. Straight `'`, curly `’`, left single quote `‘`, modifier
+  letter `ʼ`, and fullwidth `＇` all count as one character, the same ones a key
+  drops. `[[Minas Journal]]` still doesn't match, and a backtick or an ʻokina
+  isn't an apostrophe.
+- `get_entity`, the tools that name a note, and the link picker find it with
+  any of them. The picker also matches them a word at a time: `mina’s jour`
+  finds it.
+- The link stays as written, and its label is never touched. Nothing rewrites
+  it on indexing (F-LINK-10).
+- Two notes in one scope, "Mina's Journal" and "Mina’s Journal", are the same
+  name to a link, so a link to either is ambiguous and neither is chosen, unless
+  one is in a nearer scope. A new note that would do that to existing links is
+  refused unless `allow_relinks` is given, as for an identical name. Its file
+  is `minas-journal-2.md`.
+- Changing only the apostrophes in a name, an alias, or a section ("Mina's" to
+  "Mina’s") leaves every link as it is, even in a final book, and doesn't keep
+  the old name as an alias. Any other rename rewrites a link whichever
+  apostrophe it used, to the new text as it was given, and keeps its label, so
+  a link in a final book stops it.
+- A move treats them the same way. Moving the note leaves a curly link as it
+  is while it still reaches the note. Moved into the scope of a note that
+  differs only by apostrophe, a link to the moved note goes to its id, showing
+  the same text. If a link there reaches the other note, and would become
+  ambiguous, the move is refused, naming both, unless `allow_relinks` is given.
+- An index built before this is rebuilt, since it stored names under the old
+  matching.
+
+Spec: format.md F-LINK-4, F-LINK-7, F-LINK-9, F-LINK-11, F-RT-5, types.md
+F-TPL-6 (#308). Covered by: `LinkTextTests.EveryApostropheIsTheSameCharacter`,
+`LinkTextTests.WhatIsNotAnApostropheStaysDistinct`,
+`LinkResolutionTests.AnyApostropheInALinkMatchesAnyInAName`,
+`LinkResolutionTests.AnyApostropheMatchesInAHeadingWithOrWithoutALabel`,
+`LinkResolutionTests.ALinksLabelKeepsItsApostrophe`,
+`LinkResolutionTests.AnyApostropheMatchesInAnAlias`,
+`LinkResolutionTests.TwoNotesThatDifferOnlyByApostropheAreAmbiguous`,
+`LinkResolutionTests.ANearerScopeStillBreaksATieBetweenApostrophes`,
+`LinkResolutionTests.ABacklinkCountsWhicheverApostropheTheLinkUses`,
+`LinkResolutionTests.ABrokenLinksHintMatchesAnyApostrophe`,
+`EntityLookupTests.AnyApostropheTypedFindsAnyInAName`,
+`EntityLookupTests.AnyApostropheTypedFindsAnyInAnAlias`,
+`ApostropheLinkToolTests`, and in the web tests, `linkFor`'s check in
+`FieldEditing.test.tsx`.
 
 ## STORE: Wolfden saves, moves, and deletes notes
 
@@ -4862,7 +4912,8 @@ by: `WriteEndpointTests.TheSourceGivesTheFilesHashAndEachSectionsTextAsWritten`,
 - Rename turns the heading into a text box. Saving renames the section
   and rewrites every link to it by heading, in any note, as the MCP
   `rename_section` does (format.md F-RT-5); if one of those links is in a
-  final book, nothing is renamed.
+  final book, nothing is renamed. Changing only its apostrophes rewrites no
+  link (SC-MCP-46).
 - Remove asks in the page, not in a browser dialog: "Remove the section
   'Arc' and its 1 subsection?", with "Keep it" focused. Removing takes the
   section's subsections too. Links to it by heading aren't rewritten; the

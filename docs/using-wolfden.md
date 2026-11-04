@@ -757,7 +757,9 @@ the pages don't have a form for it yet. The rules are in
   and the opening (the text before the first section) has **Edit
   opening**. Edit opens the text as Markdown, as it's written in the
   file. Type `[[` and a few letters of a note's name or alias to pick a
-  note to link to. The link is the text you matched, so it reads well:
+  note to link to, with either kind of apostrophe: links don't mind whether
+  it's straight or curly, so `[[Mina’s Journal]]` reaches "Mina's Journal".
+  The link is the text you matched, so it reads well:
   `[[Mina Harker]]`, or `[[Madam Mina]]` if you typed her alias. When
   that text could mean another note too, it uses her name instead, or
   failing that her file name (`[[mina-harker]]`). A note that no link
@@ -768,7 +770,9 @@ the pages don't have a form for it yet. The rules are in
   does dropping or pasting one into the text
   ([Adding an image while you edit](#adding-an-image-while-you-edit)).
   **Add section** adds one at the end or before another. Renaming a
-  section changes the links to it in every note; removing one asks first.
+  section changes the links to it in every note, unless only its
+  apostrophes change (straight to curly, say), since links already match
+  either; removing one asks first.
 - **Edit file** opens the whole note, frontmatter and all, for anything
   the other controls don't do, such as a section's
   `<!-- wolfden: ... -->` comment.

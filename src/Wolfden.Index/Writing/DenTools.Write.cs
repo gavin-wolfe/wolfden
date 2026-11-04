@@ -436,7 +436,9 @@ public sealed partial class DenTools
             var after = EntityCatalog.ReadEntityFile(check.Structure, path, files[path]).Entity!;
             var effects = new List<string>
             {
-                plan.LinksRewritten == 0
+                LinkText.FoldApostrophes(found.Name) == LinkText.FoldApostrophes(newName)
+                    ? $"Renamed '{found.Name}' to '{newName}'. Links match any apostrophe (F-LINK-4), so any that name it still reach it, and none were changed."
+                    : plan.LinksRewritten == 0
                     ? $"Renamed '{found.Name}' to '{newName}'. No links named it."
                     : $"Renamed '{found.Name}' to '{newName}', and rewrote {plan.LinksRewritten} link(s) to it so they name '{newName}' (files written: {files.Count}).",
             };

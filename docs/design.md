@@ -1304,7 +1304,8 @@ store, so an edit changes only what it means to (format.md §12):
   and says which don't resolve where the copy is.
 - **Renames** (maintainer decision, 2026-10-23). `rename_section`
   rewrites every link that reaches the section by heading, in any file
-  (F-RT-5), as one change: if any of those files is in a final book,
+  (F-RT-5; none if only its apostrophes change, since they still match,
+  #308), as one change: if any of those files is in a final book,
   nothing is renamed, and if a write fails part way, the files already
   written are put back, newest first, and the result names any that
   couldn't be, or that another program changed meanwhile (those are
@@ -1350,7 +1351,7 @@ store, so an edit changes only what it means to (format.md §12):
   differently (a kept alias another entity also has makes it
   ambiguous, F-LINK-7), and any relinked link allowed, is listed in
   `effects`. A link that was ambiguous or broken and now resolves
-  reached no entity before, so it's only reported, never refused. A change that only alters case or spacing changes no link
+  reached no entity before, so it's only reported, never refused. A change that only alters case, spacing, or which apostrophe is used changes no link
   (F-LINK-4). Renaming an entity to one of its own aliases takes that
   alias out.
 - **Moves** (maintainer decision, 2026-10-24, #89). `move_entity`
@@ -2173,7 +2174,9 @@ docs/
     characters are typed (a ULID's first ten are its time, which notes
     made together share). Words are split and compared as search does
     (`unicode61`, `remove_diacritics 2`), so `zoe ark` finds Zoë
-    Arkwright and `mur wil` finds the alias Wilhelmina Murray. Matches
+    Arkwright and `mur wil` finds the alias Wilhelmina Murray. Any
+    apostrophe F-LINK-4 counts splits a word as a straight one does, so
+    `mina’s jour` finds "Mina's Journal". Matches
     come best first: the whole text as a link would match it (F-LINK-4)
     to the name, then to the file name or id, then to an alias; then a
     name that starts with the words, in order; a name that holds them;

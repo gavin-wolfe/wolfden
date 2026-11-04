@@ -1,4 +1,5 @@
 using System.Text;
+using Wolfden.Core.Editing;
 
 namespace Wolfden.Core.Links;
 
@@ -10,8 +11,9 @@ public static class LinkText
 {
     /// <summary>
     /// Normalizes <paramref name="text"/> for comparison: Unicode NFC
-    /// (F-ENC-5), trimmed, each run of whitespace collapsed to one space, then
-    /// case folded. Hyphens and spaces stay distinct, so <c>ilse-tarrow</c> and
+    /// (F-ENC-5), trimmed, each run of whitespace collapsed to one space, case
+    /// folded, then every apostrophe made the straight one (<see cref="FoldApostrophes"/>).
+    /// Hyphens and spaces stay distinct, so <c>ilse-tarrow</c> and
     /// <c>ilse tarrow</c> don't match.
     /// </summary>
     /// <remarks>
@@ -44,13 +46,39 @@ public static class LinkText
             AppendFolded(sb, rune);
         }
 
-        return sb.ToString();
+        // After folding, since a letter can fold to text with an apostrophe in it (ŉ to ʼn).
+        return FoldApostrophes(sb.ToString());
+    }
+
+    /// <summary>
+    /// <paramref name="text"/> with every character that counts as an
+    /// apostrophe (<see cref="NewEntity.IsApostrophe"/>, the set a key drops,
+    /// types.md F-TPL-6) made the straight one.
+    /// </summary>
+    public static string FoldApostrophes(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        if (!text.Any(c => c != '\'' && NewEntity.IsApostrophe(c)))
+        {
+            return text;
+        }
+
+        var chars = text.ToCharArray();
+        for (var i = 0; i < chars.Length; i++)
+        {
+            if (NewEntity.IsApostrophe(chars[i]))
+            {
+                chars[i] = '\'';
+            }
+        }
+
+        return new string(chars);
     }
 
     /// <summary>
     /// Case folds <paramref name="text"/> as <see cref="Normalize"/> does,
-    /// after NFC, but without trimming or collapsing whitespace. Enum values
-    /// match their keys this way (types.md F-FT-8).
+    /// after NFC, but without trimming or collapsing whitespace or folding
+    /// apostrophes. Enum values match their keys this way (types.md F-FT-8).
     /// </summary>
     public static string CaseFold(string text)
     {

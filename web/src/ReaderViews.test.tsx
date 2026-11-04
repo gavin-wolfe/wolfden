@@ -83,11 +83,11 @@ describe('SC-WEB-103: the Author’s view and the Reader’s view', () => {
   it('says what it doesn’t cover yet, beside read-only, on both tabs', async () => {
     stubApi()
     const note = renderApp('/u/dracula/e/E-MINA?at=dracula:3&readers=1')
-    expect(await screen.findByText(/The sidebar, search, and other pages aren't part of the Reader's view yet/)).toBeTruthy()
+    expect(await screen.findByText(/Search, book and chapter pages, and the chapter menu aren't part of the Reader's view yet/)).toBeTruthy()
     note.unmount()
 
     renderApp('/u/dracula/e/E-MINA?view=history&at=dracula:3&readers=1')
-    expect(await screen.findByText(/The sidebar, search, and other pages aren't part of the Reader's view yet/)).toBeTruthy()
+    expect(await screen.findByText(/Search, book and chapter pages, and the chapter menu aren't part of the Reader's view yet/)).toBeTruthy()
   })
 
   it('doesn’t say so in the Author’s view', async () => {
@@ -159,12 +159,15 @@ describe('SC-WEB-103: the Author’s view and the Reader’s view', () => {
     expect(entityCalls(calls)).toEqual(['/api/entity?entity=E-MINA&universe=dracula&marksAt=dracula%3A3'])
   })
 
-  it('isn’t on a page that has one view until later steps', async () => {
+  it('is on every page with a position, as the sidebar is, but for Edit file', async () => {
     stubApi()
     renderApp('/u/dracula?at=dracula:3')
+    await screen.findByRole('group', { name: 'Whose view' })
+    cleanup()
+
+    renderApp('/file?path=universes%2Fdracula%2Funiverse.md&at=dracula:3')
     await screen.findByRole('group', { name: 'Story position' })
     await screen.findByRole('main')
-
     expect(switchOf()).toBeNull()
   })
 

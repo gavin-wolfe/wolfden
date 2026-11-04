@@ -408,7 +408,7 @@ describe('SC-WEB-23: I look at a note’s history in the browser', () => {
     renderApp('/u/dracula/e/E-QUINCEY?view=history&at=dracula:5')
 
     await screen.findByRole('heading', { name: 'Checkpoints' })
-    expect(screen.queryByText(/enters at/)).toBeNull()
+    expect(within(screen.getByRole('main')).queryByText(/enters at/)).toBeNull()
   })
 
   it('fetches no history in the Reader’s view, and keeps a note not met yet behind the banner', async () => {

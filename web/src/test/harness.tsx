@@ -7,6 +7,7 @@ import { refreshDefaults, writeDefaults } from '../formHold'
 import type {
   DenSummary,
   EntityListResult,
+  MarkedEntityListResult,
   EntityPage,
   EntityPageResult,
   EntitySummary,
@@ -299,6 +300,17 @@ function answer(path: string, params: URLSearchParams, at: string | null, option
       return { version: 1, position: at, count: fields.length, fields } satisfies FieldNamesResult
     }
     case '/api/entities': {
+      if (marksAt) {
+        const met = inViewAt(marksAt)
+        const marked = entities.map((e) => ({
+          ...e,
+          met: met.includes(e),
+          ...(!met.includes(e) && ['canon', 'draft'].includes(e.status) ? { readerMark: { kind: 'ahead' as const, at: e.from } } : {}),
+        }))
+        const list = [...marked.filter((e) => e.met), ...marked.filter((e) => !e.met)]
+        return { version: 1, count: list.length, total: list.length, truncated: false, entities: list, marksAt } satisfies MarkedEntityListResult
+      }
+
       const list = at ? inViewAt(at) : entities
       return { version: 1, count: list.length, total: list.length, truncated: false, entities: list } satisfies EntityListResult
     }

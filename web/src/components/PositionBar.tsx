@@ -118,14 +118,13 @@ function UniversePositionBar({ universe }: { universe: string }) {
 
 /**
  * Whose view of a chosen position this is (#300): both labels are always there,
- * and the current one is pressed, so the page always says which it is. The lists,
- * search, and the book page have one view until later steps of #300, so it's only
- * on a note's pages for now.
+ * and the current one is pressed, so the page always says which it is. It's on
+ * every page, as the sidebar is, but for Edit file, which is always the writer's.
  */
 function ViewSwitch() {
   const { readers, setReaders } = usePosition()
-  const onNote = useRouterState({ select: (s) => s.matches.some((m) => m.routeId === '/u/$universe/e/$') })
-  if (!onNote) {
+  const onFile = useRouterState({ select: (s) => s.location.pathname === '/file' })
+  if (onFile) {
     return null
   }
 

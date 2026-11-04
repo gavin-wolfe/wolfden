@@ -4646,21 +4646,15 @@ bookmarked at chapter 3.
 Spec: design.md §9 (#26, maintainer decision). Covered by:
 `PositionBar.test.tsx`, `Navigation.test.tsx` (web).
 
-### SC-WEB-12. As of a chapter, the tree hides what the reader hasn't met
+### SC-WEB-12. With no position, the tree lists every note
 
-The writer sets the bar to Dracula chapter 3.
+The writer hasn't picked a position.
 
-- Each group in the tree lists only the notes in the view there. The
-  characters list Jonathan and Mina, but not Lucy or Quincey Morris,
-  who enter in chapter 5. "2 more appear later" shows those two greyed,
-  each with "enters at Dracula chapter 5". A note left out for its
-  status, such as an idea, says "not in canon: idea" instead. With no
-  position, every note is listed and there's no peek.
-- An open peek closes when the position changes, or when the writer
-  moves to another chapter's page.
+- Every note is listed in its group, with no tags and no line about them.
+- Picking a position changes this: SC-WEB-104 for the Author's view, and
+  SC-WEB-105 for the Reader's view.
 
-Spec: design.md §9 (#24, #26, maintainer decision). Covered by:
-`Browse.test.tsx`, `Navigation.test.tsx` (web).
+Spec: design.md §9 (#24, #26, #300). Covered by: `Browse.test.tsx` (web).
 
 ### SC-WEB-13. I open a note the reader hasn't met yet
 
@@ -4706,7 +4700,8 @@ The writer opens Dracula chapter 5 from the book's page.
 
 - The page names the chapter by its title, "Letters—Lucy and Mina", and
   lists the notes that enter the story there (Lucy Westenra, Quincey P.
-  Morris), hidden with a peek as of an earlier position. A button reads
+  Morris), tagged in the Author's view as of an earlier position (SC-WEB-104),
+  and not named in the Reader's view (SC-WEB-105). A button reads
   the den as of this chapter. A chapter the book doesn't have says so.
 
 Spec: design.md §9 (#24). Covered by: `Navigation.test.tsx` (web).
@@ -6501,7 +6496,7 @@ with `marksAt` for that position (#300). A note's tabs ask for it (SC-WEB-102), 
 the search page doesn't yet.
 
 - I get the whole note, or every hit a search with no position finds in that
-  universe. Nothing is hidden.
+  universe, or every note in a list (SC-WEB-104). Nothing is hidden.
 - A note readers meet later has `readerMark`, `ahead`, at where it enters. A
   field's entry or a section that starts later has its own, at its effective
   start: a thread's `## Payoff` starts at `paid_off`, though it has no `from`.
@@ -6571,8 +6566,9 @@ I'm at chapter 3 in the Author's view, on a note's page.
   only the note has a tag.
 - "Linked from" says the same of what holds each link, in plain text with a tooltip
   rather than a button, with one line above the list to say what they are. A link in
-  a section an error leaves out has the **left out** badge. A link in a universe's,
-  series', or book's own text has no tag, since that text isn't in story order.
+  a section an error leaves out has the **left out** badge. A link with no position
+  has no tag, since it isn't in story order: one in a universe's, series', or book's
+  own text, in an outline's notes, or in a chapter value or default that isn't held.
 - A type's field defaults aren't listed, as in Everything mode, since they aren't
   in the note. The Reader's view lists them, with their `type default` badge.
 - I can edit from here. The save goes to the real note, the page reads the same way
@@ -6587,23 +6583,67 @@ Spec: F-VIEW-4, F-VIEW-5, design.md §9 (#300). Covered by: `web/src/ReaderViews
 ### SC-WEB-103. I switch between the Author's view and the Reader's view
 
 - With no position, there's only the full view, and no control.
-- Once I pick a position on a note's page, a two-way control in the position bar
-  says `Author's view` and `Reader's view`, with the current one pressed. It opens
-  on the Author's view.
+- Once I pick a position, on any page but Edit file, a two-way control in the
+  position bar says `Author's view` and `Reader's view`, with the current one pressed.
+  It opens on the Author's view.
 - The Reader's view is in the URL (`?readers=1`), so a reload or a shared link keeps
   it, and following a link, changing the chapter, or changing tab does too. A fresh
   start opens the Author's view, and nothing is remembered.
 - **Show everything** ends it, and `?readers=1` with no position means nothing.
 - The Reader's view of a note's page shows only what readers know (SC-WEB-101), with
-  no tags, and has no way to edit: no Edit buttons, and it says so. It also says the
-  sidebar, search, and other pages aren't part of it yet.
+  no tags, and has no way to edit: no Edit buttons, and it says so. It also says
+  search, book and chapter pages, and the chapter menu aren't part of it yet, as every
+  other page in that view does.
 - The ⚠ list's **Edit file** leaves the Reader's view behind and keeps the position,
   since it's the whole source, for the writer.
 - A note readers haven't met there has only the banner (SC-WEB-13), and the History
   tab fetches no saved version, since one can hold anything. It says so.
 - With an unsaved edit open, switching asks first, as moving the position does.
-- Lists, search, and the book page have one view until later steps of #300, so the
-  control isn't there.
 
 Spec: design.md §9 (#300). Covered by: `web/src/ReaderViews.test.tsx`,
 `web/src/History.test.tsx`, `web/src/Browse.test.tsx`, `web/src/Editing.test.tsx`.
+
+### SC-WEB-104. In the Author's view, a list has everything, what readers have met first
+
+I'm at Dracula chapter 3 in the Author's view, looking at the sidebar.
+
+- Each group lists every note. The characters list Jonathan and Mina, then a dashed
+  line, then Lucy and Quincey Morris, greyed, each with `enters at chapter 5`. Nothing
+  collapses, and each part keeps the order it has with no position.
+- The tag is plain text with the same tooltip as on a note's page, not a button, so a
+  row is one Tab stop. One line, once at the top of the tree, says what the tags are,
+  for a keyboard or a touch.
+- A note with a position the universe doesn't have says `not placed in the story yet`.
+  An idea comes after the line with its own badge and no tag.
+- A group's count says what readers have met, `2 of 5`, and has a tooltip that says so.
+- A chapter's "Enters the story here" works the same way.
+- When there are more notes than a list can hold, what readers have met stays, and it
+  says only the first ones are listed.
+- `/api/entities` with `marksAt` gives this in one answer, and its filters by type,
+  status, series, and book work as they do without it. What's met is what `asOf` and
+  `canon_as_of` hold, at every position.
+- With no tag in the list, there's no line.
+
+Spec: design.md §9 (#300, #302). Covered by: `web/src/ReaderLists.test.tsx`,
+`MarkedListTests`.
+
+### SC-WEB-105. In the Reader's view, a list has only what readers know
+
+I'm at Dracula chapter 3 with `?readers=1`.
+
+- The sidebar lists only what's in `canon_as_of` there. No later note's name is on
+  the page, and the page doesn't ask for it. A group's count is what's listed, and
+  a type with nothing met isn't there.
+- Later books and chapters aren't listed in the tree or on the universe's and series'
+  pages, and a series with nothing yet isn't. A later book or series stays only if a met
+  note is filed in it, with no later chapters. A series readers haven't got to says so,
+  without its name.
+- A chapter's "Enters the story here" lists what they've met, and otherwise says
+  "Readers have met no notes that enter the story here", at a later chapter too.
+- There's no tag, legend, or New button, and the universe's and series' pages have no
+  chapter defaults.
+- Following a note from a list and coming back keeps `readers=1`.
+- A note they haven't met still has its banner (SC-WEB-13).
+
+Spec: format.md §9.5, design.md §9 (#300). Covered by: `web/src/ReaderLists.test.tsx`,
+`MarkedListTests.AtEveryPositionTheReadersListAndWhatsMetAreWhatCanonAsOfHolds`.

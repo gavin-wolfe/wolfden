@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { getRouteApi } from '@tanstack/react-router'
-import { entityQuery, type ContainerRef, type PositionView, type ReaderMark } from '../api'
+import { entityQuery, positionsQuery, type ContainerRef, type PositionView, type ReaderMark } from '../api'
 import { FileDiffView } from '../components/DiffView'
 import { MarkTag } from '../components/AheadOfReaders'
 import { EntityTabs } from '../components/EntityTabs'
 import { ErrorState, Loading } from '../components/States'
 import type { EntitySearch } from '../entitySearch'
-import { useDocumentTitle, useEntitiesInView, usePosition } from '../hooks'
+import { useDocumentTitle, useNoteSummary, usePosition } from '../hooks'
 import { historyDiffQuery, historyQuery, type DiffSelection, type HistoryDiffResult, type HistoryEntry, type HistoryResult } from '../historyApi'
 import { READERS_VIEW_REACH } from '../readerWords'
 import { Breadcrumb, NotInView } from './EntityPageView'
@@ -34,7 +34,8 @@ export function HistoryPage() {
   const { universe, _splat: key = '' } = route.useParams()
   const { at, readers } = usePosition()
   const page = useQuery(entityQuery(universe, key, at, readers))
-  const view = useEntitiesInView(universe)
+  const positions = useQuery(positionsQuery(universe)).data?.positions ?? []
+  const summary = useNoteSummary(universe, key, page.data !== undefined && page.data.entity === null)
   useDocumentTitle(page.data ? (page.data.entity ? `${page.data.entity.name}: history` : 'Not met yet') : undefined)
 
   if (page.isPending) {
@@ -46,12 +47,11 @@ export function HistoryPage() {
   }
 
   if (!page.data.entity) {
-    const summary = view.all?.entities.find((e) => e.key === key || e.id === key || e.path === key)
     return (
       <NotInView
         summary={summary}
         note={page.data.note}
-        positions={view.positions ?? []}
+        positions={positions}
         at={at}
         className="page-body history"
       />
@@ -74,7 +74,7 @@ export function HistoryPage() {
     )
   }
 
-  return <History universe={universe} entityKey={key} scope={entity.scope} mark={entity.readerMark} positions={view.positions ?? []} />
+  return <History universe={universe} entityKey={key} scope={entity.scope} mark={entity.readerMark} positions={positions} />
 }
 
 /** The history itself. `scope` is the note's breadcrumb, and `mark` what readers at the position don't know of it. */

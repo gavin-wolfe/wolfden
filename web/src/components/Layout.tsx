@@ -2,7 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, Outlet, useRouterState } from '@tanstack/react-router'
 import { denQuery } from '../api'
-import { useUniverseKey } from '../hooks'
+import { usePosition, useUniverseKey } from '../hooks'
+import { READERS_VIEW_REACH } from '../readerWords'
 import { CheckpointIndicator } from './CheckpointIndicator'
 import { DenErrorsIndicator } from './DenErrorsIndicator'
 import { ContainerCreatedNotice, NewContainerProvider } from './NewContainer'
@@ -21,6 +22,13 @@ import { Sidebar } from './Sidebar'
  * a note from a type's template (#29), and the universe's and series'
  * pages make series and books (#213).
  */
+function ReadersReach() {
+  const { readers } = usePosition()
+  // A note's page says it beside "read-only".
+  const onNote = useRouterState({ select: (s) => s.matches.some((m) => m.routeId === '/u/$universe/e/$') })
+  return readers && !onNote ? <p className="muted readers-reach">{READERS_VIEW_REACH}</p> : null
+}
+
 export function Layout() {
   const den = useQuery(denQuery)
   const pathname = useRouterState({ select: (s) => s.location.pathname })
@@ -29,6 +37,7 @@ export function Layout() {
     select: (s) => (s.location.pathname === '/file' ? /^universes\/([^/]+)\//.exec(String((s.location.search as { path?: unknown }).path ?? ''))?.[1] : undefined),
   })
   const routeUniverse = useUniverseKey()
+  const { readers } = usePosition()
   const universe = routeUniverse ?? (den.data?.universes.some((u) => u.key === fileUniverse) ? fileUniverse : undefined)
   const [treeOpen, setTreeOpen] = useState(false)
   const appRef = useRef<HTMLDivElement>(null)
@@ -93,7 +102,8 @@ export function Layout() {
             <Link to="/" className="den-name">
               {den.data?.name ?? 'Wolfden'}
             </Link>
-            {universe && <NewMenu universe={universe} />}
+            {/* The Reader's view is read-only, and this asks for every note's name to know where a new one would go. */}
+            {universe && !readers && <NewMenu universe={universe} />}
             <SearchBox universe={universe} />
             <PositionBar universe={universe} />
             <DenErrorsIndicator universe={universe} />
@@ -107,6 +117,7 @@ export function Layout() {
             <main className="page">
               <CreatedNotice />
               <ContainerCreatedNotice />
+              <ReadersReach />
               <Outlet />
             </main>
           </div>

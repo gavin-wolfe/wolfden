@@ -3,8 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import type { EntityPageResult, LinkView, PageSection } from './api'
 import { atOf, entities, page, renderApp, stubApi } from './test/harness'
-import { splitByView } from './story'
-import { positions } from './test/harness'
+import { MARKS_LEGEND } from './readerWords'
 
 afterEach(() => {
   cleanup()
@@ -17,8 +16,8 @@ async function tree() {
   return screen.findByRole('navigation', { name: 'Contents' })
 }
 
-describe('SC-WEB-12: the tree shows what the reader has met, with a peek at the rest', () => {
-  it('shows every note at no position, with no peek', async () => {
+describe('SC-WEB-12: the tree at no position', () => {
+  it('shows every note, with no tags and no line about them', async () => {
     stubApi()
     renderApp('/u/dracula')
     const contents = await tree()
@@ -26,48 +25,9 @@ describe('SC-WEB-12: the tree shows what the reader has met, with a peek at the 
     expect(within(contents).getByRole('link', { name: 'Quincey P. Morris' })).toBeTruthy()
     expect(within(contents).getByRole('link', { name: 'A scene at the inn' })).toBeTruthy()
     expect(within(contents).queryByRole('button', { name: /more/ })).toBeNull()
-  })
-
-  it('as of a chapter, hides notes met later behind "N more appear later", greyed with where they enter', async () => {
-    stubApi()
-    renderApp('/u/dracula?at=dracula:3')
-    const contents = await tree()
-    await within(contents).findByRole('link', { name: 'Jonathan Harker' })
-
-    expect(within(contents).getByRole('link', { name: 'Mina Harker' })).toBeTruthy()
-    expect(within(contents).queryByRole('link', { name: 'Quincey P. Morris' })).toBeNull()
-    expect(within(contents).queryByRole('link', { name: 'Lucy Westenra' })).toBeNull()
-
-    const peek = within(contents).getByRole('button', { name: '3 more appear later' })
-    expect(peek.getAttribute('aria-expanded')).toBe('false')
-    fireEvent.click(peek)
-
-    const quincey = within(contents).getByRole('link', { name: 'Quincey P. Morris' })
-    const row = quincey.closest('li')!
-    expect(row.className).toBe('later')
-    expect(row.textContent).toContain('enters at Dracula chapter 5')
-    expect(within(contents).getByRole('button', { name: 'Hide the 3 not met yet' }).getAttribute('aria-expanded')).toBe('true')
-    // A chapter without a number is named by its title.
-    expect(within(contents).getByRole('link', { name: 'Quincey Harker' }).closest('li')!.textContent).toContain('enters at Dracula, “Note”')
-  })
-
-  it('says a note out of canon for its status is not in view, rather than later', async () => {
-    stubApi()
-    renderApp('/u/dracula?at=dracula:3')
-    const contents = await tree()
-
-    fireEvent.click(await within(contents).findByRole('button', { name: '1 more not in view here' }))
-    expect(within(contents).getByRole('link', { name: 'A scene at the inn' }).closest('li')!.textContent).toContain('not in canon: idea')
-    expect(within(contents).getByRole('button', { name: 'Hide the 1 not in view' })).toBeTruthy()
-  })
-
-  it('compares the unfiltered list with the list as of the position', () => {
-    const inView = new Set(['E-CASTLE', 'E-JONATHAN'])
-    const { shown, hidden } = splitByView([byKey('E-CASTLE'), byKey('E-JONATHAN'), byKey('E-LUCY')], inView, 'dracula:2', positions)
-
-    expect(shown.map((e) => e.key)).toEqual(['E-CASTLE', 'E-JONATHAN'])
-    expect(hidden).toEqual([{ entity: byKey('E-LUCY'), entry: 'dracula:5', entersAt: 'Dracula chapter 5', later: true }])
-    expect(splitByView([byKey('E-LUCY')], null, undefined, positions)).toEqual({ shown: [byKey('E-LUCY')], hidden: [] })
+    expect(contents.textContent).not.toContain('enters at')
+    expect(contents.textContent).not.toContain(MARKS_LEGEND)
+    expect(contents.querySelector('.later')).toBeNull()
   })
 })
 

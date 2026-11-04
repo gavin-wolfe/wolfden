@@ -1,10 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
-import { denQuery, hierarchyQuery, type BookNode, type EntitySummary, type ScopeKind } from '../api'
+import { denQuery, hierarchyQuery, type BookNode, type PositionView, type ScopeKind } from '../api'
 import { useShownError } from '../formHold'
-import { useEntitiesInView } from '../hooks'
-import { chapterLabel } from '../story'
+import { useEntitiesInView, type ListedEntity } from '../hooks'
+import { MARKS_LEGEND } from '../readerWords'
+import { chapterLabel, readersTree } from '../story'
 import { EntityList } from './EntityList'
 import { NewTypeButton } from './NewEntity'
 import { typePlural } from './Links'
@@ -13,9 +14,11 @@ import { ErrorState, Loading } from './States'
 /**
  * The hierarchy tree (#24): universe → series in story order → books →
  * chapters and entity types → entities. Universe and series notes sit under
- * their own scope. As of a position, each type group lists only what the
- * reader has met, with a peek at the rest, and a New <type> button that
- * makes another of that type there (#29).
+ * their own scope. Each type group has a New <type> button that makes another
+ * of that type there (#29). At a position, the Author's view lists every note,
+ * what the reader has met first, and one line says what the tags on the rest
+ * are. The Reader's view has only what the reader knows: no later notes, books,
+ * or chapters, no count of them, and no New buttons, as it's read-only (#300).
  */
 export function Sidebar({ universe }: { universe: string | undefined }) {
   const den = useQuery(denQuery)
@@ -31,7 +34,7 @@ export function Sidebar({ universe }: { universe: string | undefined }) {
             value={universe ?? ''}
             onChange={(e) =>
               // Positions belong to one universe, so a switch starts at everything.
-              void navigate({ to: '/u/$universe', params: { universe: e.currentTarget.value }, search: { at: undefined } })
+              void navigate({ to: '/u/$universe', params: { universe: e.currentTarget.value }, search: { at: undefined, readers: undefined } })
             }
           >
             {!universe && <option value="">Choose…</option>}
@@ -49,9 +52,9 @@ export function Sidebar({ universe }: { universe: string | undefined }) {
 }
 
 function UniverseTree({ universe }: { universe: string }) {
-  const hierarchy = useQuery(hierarchyQuery(universe, undefined))
-  const failedHierarchy = useShownError(hierarchy)
   const view = useEntitiesInView(universe)
+  const hierarchy = useQuery(hierarchyQuery(universe, view.readers ? view.at : undefined))
+  const failedHierarchy = useShownError(hierarchy)
   const params = useParams({ strict: false }) as { book?: string; chapter?: string; _splat?: string }
 
   if (hierarchy.isPending || view.isPending) {
@@ -63,12 +66,22 @@ function UniverseTree({ universe }: { universe: string }) {
     return <ErrorState error={error} />
   }
 
-  const u = hierarchy.data!.universe
-  const all = view.all!.entities
+  const positions = view.positions!
+  const u = view.readers ? readersTree(hierarchy.data!.universe, view.at!, positions) : hierarchy.data!.universe
+  const all = view.entities!
   const current = all.find((e) => e.key === params._splat || e.id === params._splat || e.path === params._splat)
   const byScope = groupByScope(all)
   const scopeGroups = (kind: ScopeKind, key: string, name: string, final = false) => (
-    <TypeGroups universe={universe} scope={{ kind, key }} scopeName={name} entities={byScope.get(`${kind}:${key}`) ?? []} view={view} current={current} final={final} />
+    <TypeGroups
+      universe={universe}
+      scope={{ kind, key }}
+      scopeName={name}
+      entities={byScope.get(`${kind}:${key}`) ?? []}
+      positions={positions}
+      readers={view.readers}
+      current={current}
+      final={final}
+    />
   )
   const book = (b: BookNode) => (
     <TreeNode
@@ -101,7 +114,8 @@ function UniverseTree({ universe }: { universe: string }) {
           {u.name}
         </Link>
       </p>
-      {view.all!.truncated && <p className="muted">Only the first {all.length} notes are listed.</p>}
+      {view.truncated && <p className="muted">Only the first {all.length} notes are listed.</p>}
+      {all.some((e) => e.readerMark) && <p className="muted list-legend">{MARKS_LEGEND}</p>}
       {scopeGroups('universe', u.key, u.name)}
       {u.series.map((s) => (
         <TreeNode key={s.key} label={<Link to="/u/$universe/s/$series" params={{ universe, series: s.key }}>{s.name}</Link>} open>
@@ -114,11 +128,16 @@ function UniverseTree({ universe }: { universe: string }) {
   )
 }
 
-function groupByScope(entities: readonly EntitySummary[]): Map<string, EntitySummary[]> {
-  const groups = new Map<string, EntitySummary[]>()
+function groupByScope(entities: readonly ListedEntity[]): Map<string, ListedEntity[]> {
+  const groups = new Map<string, ListedEntity[]>()
   for (const e of entities) {
     const key = `${e.scopeKind}:${e.scopeKey}`
-    groups.set(key, [...(groups.get(key) ?? []), e])
+    const group = groups.get(key)
+    if (group) {
+      group.push(e)
+    } else {
+      groups.set(key, [e])
+    }
   }
 
   return groups
@@ -129,37 +148,42 @@ function TypeGroups({
   scope,
   scopeName,
   entities,
-  view,
+  positions,
+  readers,
   current,
   final,
 }: {
   universe: string
   scope: { kind: ScopeKind; key: string }
   scopeName: string
-  entities: readonly EntitySummary[]
-  view: ReturnType<typeof useEntitiesInView>
-  current: EntitySummary | undefined
+  entities: readonly ListedEntity[]
+  positions: readonly PositionView[]
+  readers: boolean
+  current: ListedEntity | undefined
   /** A final book takes nothing new, so its lists have no New <type> (#285), as its page has no New note (#203). */
   final: boolean
 }) {
-  const { split } = view
   const types = [...new Set(entities.map((e) => e.type))].sort()
   return (
     <>
       {types.map((type) => {
-        const { shown, hidden } = split(entities.filter((e) => e.type === type))
+        const ofType = entities.filter((e) => e.type === type)
+        const met = ofType.filter((e) => e.met).length
         return (
           <TreeNode
             key={type}
             label={
               <>
-                {typePlural(type)} <span className="count">{shown.length}</span>
+                {typePlural(type)}{' '}
+                <span className="count" title={met < ofType.length ? `Readers have met ${met} of these ${ofType.length} by this point.` : undefined}>
+                  {met < ofType.length ? `${met} of ${ofType.length}` : ofType.length}
+                </span>
               </>
             }
             open={current !== undefined && current.type === type && entities.includes(current)}
           >
-            <EntityList key={view.at ?? ''} universe={universe} shown={shown} hidden={hidden} current={current?.key} />
-            {!final && <NewTypeButton type={type} scope={scope} scopeName={scopeName} />}
+            <EntityList universe={universe} entities={ofType} positions={positions} current={current?.key} />
+            {!final && !readers && <NewTypeButton type={type} scope={scope} scopeName={scopeName} />}
           </TreeNode>
         )
       })}

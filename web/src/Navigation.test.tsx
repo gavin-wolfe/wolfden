@@ -15,44 +15,6 @@ async function main() {
   return screen.findByRole('main')
 }
 
-describe('SC-WEB-12: the peek closes when the list changes', () => {
-  it('on the chapter page, moving to another chapter starts with its peek closed', async () => {
-    stubApi()
-    renderApp('/u/dracula/b/dracula/c/5?at=dracula:3')
-    const page = await main()
-
-    fireEvent.click(await within(page).findByRole('button', { name: '2 more appear later' }))
-    expect(within(page).getByRole('link', { name: 'Lucy Westenra' })).toBeTruthy()
-
-    fireEvent.click(within(page).getByRole('link', { name: /Note ›/ }))
-    const peek = await within(page).findByRole('button', { name: '1 more appears later' })
-    expect(peek.getAttribute('aria-expanded')).toBe('false')
-    expect(within(page).queryByRole('link', { name: 'Quincey Harker' })).toBeNull()
-    expect(within(page).queryByRole('link', { name: 'Lucy Westenra' })).toBeNull()
-  })
-
-  it('in the tree, a new position starts with the peek closed, even when the tree stays on screen', async () => {
-    stubApi()
-    // Chapter 4 is visited first, so going back to it later is cached and the tree isn't replaced while it loads.
-    const { history } = renderApp('/u/dracula?at=dracula:4')
-    const slider = await screen.findByRole('slider', { name: 'Story position' })
-    await within(await screen.findByRole('navigation', { name: 'Contents' })).findByRole('button', { name: '3 more appear later' })
-    fireEvent.keyDown(slider, { key: 'ArrowLeft' })
-    await waitFor(() => expect(atOf(history)).toBe('dracula:3'))
-    const contents = await screen.findByRole('navigation', { name: 'Contents' })
-
-    fireEvent.click(await within(contents).findByRole('button', { name: '3 more appear later' }))
-    expect(within(contents).getByRole('link', { name: 'Quincey P. Morris' })).toBeTruthy()
-    fireEvent.keyDown(slider, { key: 'ArrowRight' })
-    await waitFor(() => expect(atOf(history)).toBe('dracula:4'))
-
-    expect(screen.getByRole('navigation', { name: 'Contents' })).toBe(contents)
-    const peek = await within(contents).findByRole('button', { name: '3 more appear later' })
-    expect(peek.getAttribute('aria-expanded')).toBe('false')
-    expect(within(contents).queryByRole('link', { name: 'Quincey P. Morris' })).toBeNull()
-  })
-})
-
 describe('SC-WEB-16: the chapter page', () => {
   it('names the chapter, lists the notes that enter there, and reads the den as of it', async () => {
     stubApi()

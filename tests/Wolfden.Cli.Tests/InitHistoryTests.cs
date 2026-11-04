@@ -247,12 +247,14 @@ public class InitHistoryTests
 
         // The den, then each command it names.
         Assert.Equal(CliApp.ExitOk, InitCommand.Run([folder.Root], new StringWriter(), new StringWriter(), git));
-        var commands = System.Text.RegularExpressions.Regex.Matches(error.ToString(), "git config --local (\\S+) (<name>|<email>|false)");
+        var commands = System.Text.RegularExpressions.Regex.Matches(error.ToString(), "git config --local \\S+ (\"<name>\"|<email>|false)");
         Assert.Equal(10, commands.Count);
         foreach (System.Text.RegularExpressions.Match command in commands)
         {
-            var value = command.Groups[2].Value switch { "<name>" => "Ash Calloway", "<email>" => "ash@example.invalid", _ => "false" };
-            GitRun(folder.Root, git, "config", "--local", command.Groups[1].Value, value);
+            // As typed, with the two-word name in the quotes the command shows: the shell's words, without "git".
+            var typed = command.Value.Replace("<name>", "Ash Calloway", StringComparison.Ordinal).Replace("<email>", "ash@example.invalid", StringComparison.Ordinal);
+            var words = System.Text.RegularExpressions.Regex.Matches(typed, "\"[^\"]*\"|\\S+").Select(word => word.Value.Trim('"')).Skip(1);
+            GitRun(folder.Root, git, [.. words]);
         }
 
         File.WriteAllText(Path.Combine(folder.Root, "second.txt"), "second\n", new UTF8Encoding(false));

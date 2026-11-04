@@ -1059,11 +1059,11 @@ The `author` and `committer` settings beat `user` if git has them, and the
 last four keep git's own key from signing under that name:
 
 ```text
-git config --local user.name <name>
+git config --local user.name "<name>"
 git config --local user.email <email>
-git config --local author.name <name>
+git config --local author.name "<name>"
 git config --local author.email <email>
-git config --local committer.name <name>
+git config --local committer.name "<name>"
 git config --local committer.email <email>
 git config --local commit.gpgsign false
 git config --local tag.gpgsign false

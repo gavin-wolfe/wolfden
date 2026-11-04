@@ -106,7 +106,8 @@ public static class GitRepository
                 return new GitLocation(GitLocationKind.Unusable, Problem: run.Said);
             }
 
-            if (run.Output.Contains("Reinitialized", StringComparison.Ordinal))
+            // At the start: the line goes on to name the folder, which can hold any word.
+            if (run.Output.StartsWith("Reinitialized", StringComparison.Ordinal))
             {
                 return new GitLocation(GitLocationKind.InRepository, Path.GetFullPath(folder), AlreadyThere: true);
             }

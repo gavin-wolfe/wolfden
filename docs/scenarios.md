@@ -4038,8 +4038,8 @@ The writer's git signs every commit, with a key in their everyday name
 - Nothing changes when nothing is given.
 - If a commit or tag fails while git's settings say that call would sign,
   git's output isn't repeated, whatever it was, since a signing program's
-  words can name who the key belongs to. The message says to run the same
-  command to see it. That holds at every checkpoint and tag, with or without
+  words can name who the key belongs to. The message says to run `git commit`
+  or `git tag` to see it. That holds at every checkpoint and tag, with or without
   a name given. When that call wouldn't sign, git's output is repeated as
   usual, even if it mentions signing.
 - A signing setting that stays on after saving (`GIT_CONFIG_COUNT`, say)

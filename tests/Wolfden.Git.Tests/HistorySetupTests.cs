@@ -760,6 +760,42 @@ public sealed class HistorySetupTests : IDisposable
 
     [Fact]
     [Trait("Scenario", "SC-HIST-16")]
+    public void TakingBackKeepsASettingWithNoValueAndAnEmptyOne()
+    {
+        var den = Den();
+        var options = Without(Config("[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n"));
+        RunGit(den, options, "init", "--quiet");
+        File.AppendAllText(Path.Combine(den, ".git", "config"), "[commit]\n\tgpgsign\n[push]\n\tgpgsign =\n", new UTF8Encoding(false));
+        var setup = new GitHistorySetup(den, options) { BeforeStep = FailAt("user.email") };
+
+        var failed = setup.TurnOn(new HistorySetupRequest("Ash Calloway", "ash@example.invalid"), Token);
+
+        Assert.Contains("What had been saved was taken back.", failed.Problem, StringComparison.Ordinal);
+
+        // No value means true, and git can't write that, so it comes back as what it means.
+        Assert.Equal("true\n", RunGit(den, options, "config", "--local", "--type=bool", "--get", "commit.gpgsign"));
+        Assert.Equal("\n", RunGit(den, options, "config", "--local", "--get", "push.gpgsign"));
+        Assert.Equal(1, GitProcess.Run(options, den, ["config", "--local", "--get", "tag.gpgsign"], cancellationToken: Token).ExitCode);
+        Assert.Equal(1, GitProcess.Run(options, den, ["config", "--local", "--get", "user.name"], cancellationToken: Token).ExitCode);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-17")]
+    public void ARepositoryThisRunMadeInAFolderNamedReinitializedIsStillTakenAway()
+    {
+        // git init names the folder, so only the start of what it says tells a new repository from one found.
+        var den = Path.Combine(Folder(), "Reinitialized");
+        Directory.CreateDirectory(den);
+        File.WriteAllText(Path.Combine(den, "den.yaml"), "format: 1\n", new UTF8Encoding(false));
+
+        var result = new GitHistorySetup(den, Without(Config(""))).TurnOn(new HistorySetupRequest(), Token);
+
+        Assert.Equal(HistorySetupCodes.IdentityNeeded, result.Code);
+        Assert.False(Directory.Exists(Path.Combine(den, ".git")));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-16")]
     public void AHeldConfigThatStopsTheTakingBackSaysWhatsLeftAndAskedAgainItFinishesUnderTheNameGiven()
     {
         // The lock appears after the name is saved, so neither the email nor the taking back can write.
@@ -923,6 +959,7 @@ public sealed class HistorySetupTests : IDisposable
 
         Assert.True(File.Exists(attempts));
         Assert.StartsWith("Git refused the checkpoint, so nothing was recorded (", refused.Message, StringComparison.Ordinal);
+        Assert.Contains("run 'git commit' in the den's folder", refused.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("KEY-OF-MAREK", refused.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("marek", refused.Message, StringComparison.OrdinalIgnoreCase);
 
@@ -931,6 +968,7 @@ public sealed class HistorySetupTests : IDisposable
         Assert.True(history.Checkpoint(new CheckpointRequest("Start"), Token).IsAvailable);
         var tag = Assert.Throws<HistoryException>(() => history.Tag(new TagRequest("book/final", Message: "Final"), Token));
 
+        Assert.Contains("run 'git tag' in the den's folder", tag.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("marek", tag.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -1213,12 +1251,14 @@ public sealed class HistorySetupTests : IDisposable
         Assert.DoesNotContain("Marek", result.Problem, StringComparison.Ordinal);
 
         // Every command it names, exactly as it names it, with the writer's values filled in.
-        var commands = System.Text.RegularExpressions.Regex.Matches(result.Problem!, "git config --local (\\S+) (<name>|<email>|false)");
+        var commands = System.Text.RegularExpressions.Regex.Matches(result.Problem!, "git config --local \\S+ (\"<name>\"|<email>|false)");
         Assert.Equal(10, commands.Count);
         foreach (System.Text.RegularExpressions.Match command in commands)
         {
-            var value = command.Groups[2].Value switch { "<name>" => "Ash Calloway", "<email>" => "ash@example.invalid", _ => "false" };
-            RunGit(den, options, "config", "--local", command.Groups[1].Value, value);
+            // As typed, with the two-word name in the quotes the command shows: the shell's words, without "git".
+            var typed = command.Value.Replace("<name>", "Ash Calloway", StringComparison.Ordinal).Replace("<email>", "ash@example.invalid", StringComparison.Ordinal);
+            var words = System.Text.RegularExpressions.Regex.Matches(typed, "\"[^\"]*\"|\\S+").Select(word => word.Value.Trim('"')).Skip(1);
+            RunGit(den, options, [.. words]);
         }
 
         Assert.Equal(AshOnly, LaterCommitIdentity(den, options));

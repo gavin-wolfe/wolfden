@@ -566,7 +566,7 @@ public sealed partial class GitHistory : IHistoryProvider
             // Put the new files back as they were: untracked, not marked.
             Unmark(untracked);
             throw new HistoryException(
-                $"Git refused the checkpoint, so nothing was recorded ({SaidUnlessSigning(commit, "commit.gpgsign")}). A pre-commit or commit-msg hook, commit signing, " +
+                $"Git refused the checkpoint, so nothing was recorded ({SaidUnlessSigning(commit, "git commit", "commit.gpgsign")}). A pre-commit or commit-msg hook, commit signing, " +
                 "or a merge or rebase in progress can do this. The den's files and what was staged are as they were.");
         }
 
@@ -771,7 +771,7 @@ public sealed partial class GitHistory : IHistoryProvider
         {
             throw request.Message is null
                 ? Failed("tag", made)
-                : new HistoryException($"git tag failed: {SaidUnlessSigning(made, "tag.gpgsign", "tag.forcesignannotated")}");
+                : new HistoryException($"git tag failed: {SaidUnlessSigning(made, "git tag", "tag.gpgsign", "tag.forcesignannotated")}");
         }
 
         return HistoryResult<HistoryTag>.Done(new HistoryTag(request.Name, at));
@@ -1729,7 +1729,7 @@ public sealed partial class GitHistory : IHistoryProvider
     /// words can name who a key belongs to, and no list of words tells them apart (#286).
     /// A setting git can't read as true or false counts as on.
     /// </summary>
-    private string SaidUnlessSigning(GitRun failed, params string[] settings)
+    private string SaidUnlessSigning(GitRun failed, string command, params string[] settings)
     {
         bool signs;
         try
@@ -1746,7 +1746,7 @@ public sealed partial class GitHistory : IHistoryProvider
         }
 
         return signs
-            ? "git is set to sign, so what it said isn't repeated here, since that can name who a key belongs to: run the same git command in the den's folder to see it"
+            ? $"git is set to sign, so what it said isn't repeated here, since that can name who a key belongs to: run '{command}' in the den's folder to see it"
             : failed.Said;
     }
 

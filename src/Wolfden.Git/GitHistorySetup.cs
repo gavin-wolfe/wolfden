@@ -283,7 +283,7 @@ public sealed class GitHistorySetup : IHistorySetup
         // part way, and a retry that then sees nothing to change, can't sign with git's key.
         var signingOff = false;
         var signingWritten = false;
-        var written = new List<(string Key, string[] Before)>();
+        var written = new List<(string Key, string?[] Before)>();
         if (given)
         {
             string? beatenAfterSaving;
@@ -547,9 +547,9 @@ public sealed class GitHistorySetup : IHistorySetup
     /// </summary>
     public const string ChangeNameByHand =
         "run these in the den's folder: " +
-        "git config --local user.name <name> ; git config --local user.email <email> ; " +
-        "git config --local author.name <name> ; git config --local author.email <email> ; " +
-        "git config --local committer.name <name> ; git config --local committer.email <email> " +
+        "git config --local user.name \"<name>\" ; git config --local user.email <email> ; " +
+        "git config --local author.name \"<name>\" ; git config --local author.email <email> ; " +
+        "git config --local committer.name \"<name>\" ; git config --local committer.email <email> " +
         "(git prefers those two kinds to the first, if it has them), and, so git's own key doesn't sign under that name: " +
         "git config --local commit.gpgsign false ; git config --local tag.gpgsign false ; " +
         "git config --local tag.forcesignannotated false ; git config --local push.gpgsign false . " +
@@ -674,23 +674,24 @@ public sealed class GitHistorySetup : IHistorySetup
     /// a key there came from a template (<c>init.templateDir</c>), so it wasn't.
     /// </summary>
     private bool HasOwnSigningKey(bool made, CancellationToken cancellationToken) =>
-        !made && LocalValues("user.signingkey", cancellationToken).Any(key => key.Trim().Length > 0);
+        !made && LocalValues("user.signingkey", cancellationToken).Any(key => !string.IsNullOrWhiteSpace(key));
 
     /// <summary>The repository's own values of <paramref name="key"/>, none if it isn't set there.</summary>
-    private string[] LocalValues(string key, CancellationToken cancellationToken)
+    private string?[] LocalValues(string key, CancellationToken cancellationToken)
     {
-        var run = Run(["config", "--local", "--get-all", key], cancellationToken);
-        if (run.ExitCode == 1)
-        {
-            return [];
-        }
-
+        // --list, since only it tells "gpgsign" with no value (null here), which means true, from
+        // an empty "gpgsign =". With --null, each is "key\nvalue\0", or "key\0" with no value.
+        var run = Run(["config", "--local", "--null", "--list"], cancellationToken);
         if (!run.Succeeded)
         {
             throw new HistoryException($"Git couldn't read its '{key}' setting: {run.Said}");
         }
 
-        return run.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(v => v.TrimEnd('\r')).ToArray();
+        return run.Output.Split('\0', StringSplitOptions.RemoveEmptyEntries)
+            .Select(entry => entry.Split('\n', 2))
+            .Where(parts => string.Equals(parts[0], key, StringComparison.OrdinalIgnoreCase))
+            .Select(parts => parts.Length == 2 ? parts[1] : null)
+            .ToArray();
     }
 
     /// <summary>
@@ -698,7 +699,7 @@ public sealed class GitHistorySetup : IHistorySetup
     /// keys it couldn't, in the order they were saved. Whatever stopped the save may stop this too.
     /// It stops at the first it can't, so signing, saved first, is the last to come back on.
     /// </summary>
-    private List<string> TakeBack(List<(string Key, string[] Before)> written)
+    private List<string> TakeBack(List<(string Key, string?[] Before)> written)
     {
         for (var i = written.Count - 1; i >= 0; i--)
         {
@@ -706,7 +707,9 @@ public sealed class GitHistorySetup : IHistorySetup
             try
             {
                 var unset = Run(["config", "--local", "--unset-all", key], CancellationToken.None, GitCallKind.MustFinish);
-                var restored = unset.Succeeded && before.All(value => Run(["config", "--local", "--add", key, value], CancellationToken.None, GitCallKind.MustFinish).Succeeded);
+
+                // Git can't write a setting with no value, so one comes back as "true", which it means.
+                var restored = unset.Succeeded && before.All(value => Run(["config", "--local", "--add", key, value ?? "true"], CancellationToken.None, GitCallKind.MustFinish).Succeeded);
                 if (!restored)
                 {
                     return written.Take(i + 1).Select(w => w.Key).ToList();

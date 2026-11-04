@@ -23,7 +23,8 @@ public enum GitLocationKind
 /// <param name="Kind">Whether it's in a repository Wolfden can use.</param>
 /// <param name="Root">The repository's top folder, as git gives it, when <paramref name="Kind"/> is <see cref="GitLocationKind.InRepository"/>.</param>
 /// <param name="Problem">What went wrong, for <see cref="GitLocationKind.GitNotInstalled"/> and <see cref="GitLocationKind.Unusable"/>.</param>
-public sealed record GitLocation(GitLocationKind Kind, string? Root = null, string? Problem = null);
+/// <param name="AlreadyThere">True if <see cref="GitRepository.Create"/> found a repository there and made none.</param>
+public sealed record GitLocation(GitLocationKind Kind, string? Root = null, string? Problem = null, bool AlreadyThere = false);
 
 /// <summary>Finding and making git repositories (#19, #122).</summary>
 public static class GitRepository
@@ -91,10 +92,24 @@ public static class GitRepository
         {
             // The user's defaults apply: the branch name, templates, and hooks.
             // Never stopped part way, which would leave a half-made repository.
-            var run = GitProcess.Run(options, folder, ["init", "--quiet"], cancellationToken: cancellationToken, kind: GitCallKind.MustFinish);
+            // In English, whatever the user's language, since only git can say whether this made
+            // the repository or found one made meanwhile, which a caller must never take away (#286).
+            var run = GitProcess.Run(
+                options,
+                folder,
+                ["init"],
+                environment: new Dictionary<string, string?> { ["LC_ALL"] = "C", ["LANGUAGE"] = "C" },
+                cancellationToken: cancellationToken,
+                kind: GitCallKind.MustFinish);
             if (!run.Succeeded)
             {
                 return new GitLocation(GitLocationKind.Unusable, Problem: run.Said);
+            }
+
+            // At the start: the line goes on to name the folder, which can hold any word.
+            if (run.Output.StartsWith("Reinitialized", StringComparison.Ordinal))
+            {
+                return new GitLocation(GitLocationKind.InRepository, Path.GetFullPath(folder), AlreadyThere: true);
             }
         }
         catch (GitNotFoundException e)

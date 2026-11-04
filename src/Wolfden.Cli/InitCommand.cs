@@ -26,15 +26,17 @@ namespace Wolfden.Cli;
 /// <para>
 /// <c>--git</c> turns history on after the den is made, as
 /// <see cref="GitHistorySetup"/> does: <c>git init</c>, <c>.wolfden/</c> in
-/// <c>.gitignore</c>, a name and email for the repository if git has none
-/// (<c>--author-name</c>, <c>--author-email</c>), and a first checkpoint,
+/// <c>.gitignore</c>, a name and email for the repository if they're given
+/// (<c>--author-name</c>, <c>--author-email</c>, which win over git's for this
+/// den) or git has none, and a first checkpoint,
 /// "Start of history", unless <c>--no-checkpoint</c>. A new den already
 /// inside a repository is left as it is, since a den can be a subfolder of
 /// a larger repository and its history is scoped to the den's files.
 /// Without git installed, a new den is still made, and the output says the
 /// repository wasn't (exit 0). If git is there but a step fails, or git
 /// needs a name or email that wasn't given, the new den is kept and the
-/// command exits 2.
+/// command exits 2. A name or email given for a new den in a repository
+/// refuses (exit 2) before anything is made, since it wouldn't be applied.
 /// </para>
 /// <para>
 /// On an existing den, <c>--git</c> refuses (exit 2, nothing changed) a den
@@ -69,9 +71,11 @@ internal static class InitCommand
           --no-checkpoint   with --git, make no first checkpoint
           --author-name <name>, --author-email <email>
                             with --git, the name and email git records on
-                            checkpoints, when git has none: saved for this
-                            den's repository only. Any name will do, a pen
-                            name included; the email can be a placeholder
+                            checkpoints: saved for this den's repository only,
+                            and used even if git has its own. Give both, or
+                            neither. Any name will do, a pen name included;
+                            the email can be a placeholder. Signing goes off
+                            for this den when they're given
           --json            print one JSON document instead of text
 
         It never overwrites anything, and won't create a den inside another den
@@ -130,6 +134,12 @@ internal static class InitCommand
             return Fail($"--author-email: {emailProblem}");
         }
 
+        // The two go together, so one alone is refused before anything is made (#286).
+        if ((authorName is null) != (authorEmail is null))
+        {
+            return Fail("--author-name and --author-email go together: give both, or neither to use what git has. Nothing was changed.");
+        }
+
         if (File.Exists(folder))
         {
             return Fail($"'{folder}' is a file, not a folder.");
@@ -161,6 +171,21 @@ internal static class InitCommand
         if (Directory.Exists(root) && DenLocation.FindBelow(root) is { } inner)
         {
             return Fail($"'{folder}' already holds the den at '{inner}', and dens don't nest (F-LAY-1). Choose a folder that doesn't hold one, or first move that den's den.yaml out of the way, or into a hidden folder such as .old/, which Wolfden ignores.");
+        }
+
+        // A new den in a repository is left as it is, so a name given for it wouldn't be applied,
+        // and that repository's settings aren't this den's to change (#286).
+        if (withGit && (authorName is not null || authorEmail is not null))
+        {
+            if (new GitHistorySetup(root, git).RedirectedByEnvironment() is { } redirected)
+            {
+                return Fail(redirected);
+            }
+
+            if (RepositoryAround(root, git) is { } around)
+            {
+                return Fail(NameNotApplied(folder, root, around, git));
+            }
         }
 
         var created = new List<string>();
@@ -239,6 +264,43 @@ internal static class InitCommand
         }
     }
 
+    /// <summary>The repository a new den at <paramref name="root"/> would be in, if there's one.</summary>
+    private static string? RepositoryAround(string root, GitOptions git)
+    {
+        // The folder may not exist yet: git is asked from the nearest one that does.
+        var folder = root;
+        while (!Directory.Exists(folder) && Path.GetDirectoryName(folder) is { } parent)
+        {
+            folder = parent;
+        }
+
+        var location = GitRepository.Locate(folder, git);
+        return location.Kind == GitLocationKind.InRepository ? location.Root : null;
+    }
+
+    /// <summary>The refusal of a name given for a new den in a repository, with advice that doesn't lead to a second refusal.</summary>
+    private static string NameNotApplied(string folder, string root, string around, GitOptions git)
+    {
+        var same = string.Equals(
+            Path.TrimEndingDirectorySeparator(around),
+            Path.TrimEndingDirectorySeparator(root),
+            OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase);
+        if (!same)
+        {
+            return $"'{folder}' is inside the git repository at '{around}', whose settings a den there shares, so the name and email given weren't applied, and later checkpoints would stay under what git has for that repository. " +
+                "Nothing was created. To use that, run this again without --author-name and --author-email; to keep this den under the name given, choose a folder outside it.";
+        }
+
+        var check = new GitHistorySetup(root, git).Check();
+        return check.Possible
+            ? $"'{folder}' is already a git repository, and 'init --git' leaves a new den's repository as it is, so the name and email given weren't applied. Nothing was created. " +
+                "To save them, make the den first with 'wolfden init', then run 'wolfden init --git --author-name \"<name>\" --author-email <email>' in it."
+            : check.Code == HistorySetupCodes.HasRepository
+                ? $"'{folder}' is already a git repository with checkpoints, so the name and email given weren't applied. Nothing was created. " +
+                    $"To make the den there, run 'wolfden init' without --git; to put it under that name from now on, {GitHistorySetup.ChangeNameByHand}"
+                : $"{check.Reason} {GitHistorySetup.NotApplied(check.Code ?? "")}".TrimEnd();
+    }
+
     /// <summary>
     /// <c>--git</c> for a new den: turns on its history, unless it's already
     /// inside a repository (#122, #195). Nothing here undoes the den.
@@ -281,7 +343,7 @@ internal static class InitCommand
         }
 
         var problem = result.Code == HistorySetupCodes.IdentityNeeded && result.Status == HistorySetupStatus.Refused
-            ? IdentityNeeded(result, "in the den")
+            ? IdentityNeeded("in the den")
             : result.Problem!;
         return Report(InitGitReport.Failed, result, $"the den was created, but its history wasn't turned on: {problem}");
     }
@@ -297,7 +359,7 @@ internal static class InitCommand
             _ => InitGitReport.Failed,
         };
         var problem = result.Code == HistorySetupCodes.IdentityNeeded && result.Status == HistorySetupStatus.Refused
-            ? IdentityNeeded(result, "again")
+            ? IdentityNeeded("again")
             : result.Problem;
         var message = result.Status == HistorySetupStatus.Done
             ? $"Turned on history for the den at '{root}'.\n{string.Join("\n", result.Steps)}"
@@ -327,16 +389,10 @@ internal static class InitCommand
     }
 
     /// <summary>The refusal when git has no name or email for the den, in the CLI's words.</summary>
-    private static string IdentityNeeded(HistorySetupResult result, string where)
-    {
-        var what = result.NeedsName && result.NeedsEmail ? "name or email" : result.NeedsName ? "name" : "email";
-        var options = string.Join(
-            " ",
-            new[] { result.NeedsName ? "--author-name <name>" : null, result.NeedsEmail ? "--author-email <email>" : null }.OfType<string>());
-        return $"git records who made each checkpoint, and has no {what} for this den. Run 'wolfden init --git' {where} with {options}: " +
+    private static string IdentityNeeded(string where) =>
+        $"git records who made each checkpoint, and needs a name and an email for this den. Run 'wolfden init --git' {where} with --author-name \"<name>\" --author-email <email>: " +
             "they're saved for this den's repository only, never globally. Any name will do, a pen name included, and the email can be a placeholder, " +
             "such as you@example.com. Nothing was changed in git.";
-    }
 
     private static InitGitReport Report(string outcome, HistorySetupResult result, string message) => new(
         outcome,

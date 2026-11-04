@@ -79,8 +79,8 @@ public class InitHistoryTests
         Assert.Equal(CliApp.ExitUsage, refused);
         Assert.Empty(output.ToString());
         Assert.Equal(
-            "wolfden init: git records who made each checkpoint, and has no name or email for this den. " +
-            "Run 'wolfden init --git' again with --author-name <name> --author-email <email>: they're saved for this den's repository only, never globally. " +
+            "wolfden init: git records who made each checkpoint, and needs a name and an email for this den. " +
+            "Run 'wolfden init --git' again with --author-name \"<name>\" --author-email <email>: they're saved for this den's repository only, never globally. " +
             "Any name will do, a pen name included, and the email can be a placeholder, such as you@example.com. Nothing was changed in git.\n",
             error.ToString().ReplaceLineEndings("\n"));
         Assert.False(Directory.Exists(Path.Combine(den.Root, ".git")));
@@ -99,7 +99,7 @@ public class InitHistoryTests
 
     [Fact]
     [Trait("Scenario", "SC-HIST-15")]
-    public void ANameAndEmailGitGivesOnlyInsideTheRepositoryAreUsedAndOnesGivenSaySoIfNotUsed()
+    public void ANameAndEmailGitGivesOnlyInsideTheRepositoryAreUsedWhenNoneIsGiven()
     {
         using var den = TempDen.DraculaCopy();
         using var config = TempDen.Empty();
@@ -111,15 +111,221 @@ public class InitHistoryTests
         var output = new StringWriter();
         var error = new StringWriter();
 
-        var exitCode = InitCommand.Run([den.Root, "--git", "--author-name", "Ilse Tarrow"], output, error, NoIdentity(global));
+        var exitCode = InitCommand.Run([den.Root, "--git"], output, error, NoIdentity(global));
 
         Assert.Equal(CliApp.ExitOk, exitCode);
         Assert.Empty(error.ToString());
-        Assert.Contains(
-            "Git already has a name for this den (Ash Calloway), so the one given (Ilse Tarrow) wasn't used.\n",
-            output.ToString().ReplaceLineEndings("\n"),
-            StringComparison.Ordinal);
         Assert.Equal("Ash Calloway", GitHistory.ForDen(den.Root, NoIdentity(global), Token).Log(new HistoryLogQuery(), Token).Value[0].Author);
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-HIST-21")]
+    [Trait("Scenario", "SC-CLI-12")]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AGivenNameAndEmailWinOverGitsInAnExistingOrNewDen(bool existing)
+    {
+        using var den = existing ? TempDen.DraculaCopy() : TempDen.Empty();
+        using var config = TempDen.Empty();
+        var text = "[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n";
+        var global = Path.Combine(config.Root, "gitconfig");
+        File.WriteAllText(global, text, new UTF8Encoding(false));
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var exitCode = InitCommand.Run([den.Root, "--git", "--author-name", "Ash Calloway", "--author-email", "ash@example.invalid"], output, error, NoIdentity(global));
+
+        Assert.Equal(CliApp.ExitOk, exitCode);
+        Assert.Empty(error.ToString());
+        Assert.Contains("Saved your name and email for this den's repository only.\n", output.ToString().ReplaceLineEndings("\n"), StringComparison.Ordinal);
+        Assert.DoesNotContain("Marek", output.ToString(), StringComparison.Ordinal);
+        Assert.Equal("Ash Calloway|ash@example.invalid|Ash Calloway|ash@example.invalid\n", TestGit.Run(den.Root, "log", "-1", "--format=%an|%ae|%cn|%ce"));
+        Assert.Equal(text, File.ReadAllText(global));
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-HIST-17")]
+    [Trait("Scenario", "SC-CLI-12")]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ANewDenInALargerRepositoryIsRefusedWithANameGivenAndNothingIsMade(bool folderExists)
+    {
+        using var writing = TempDen.Empty();
+        using var config = TempDen.Empty();
+        var global = Path.Combine(config.Root, "gitconfig");
+        File.WriteAllText(global, "[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n", new UTF8Encoding(false));
+        var git = NoIdentity(global);
+        TestGit.Run(writing.Root, "init", "--quiet");
+        var before = File.ReadAllText(Path.Combine(writing.Root, ".git", "config"));
+        var folder = Path.Combine(writing.Root, "outer", "vael-notes");
+        if (folderExists)
+        {
+            Directory.CreateDirectory(folder);
+        }
+
+        var output = new StringWriter();
+        var error = new StringWriter();
+        var exitCode = InitCommand.Run([folder, "--git", "--author-name", "Ash Calloway", "--author-email", "ash@example.invalid"], output, error, git);
+
+        Assert.Equal(CliApp.ExitUsage, exitCode);
+        Assert.Empty(output.ToString());
+        Assert.Contains("weren't applied", error.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("marek", error.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(folderExists, Directory.Exists(folder));
+        Assert.False(File.Exists(Path.Combine(folder, "den.yaml")));
+        Assert.Equal(before, File.ReadAllText(Path.Combine(writing.Root, ".git", "config")));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-17")]
+    public void ANewDenInAFolderThatIsARepositoryIsRefusedWithANameGivenAndSaysHowToGiveIt()
+    {
+        using var folder = TempDen.Empty();
+        using var config = TempDen.Empty();
+        var global = Path.Combine(config.Root, "gitconfig");
+        File.WriteAllText(global, "[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n", new UTF8Encoding(false));
+        TestGit.Run(folder.Root, "init", "--quiet");
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var refused = InitCommand.Run([folder.Root, "--git", "--author-name", "Ash Calloway", "--author-email", "ash@example.invalid"], output, error, NoIdentity(global));
+
+        Assert.Equal(CliApp.ExitUsage, refused);
+        Assert.Contains("--author-name \"<name>\" --author-email <email>", error.ToString(), StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(folder.Root, "den.yaml")));
+
+        // What it says works: the den first, then its history, under the name given.
+        Assert.Equal(CliApp.ExitOk, InitCommand.Run([folder.Root], new StringWriter(), new StringWriter(), NoIdentity(global)));
+        Assert.Equal(CliApp.ExitOk, InitCommand.Run([folder.Root, "--git", "--author-name", "Ash Calloway", "--author-email", "ash@example.invalid"], new StringWriter(), new StringWriter(), NoIdentity(global)));
+        Assert.Equal("Ash Calloway|ash@example.invalid|Ash Calloway|ash@example.invalid\n", TestGit.Run(folder.Root, "log", "-1", "--format=%an|%ae|%cn|%ce"));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-21")]
+    public void GitDirInTheEnvironmentIsNamedForANewDenRatherThanBlamingTheFolderAbove()
+    {
+        using var parent = TempDen.Empty();
+        using var config = TempDen.Empty();
+        using var other = TempDen.Empty();
+        var global = Path.Combine(config.Root, "gitconfig");
+        File.WriteAllText(global, "[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n", new UTF8Encoding(false));
+        TestGit.Run(other.Root, "init", "--quiet");
+        var git = NoIdentity(global);
+        git = git with { Environment = new Dictionary<string, string?>(git.Environment) { ["GIT_DIR"] = Path.Combine(other.Root, ".git") } };
+        var folder = Path.Combine(parent.Root, "vael-notes");
+        var error = new StringWriter();
+
+        var exitCode = InitCommand.Run([folder, "--git", "--author-name", "Ash Calloway", "--author-email", "ash@example.invalid"], new StringWriter(), error, git);
+
+        Assert.Equal(CliApp.ExitUsage, exitCode);
+        Assert.Contains("GIT_DIR", error.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("inside the git repository", error.ToString(), StringComparison.Ordinal);
+        Assert.False(Directory.Exists(folder));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-17")]
+    public void ANewDenInARepositoryWithCheckpointsIsRefusedWithAdviceThatWorks()
+    {
+        using var folder = TempDen.Empty();
+        using var config = TempDen.Empty();
+        var global = Path.Combine(config.Root, "gitconfig");
+        File.WriteAllText(global, "[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n[author]\n\tname = Marek Author\n", new UTF8Encoding(false));
+        var git = NoIdentity(global);
+        GitRun(folder.Root, git, "init", "--quiet");
+        File.WriteAllText(Path.Combine(folder.Root, "first.txt"), "first\n", new UTF8Encoding(false));
+        GitRun(folder.Root, git, "add", "--all");
+        GitRun(folder.Root, git, "commit", "--quiet", "-m", "First");
+        var error = new StringWriter();
+
+        var refused = InitCommand.Run([folder.Root, "--git", "--author-name", "Ash Calloway", "--author-email", "ash@example.invalid"], new StringWriter(), error, git);
+
+        // It doesn't send the writer to a second refusal.
+        Assert.Equal(CliApp.ExitUsage, refused);
+        Assert.False(File.Exists(Path.Combine(folder.Root, "den.yaml")));
+        Assert.DoesNotContain("wolfden init --git --author-name", error.ToString(), StringComparison.Ordinal);
+        Assert.Contains("weren't applied", error.ToString(), StringComparison.Ordinal);
+
+        // The den, then each command it names.
+        Assert.Equal(CliApp.ExitOk, InitCommand.Run([folder.Root], new StringWriter(), new StringWriter(), git));
+        var commands = System.Text.RegularExpressions.Regex.Matches(error.ToString(), "git config --local \\S+ (\"<name>\"|<email>|false)");
+        Assert.Equal(10, commands.Count);
+        foreach (System.Text.RegularExpressions.Match command in commands)
+        {
+            // As typed, with the two-word name in the quotes the command shows: the shell's words, without "git".
+            var typed = command.Value.Replace("<name>", "Ash Calloway", StringComparison.Ordinal).Replace("<email>", "ash@example.invalid", StringComparison.Ordinal);
+            var words = System.Text.RegularExpressions.Regex.Matches(typed, "\"[^\"]*\"|\\S+").Select(word => word.Value.Trim('"')).Skip(1);
+            GitRun(folder.Root, git, [.. words]);
+        }
+
+        File.WriteAllText(Path.Combine(folder.Root, "second.txt"), "second\n", new UTF8Encoding(false));
+        GitRun(folder.Root, git, "add", "--all");
+        GitRun(folder.Root, git, "commit", "--quiet", "-m", "Second");
+        Assert.Equal("Ash Calloway|ash@example.invalid|Ash Calloway|ash@example.invalid\n", GitRun(folder.Root, git, "log", "-1", "--format=%an|%ae|%cn|%ce"));
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-HIST-22")]
+    [InlineData(true, "--author-name", "Ash Calloway")]
+    [InlineData(true, "--author-email", "ash@example.invalid")]
+    [InlineData(true, "--author-name", "Marek Oswin")]
+    [InlineData(false, "--author-name", "Ash Calloway")]
+    public void OneGivenAloneIsRefusedAndNothingIsMade(bool existing, string option, string value)
+    {
+        using var parent = TempDen.Empty();
+        using var dracula = TempDen.DraculaCopy();
+        using var config = TempDen.Empty();
+        var global = Path.Combine(config.Root, "gitconfig");
+        File.WriteAllText(global, "[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n", new UTF8Encoding(false));
+        var folder = existing ? dracula.Root : Path.Combine(parent.Root, "kestrel-notes");
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var exitCode = InitCommand.Run([folder, "--git", option, value], output, error, NoIdentity(global));
+
+        Assert.Equal(CliApp.ExitUsage, exitCode);
+        Assert.Empty(output.ToString());
+        Assert.StartsWith("wolfden init: --author-name and --author-email go together", error.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("marek", error.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.False(Directory.Exists(Path.Combine(folder, ".git")));
+        Assert.Equal(existing, Directory.Exists(folder));
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-HIST-23")]
+    [InlineData("gpg")]
+    [InlineData("ssh")]
+    public void AGivenNameTurnsSigningOffForTheDenAndSaysSo(string format)
+    {
+        using var den = TempDen.DraculaCopy();
+        using var config = TempDen.Empty();
+        var attempts = Path.Combine(config.Root, "attempts").Replace('\\', '/');
+        var program = Path.Combine(config.Root, "signer.sh").Replace('\\', '/');
+        File.WriteAllText(program, $"#!/bin/sh\necho \"$*\" >> \"{attempts}\"\nexit 1\n", new UTF8Encoding(false));
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(program, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+
+        var global = Path.Combine(config.Root, "gitconfig");
+        File.WriteAllText(
+            global,
+            "[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n[commit]\n\tgpgsign = true\n" +
+            (format == "ssh"
+                ? $"[gpg]\n\tformat = ssh\n[gpg \"ssh\"]\n\tprogram = {program}\n\tdefaultKeyCommand = {program}\n"
+                : $"[user]\n\tsigningkey = KEY-OF-MAREK\n[gpg]\n\tprogram = {program}\n"),
+            new UTF8Encoding(false));
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        var exitCode = InitCommand.Run([den.Root, "--git", "--author-name", "Ash Calloway", "--author-email", "ash@example.invalid"], output, error, NoIdentity(global));
+
+        Assert.Equal(CliApp.ExitOk, exitCode);
+        Assert.False(File.Exists(attempts));
+        Assert.Contains("Turned signing off for this den's repository only", output.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("KEY-OF-MAREK", output.ToString(), StringComparison.Ordinal);
+        Assert.Equal("Ash Calloway|ash@example.invalid|Ash Calloway|ash@example.invalid\n", TestGit.Run(den.Root, "log", "-1", "--format=%an|%ae|%cn|%ce"));
+        Assert.Equal("N\n", TestGit.Run(den.Root, "log", "-1", "--format=%G?"));
     }
 
     [Fact]
@@ -140,8 +346,8 @@ public class InitHistoryTests
         Assert.True(File.Exists(Path.Combine(folder, "den.yaml")));
         Assert.False(Directory.Exists(Path.Combine(folder, ".git")));
         Assert.StartsWith(
-            "wolfden init: the den was created, but its history wasn't turned on: git records who made each checkpoint, and has no email for this den. " +
-            "Run 'wolfden init --git' in the den with --author-email <email>:",
+            "wolfden init: the den was created, but its history wasn't turned on: git records who made each checkpoint, and needs a name and an email for this den. " +
+            "Run 'wolfden init --git' in the den with --author-name \"<name>\" --author-email <email>:",
             error.ToString(),
             StringComparison.Ordinal);
     }
@@ -255,15 +461,47 @@ public class InitHistoryTests
         Assert.False(den.Exists(".gitignore"));
     }
 
+    /// <summary>Runs git with <paramref name="options"/>' configuration; a failure fails the test.</summary>
+    private static string GitRun(string folder, GitOptions options, params string[] args)
+    {
+        var start = new System.Diagnostics.ProcessStartInfo("git")
+        {
+            WorkingDirectory = folder,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        foreach (var arg in args)
+        {
+            start.ArgumentList.Add(arg);
+        }
+
+        foreach (var (name, value) in options.Environment)
+        {
+            if (value is null)
+            {
+                start.Environment.Remove(name);
+            }
+            else
+            {
+                start.Environment[name] = value;
+            }
+        }
+
+        using var process = System.Diagnostics.Process.Start(start)!;
+        var output = process.StandardOutput.ReadToEndAsync(Token);
+        var said = process.StandardError.ReadToEndAsync(Token);
+        process.WaitForExitAsync(Token).GetAwaiter().GetResult();
+        Assert.True(process.ExitCode == 0, said.GetAwaiter().GetResult());
+        return output.GetAwaiter().GetResult().ReplaceLineEndings("\n");
+    }
+
     private static GitOptions NoIdentity(string global)
     {
         var environment = new Dictionary<string, string?>(TestGit.Options.Environment)
         {
             ["GIT_CONFIG_GLOBAL"] = global,
-            ["GIT_AUTHOR_NAME"] = null,
-            ["GIT_AUTHOR_EMAIL"] = null,
-            ["GIT_COMMITTER_NAME"] = null,
-            ["GIT_COMMITTER_EMAIL"] = null,
             ["EMAIL"] = null,
         };
         return TestGit.Options with { Environment = environment };

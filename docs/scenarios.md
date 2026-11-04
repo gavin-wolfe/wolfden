@@ -3312,6 +3312,22 @@ until `ash:3`. My assistant is drafting a chapter.
 
 Spec: F-VIEW-4 (#288). Covered by: `FutureUntilTests`.
 
+### SC-MCP-44. My assistant writes a character who knows more than the reader
+
+I ask my assistant to draft a scene with Renfield at `dracula:20`. He has
+already let the Count in, and the reader learns that at `dracula:21`.
+
+- `get_entity` for Renfield with `as_of` `dracula:20` has nothing about his
+  death or how he let the Count in, and the event *Renfield lets the Count in*
+  isn't in view at all.
+- `get_entity` with no `as_of` has both, so the assistant can read the two
+  together: what the reader knows, and what's coming.
+- The server's instructions tell it when to read ahead, and to let later facts
+  shape hints and how a character behaves without stating them. The prose is
+  the assistant's, so no test can hold it to that.
+
+Spec: #300. Covered by: `McpServerTests`.
+
 ## STORE: Wolfden saves, moves, and deletes notes
 
 Background: the den store (design.md §6, #121) is how Wolfden writes a

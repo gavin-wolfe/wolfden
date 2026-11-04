@@ -46,7 +46,12 @@ public static class WolfdenMcpServer
 
         To draft or review a chapter without spoilers, use canon_as_of with that chapter's position, or get_entity with as_of.
         Without a position, get_entity, list_entities, and search give the author's full view, including ideas and material the
-        reader meets later. Use check for continuity problems, and get_history for the checkpoints that changed an entity and
+        reader meets later. Read ahead (get_entity without as_of) to plan, outline, foreshadow, or check continuity, when the writer
+        asks, or to write a character who knows more than the reader, since a read at a position leaves that out. The two reads work
+        together: the view at the chapter is what the reader knows, and the full note is what's coming. Let later facts shape hints
+        and how a character behaves, but never state them or have a narrator or point-of-view character reveal them.
+        If you aren't sure which read applies, ask the writer.
+        Use check for continuity problems, and get_history for the checkpoints that changed an entity and
         what changed since.
 
         An image kept in the den is written in a note as ![alt text](path), with the path relative to the folder of the note's own

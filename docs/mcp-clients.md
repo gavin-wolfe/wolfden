@@ -389,7 +389,8 @@ docs. The writer's own list is in
   fact just holds, as it does for the reader. To plan ahead, read the note
   with `get_entity` and no `as_of`, which has every `from` and `until`.
   `canon_as_of` with no position won't do, since it's the end of the story,
-  and a fact that ends before then isn't in it.
+  and a fact that ends before then isn't in it. Read without `as_of` before
+  changing a fact too, or the change can drop an `until` you weren't shown.
 - **Writes land at once; only `checkpoint` records them.** An open page
   in the web UI shows each write within about 5 seconds, or once the
   writer closes an editor or form they have open there. If they save a

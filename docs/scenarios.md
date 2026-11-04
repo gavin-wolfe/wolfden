@@ -3304,7 +3304,10 @@ until `ash:3`. My assistant is drafting a chapter.
 - At `ash:1`, the Recovery section has no `until` either. A pinned fact has
   none in `pinned` or in place, and `brief` gives none in `pinned`.
 - When the assistant is helping me plan, `get_entity` with no `as_of` gives
-  both dates.
+  both dates. The server's instructions tell it to read that way before changing
+  a fact, so a change doesn't drop a date it wasn't shown.
+- A field of my own that's a mapping with a key named `until`, and no `value`,
+  isn't a dated fact (F-TMP-1), so it comes through as I wrote it.
 - The web API gives the date at the same position, for me (SC-WEB-97).
 
 Spec: F-VIEW-4 (#288). Covered by: `FutureUntilTests`.
@@ -5925,11 +5928,13 @@ A section of a note holds until chapter 5, and I'm reading at chapter 3.
 
 - The heading keeps the date, `until ch. 5` (`until Ash ch. 5` in a universe with
   several books), with the words `ahead of readers` in a small muted tag beside it. Hovering says
-  "Readers at this point in the story don't know this yet." A field's entry is the
-  same.
+  "Readers at this point in the story don't know this yet." Clicking it, or pressing
+  Enter on it, shows the same sentence beside it. A field's entry is the same.
 - With no position, there's no tag.
 - At chapter 5 or after, there's no tag. A fact past its date is only shown at
   that position in a full view: while editing, or with "Show it anyway".
+- At a bare book, a date of that book's first chapter has no tag, since they're
+  the same point (F-POS-7), and a date of its second chapter has one.
 - A date that isn't a chapter or book the universe has gets no tag.
 - `/api/entity` and `/api/canon` give the `until` at a position, which MCP leaves
   out (SC-MCP-41).

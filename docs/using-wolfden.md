@@ -812,7 +812,7 @@ it holds until then. A fact that doesn't change can still have a
 When you read a note at a story position, a value or section that stops
 holding later still shows its date, with a small **ahead of readers** beside
 it: `until Ash ch. 5` is your plan, and readers at this point don't know it
-yet. Hover over it to see that said in full. A date the position has reached
+yet. Hover over it or click it to see that said in full. A date the position has reached
 has no tag. An AI assistant reading at that position isn't told the date at
 all, so it can't write toward it. When you're planning with one, ask it to
 read the note with no position, and it sees every date.

@@ -462,6 +462,22 @@ describe('SC-WEB-98: when another file stopped the save', () => {
     await screen.findByText(named, { exact: false })
     expect(screen.queryByText(/The note changed meanwhile/)).toBeNull()
   })
+
+  it('shows what a write left part way says of each file, even when it stopped at this note', async () => {
+    const left =
+      "universes/dracula/entities/notes/mina.md changed while the edit was being saved. Another program saved or removed these since Wolfden wrote them, so they're left as that program left them, and may have old links: universes/dracula/entities/notes/other.md. Don't restore them from history: that would lose that save."
+    stubEditing({ onPost: () => Response.json({ code: 'write_failed', message: left }, { status: 500 }) })
+    renderApp('/u/dracula/e/E-MINA')
+    fireEvent.click(await screen.findByRole('button', { name: 'Rename “Arc”' }))
+    const input = await screen.findByLabelText('New name for the section “Arc”')
+    fireEvent.change(input, { target: { value: 'Story' } })
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Rename' }) as HTMLButtonElement).disabled).toBe(false))
+    fireEvent.click(screen.getByRole('button', { name: 'Rename' }))
+
+    await screen.findByText(/Don.t restore them from history/)
+    expect(screen.getByText(/universes\/dracula\/entities\/notes\/other\.md/)).toBeTruthy()
+    expect(screen.queryByText(/The note changed meanwhile/)).toBeNull()
+  })
 })
 
 describe('SC-WEB-43: when the file changed meanwhile', () => {

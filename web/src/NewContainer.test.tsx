@@ -243,6 +243,26 @@ describe('SC-WEB-69: I put a new book first', () => {
   })
 })
 
+describe('SC-WEB-98: a write left part way', () => {
+  it("shows the server's words, not that the book wasn't created", async () => {
+    const left =
+      'universes/dracula/universe.md changed while the edit was being saved. These could not be put back: universes/dracula/books/draculas-guest/book.md.'
+    const { posted } = stubCreate(() => new Response(JSON.stringify({ code: 'write_failed', message: left }), { status: 500 }))
+    renderApp('/u/dracula')
+    await screen.findByRole('heading', { name: 'Dracula', level: 1 })
+    fireEvent.click(screen.getByRole('button', { name: 'New book in Dracula' }))
+    const form = screen.getByRole('dialog')
+    await within(form).findByLabelText('Place after…')
+    fireEvent.change(within(form).getByLabelText('Name'), { target: { value: "Dracula's Guest" } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Create' }))
+
+    const alert = await within(form).findByRole('alert')
+    expect(alert.textContent).toContain('books/draculas-guest/book.md')
+    expect(alert.textContent).not.toContain("wasn't created")
+    expect(posted).toHaveLength(1)
+  })
+})
+
 describe('SC-WEB-70: New series and New book are guarded', () => {
   it('a refusal shows in the form, which keeps the name and asks for the story order again', async () => {
     let answer: Response | null = new Response(

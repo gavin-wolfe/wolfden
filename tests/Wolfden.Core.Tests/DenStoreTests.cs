@@ -848,6 +848,223 @@ public sealed class DenStoreTests : IDisposable
         Assert.Empty(Directory.EnumerateFiles(Full(Characters), FileSystemDenStore.TempPrefix + "*"));
     }
 
+    // ----- a write compares the file again before each try (#323) -----
+
+    [Fact]
+    [Trait("Scenario", "SC-STORE-6")]
+    public void ASaveMadeWhileTheStoreWaitsIsntReplaced()
+    {
+        SkipUnlessWindows();
+        var builtOn = File.ReadAllBytes(Full(Ilse));
+        var theirs = Bytes("their whole save");
+
+        // A real refusal: the move can't go through until the program closes the file.
+        using var saving = new FileStream(Full(Ilse), FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+        using var retries = new RetryCounter(_root, count =>
+        {
+            if (count == 1)
+            {
+                saving.SetLength(0);
+                saving.Write(theirs);
+                saving.Dispose();
+            }
+        });
+
+        var e = Assert.Throws<DenStoreException>(() => Store().WriteFile(Ilse, Bytes("built on the old note"), DenWriteMode.Replace, builtOn));
+
+        Assert.Equal(DenStoreError.Changed, e.Error);
+        Assert.Equal(Ilse, e.Path);
+        Assert.Equal(1, retries.Count);
+        Assert.Equal(theirs, File.ReadAllBytes(Full(Ilse)));
+        Assert.Empty(Directory.EnumerateFiles(Full(Characters), FileSystemDenStore.TempPrefix + "*"));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-STORE-6")]
+    public void PartOfASaveStillUnderWayCountsAsAChange()
+    {
+        SkipUnlessWindows();
+        var builtOn = File.ReadAllBytes(Full(Ilse));
+        using var saving = new FileStream(Full(Ilse), FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+        using var retries = new RetryCounter(_root, count =>
+        {
+            if (count == 1)
+            {
+                saving.SetLength(0);
+                saving.Write(Bytes("the first part"));
+                saving.Flush();
+            }
+        });
+
+        var e = Assert.Throws<DenStoreException>(() => Store().WriteFile(Ilse, Bytes("x"), DenWriteMode.Replace, builtOn));
+
+        Assert.Equal(DenStoreError.Changed, e.Error);
+        Assert.Equal(1, retries.Count);
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-STORE-6")]
+    [InlineData(FileAccess.Read, FileShare.ReadWrite | FileShare.Delete)]
+    [InlineData(FileAccess.Read, FileShare.Read)]
+    [InlineData(FileAccess.Read, FileShare.None)]
+    [InlineData(FileAccess.Write, FileShare.ReadWrite | FileShare.Delete)]
+    public void AFileOnlyOpenAndUnchangedIsStillTriedAgain(FileAccess access, FileShare share)
+    {
+        SkipUnlessWindows();
+        var builtOn = File.ReadAllBytes(Full(Ilse));
+        var saved = Bytes("the new note");
+
+        // As a virus scanner or indexer holds a file: nothing about it changes, and it lets go.
+        using var held = new FileStream(Full(Ilse), FileMode.Open, access, share);
+        using var retries = new RetryCounter(_root, count =>
+        {
+            if (count == 2)
+            {
+                held.Dispose();
+            }
+        });
+
+        Store().WriteFile(Ilse, saved, DenWriteMode.Replace, builtOn);
+
+        Assert.True(retries.Count >= 2, $"It was tried {retries.Count + 1} times, so the holder never got in the way.");
+        Assert.Equal(saved, File.ReadAllBytes(Full(Ilse)));
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-STORE-6")]
+    [InlineData(FileAccess.Read, FileShare.None)]
+    [InlineData(FileAccess.Write, FileShare.ReadWrite | FileShare.Delete)]
+    public void AFileHeldUnchangedThroughEveryTryIsStillInUse(FileAccess access, FileShare share)
+    {
+        SkipUnlessWindows();
+        var builtOn = File.ReadAllBytes(Full(Ilse));
+        using var held = new FileStream(Full(Ilse), FileMode.Open, access, share);
+        using var retries = new RetryCounter(_root);
+
+        var e = Assert.Throws<DenStoreException>(() => Store().WriteFile(Ilse, Bytes("x"), DenWriteMode.Replace, builtOn));
+
+        Assert.Equal(DenStoreError.InUse, e.Error);
+        Assert.Equal(FileSystemDenStore.Attempts - 1, retries.Count);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-STORE-6")]
+    public void AFileThatCantBeReadIsntTriedAndTheNextLookDecides()
+    {
+        SkipUnlessWindows();
+        var builtOn = File.ReadAllBytes(Full(Ilse));
+        var theirs = Bytes("their whole save");
+        var moves = 0;
+        var store = new FileSystemDenStore(_root)
+        {
+            FileMove = (from, to, overwrite) =>
+            {
+                moves++;
+                File.Move(from, to, overwrite);
+            },
+        };
+
+        // Locked against reading from the start, so nothing can be said of it until it's let go, changed.
+        using var locked = new FileStream(Full(Ilse), FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        using var retries = new RetryCounter(_root, count =>
+        {
+            if (count == 2)
+            {
+                locked.SetLength(0);
+                locked.Write(theirs);
+                locked.Dispose();
+            }
+        });
+
+        var e = Assert.Throws<DenStoreException>(() => store.WriteFile(Ilse, Bytes("x"), DenWriteMode.Replace, builtOn));
+
+        Assert.Equal(DenStoreError.Changed, e.Error);
+        Assert.Equal(0, moves);
+        Assert.Equal(theirs, File.ReadAllBytes(Full(Ilse)));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-STORE-6")]
+    public void AFileDeletedWhileTheStoreWaitsIsntBroughtBack()
+    {
+        SkipUnlessWindows();
+        var builtOn = File.ReadAllBytes(Full(Ilse));
+        var store = new FileSystemDenStore(_root)
+        {
+            FileMove = (_, to, _) =>
+            {
+                File.Delete(to);
+                throw new UnauthorizedAccessException("Access to the path is denied.");
+            },
+        };
+
+        var e = Assert.Throws<DenStoreException>(() => store.WriteFile(Ilse, Bytes("x"), DenWriteMode.Replace, builtOn));
+
+        Assert.Equal(DenStoreError.Changed, e.Error);
+        Assert.False(File.Exists(Full(Ilse)));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-STORE-6")]
+    public void ASaveJustBeforeTheFirstTryIsLeftOnEveryOs()
+    {
+        var builtOn = File.ReadAllBytes(Full(Ilse));
+        var theirs = Bytes("their whole save");
+        var store = new FileSystemDenStore(_root)
+        {
+            // After the temporary file is written and flushed, which can take a while, and before the move.
+            BeforeReplace = _ => File.WriteAllBytes(Full(Ilse), theirs),
+        };
+
+        var e = Assert.Throws<DenStoreException>(() => store.WriteFile(Ilse, Bytes("x"), DenWriteMode.Replace, builtOn));
+
+        Assert.Equal(DenStoreError.Changed, e.Error);
+        Assert.Equal(theirs, File.ReadAllBytes(Full(Ilse)));
+        Assert.Empty(Directory.EnumerateFiles(Full(Characters), FileSystemDenStore.TempPrefix + "*"));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-STORE-6")]
+    public void AWriteThatMatchesWhatItBuiltOnGoesThroughOnEveryOs()
+    {
+        var saved = Bytes("the new note");
+
+        Store().WriteFile(Ilse, saved, DenWriteMode.Replace, File.ReadAllBytes(Full(Ilse)));
+
+        Assert.Equal(saved, File.ReadAllBytes(Full(Ilse)));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-STORE-6")]
+    public void AMoveOrDeleteLeavesASaveMadeWhileTheStoreWaits()
+    {
+        SkipUnlessWindows();
+        var builtOn = File.ReadAllBytes(Full(Ilse));
+        var moved = $"{Characters}/ilse.md";
+        void Try(Action<FileSystemDenStore> write)
+        {
+            // No sharing of delete, so a move or delete is refused while it's open.
+            using var saving = new FileStream(Full(Ilse), FileMode.Open, FileAccess.Write, FileShare.ReadWrite);
+            using var retries = new RetryCounter(_root, count =>
+            {
+                if (count == 1)
+                {
+                    saving.SetLength(0);
+                    saving.Write(Bytes("their whole save"));
+                    saving.Dispose();
+                }
+            });
+
+            Assert.Equal(DenStoreError.Changed, Assert.Throws<DenStoreException>(() => write(Store())).Error);
+            Assert.Equal(Bytes("their whole save"), File.ReadAllBytes(Full(Ilse)));
+            File.WriteAllBytes(Full(Ilse), builtOn);
+        }
+
+        Try(store => store.MoveFile(Ilse, moved, builtOn));
+        Assert.False(File.Exists(Full(moved)));
+        Try(store => store.DeleteFile(Ilse, builtOn));
+    }
+
     [Theory]
     [InlineData("/", "/universes/x.md", true)]
     [InlineData("/den", "/den/universes/x.md", true)]
@@ -1000,6 +1217,14 @@ public sealed class DenStoreTests : IDisposable
         throw new TimeoutException("Nothing matching within 30 s.");
     }
 
+    private static void SkipUnlessWindows()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Skip("Only Windows keeps an open file from being replaced.");
+        }
+    }
+
     /// <summary>Counts the store's retries (<see cref="FileSystemDenStore.Retrying"/>) of paths in one den, while it's alive.</summary>
     private sealed class RetryCounter : IDisposable
     {
@@ -1090,4 +1315,18 @@ public sealed class DenStoreTests : IDisposable
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern uint GetShortPathName(string longPath, StringBuilder shortPath, int bufferLength);
+}
+
+/// <summary>
+/// The store's calls with nothing to compare, for tests of everything else it does.
+/// <c>builtOn</c> has no default in the store, so a real write can't forget it (#323).
+/// </summary>
+internal static class StoreWithoutComparing
+{
+    public static void WriteFile(this IDenStore store, string path, byte[] bytes, DenWriteMode mode = DenWriteMode.CreateOrReplace) =>
+        store.WriteFile(path, bytes, mode, builtOn: null);
+
+    public static void DeleteFile(this IDenStore store, string path) => store.DeleteFile(path, builtOn: null);
+
+    public static void MoveFile(this IDenStore store, string from, string to) => store.MoveFile(from, to, builtOn: null);
 }

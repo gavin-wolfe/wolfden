@@ -1495,14 +1495,24 @@ in it, which Wolfden calls a checkpoint.
 - **Pages and `wolfden check` still see a note open elsewhere,** as long as that
   program lets others read it. If you catch it part way through saving, a page may
   show part of the note, or an error, for a moment. Reload, and it's right.
-- **Changes wait until the other program has let go.** While a program has a note
-  open to write, it could be part way through saving, so on Windows Wolfden won't
-  build a change on that note. An edit of it is refused. So is anything that reads
-  every note: a rename, a move, a copy, a new note, or a freeze. An edit of a note
-  is refused too if it's that note's `book.md`, `series.md`, or `universe.md`
-  that's open, or `den.yaml`. It says which file, and changes nothing. Close it
-  there, or wait for the save to finish, then try again. An edit of a different
-  note isn't stopped.
+- **While a program has a note open to write, Windows refuses changes built on it.**
+  It could be part way through saving, so Wolfden won't build a change on that note.
+  An edit of it is refused. So is anything that reads every note: a rename, a move,
+  a copy, a new note, or a freeze. An edit of a note, or adding an image to one, is
+  refused too if it's that note's `book.md`, `series.md`, or `universe.md` that's
+  open, or `den.yaml`. It says which file, and changes nothing. Close it there, or
+  wait for the save to finish, then try again. An edit of a different note isn't
+  stopped, and neither is adding an image to the note that's open. A change whose
+  note or book can't be found while something's open says which file is open, even
+  if the name you gave is wrong too: try again once it's closed.
+- **A save can still be lost if it starts just after Wolfden has started.** If you
+  save a note in another program in the moment Wolfden is changing that same note,
+  and that program pauses briefly part way, Wolfden can finish its change over
+  yours and report success, and your save is gone. Nothing warns you. This takes a
+  save timed within a fraction of a second of a change, so it shouldn't be common,
+  but it isn't impossible, on any system. Don't save a note elsewhere while your
+  assistant or a page is changing it, and checkpoint often: history keeps what you
+  checkpointed.
 - **`wolfden check` won't list a note that's only open to write,** so a refusal can
   name a file `check` calls fine. That's expected.
 - **A program that locks a note against reading goes further.** `wolfden check`

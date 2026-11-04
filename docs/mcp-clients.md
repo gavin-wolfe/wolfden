@@ -249,9 +249,10 @@ prompts. This list is for knowing what the assistant can do.
   folder can't be listed, the write is refused as a whole with
   `den_unreadable`, names the file, and writes nothing (format.md F-GEN-5).
   So links in that file don't break, and a final book's refusal isn't
-  skipped. `check` lists such a file as an error. An error that a name or
-  position wasn't found keeps its own code, and adds that a file couldn't
-  be read and may be why.
+  skipped. `check` lists such a file if it's locked against reading. An error
+  that a name or position wasn't found keeps its own code, and adds that a file
+  couldn't be read and may be why. If a file is only open to write, a write's
+  lookup that fails is `den_unreadable` naming it, even if the name is wrong too.
 - **Effects, not just bytes.** Results say what an edit means for the
   story: a status that takes an entity out of canon views, a chapter left
   with no POV, the links a rename rewrote, and any link that would now

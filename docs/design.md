@@ -1049,21 +1049,23 @@ same code (§9):
   position, `canon_as_of` and `get_entity` leave out each fact's `until`
   (format.md F-VIEW-4), since it tells an assistant drafting that chapter
   that a "truth" gets overturned, and it could write toward that. To plan
-  ahead, an assistant reads `get_entity` without `as_of`. It's done in the
-  MCP layer (`AsOfReads`), so it's a place these tools differ from
-  the web API and `query`, which keep the date for the writer.
+  ahead, an assistant reads `get_entity` without `as_of`. It's done by
+  `AsOfReads` in `Wolfden.Index`, which these tools always apply, and the web
+  API's Reader's view (`readers=true`, §9) applies too, so there's one rule for
+  the two. `query`, and the web API's other reads, keep the date for the writer.
 - **A later position value is left out** (maintainer decision on #305).
   With a position, `canon_as_of` and `get_entity` leave out each value of a
   `position` field that's later than it (format.md F-VIEW-5), since a thread's
   `paid_off` says when it resolves, just as an `until` does. A value that
-  can't be compared goes too. It's in `AsOfReads` as well, so the web API and
-  `query` keep every value. The index keeps which fields of each type are
+  can't be compared goes too. It's in `AsOfReads` as well, so the web API's
+  Reader's view leaves it out, and `query` and its other reads keep every value. The index keeps which fields of each type are
   `position` fields, since a field's type isn't in its value.
 - **Comments are left out at a position** (maintainer decision on #306). With a
   position, `canon_as_of` and `get_entity` leave out every HTML comment in a lead
   or section (format.md F-VIEW-6), since a comment can name a later fact, and a
   misplaced wolfden comment names a date. A comment shown as code stays. It's in
-  `AsOfReads` too, so the web API, `query`, and reads with no position keep them.
+  `AsOfReads` too, so the web API's Reader's view leaves them out, and its other
+  reads, `query`, and reads with no position keep them.
   No MCP tool replaces a section's or lead's text, and `append_section` leaves
   comments in place. `rename_section` given a heading's full name drops a comment
   in that heading, but only a read with no position shows the full name: with the
@@ -1566,7 +1568,8 @@ docs/
   session. `asOf` is the tools' `as_of`: a position, with the same
   syntax, checks, and canon-as-of meaning; without it, the author's
   full view. `marksAt` is a position for the writer, which no MCP tool
-  has: "Marks for the writer" below. An endpoint refuses a parameter it doesn't take (so
+  has: "Marks for the writer" below. `readers=true` on `/api/entity`, beside
+  `asOf`, is the UI's Reader's view: "The Reader's view" below. An endpoint refuses a parameter it doesn't take (so
   `as_of` isn't quietly ignored) or one given twice. An empty value
   counts as left out, except an empty `asOf` or `marksAt`, which is `bad_argument`:
   left out it would give the full view, spoilers and all, so a page that
@@ -1585,7 +1588,7 @@ docs/
   | `/api/positions` | `universe` | Every story position in order, with its book's name and series and the chapter's number and title, for a position picker. A book with no chapters yet is listed by its bare key. |
   | `/api/entities` | `universe`, `type`, `status`, `series`, `book`, `asOf`, `limit` | `list_entities`; with `asOf`, only the entities in the canon view there, in its order. |
   | `/api/entities/lookup` | `query`, `universe`, `type`, `asOf`, `limit` | The notes whose name, alias, file name, or id has a word starting with each word typed, best first, each with what matched and which alias, for the link pickers (#198; "Looking notes up by name and alias" below). `type` takes several types separated by commas; with `asOf`, only notes the reader has met by then. |
-  | `/api/entity` | `entity`, `universe`, `asOf`, `marksAt` | `get_entity`, as a page: each field value or entry and each section lists its links, resolved from the index (the entity reached, or broken or ambiguous); also the scope's container chain, where the entity enters canon (its `from`, or its scope's start, inherited, format.md F-ENT-6), and its backlinks (which entity, field, section, chapter, or outline row). As of a position, a link to an entity the reader hasn't met doesn't say what it reaches, and only links in what the reader has met count as backlinks. |
+  | `/api/entity` | `entity`, `universe`, `asOf`, `marksAt`, `readers` | `get_entity`, as a page: each field value or entry and each section lists its links, resolved from the index (the entity reached, or broken or ambiguous); also the scope's container chain, where the entity enters canon (its `from`, or its scope's start, inherited, format.md F-ENT-6), and its backlinks (which entity, field, section, chapter, or outline row). As of a position, a link to an entity the reader hasn't met doesn't say what it reaches, and only links in what the reader has met count as backlinks. |
   | `/api/canon` | `universe`, `asOf`, `series`, `book`, `type`, `brief` | `canon_as_of`. |
   | `/api/search` | `query`, `universe`, `type`, `canonOnly`, `limit`, `status`, `series`, `book`, `asOf`, `field`, `marksAt` | `search`, with snippets; it can also keep entities of one status, those a series or book filter covers (as in a canon view), or, as of a position, hits in the entities, sections, and field values in the canon view there. Each hit adds `text`, the snippet without marks, and `matches`, the `start` and `length` of each match in it (UTF-16 code units), so the page never mistakes a note's own brackets for a match (#179). |
   | `/api/den/files` | | A fingerprint of the den's files (their paths, sizes, and times, no contents), for an open page to see that something changed (#285). It's all this answers, and it doesn't bring the index up to date. |
@@ -1646,9 +1649,7 @@ docs/
   finds what it finds with no position, in the universe the position settles,
   and the answer says what readers there don't know. Without it, nothing is
   different: `asOf` is still the canon view, and giving both is `bad_argument`.
-  The Reader's view starts from that view, but `asOf` gives later `until`s and
-  position values for the writer (F-VIEW-4, F-VIEW-5), which the Reader's view
-  hides, so it needs more than `asOf`. A position that can't be read is
+  A position that can't be read is
   `bad_position`, with the message `asOf` gets, and `universe=*` doesn't go with
   one. `Wolfden.Api`'s `ReaderMarks` makes the marks, and no MCP tool can ask for
   them or reach that project (`McpStaysStrictTests`). What's added, only with
@@ -1713,9 +1714,28 @@ docs/
     `wolfden check` warns about) isn't ahead or ended, so it has no mark, though
     the canon view shows only the other.
   - **A search hit** has the mark of the text it found: its section's or entry's,
-    or else the note's. Links, backlinks, and the page's `pinned` carry no marks.
-    So a field hit found through a linked note's name or alias has the mark of the
-    field, even if readers meet that note later.
+    or else the note's. Links and the page's `pinned` carry no marks. So a field
+    hit found through a linked note's name or alias has the mark of the field,
+    even if readers meet that note later. (The page shows pinned facts in place,
+    where each has its own mark, and doesn't list `pinned`.)
+  - **A backlink** has the mark of what holds it, as a search hit does: its
+    section's or entry's, or else the note's. One in a chapter's fields or an
+    outline compares where it's written. One with no position, such as in a
+    container's own text (F-LINK-13), has no mark: there's nothing to fix or wait
+    for, so it's a second exception to "no mark means a reader sees it". One in a
+    section an error leaves out has `leftOut`, for the page's badge, and no mark.
+
+  **The Reader's view** (#300). `readers=true` beside `asOf` on `/api/entity` gives
+  the page as an AI assistant's read at that position has it, since `asOf` alone
+  keeps later `until`s, position values, and comments for the writer (F-VIEW-4,
+  F-VIEW-5, F-VIEW-6). `Wolfden.Api` and `Wolfden.Mcp` apply the one filter,
+  `AsOfReads` in `Wolfden.Index`, so a page's fields, sections, and `pinned` at every
+  position equal `get_entity`'s (`ReadersViewTests`), and neither project references
+  the other. A link or backlink in text the filter leaves out as a comment is gone
+  too, and a heading's comment doesn't come through a backlink's section name or a
+  link's `section`, which the index keeps as written. It goes only with `asOf`: without it, or with `marksAt`, it's `bad_argument`,
+  and `readers=false` is the same as leaving it out. `/api/canon` doesn't take it,
+  since no page needs it yet.
 
   An `/api/entity` for a note left out is still 404 `unknown_entity`, with
   `leftOut` (`path`, `line`, `rule`, `message`), found by its path, a path under a
@@ -1753,25 +1773,46 @@ docs/
   - **Notes the reader hasn't met: hidden, with a peek.** At a position,
     lists and the tree show only what the reader knows by then, plus a
     "N more appear later" control that reveals them greyed, each with
-    its entry point. Opening such a note directly shows a banner, for
-    example "Readers first meet Quincey Morris in chapter 11".
-  - **"Show it anyway"** (#26). The banner has a "Show it anyway"
-    button. It shows the note in place, greyed like the peek, and keeps
-    the current position. The note's full view (no `asOf`) is fetched
-    only on that click. The reveal lasts only while the page shows that
-    note at that position: navigation, a change of position, or a
-    reload hides it again. What it shows follows the full view, so its
-    links to other notes the reader hasn't met may resolve.
-  - **`ahead of readers`** (maintainer decision on #288). The writer
-    still sees a fact's `until` at a position, and when it's later than
-    the position it has a small muted text tag, `ahead of readers`, with
-    the tooltip "Readers at this point in the story don't know this yet."
-    It's a button that also shows that sentence in place, since a tooltip
-    only comes on hover, which a keyboard or a touch can't do.
-    An `until` the position has reached has no tag, which can only be
-    seen where the page shows the full view at a position (editing, or
-    "Show it anyway"). The tag is its own component, `AheadOfReaders`, for
-    the wider question in #300.
+    its entry point. (#300 changes this in later steps, as it has for a
+    note's own pages.)
+  - **The Author's view and the Reader's view** (maintainer decisions on #300,
+    which replace #26's "Show it anyway" on a note's pages). At a position, a
+    note's page and History tab show everything by default, since the writer is
+    the author, and tag what readers there don't know. A two-way control,
+    `Author's view` and `Reader's view`, appears once a position is picked, with
+    the current one always visible, so the page always says which it is. On note
+    pages only, until the lists and search have the two views. It's kept in the
+    URL (`?readers=1`) and isn't remembered, so a fresh start opens the Author's
+    view, and it ends with the position.
+    - **The Author's view** asks `marksAt`. A note the reader hasn't met shows,
+      tagged `enters at chapter 11`, and it edits the real note, in the same read
+      it already has. Tags are `ahead of readers`, `no longer true here`, `not
+      placed in the story yet`, and `never true (its dates don't overlap)`, in one
+      place (`readerWords.ts`), with the sentence on hover. A note-page tag is a
+      button, as a keyboard or touch can't hover. A list uses plain text and one
+      line to explain it (#302), as "Linked from" does. Nothing has two tags, and
+      what keeps its own badge (out of canon, bookkeeping, left out) has none. A
+      type's field defaults aren't listed, as with no position, since they aren't
+      in the note.
+    - **The Reader's view** asks `asOf` with `readers=true`, so it holds what an
+      AI assistant reads there, a type's defaults included, badged. The note's page
+      is read-only. The rest of the screen isn't part of it yet, and the page says so
+      until later steps of #300 land: the sidebar, search, and the book page and
+      chapter menu aren't filtered as it is, and the New buttons, checkpoints, and the
+      book and chapter pages' controls still work. Edit file by path drops `readers`,
+      so it's plainly the writer's. The API's writes know nothing of views.
+      A note the reader hasn't met shows the banner, for example "Readers first
+      meet Quincey Morris in chapter 11", with the Author's view as a way to see
+      it. Saved versions can hold anything, so its History tab fetches none of
+      them and says so.
+  - **`ahead of readers`** (maintainer decision on #288). In the Author's
+    view, a fact's `until` later than the position has a small muted
+    text tag, `ahead of readers`, with the tooltip "Readers at this
+    point in the story don't know this yet." It's a button that also shows
+    that sentence in place, since a tooltip only comes on hover. It's 24px
+    tall, for touch, and has a dotted underline, so a touch user can tell it
+    opens. An `until` the position has reached is `no longer true here`.
+    The tag's component is `AheadOfReaders`.
 
   The rest is v0 behaviour, not a recorded decision.
   - **Routes and URLs.** The UI routes with TanStack Router:
@@ -1801,13 +1842,13 @@ docs/
     entry point is listed in the peek as "not in canon: <status>". The
     peek closes when the position or the list changes. The banner for a
     note not met yet also offers to go to where it enters, or to show
-    everything. The tab's title names only what's in view.
+    everything. In the Reader's view, the tab's title names only what's in view.
   - **Entity pages.** An entity page shows the name, type, status, scope
     breadcrumb, and entry point; the fields; the sections, as markdown;
     and "Linked from", grouped by source. `[[...]]` links become in-app
     links through the API's resolved `links`, matched by exact text in
     order. A broken link is marked as broken, and an ambiguous link
-    lists its matches in a tooltip. As of a position, a link to a note
+    lists its matches in a tooltip. In the Reader's view, a link to a note
     the reader hasn't met is plain text. Markdown is rendered with
     react-markdown, which builds React elements and never HTML strings.
     Raw HTML in a note is dropped, and unsafe URLs such as `javascript:`
@@ -1980,11 +2021,10 @@ docs/
     change, so it's fetched once; the uncommitted one is fetched again
     after a few seconds at most.
   - **Position.** History isn't a story view, so it ignores the
-    position, and says so. At a position where the reader hasn't met
-    the entity, both tabs show the #26 banner and fetch nothing of it
-    until "Show it anyway". The reveal is one per note, at that
-    position, shared by both tabs, and greyed alike; leaving the note,
-    changing the position, or a reload hides it again.
+    position, and says so. In the Author's view, a note readers meet
+    later has its `enters at` tag in the header. The Reader's view
+    fetches none of it, and says to switch; where the reader hasn't met
+    the note, the banner shows, as on its Note tab.
   - **Limits.** Since the log follows the file's current path (§6), it
     ends at the checkpoint that renamed the file, which it lists as a
     rename; a compare across it shows the rename too. The page needs
@@ -2011,8 +2051,8 @@ docs/
     checkpoint (checkpoints are #30).
   - **Editing shows everything.** Editing works on the full note, every
     dated entry and section, whatever the story position, with an
-    "Editing shows everything" badge. The position view comes back when
-    the edit ends.
+    "Editing shows everything" badge. At a position, that's the Author's
+    view (#300), so it needs no other read of the note, and its tags stay.
 
   Fields, with dated entries' `from` and `until`, are part b of #28;
   chapter fields and inherited values are #138. The rest is v0
@@ -2141,8 +2181,8 @@ docs/
     cached answer, since a rename or a new name can change lists,
     searches, and links anywhere, and shows its effects, the pinned
     canon it touched, the file's warnings, and that it isn't a
-    checkpoint. A note the reader hasn't met can be edited once shown
-    with "Show it anyway". A write from outside refreshes an open page the
+    checkpoint. At a position, a note can be edited from the Author's view, even
+    one the reader hasn't met, and the Reader's view is read-only. A write from outside refreshes an open page the
     same way: while it's visible the page asks for `/api/den/files` every 5
     seconds, and when the answer changes it refreshes every cached answer.
     While an editor or form is open it waits, the note's page stays as the
@@ -2556,9 +2596,9 @@ docs/
     after any save (`useAfterSave`), and the page goes to
     the new note, keeping the story position, with a notice naming the
     file that takes focus and lasts until the writer leaves the page. A
-    note made at a place the reader meets after the position shows the
-    usual "not met yet" banner, whose **Show it anyway** reveals it to
-    edit. Escape or Cancel closes the form and returns focus to what
+    note made at a place the reader meets after the position opens with
+    its `enters at` tag, in the Author's view, or the usual "not met yet"
+    banner in the Reader's view. Escape or Cancel closes the form and returns focus to what
     opened it.
   - **New note on the place pages** (#203). A type group exists in the
     tree only where that type already has notes, so each universe,

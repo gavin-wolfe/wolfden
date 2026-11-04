@@ -162,6 +162,22 @@ export interface PageField {
   entryIndex: number | null
   live: boolean | null
   links: LinkView[]
+  /** In the Author's view, what readers at the position don't know of this value or entry. */
+  readerMark?: ReaderMark
+  /** In the Author's view, a position field's values later than the position, as written. */
+  aheadValues?: string[]
+  /** In the Author's view, a position field's values that can't be compared, as written. */
+  unplacedValues?: string[]
+}
+
+/**
+ * Why readers at the position don't see a note or fact the writer is shown (#300).
+ * `at` is the position that makes it so, and can be null where no position names
+ * that point. Only the Author's view has these: the words are in readerWords.ts.
+ */
+export interface ReaderMark {
+  kind: 'ahead' | 'ended' | 'unplaced' | 'never'
+  at: string | null
 }
 
 export interface PageSection {
@@ -178,6 +194,8 @@ export interface PageSection {
   links: LinkView[]
   /** Why an error leaves this section out of every story view, in the full view only; otherwise null or missing. */
   leftOut?: SectionProblem[] | null
+  /** In the Author's view, what readers at the position don't know of this section. */
+  readerMark?: ReaderMark
 }
 
 /** An error that leaves a section out: a bad value in its comment, or in the comment of a section holding it. */
@@ -207,6 +225,10 @@ export interface BacklinkView {
   outlineRow: string | null
   status: string | null
   bookkeeping: boolean
+  /** In the Author's view, what readers at the position don't know of what holds this link. */
+  readerMark?: ReaderMark
+  /** True for a link in a section an error leaves out, which only the writer's views list. */
+  leftOut?: boolean
 }
 
 export interface EntityPage {
@@ -230,6 +252,8 @@ export interface EntityPage {
   backlinks: BacklinkView[]
   /** Why the note can't be edited, since it's in a final book (#28), or null (or left out) if it can be. */
   frozen?: string | null
+  /** In the Author's view, for a note readers meet after the position, or that no position places. */
+  readerMark?: ReaderMark
 }
 
 export interface EntityPageResult {
@@ -239,6 +263,8 @@ export interface EntityPageResult {
   inView: boolean
   note: string | null
   entity: EntityPage | null
+  /** In the Author's view, the position its marks are at. */
+  marksAt?: string
 }
 
 export interface ApiError {
@@ -376,10 +402,16 @@ export function entitiesQuery(universe: string, at: string | undefined) {
   })
 }
 
-export function entityQuery(universe: string, entity: string, at: string | undefined) {
+/**
+ * A note's page. With no position, its full view. At a position, the Author's
+ * view: all of it, with what readers there don't know marked. With `readers`,
+ * the Reader's view: only what they know, as an AI assistant reads it (#300).
+ */
+export function entityQuery(universe: string, entity: string, at: string | undefined, readers = false) {
+  const asked = at === undefined ? {} : readers ? { asOf: at, readers: 'true' } : { marksAt: at }
   return queryOptions({
-    queryKey: ['entity', universe, entity, at ?? null],
-    queryFn: () => getJson<EntityPageResult>(apiPath('/api/entity', { entity, universe, asOf: at })),
+    queryKey: ['entity', universe, entity, at ?? null, readers && at !== undefined],
+    queryFn: () => getJson<EntityPageResult>(apiPath('/api/entity', { entity, universe, ...asked })),
   })
 }
 

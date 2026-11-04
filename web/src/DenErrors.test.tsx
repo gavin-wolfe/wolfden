@@ -207,6 +207,18 @@ describe('the top bar’s problems', () => {
     expect(links[2]).toContain('at=dracula:1')
   })
 
+  it('SC-WEB-103: Edit file is the writer’s, so it leaves the Reader’s view behind, and keeps the position', async () => {
+    stubApi({ override: (path) => (path === '/api/den/errors' ? list(error()) : undefined) })
+    const { history } = renderApp('/u/dracula/e/E-MINA?at=dracula:1&readers=1')
+
+    fireEvent.click(await screen.findByRole('button', { name: /1 problem/ }))
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('link', { name: 'Edit file' }))
+
+    await waitFor(() => expect(history.location.pathname).toBe('/file'))
+    await waitFor(() => expect(new URLSearchParams(history.location.search).get('readers')).toBeNull())
+    expect(new URLSearchParams(history.location.search).get('at')).toBe('dracula:1')
+  })
+
   it('SC-WEB-96: a file that can’t be read has no Edit file, and a folder doesn’t ask for a file that’s there', async () => {
     const book = 'universes/dracula/books/dracula'
     stubApi({
@@ -504,7 +516,7 @@ describe('the page of a note left out', () => {
     expect(document.body.textContent).not.toContain('/api/')
   })
 
-  it('SC-WEB-95: as of a position, names no file, and offers to show everything', async () => {
+  it('SC-WEB-95: in the Reader’s view, names no file, and offers to show everything', async () => {
     stubApi({
       override: (path, params) => {
         if (path !== '/api/entity') {
@@ -516,7 +528,7 @@ describe('the page of a note left out', () => {
           : json({ code: 'unknown_entity', message: 'It has an error at line 5.', leftOut: { path: VAULT, line: 5, rule: 'F-ENT-5', message: 'bad' } }, 404)
       },
     })
-    renderApp('/u/dracula/e/E-1?at=dracula:1')
+    renderApp('/u/dracula/e/E-1?at=dracula:1&readers=1')
 
     expect(await screen.findByRole('heading', { name: 'This note is left out' })).toBeTruthy()
     expect(screen.queryByRole('link', { name: 'Edit file' })).toBeNull()

@@ -85,7 +85,7 @@ public sealed class WolfdenTools
         Respond(() =>
         {
             var result = _tools.GetEntity(entity, universe, as_of, out var horizon);
-            return AsOfReads.ForAssistant(result, horizon);
+            return AsOfReads.ForReaders(result, horizon);
         });
 
     /// <summary>The <c>list_entities</c> tool.</summary>
@@ -126,7 +126,7 @@ public sealed class WolfdenTools
         Respond(() =>
         {
             var result = _tools.CanonAsOf(universe, position, series, book, type, brief, out var horizon);
-            return AsOfReads.ForAssistant(result, horizon);
+            return AsOfReads.ForReaders(result, horizon);
         });
 
     /// <summary>The <c>check</c> tool.</summary>

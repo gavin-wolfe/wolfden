@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { getRouteApi } from '@tanstack/react-router'
-import { entityQuery, type ContainerRef } from '../api'
+import { entityQuery, type ContainerRef, type PositionView, type ReaderMark } from '../api'
 import { FileDiffView } from '../components/DiffView'
+import { MarkTag } from '../components/AheadOfReaders'
 import { EntityTabs } from '../components/EntityTabs'
 import { ErrorState, Loading } from '../components/States'
 import type { EntitySearch } from '../entitySearch'
 import { useDocumentTitle, useEntitiesInView, usePosition } from '../hooks'
 import { historyDiffQuery, historyQuery, type DiffSelection, type HistoryDiffResult, type HistoryEntry, type HistoryResult } from '../historyApi'
+import { READERS_VIEW_REACH } from '../readerWords'
 import { Breadcrumb, NotInView } from './EntityPageView'
 import '../history.css'
 
@@ -22,16 +24,16 @@ const NOW = 'now'
  * differs from the latest checkpoint; and the diff of the one selected, or
  * of two compared.
  *
- * History isn't a story view, so it ignores the position. But a note the
- * reader hasn't met at the position stays hidden, as on its Note tab: the
- * same banner, and its history, greyed, only after "Show it anyway", which
- * the two tabs share (maintainer decision, #26). Nothing of the history is
- * fetched until then.
+ * History isn't a story view, so it ignores the position: in the Author's
+ * view, the note's tag says when readers meet it, and the rest is every saved
+ * version. A saved version can say anything, so the Reader's view fetches none
+ * of it, and says to switch (#300). A note the reader hasn't met there has the
+ * same banner as on its Note tab.
  */
 export function HistoryPage() {
   const { universe, _splat: key = '' } = route.useParams()
-  const { at } = usePosition()
-  const page = useQuery(entityQuery(universe, key, at))
+  const { at, readers } = usePosition()
+  const page = useQuery(entityQuery(universe, key, at, readers))
   const view = useEntitiesInView(universe)
   useDocumentTitle(page.data ? (page.data.entity ? `${page.data.entity.name}: history` : 'Not met yet') : undefined)
 
@@ -47,36 +49,52 @@ export function HistoryPage() {
     const summary = view.all?.entities.find((e) => e.key === key || e.id === key || e.path === key)
     return (
       <NotInView
-        universe={universe}
-        entityKey={key}
         summary={summary}
         note={page.data.note}
         positions={view.positions ?? []}
         at={at}
         className="page-body history"
-      >
-        <History universe={universe} entityKey={key} scope={undefined} />
-      </NotInView>
+      />
     )
   }
 
-  return <History universe={universe} entityKey={key} scope={page.data.entity.scope} />
+  const { entity } = page.data
+  if (readers) {
+    return (
+      <div className="page-body history">
+        <Breadcrumb universe={universe} scope={entity.scope} />
+        <EntityTabs universe={universe} entityKey={key} current="history" />
+        <header>
+          <p className="eyebrow">{entity.type}</p>
+          <h1>{entity.name}</h1>
+        </header>
+        <p className="muted history-note">History isn't part of the Reader's view, since saved versions can hold what readers don't know yet. Switch to the Author's view to see it.</p>
+        <p className="muted history-note">{READERS_VIEW_REACH}</p>
+      </div>
+    )
+  }
+
+  return <History universe={universe} entityKey={key} scope={entity.scope} mark={entity.readerMark} positions={view.positions ?? []} />
 }
 
-/**
- * The history itself. `scope` is the note's breadcrumb from its page at the
- * position; for a note shown anyway it's undefined, and the full view gives
- * it. Shown anyway, it sits inside the banner's page, so it isn't wrapped in
- * a page of its own.
- */
-function History({ universe, entityKey, scope }: { universe: string; entityKey: string; scope: ContainerRef[] | undefined }) {
-  const outer = scope === undefined ? 'history' : 'page-body history'
+/** The history itself. `scope` is the note's breadcrumb, and `mark` what readers at the position don't know of it. */
+function History({
+  universe,
+  entityKey,
+  scope,
+  mark,
+  positions,
+}: {
+  universe: string
+  entityKey: string
+  scope: ContainerRef[]
+  mark: ReaderMark | undefined
+  positions: PositionView[]
+}) {
+  const outer = 'page-body history'
   const search = route.useSearch()
   const history = useInfiniteQuery(historyQuery(universe, entityKey))
   const uncommitted = useQuery(historyDiffQuery(universe, entityKey, {}))
-  const full = useQuery({ ...entityQuery(universe, entityKey, undefined), enabled: scope === undefined })
-  const crumbs = scope ?? full.data?.entity?.scope
-
   const entries = history.data?.pages.flatMap((p) => p.entries ?? []) ?? []
   const hasUncommitted = uncommitted.data?.available === true && (uncommitted.data.diff?.files.length ?? 0) > 0
   const selection = chooseSelection(search, hasUncommitted, entries, uncommitted.isPending)
@@ -94,10 +112,12 @@ function History({ universe, entityKey, scope }: { universe: string; entityKey: 
   const first = history.data.pages[0]
   const header = (
     <>
-      {crumbs && <Breadcrumb universe={universe} scope={crumbs} />}
+      <Breadcrumb universe={universe} scope={scope} />
       <EntityTabs universe={universe} entityKey={entityKey} current="history" />
       <header>
-        <p className="eyebrow">{first.entity.type}</p>
+        <p className="eyebrow">
+          {first.entity.type} {mark && <MarkTag mark={mark} positions={positions} note />}
+        </p>
         <h1>{first.entity.name}</h1>
       </header>
     </>

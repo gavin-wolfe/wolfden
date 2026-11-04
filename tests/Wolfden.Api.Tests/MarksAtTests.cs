@@ -13,10 +13,10 @@ namespace Wolfden.Api.Tests;
 public sealed class MarksAtTests : IDisposable
 {
     private const string Tithe = "The%20salt%20tithe";
-    private const string TithePath = "universes/starfall/entities/threads/the-salt-tithe.md";
+    internal const string TithePath = "universes/starfall/entities/threads/the-salt-tithe.md";
     private const string HeirPath = "universes/starfall/entities/notes/the-salt-heir.md";
 
-    private const string TitheText = """
+    internal const string TitheText = """
         ---
         type: thread
         name: The salt tithe
@@ -82,7 +82,7 @@ public sealed class MarksAtTests : IDisposable
         """;
 
     /// <summary>The words a reader at <c>ember:3</c> hasn't met, each from one place above.</summary>
-    private static readonly string[] LaterWords =
+    internal static readonly string[] LaterWords =
         ["Morvane", "Corvin", "Sablewick", "Drennick", "Cinderlace", "Brackwater", "Larkspire", "Quillfeather", "Hallowmere", "Vespergale", "Ostrelline", "Fenwraith", "Wyrmsedge", "Pellucid", "ash:"];
 
     private readonly TempDen _den = TempDen.Starfall();

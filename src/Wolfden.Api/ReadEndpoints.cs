@@ -34,6 +34,12 @@ namespace Wolfden.Api;
 /// there don't know marked (<see cref="ReaderMarks"/>, #300). It doesn't go with
 /// <c>asOf</c>, and no MCP tool has it.
 /// </para>
+/// <para>
+/// <c>readers=true</c>, on <c>/api/entity</c> beside <c>asOf</c>, is the web UI's
+/// Reader's view: the page as an AI assistant's read at that position has it
+/// (<see cref="AsOfReads"/>), with no later <c>until</c>, position value, or HTML
+/// comment. Without <c>asOf</c>, or with <c>marksAt</c>, it's <c>bad_argument</c>.
+/// </para>
 /// </remarks>
 public static class ReadEndpoints
 {
@@ -78,7 +84,7 @@ public static class ReadEndpoints
             ["query", "universe", "type", "asOf", "limit"],
             q => reader.LookupEntities(q.Text("query") ?? "", q.Text("universe"), Types(q.Text("type")), q.Position("asOf"), q.Int("limit", 20))));
         api.MapGet("/entity", (HttpContext c) => Answer(
-            c, ["entity", "universe", "asOf", "marksAt"], q => EntityPages.Get(reader, q.Text("entity"), q.Text("universe"), q.Position("asOf"), q.Position("marksAt"))));
+            c, ["entity", "universe", "asOf", "marksAt", "readers"], q => EntityPages.Get(reader, q.Text("entity"), q.Text("universe"), q.Position("asOf"), q.Position("marksAt"), q.Bool("readers"))));
         api.MapGet("/canon", (HttpContext c) => Answer(
             c,
             ["universe", "asOf", "series", "book", "type", "brief"],

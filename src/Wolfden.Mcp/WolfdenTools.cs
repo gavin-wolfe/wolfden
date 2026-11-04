@@ -280,6 +280,7 @@ public sealed class WolfdenTools
     [Description(
         "Renames a section of an entity, and in the same change rewrites every link to it by heading ([[entity#Old name]]) in any " +
         "file of the den, so they name the new heading. If a file that links to it is in a final (frozen) book, nothing is renamed. " +
+        "A rename that changes only which apostrophes the name uses (straight or curly) rewrites no links, since they still match, so a final book doesn't stop it. " +
         "The result lists every file written, with its new hash." + WriteHelp)]
     public CallToolResult RenameSection(
         [Description("The entity: its name, an alias, its file name, its id, its key, or its path.")] string entity,

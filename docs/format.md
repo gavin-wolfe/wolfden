@@ -1666,7 +1666,9 @@ rewrite, in the same change, every reference that depends on the old name:
   as an alias, so those links keep resolving.
 - Renaming a section: every link to it by heading
   (`[[entity#Old name]]`, matched as in F-LINK-4), in any file, so it
-  names the new heading.
+  names the new heading. A rename that changes only which apostrophes the
+  name uses rewrites none: each link still matches, and keeps what its
+  writer typed, even in a final book.
 - Moving an entity to another scope: any link that would no longer resolve
   to it (F-LINK-7) is rewritten to its id or another unique form. An
   entity without an `id` MUST get one in the same change (F-ID-6).

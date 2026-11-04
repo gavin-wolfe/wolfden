@@ -13,6 +13,7 @@ public sealed class ApostropheLinkToolTests : IDisposable
     private const string Journal = "universes/dracula/entities/notes/minas-journal.md";
     private const string Note = "universes/dracula/entities/notes/whitby-dialect.md";
     private const string BookFile = "universes/dracula/books/dracula/book.md";
+    private const string Twin = "universes/dracula/books/dracula/entities/notes/mina-curly.md";
 
     private readonly TempDen _den = TempDen.Dracula();
 
@@ -172,6 +173,73 @@ public sealed class ApostropheLinkToolTests : IDisposable
         Assert.Contains("\n## Mina’s Notes\n", _den.Read(Journal), StringComparison.Ordinal);
         Assert.Contains(result.Effects, e => e.Contains("Links match any apostrophe", StringComparison.Ordinal));
         Assert.DoesNotContain(Tools.Check().Diagnostics, d => d.Rule == "F-LINK-9");
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-46")]
+    public void ChangingOnlyAnApostropheInASectionIsntStoppedByALinkInAFinalBook()
+    {
+        WriteNotes();
+        const string Memories = "universes/dracula/books/aftermath/entities/notes/memories.md";
+        _den.Write("universes/dracula/books/aftermath/book.md", "---\nid: 01M4TF5F0EKGGWD5FNVBAEY8Z4\nname: Aftermath\nstatus: final\n---\n");
+        _den.Write(Memories, "---\nid: 01M4TF5F0EKGGWD5FNVBAEY8Z5\ntype: note\nname: Memories\nstatus: draft\n---\n\nRecall [[minas-journal#Mina's Notes]].\n");
+        var before = _den.Read(Memories);
+
+        var result = Tools.RenameSection(Journal, "Mina's Notes", "Mina’s Notes", Tools.GetEntity(Journal).Entity!.Hash!);
+
+        Assert.True(result.Changed);
+        Assert.Equal([Journal], result.Files!.Select(f => f.Path));
+        Assert.Equal(before, _den.Read(Memories));
+        Assert.DoesNotContain(Tools.Check().Diagnostics, d => d.Rule == "F-LINK-9");
+
+        // A real change has to rewrite it, so the final book stops that, whichever apostrophe the section now uses.
+        var refused = Assert.Throws<DenToolException>(() => Tools.RenameSection(Journal, "Mina’s Notes", "Shorthand", result.Hash));
+        Assert.Equal(ToolErrorCodes.Frozen, refused.Code);
+        Assert.Contains(Memories, refused.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-46")]
+    public void MovingANoteLeavesALinkWithAnotherApostropheAsItIs()
+    {
+        WriteNotes();
+        var before = _den.Read(Note);
+
+        var result = Tools.MoveEntity("Mina's Journal", Tools.GetEntity(Journal).Entity!.Hash!, toBook: "dracula", keepEntry: true);
+
+        Assert.True(result.Changed);
+        Assert.Equal(before, _den.Read(Note));
+        Assert.DoesNotContain(Tools.Check().Diagnostics, d => d.Rule is "F-LINK-7" or "F-LINK-8" or "F-LINK-9");
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-46")]
+    public void MovingANoteBesideOneThatDiffersOnlyByApostropheSendsItsLinksToItsId()
+    {
+        WriteNotes();
+        _den.Write(Twin, "---\nid: 01M4TF5F0EKGGWD5FNVBAEY8Z3\ntype: note\nname: \"Mina’s Journal\"\nstatus: draft\n---\n\n# Mina’s Journal\n");
+
+        var result = Tools.MoveEntity(Journal, Tools.GetEntity(Journal).Entity!.Hash!, toBook: "dracula", keepEntry: true);
+
+        Assert.True(result.Changed);
+        Assert.Contains("[[01M4TF5F0EKGGWD5FNVBAEY8Z2|Mina’s Journal]]", _den.Read(Note), StringComparison.Ordinal);
+        Assert.DoesNotContain(Tools.Check().Diagnostics, d => d.Path == Note && d.Rule is "F-LINK-7" or "F-LINK-8");
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-46")]
+    public void MovingANoteThatWouldMakeALinkToOneDifferingOnlyByApostropheAmbiguousIsRefused()
+    {
+        WriteNotes();
+        _den.Write(Twin, "---\nid: 01M4TF5F0EKGGWD5FNVBAEY8Z3\ntype: note\nname: \"Mina’s Journal\"\nstatus: draft\n---\n\n# Mina’s Journal\n\nSee [[Mina's Journal]].\n");
+        var before = _den.Read(Journal);
+
+        var refused = Assert.Throws<DenToolException>(
+            () => Tools.MoveEntity(Journal, Tools.GetEntity(Journal).Entity!.Hash!, toBook: "dracula", keepEntry: true));
+
+        Assert.Contains("minas-journal.md", refused.Message, StringComparison.Ordinal);
+        Assert.Contains("mina-curly.md", refused.Message, StringComparison.Ordinal);
+        Assert.Equal(before, _den.Read(Journal));
     }
 
     [Fact]

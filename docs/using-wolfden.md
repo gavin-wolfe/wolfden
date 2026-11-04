@@ -770,7 +770,9 @@ the pages don't have a form for it yet. The rules are in
   does dropping or pasting one into the text
   ([Adding an image while you edit](#adding-an-image-while-you-edit)).
   **Add section** adds one at the end or before another. Renaming a
-  section changes the links to it in every note; removing one asks first.
+  section changes the links to it in every note, unless only its
+  apostrophes change (straight to curly, say), since links already match
+  either; removing one asks first.
 - **Edit file** opens the whole note, frontmatter and all, for anything
   the other controls don't do, such as a section's
   `<!-- wolfden: ... -->` comment.

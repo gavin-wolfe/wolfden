@@ -3430,7 +3430,13 @@ note links `[[Mina’s Journal]]`, as a word processor writes it, or the reverse
 - Changing only the apostrophes in a name, an alias, or a section ("Mina's" to
   "Mina’s") leaves every link as it is, even in a final book, and doesn't keep
   the old name as an alias. Any other rename rewrites a link whichever
-  apostrophe it used, to the new text as it was given, and keeps its label.
+  apostrophe it used, to the new text as it was given, and keeps its label, so
+  a link in a final book stops it.
+- A move treats them the same way. Moving the note leaves a curly link as it
+  is while it still reaches the note. Moved into the scope of a note that
+  differs only by apostrophe, a link to the moved note goes to its id, showing
+  the same text. If a link there reaches the other note, and would become
+  ambiguous, the move is refused, naming both, unless `allow_relinks` is given.
 - An index built before this is rebuilt, since it stored names under the old
   matching.
 
@@ -4751,7 +4757,8 @@ by: `WriteEndpointTests.TheSourceGivesTheFilesHashAndEachSectionsTextAsWritten`,
 - Rename turns the heading into a text box. Saving renames the section
   and rewrites every link to it by heading, in any note, as the MCP
   `rename_section` does (format.md F-RT-5); if one of those links is in a
-  final book, nothing is renamed.
+  final book, nothing is renamed. Changing only its apostrophes rewrites no
+  link (SC-MCP-46).
 - Remove asks in the page, not in a browser dialog: "Remove the section
   'Arc' and its 1 subsection?", with "Keep it" focused. Removing takes the
   section's subsections too. Links to it by heading aren't rewritten; the

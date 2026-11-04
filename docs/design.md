@@ -1273,7 +1273,8 @@ store, so an edit changes only what it means to (format.md §12):
   and says which don't resolve where the copy is.
 - **Renames** (maintainer decision, 2026-10-23). `rename_section`
   rewrites every link that reaches the section by heading, in any file
-  (F-RT-5), as one change: if any of those files is in a final book,
+  (F-RT-5; none if only its apostrophes change, since they still match,
+  #308), as one change: if any of those files is in a final book,
   nothing is renamed, and if a write fails part way, the files already
   written are put back, newest first, and the result names any that
   couldn't be, or that another program changed meanwhile (those are

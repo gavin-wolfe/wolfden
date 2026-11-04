@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Wolfden.Index;
 
 namespace Wolfden.Api;
@@ -128,9 +129,32 @@ public sealed record LinkView(
 /// <param name="EntryIndex">See <see cref="FieldView"/>.</param>
 /// <param name="Live">See <see cref="FieldView"/>.</param>
 /// <param name="Links">The links in this value or entry.</param>
+/// <param name="ReaderMark">With <c>marksAt</c>, what readers there don't know of this value or entry; left out when there's nothing to say, and always without <c>marksAt</c>.</param>
+/// <param name="AheadValues">With <c>marksAt</c>, a position field's values later than it, as written (format.md F-VIEW-5); left out when there are none, and always without <c>marksAt</c>.</param>
 public sealed record PageField(
     string Name, JsonElement Value, string Kind, string? Status, bool Pinned, string? From, string? Until, int Line, int? EntryIndex, bool? Live,
-    IReadOnlyList<LinkView> Links);
+    IReadOnlyList<LinkView> Links,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReaderMark? ReaderMark = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? AheadValues = null);
+
+/// <summary>
+/// What readers at the position <c>marksAt</c> names don't know about a note or
+/// a fact the writer is shown (#300, design.md §9). The words are the page's.
+/// </summary>
+/// <param name="Kind"><see cref="Ahead"/> or <see cref="Ended"/>.</param>
+/// <param name="At">
+/// The position that makes it so: where a note or fact enters, or where a fact
+/// stopped holding. It's the effective one, so it may not be written on the
+/// fact. Null only for a note filed in a series with no books yet.
+/// </param>
+public sealed record ReaderMark(string Kind, string? At)
+{
+    /// <summary>Readers reach it after the position: a note's <c>enters at</c>, a fact's <c>ahead of readers</c>.</summary>
+    public const string Ahead = "ahead";
+
+    /// <summary>A fact whose end is at or before the position: <c>no longer true here</c>.</summary>
+    public const string Ended = "ended";
+}
 
 /// <summary>A section on an entity page: <see cref="SectionView"/>, whose <c>body</c> is markdown, with its links.</summary>
 /// <param name="Name">See <see cref="SectionView"/>.</param>
@@ -146,7 +170,8 @@ public sealed record PageField(
 /// <param name="Links">The links in the section's own text, in file order.</param>
 public sealed record PageSection(
     string Name, int Level, IReadOnlyList<string> HeadingPath, string Status, bool Pinned, string? From, string? Until, int Line, string Body,
-    bool? Bookkeeping, IReadOnlyList<LinkView> Links, IReadOnlyList<SectionProblem>? LeftOut = null);
+    bool? Bookkeeping, IReadOnlyList<LinkView> Links, IReadOnlyList<SectionProblem>? LeftOut = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReaderMark? ReaderMark = null);
 
 /// <summary>
 /// Where an entity enters canon (format.md F-ENT-6): its own <c>from</c>, or,
@@ -201,11 +226,13 @@ public sealed record BacklinkView(
 /// <param name="LeadLinks">The links in its lead.</param>
 /// <param name="Backlinks">The links that reach it, by path and place in the file; as of a position, only those in what the reader has met.</param>
 /// <param name="Frozen">Why it can't be edited, since it's filed in a final book (format.md F-BOOK-1), or null if it can be (#28).</param>
+/// <param name="ReaderMark">With <c>marksAt</c>, for a note readers meet after it; otherwise left out.</param>
 public sealed record EntityPage(
     string Key, string? Id, string Name, string Type, string Status, string Universe, string ScopeKind, string ScopeKey, string Path, string? From,
     IReadOnlyList<string>? Aliases, string? Lead, PinnedFacts? Pinned, IReadOnlyList<PageField> Fields, IReadOnlyList<PageSection> Sections,
     string? Hash, IReadOnlyList<ContainerRef> Scope, EntryView Entry, IReadOnlyList<LinkView> LeadLinks, IReadOnlyList<BacklinkView> Backlinks,
-    string? Frozen = null);
+    string? Frozen = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReaderMark? ReaderMark = null);
 
 /// <summary>The result of <c>GET /api/entity</c>: <see cref="GetEntityResult"/>, with the page.</summary>
 /// <param name="Version">The shape version.</param>
@@ -214,7 +241,10 @@ public sealed record EntityPage(
 /// <param name="InView">See <see cref="GetEntityResult"/>.</param>
 /// <param name="Note">See <see cref="GetEntityResult"/>.</param>
 /// <param name="Entity">The page, or null when the entity isn't in the view.</param>
-public sealed record EntityPageResult(int Version, string View, string? Position, bool InView, string? Note, EntityPage? Entity);
+/// <param name="MarksAt">The position the page's marks are at, in the full view; left out without <c>marksAt</c>.</param>
+public sealed record EntityPageResult(
+    int Version, string View, string? Position, bool InView, string? Note, EntityPage? Entity,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? MarksAt = null);
 
 /// <summary>What changed in an entity's file, from <c>GET /api/history/diff</c>.</summary>
 /// <param name="From">The checkpoint compared from, or null for a checkpoint's own diff when it's the first, compared with nothing.</param>
@@ -248,7 +278,9 @@ public sealed record HistoryDiffResult(int Version, EntitySummary Entity, string
 /// <param name="Matches">Where the matches are in <paramref name="Text"/>, in order, as offsets and lengths in UTF-16 code units (JavaScript string indexes).</param>
 public sealed record SearchPageHit(
     EntitySummary Entity, string? Section, int? Line, string Snippet, string Status, bool InCanon, bool InComment, string? Field, string Text,
-    IReadOnlyList<TextMatch> Matches, bool? LeftOut = null);
+    IReadOnlyList<TextMatch> Matches, bool? LeftOut = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReaderMark? ReaderMark = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? AheadValues = null);
 
 /// <summary>A search's result as the search page gets it: the MCP tool's, with <see cref="SearchPageHit"/>s.</summary>
 /// <param name="Version">The shape version.</param>
@@ -256,4 +288,7 @@ public sealed record SearchPageHit(
 /// <param name="Count">How many hits this result holds.</param>
 /// <param name="Truncated">True if more hits matched than <c>limit</c>.</param>
 /// <param name="Hits">The hits, best first.</param>
-public sealed record SearchPageResult(int Version, string Query, int Count, bool Truncated, IReadOnlyList<SearchPageHit> Hits);
+/// <param name="MarksAt">The position the hits' marks are at; left out without <c>marksAt</c>.</param>
+public sealed record SearchPageResult(
+    int Version, string Query, int Count, bool Truncated, IReadOnlyList<SearchPageHit> Hits,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? MarksAt = null);

@@ -18,13 +18,18 @@ internal static class EntityPages
 {
     private static readonly string[] InCanon = ["draft", "canon"];
 
-    /// <summary>The page of <paramref name="entity"/>, named as <c>get_entity</c> names it, in the full view or as of <paramref name="asOf"/>.</summary>
-    public static EntityPageResult Get(DenReader reader, string? entity, string? universe, string? asOf)
+    /// <summary>
+    /// The page of <paramref name="entity"/>, named as <c>get_entity</c> names it, in the full view or as of
+    /// <paramref name="asOf"/>. With <paramref name="marksAt"/>, the full view, with what readers there don't know marked (<see cref="ReaderMarks"/>).
+    /// </summary>
+    public static EntityPageResult Get(DenReader reader, string? entity, string? universe, string? asOf, string? marksAt = null)
     {
         DenReader.CheckEntityName(entity);
+        ReadEndpoints.CheckOnePosition(asOf, marksAt);
         return reader.WithIndex(index =>
         {
-            var found = reader.GetEntity(index, entity, universe, asOf, out var canonView);
+            var marks = marksAt is null ? null : ReaderMarks.For(reader, index, universe, marksAt);
+            var found = reader.GetEntity(index, entity, marks?.Universe ?? universe, asOf, out var canonView);
             if (found.Entity is not { } view)
             {
                 return new EntityPageResult(ReadEndpoints.ResultVersion, found.View, found.Position, found.InView, found.Note, null);
@@ -34,6 +39,7 @@ internal static class EntityPages
             var record = db.Entities.Single(e => e.Path == view.Path);
             var containers = db.Containers.Where(c => c.UniverseId == record.UniverseId).ToList().ToDictionary(c => c.Id);
             var canon = canonView?.Entities.ToDictionary(e => e.Path, StringComparer.Ordinal);
+            var noteMarks = marks?.Of(record);
 
             // The entity's own links, and every entity they reach or match.
             var links = db.Links.Where(l => l.SourceEntityId == record.Id).ToList().OrderBy(l => l.Line).ThenBy(l => l.Column).ToList();
@@ -67,17 +73,19 @@ internal static class EntityPages
                 view.Aliases, view.Lead, view.Pinned,
                 (view.Fields ?? []).Select(f => new PageField(
                     f.Name, f.Value, f.Kind, f.Status, f.Pinned, f.From, f.Until, f.Line, f.EntryIndex, f.Live,
-                    f.Kind == "default" ? [] : byEntry[(f.Name, f.Line)].Select(Link).ToList())).ToList(),
+                    f.Kind == "default" ? [] : byEntry[(f.Name, f.Line)].Select(Link).ToList(),
+                    noteMarks?.Field(f.Name, f.EntryIndex), noteMarks?.AheadValues(f.Name, f.EntryIndex, f.Value))).ToList(),
                 (view.Sections ?? []).Select(s => new PageSection(
                     s.Name, s.Level, s.HeadingPath, s.Status, s.Pinned, s.From, s.Until, s.Line, s.Body, s.Bookkeeping,
-                    bySection[s.Line].Select(Link).ToList(), s.LeftOut)).ToList(),
+                    bySection[s.Line].Select(Link).ToList(), s.LeftOut, noteMarks?.Section(s.Line))).ToList(),
                 view.Hash,
                 Chain(containers, record.ScopeId),
                 Entry(record, containers),
                 links.Where(l => l.Site == "entity_lead").Select(Link).ToList(),
                 Backlinks(index, record, containers, canon, asOf is null ? null : index.PointOf(view.Universe, asOf)),
-                Frozen(record, containers));
-            return new EntityPageResult(ReadEndpoints.ResultVersion, found.View, found.Position, found.InView, found.Note, page);
+                Frozen(record, containers),
+                noteMarks?.Note);
+            return new EntityPageResult(ReadEndpoints.ResultVersion, found.View, found.Position, found.InView, found.Note, page, marksAt);
         });
     }
 
@@ -203,7 +211,7 @@ internal static class EntityPages
     }
 
     /// <summary>Where the entity enters canon: its own <c>from</c>, or the start of its scope (format.md F-ENT-6, F-ORD-3).</summary>
-    private static EntryView Entry(EntityRecord entity, Dictionary<int, ContainerRecord> containers)
+    internal static EntryView Entry(EntityRecord entity, Dictionary<int, ContainerRecord> containers)
     {
         if (entity.FromText is { } from)
         {

@@ -83,8 +83,10 @@ A file or container that another error leaves out is left out whole, and a
 bad section comment in it is still reported as an [error].
 
 A section left out this way isn't live (F-SEC-8), has no range or pin, and no
-view at a story position shows it or says it's there, since a heading can
-give away a reveal (F-VIEW-1, F-VIEW-2). It isn't lost: its text stays in the
+canon view at a story position, which is what an AI assistant and the web UI's
+Reader's view read, shows it or says it's there, since a heading can give away
+a reveal (F-VIEW-1, F-VIEW-2). A view for the writer shows it, and says it's
+left out and why (design.md §9). It isn't lost: its text stays in the
 file, and links in it still resolve, so a rename or a move rewrites them.
 
 **F-GEN-3.** Validators MUST report every diagnostic they find, not just the

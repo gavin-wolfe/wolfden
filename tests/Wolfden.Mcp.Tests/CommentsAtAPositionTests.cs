@@ -174,6 +174,36 @@ public sealed class CommentsAtAPositionTests : IDisposable
 
     [Fact]
     [Trait("Scenario", "SC-MCP-48")]
+    public void ASectionNotFoundDoesntListAHeadingsComment()
+    {
+        using var read = Read(_tools.GetEntity(Ledger, "starfall", "ember:1"));
+        var hash = read.RootElement.GetProperty("entity").GetProperty("hash").GetString()!;
+
+        var result = _tools.RenameSection(Ledger, "Binding style", "Binding", hash, "starfall", cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsError);
+        var text = Assert.IsType<TextContentBlock>(Assert.Single(result.Content)).Text;
+        Assert.Contains("unknown_section", text, StringComparison.Ordinal);
+        Assert.Contains("'Binding style'", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Wraithmoor", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-48")]
+    public void AHeadingThatsOnlyACommentHasNoName()
+    {
+        _den.Write("universes/starfall/entities/notes/the-blank-head.md", "---\ntype: note\nname: The blank head\nstatus: canon\n---\n\n## <!-- Wraithmoor burns it -->\nBelow it.\n");
+
+        using var json = Read(_tools.GetEntity("The blank head", "starfall", "ember:1"));
+
+        var section = json.RootElement.GetProperty("entity").GetProperty("sections")[0];
+        Assert.Equal("", section.GetProperty("name").GetString());
+        Assert.Equal("Below it.", section.GetProperty("body").GetString());
+        Assert.DoesNotContain("Wraithmoor", json.RootElement.GetRawText(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-48")]
     public void AnUnclosedCommentDoesntReachTheAssistant()
     {
         _den.Write(

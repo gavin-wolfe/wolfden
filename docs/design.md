@@ -1064,9 +1064,12 @@ same code (§9):
   or section (format.md F-VIEW-6), since a comment can name a later fact, and a
   misplaced wolfden comment names a date. A comment shown as code stays. It's in
   `AsOfReads` too, so the web API, `query`, and reads with no position keep them.
-  No MCP tool replaces a section's or lead's text, so no tool can delete a comment
-  a read at a position didn't show. `append_section` leaves them in place. An
-  assistant editing a file by other means is told to read with no position first.
+  No MCP tool replaces a section's or lead's text, and `append_section` leaves
+  comments in place. `rename_section` given a heading's full name drops a comment
+  in that heading, but only a read with no position shows the full name: with the
+  name a read at a position shows, it's refused, and its message lists headings
+  without their comments. An assistant editing a file by other means is told to
+  read with no position first.
 - **Pinned first.** Results of `canon_as_of` and `get_entity` start with
   `pinned`, the pinned canon view (F-VIEW-2), and list the same facts in
   place too, so each entity is complete.

@@ -84,170 +84,50 @@ public static partial class MarkdownComments
     /// makes it text or a backslash escapes it, rather than only at what the parser
     /// calls a comment. It takes LF line breaks, as reads return text.
     /// </remarks>
-    public static string Strip(string markdown)
+    public static string Strip(string markdown) => Strip(markdown, out _);
+
+    /// <param name="markdown">The text.</param>
+    /// <param name="steps">How much looking up it took, so a test can bound the work on a large, badly formed note without timing it.</param>
+    internal static string Strip(string markdown, out long steps)
     {
         ArgumentNullException.ThrowIfNull(markdown);
+        steps = 0;
         if (!markdown.Contains("<!--", StringComparison.Ordinal))
         {
             return markdown;
         }
 
         // A body too deep to parse (F-FM-2) has no code to spare, so everything that looks like a comment goes.
-        var document = BodyLinkScanner.Parse(markdown, 0, BodyLinkScanner.Plain);
-        var ranges = CommentsToStrip(markdown, document);
-        return ranges.Count == 0 ? markdown : Without(markdown, ranges);
+        var scan = new CommentScan(markdown, BodyLinkScanner.Parse(markdown, 0, BodyLinkScanner.Plain));
+        var comments = scan.Comments();
+        steps = scan.Steps;
+        return comments.Count == 0 ? markdown : Without(markdown, comments);
     }
 
-    private static List<(int Start, int End)> CommentsToStrip(string markdown, MarkdownDocument? document)
+    private static string Without(string markdown, List<FoundComment> comments)
     {
-        List<(int Start, int End)> code = document is null ? [] : CodeRanges(markdown, document);
-        var ranges = new List<(int Start, int End)>();
-        var at = 0;
-        while (NextOpen(markdown, at, code) is var open && open >= 0)
-        {
-            var end = EndOfComment(markdown, open, code) ?? EndOfBlock(markdown, open, document);
-            ranges.Add((open, end));
-            at = end;
-        }
-
-        return ranges;
-    }
-
-    private static List<(int Start, int End)> CodeRanges(string markdown, MarkdownDocument document)
-    {
-        var ranges = new List<(int Start, int End)>();
-        foreach (var node in document.Descendants())
-        {
-            // A fenced block is a CodeBlock too. One nothing closes has a span that can stop before its last lines.
-            if (node is CodeBlock or CodeInline)
-            {
-                var end = Math.Max(node.Span.Start, node.Span.End);
-                if (node is CodeBlock { Lines.Count: > 0 } block)
-                {
-                    end = Math.Max(end, block.Lines.Lines[block.Lines.Count - 1].Slice.End);
-                }
-
-                ranges.Add((node.Span.Start, Math.Min(markdown.Length, end + 1)));
-            }
-        }
-
-        return ranges;
-    }
-
-    private static bool InCode(int offset, List<(int Start, int End)> code) => code.Exists(c => offset >= c.Start && offset < c.End);
-
-    private static int NextOpen(string markdown, int from, List<(int Start, int End)> code)
-    {
-        for (var open = markdown.IndexOf("<!--", from, StringComparison.Ordinal); open >= 0; open = markdown.IndexOf("<!--", open + 4, StringComparison.Ordinal))
-        {
-            if (!InCode(open, code) && !IsEscaped(markdown, open))
-            {
-                return open;
-            }
-        }
-
-        return -1;
-    }
-
-    private static bool IsEscaped(string markdown, int offset)
-    {
-        var slashes = 0;
-        while (offset - slashes > 0 && markdown[offset - slashes - 1] == '\\')
-        {
-            slashes++;
-        }
-
-        return slashes % 2 == 1;
-    }
-
-    /// <summary>
-    /// Where the comment at <paramref name="open"/> ends, or null if nothing closes
-    /// it. It's at the first <c>--&gt;</c>, as in CommonMark, unless another
-    /// <c>&lt;!--</c> opened inside it and a later <c>--&gt;</c> balances the two:
-    /// then the text between them is what the writer meant to hide too.
-    /// </summary>
-    private static int? EndOfComment(string markdown, int open, List<(int Start, int End)> code)
-    {
-        // "<!-->" and "<!--->" are complete comments in CommonMark 0.31.2.
-        foreach (var shortForm in new[] { open + 2, open + 3 })
-        {
-            if (string.CompareOrdinal(markdown, shortForm, "-->", 0, 3) == 0)
-            {
-                return shortForm + 3;
-            }
-        }
-
-        int? first = null;
-        var depth = 1;
-        var at = open + 4;
-        while (at < markdown.Length)
-        {
-            var nextOpen = markdown.IndexOf("<!--", at, StringComparison.Ordinal);
-            var nextClose = markdown.IndexOf("-->", at, StringComparison.Ordinal);
-            if (nextClose < 0)
-            {
-                break;
-            }
-
-            if (nextOpen >= 0 && nextOpen < nextClose)
-            {
-                depth += InCode(nextOpen, code) ? 0 : 1;
-                at = nextOpen + 4;
-            }
-            else
-            {
-                at = nextClose + 3;
-                if (InCode(nextClose, code))
-                {
-                    continue;
-                }
-
-                first ??= at;
-                if (--depth == 0)
-                {
-                    return at;
-                }
-            }
-        }
-
-        return first;
-    }
-
-    /// <summary>
-    /// The end of the block a comment nothing closes is in. An HTML block has
-    /// already run to the end of the text, as CommonMark has it. In a paragraph or
-    /// heading, the blocks after it are more likely meant to be read than hidden.
-    /// </summary>
-    private static int EndOfBlock(string markdown, int open, MarkdownDocument? document)
-    {
-        var block = document?.Descendants().OfType<LeafBlock>().LastOrDefault(b => b.Span.Start <= open && open <= b.Span.End);
-        if (block is not null)
-        {
-            return Math.Min(markdown.Length, block.Span.End + 1);
-        }
-
-        var blank = markdown.IndexOf("\n\n", open, StringComparison.Ordinal);
-        return blank < 0 ? markdown.Length : blank;
-    }
-
-    private static string Without(string markdown, List<(int Start, int End)> ranges)
-    {
-        var text = new StringBuilder();
+        var text = new StringBuilder(markdown.Length);
         var touched = new HashSet<int>();
+        var markers = new HashSet<int>();
         var line = 0;
+        var lineStart = 0;
+        var lineIsBlank = true;
         var at = 0;
-        foreach (var (start, end) in ranges)
+        foreach (var comment in comments)
         {
-            line += Append(markdown, at, start, text);
+            Append(comment.Start);
             touched.Add(line);
-            at = end;
+            if (comment.AfterListMarker)
+            {
+                markers.Add(line);
+            }
+
+            at = comment.End;
 
             // The comment's line reads as it would with no comment there: no doubled or trailing space, and no new indent.
-            var lineStart = text.ToString().LastIndexOf('\n') + 1;
-            var isFirst = string.IsNullOrWhiteSpace(text.ToString(lineStart, text.Length - lineStart));
             var spaceBefore = text.Length > lineStart && text[^1] is ' ' or '\t';
             var spaceAfter = at < markdown.Length && markdown[at] is ' ' or '\t';
-            if (isFirst || (spaceBefore && spaceAfter))
+            if (lineIsBlank || (spaceBefore && spaceAfter))
             {
                 while (at < markdown.Length && markdown[at] is ' ' or '\t')
                 {
@@ -262,16 +142,31 @@ public static partial class MarkdownComments
                     text.Length--;
                 }
             }
+            else if (text.Length > lineStart && text[^1] == '`' && markdown[at] == '`')
+            {
+                // Two code spans side by side would otherwise join into one.
+                text.Append(' ');
+            }
         }
 
-        Append(markdown, at, markdown.Length, text);
-        return string.Join('\n', WithoutEmptiedLines(text.ToString().Split('\n'), touched)).Trim('\n').TrimEnd();
-    }
+        Append(markdown.Length);
+        return string.Join('\n', WithoutEmptiedLines(text.ToString().Split('\n'), touched, markers)).Trim('\n').TrimEnd();
 
-    private static int Append(string markdown, int from, int to, StringBuilder text)
-    {
-        text.Append(markdown, from, to - from);
-        return markdown.AsSpan(from, to - from).Count('\n');
+        void Append(int to)
+        {
+            var added = markdown.AsSpan(at, to - at);
+            var lastBreak = added.LastIndexOf('\n');
+            text.Append(added);
+            if (lastBreak >= 0)
+            {
+                line += added.Count('\n');
+                lineStart = text.Length - (added.Length - lastBreak - 1);
+                lineIsBlank = true;
+                added = added[(lastBreak + 1)..];
+            }
+
+            lineIsBlank = lineIsBlank && added.IsWhiteSpace();
+        }
     }
 
     /// <summary>
@@ -279,13 +174,13 @@ public static partial class MarkdownComments
     /// one blank line, since the comment was its own block and they don't become one
     /// paragraph. A list item or block quote holding only a comment goes too.
     /// </summary>
-    private static List<string> WithoutEmptiedLines(string[] lines, HashSet<int> touched)
+    private static List<string> WithoutEmptiedLines(string[] lines, HashSet<int> touched, HashSet<int> markers)
     {
         var kept = new List<string>(lines.Length);
         for (var i = 0; i < lines.Length; i++)
         {
-            var emptied = EmptiedLine().Match(lines[i]);
-            if (!touched.Contains(i) || !emptied.Success)
+            var isBlank = touched.Contains(i) && IsBlank(lines[i]);
+            if (!isBlank && !(markers.Contains(i) && OnlyAListMarker().IsMatch(lines[i])))
             {
                 kept.Add(lines[i]);
                 continue;
@@ -294,7 +189,7 @@ public static partial class MarkdownComments
             var hasNext = i + 1 < lines.Length;
             var blankBefore = kept.Count == 0 || IsBlank(kept[^1]);
             var blankAfter = !hasNext || IsBlank(lines[i + 1]);
-            if (emptied.Groups["marker"].Success)
+            if (!isBlank)
             {
                 // "- <!-- x -->" with an indented line under it is still that line's list item.
                 if (!blankAfter && lines[i + 1][0] is ' ' or '\t')
@@ -321,6 +216,337 @@ public static partial class MarkdownComments
     [GeneratedRegex(@"^[ \t]*(>[ \t]*)*$")]
     private static partial Regex BlankLine();
 
-    [GeneratedRegex(@"^[ \t]*(>[ \t]*)*(?<marker>([-+*]|\d{1,9}[.)])[ \t]*)?$")]
-    private static partial Regex EmptiedLine();
+    [GeneratedRegex(@"^[ \t]*(>[ \t]*)*([-+*]|\d{1,9}[.)])[ \t]*$")]
+    private static partial Regex OnlyAListMarker();
+
+    /// <param name="Start">Where its <c>&lt;!--</c> is.</param>
+    /// <param name="End">Just past where it ends.</param>
+    /// <param name="AfterListMarker">True if a list item starts on its line, before it.</param>
+    private readonly record struct FoundComment(int Start, int End, bool AfterListMarker);
+
+    /// <summary>
+    /// Finds what to strip. Everything's looked up once, in sorted lists, so a note full
+    /// of badly formed comments costs about what a note of well-formed ones does.
+    /// </summary>
+    private sealed class CommentScan
+    {
+        private readonly string _markdown;
+        private readonly SortedRanges _code = new();
+        private readonly SortedRanges _html = new();
+        private readonly SortedRanges _fenceLines = new();
+        private readonly SortedRanges _leaves = new();
+        private readonly HashSet<int> _startsACommentBlock = [];
+        private readonly List<int> _listItems = [];
+        private readonly List<int> _lineStarts = [0];
+        private readonly List<int> _blankLines = [];
+
+        /// <summary>Every <c>&lt;!--</c> that isn't in code.</summary>
+        private readonly List<int> _opens = [];
+
+        /// <summary>Those that aren't in a fence's info string, which comments can't span.</summary>
+        private readonly List<int> _innerOpens = [];
+
+        /// <summary>Every <c>--&gt;</c> that isn't in code or a fence's info string.</summary>
+        private readonly List<int> _closes = [];
+
+        /// <summary>For an opening, where the <c>--&gt;</c> that balances it ends.</summary>
+        private readonly Dictionary<int, int> _balanced = [];
+
+        public CommentScan(string markdown, MarkdownDocument? document)
+        {
+            _markdown = markdown;
+            if (document is not null)
+            {
+                ReadBlocks(document);
+            }
+
+            ReadLines();
+            ReadMarkers();
+            Balance();
+        }
+
+        public long Steps { get; private set; }
+
+        public List<FoundComment> Comments()
+        {
+            var comments = new List<FoundComment>();
+            var at = 0;
+            foreach (var open in _opens)
+            {
+                Steps++;
+                if (open >= at && !IsEscaped(open))
+                {
+                    at = EndOf(open);
+                    comments.Add(new FoundComment(open, at, AfterAListMarker(open)));
+                }
+            }
+
+            return comments;
+        }
+
+        private void ReadBlocks(MarkdownDocument document)
+        {
+            foreach (var node in document.Descendants())
+            {
+                var end = Math.Min(_markdown.Length, Math.Max(node.Span.Start, node.Span.End) + 1);
+                switch (node)
+                {
+                    case FencedCodeBlock fence:
+                        // Its first line isn't code, and the page never shows what its info string holds.
+                        var lastLine = fence.Lines.Count > 0 ? fence.Lines.Lines[fence.Lines.Count - 1].Slice.End + 1 : end;
+                        var firstBreak = _markdown.IndexOf('\n', fence.Span.Start);
+                        var fenceLineEnd = firstBreak < 0 ? _markdown.Length : firstBreak;
+                        _fenceLines.Add(fence.Span.Start, fenceLineEnd);
+                        _code.Add(fenceLineEnd, Math.Min(_markdown.Length, Math.Max(end, lastLine)));
+                        _leaves.Add(fence.Span.Start, end);
+                        break;
+                    case CodeBlock block:
+                        _code.Add(block.Span.Start, end);
+                        _leaves.Add(block.Span.Start, end);
+                        break;
+                    case CodeInline:
+                        _code.Add(node.Span.Start, end);
+                        break;
+                    case HtmlBlock html:
+                        _html.Add(html.Span.Start, end);
+                        _leaves.Add(html.Span.Start, end);
+                        if (html.Type == HtmlBlockType.Comment)
+                        {
+                            _startsACommentBlock.Add(_markdown.IndexOf("<!--", html.Span.Start, StringComparison.Ordinal));
+                        }
+
+                        break;
+                    case LeafBlock leaf:
+                        _leaves.Add(leaf.Span.Start, end);
+                        break;
+                    case ListItemBlock item:
+                        _listItems.Add(item.Span.Start);
+                        break;
+                }
+            }
+
+            _listItems.Sort();
+        }
+
+        private void ReadLines()
+        {
+            var start = 0;
+            while (start <= _markdown.Length)
+            {
+                var lineBreak = _markdown.IndexOf('\n', start);
+                var end = lineBreak < 0 ? _markdown.Length : lineBreak;
+                if (BlankLine().IsMatch(_markdown.AsSpan(start, end - start)))
+                {
+                    _blankLines.Add(start);
+                }
+
+                if (lineBreak < 0)
+                {
+                    return;
+                }
+
+                start = lineBreak + 1;
+                _lineStarts.Add(start);
+            }
+        }
+
+        private void ReadMarkers()
+        {
+            for (var open = _markdown.IndexOf("<!--", StringComparison.Ordinal); open >= 0; open = _markdown.IndexOf("<!--", open + 4, StringComparison.Ordinal))
+            {
+                if (!_code.Contains(open, this))
+                {
+                    _opens.Add(open);
+                    if (!_fenceLines.Contains(open, this))
+                    {
+                        _innerOpens.Add(open);
+                    }
+                }
+            }
+
+            for (var close = _markdown.IndexOf("-->", StringComparison.Ordinal); close >= 0; close = _markdown.IndexOf("-->", close + 1, StringComparison.Ordinal))
+            {
+                if (!_code.Contains(close, this) && !_fenceLines.Contains(close, this))
+                {
+                    _closes.Add(close);
+                }
+            }
+        }
+
+        /// <summary>Pairs each opening with the <c>--&gt;</c> that balances it, in one pass.</summary>
+        private void Balance()
+        {
+            var open = new Stack<int>();
+            var nextOpen = 0;
+            foreach (var close in _closes)
+            {
+                while (nextOpen < _innerOpens.Count && _innerOpens[nextOpen] < close)
+                {
+                    Steps++;
+                    open.Push(_innerOpens[nextOpen++]);
+                }
+
+                if (open.Count > 0)
+                {
+                    _balanced[open.Pop()] = close + 3;
+                }
+            }
+        }
+
+        private bool IsEscaped(int offset)
+        {
+            // A backslash escapes nothing in an HTML block.
+            if (_html.Contains(offset, this))
+            {
+                return false;
+            }
+
+            var slashes = 0;
+            while (offset - slashes > 0 && _markdown[offset - slashes - 1] == '\\')
+            {
+                slashes++;
+            }
+
+            return slashes % 2 == 1;
+        }
+
+        private int EndOf(int open)
+        {
+            if (_fenceLines.Find(open, this) is { } fenceLine)
+            {
+                var close = _markdown.IndexOf("-->", open + 2, fenceLine.End - (open + 2), StringComparison.Ordinal);
+                return close < 0 ? fenceLine.End : close + 3;
+            }
+
+            return EndOfComment(open) ?? EndOfBlock(open);
+        }
+
+        /// <summary>
+        /// Where the comment at <paramref name="open"/> ends, or null if nothing closes
+        /// it. It's at the first <c>--&gt;</c>, even in a later paragraph, unless:
+        /// another <c>&lt;!--</c> opened on the way there, in a later block of a comment
+        /// CommonMark doesn't think is one, so that <c>--&gt;</c> is that one's (F-VIEW-6);
+        /// or a later <c>--&gt;</c> with no blank line before it balances the two, which
+        /// makes what's between them the writer's to hide too.
+        /// </summary>
+        private int? EndOfComment(int open)
+        {
+            // "<!-->" and "<!--->" are complete comments in CommonMark 0.31.2.
+            foreach (var shortForm in new[] { open + 2, open + 3 })
+            {
+                if (string.CompareOrdinal(_markdown, shortForm, "-->", 0, 3) == 0)
+                {
+                    return shortForm + 3;
+                }
+            }
+
+            var firstClose = FirstAtOrAfter(_closes, open + 4);
+            if (firstClose < 0)
+            {
+                return null;
+            }
+
+            var inner = FirstAtOrAfter(_innerOpens, open + 4);
+            if (inner < 0 || inner > firstClose)
+            {
+                return firstClose + 3;
+            }
+
+            if (HasBlankLine(open, firstClose) && !_startsACommentBlock.Contains(open))
+            {
+                return null;
+            }
+
+            return _balanced.TryGetValue(open, out var balanced) && !HasBlankLine(firstClose, balanced) ? balanced : firstClose + 3;
+        }
+
+        /// <summary>
+        /// The end of the block a comment nothing closes is in. An HTML block has
+        /// already run to the end of the text, as CommonMark has it. In a paragraph or
+        /// heading, the blocks after it are more likely meant to be read than hidden.
+        /// </summary>
+        private int EndOfBlock(int open)
+        {
+            if (_leaves.Find(open, this) is { } leaf)
+            {
+                return leaf.End;
+            }
+
+            var blank = FirstAtOrAfter(_blankLines, open);
+            return blank < 0 ? _markdown.Length : blank - 1;
+        }
+
+        private bool HasBlankLine(int from, int to)
+        {
+            var blank = FirstAtOrAfter(_blankLines, from);
+            return blank >= 0 && blank < to;
+        }
+
+        private bool AfterAListMarker(int open)
+        {
+            var line = LastAtOrBefore(_lineStarts, open);
+            var item = FirstAtOrAfter(_listItems, line);
+            return item >= 0 && item < open;
+        }
+
+        private int FirstAtOrAfter(List<int> sorted, int value)
+        {
+            var index = IndexAtOrAfter(sorted, value);
+            return index < sorted.Count ? sorted[index] : -1;
+        }
+
+        private int LastAtOrBefore(List<int> sorted, int value)
+        {
+            var index = IndexAtOrAfter(sorted, value + 1) - 1;
+            return index >= 0 ? sorted[index] : 0;
+        }
+
+        private int IndexAtOrAfter(List<int> sorted, int value)
+        {
+            var low = 0;
+            var high = sorted.Count;
+            while (low < high)
+            {
+                Steps++;
+                var middle = low + ((high - low) / 2);
+                if (sorted[middle] < value)
+                {
+                    low = middle + 1;
+                }
+                else
+                {
+                    high = middle;
+                }
+            }
+
+            return low;
+        }
+
+        /// <summary>Ranges that don't overlap, added in any order and looked up by offset.</summary>
+        private sealed class SortedRanges
+        {
+            private readonly List<(int Start, int End)> _ranges = [];
+            private List<int>? _starts;
+
+            public void Add(int start, int end)
+            {
+                _ranges.Add((start, end));
+                _starts = null;
+            }
+
+            public bool Contains(int offset, CommentScan scan) => Find(offset, scan) is not null;
+
+            public (int Start, int End)? Find(int offset, CommentScan scan)
+            {
+                if (_starts is null)
+                {
+                    _ranges.Sort();
+                    _starts = _ranges.ConvertAll(r => r.Start);
+                }
+
+                var index = scan.IndexAtOrAfter(_starts, offset + 1) - 1;
+                return index >= 0 && offset < _ranges[index].End ? _ranges[index] : null;
+            }
+        }
+    }
 }

@@ -505,7 +505,7 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
 
         foreach (var reply in new[] { entity, canon, brief })
         {
-            foreach (var later in new[] { "Nightquill", "ash:3", "ash:4", "ash:epilogue","a-quiet-moon:", "Drennick", "Ysmerine", "The salt heir", "Brackwater", "The reckoning", "Fenwraith", "Zanthic", "Vespergale", "Ostrelline", "Pellucid", "Tamsin", "Hallowmere", "Cinderlace" })
+            foreach (var later in new[] { "Nightquill", "ash:3", "ash:4", "ash:epilogue", "a-quiet-moon:", "Drennick", "Ysmerine", "The salt heir", "Brackwater", "The reckoning", "Fenwraith", "Zanthic", "Vespergale", "Ostrelline", "Pellucid", "Tamsin", "Hallowmere", "Cinderlace" })
             {
                 Assert.DoesNotContain(later, reply.Whole, StringComparison.Ordinal);
             }
@@ -859,7 +859,7 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
         Assert.True(reply.Json.GetProperty("available").GetBoolean());
         Assert.Equal("Add the salt tithe", reply.Json.GetProperty("entries")[0].GetProperty("message").GetString()!.Trim());
         var patch = reply.Json.GetProperty("diff").GetProperty("files")[0].GetProperty("patch").GetString();
-        foreach (var written in new[] { "Nightquill", "until=ash:2", "paid_off","ash:3", "Morvane", "Zanthic reveal", "Vespergale", "Hallowmere", "Pellucid" })
+        foreach (var written in new[] { "Nightquill", "until=ash:2", "paid_off", "ash:3", "Morvane", "Zanthic reveal", "Vespergale", "Hallowmere", "Pellucid" })
         {
             Assert.Contains(written, patch, StringComparison.Ordinal);
         }

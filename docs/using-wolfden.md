@@ -1467,6 +1467,18 @@ in it, which Wolfden calls a checkpoint.
   it does get whatever comes after that `-->`, with no position of its own, so a
   reveal there can reach it early. `wolfden check` still passes, so
   read its warnings: this one names the line where the swallowed text ends.
+- **A stray comment marker can keep your text from an assistant, with no
+  warning.** At a position, an assistant doesn't get what a comment hides, and
+  Wolfden reads a badly formed comment on the side of hiding. If you write
+  `<!-- to do` in a paragraph and forget the `-->`, and a `-->` comes later in the
+  section with no other comment on the way, the assistant gets nothing between
+  them, however long that is, while the page shows it all with the stray markers
+  in it. With a comment on the way, only the rest of that paragraph is hidden. A
+  comment with another inside it, `<!-- old <!-- older -->`, also hides any text
+  up to a second `-->`, as long as there's no blank line first, and the page may
+  look fine. `wolfden check` doesn't warn about either yet, so if an assistant
+  seems not to know something, read the note with no position or look for a stray
+  marker.
 - **Copying a note's file by hand makes a duplicate.** Both files have
   the same `id`, so Wolfden leaves both out of views, and links to them
   break, until one gets a new id. Copy with `wolfden copy`, or ask an AI

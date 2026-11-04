@@ -1388,10 +1388,15 @@ hide what it holds, this rule reads comments more widely than CommonMark does:
 
 - `<!--` starts a comment anywhere in the text, in any block, except in a code
   span or code block (F-SEC-11), or after a backslash that escapes it. Both
-  show as text, and stay.
-- A comment ends at its first `-->`, even in a later paragraph. If another
-  `<!--` opens inside it and a later `-->` in the same text balances the two,
-  it ends there instead. A `-->` with no comment open is text.
+  show as text, and stay. A backslash escapes nothing in an HTML block. A fence's
+  info string isn't code, so a comment in it goes, ending with the line at the latest.
+- A comment ends at its first `-->`, however far on, unless another `<!--` opens
+  on the way. Then, if a later `-->` balances the two with no blank line after the
+  first `-->`, the comment ends there. If there's a blank line before the first
+  `-->`, and the comment doesn't start a comment block on a line of its own,
+  nothing closes it and the next rule applies, since that `-->` belongs to the
+  later comment. So a stray `<!--` or `-->` can't take the paragraphs after it
+  unless no other comment comes between. A `-->` with no comment open is text.
 - A comment that nothing closes runs to the end of its block. On a line of its
   own that's an HTML block, which has no end (F-SEC-10), so the rest of the text
   goes with it. In a paragraph or heading, where CommonMark shows it as text, the
@@ -1403,7 +1408,9 @@ hide what it holds, this rule reads comments more widely than CommonMark does:
   A list item or block quote holding only a comment goes too. Nothing else
   changes, in code or elsewhere, and neither do `line` numbers, which are the file's.
 - A lead or section with only comments reads as one with no text. The section
-  stays listed, since its heading isn't a comment.
+  stays listed, since its heading isn't a comment. A heading with only a comment
+  has an empty name in every view (F-SEC-3), and its subsections' `heading_path`
+  has the same.
 
 A field's value isn't markdown, so a `<!--` in one is text. YAML comments aren't
 in any view. A write based on such a read isn't refused, since the file's hash is

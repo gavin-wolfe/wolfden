@@ -163,9 +163,21 @@ public class MarkdownCommentsTests
 
     [Theory]
     [Trait("Scenario", "SC-MCP-48")]
-    // Closed later, in another paragraph: as a browser would read it, it's all comment.
+    // Closed later, in another paragraph, with nothing opening on the way: as a browser would read it, it's all comment.
     [InlineData("Before <!-- she\n\ndies --> after.", "Before after.")]
     [InlineData("Before <!-- she\n\ndies\n\nalone -->\n\nAfter.", "Before\n\nAfter.")]
+    // A later comment's close isn't this one's, so a forgotten close can't take the paragraphs between.
+    [InlineData("Keep. <!-- forgot\n\nCanon.\n\n<!-- real note -->\n\nAfter.", "Keep.\n\nCanon.\n\nAfter.")]
+    [InlineData("Keep. <!-- forgot\n\nCanon <!-- real note --> too.", "Keep.\n\nCanon too.")]
+    // A comment block runs to its first close whatever it holds, in CommonMark and on the page, so it stays hidden.
+    [InlineData("<!-- old\n\nHidden.\n\n<!-- real -->\nAfter.", "After.")]
+    // A blank line ends the balancing, so one stray marker can't take the paragraphs after it.
+    [InlineData("<!-- old <!-- older -->\n\nCanon one.\n\nCanon two.\n\nRoute: Vesta --> Ardent.", "Canon one.\n\nCanon two.\n\nRoute: Vesta --> Ardent.")]
+    [InlineData("Text <!-- old <!-- older --> kept.\n\nRoute: Vesta --> Ardent.", "Text kept.\n\nRoute: Vesta --> Ardent.")]
+    [InlineData("<!-- outer\n\n<!-- inner -->\nshe dies\n-->\n\nVisible.", "Visible.")] // No blank line after the first close.
+    // Inside an inner short form, the first close is still the first.
+    [InlineData("x <!-- s <!--> Visible.\n\nMore.", "x Visible.\n\nMore.")]
+    [InlineData("x <!-- s <!---> Visible.\n\nMore.", "x Visible.\n\nMore.")]
     // Unbalanced: it ends at the first close, and what follows is text, as CommonMark has it.
     [InlineData("<!-- a <!-- b --> Visible.", "Visible.")]
     [InlineData("<!-- a <!-- b -->\nVisible.\n\n<!-- c -->\n\nMore.", "Visible.\n\nMore.")]
@@ -183,6 +195,74 @@ public class MarkdownCommentsTests
     public void NestedLookingCommentsDontLeak(string markdown, string expected)
     {
         Assert.Equal(expected, MarkdownComments.Strip(markdown));
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-MCP-48")]
+    [InlineData("```js <!-- she dies -->\nvar a;\n```", "```js\nvar a;\n```")]
+    [InlineData("``` <!-- she dies -->\n<!-- shown -->\n```", "```\n<!-- shown -->\n```")]
+    [InlineData("~~~<!-- a --><!-- b -->\ncode\n~~~", "~~~\ncode\n~~~")]
+    [InlineData("~~~js <!-- she dies\n<!-- shown -->\n~~~\n\nAfter.", "~~~js\n<!-- shown -->\n~~~\n\nAfter.")] // Unclosed, it ends with the line.
+    [InlineData("> ```js <!-- she dies -->\n> code\n> ```", "> ```js\n> code\n> ```")]
+    public void AFencesInfoStringLosesItsCommentAndTheCodeStays(string markdown, string expected)
+    {
+        Assert.Equal(expected, MarkdownComments.Strip(markdown));
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-MCP-48")]
+    [InlineData(@"<div>\<!-- she dies --></div>", @"<div>\</div>")]
+    [InlineData("<div>\n\\<!-- she dies -->\n</div>", "<div>\n\\\n</div>")]
+    public void ABackslashEscapesNothingInAnHtmlBlock(string markdown, string expected)
+    {
+        Assert.Equal(expected, MarkdownComments.Strip(markdown));
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-MCP-48")]
+    [InlineData("1999.<!-- x -->", "1999.")]
+    [InlineData("-<!-- x -->", "-")]
+    [InlineData("+<!-- x -->\nText.", "+\nText.")]
+    [InlineData("Text.\n1999. <!-- x -->\nMore.", "Text.\n1999.\nMore.")] // Only a list starting at 1 can interrupt a paragraph, so this one's text.
+    [InlineData("> 1999.<!-- x -->", "> 1999.")]
+    public void TextThatOnlyLooksLikeAListMarkerStays(string markdown, string expected)
+    {
+        Assert.Equal(expected, MarkdownComments.Strip(markdown));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-48")]
+    public void TwoCodeSpansAroundACommentStayTwo()
+    {
+        Assert.Equal("`a` `b`", MarkdownComments.Strip("`a`<!-- x -->`b`"));
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-MCP-48")]
+    [InlineData("<!-- ", "\n\n")] // Each unclosed, in its own paragraph.
+    [InlineData("Text <!-- ", "\n\n")]
+    [InlineData("Text <!-- ", " ")] // All unclosed, in one paragraph.
+    [InlineData("<!-- x -->", "\n\nText\n\n")] // Closed, as in a normal note.
+    [InlineData("a <!-- <!-- b --> ", "")] // Never balanced, all on one line.
+    [InlineData("a <!-- b <!-- ", "\n\n", "Closes here -->")] // Each one opening before a close far away.
+    [InlineData("<!-- a <!-- b --> Text\n", "\n")]
+    public void TheWorkGrowsAboutInLineWithTheNote(string repeated, string between, string end = "")
+    {
+        var (smallSteps, smallBytes) = Work(1_000);
+        var (largeSteps, largeBytes) = Work(10_000);
+
+        // Ten times the note costs about ten times the work, and looking things up in sorted lists a little more. Anything per comment over the whole note would cost about a hundred.
+        Assert.InRange(smallSteps, 1, long.MaxValue);
+        Assert.InRange((double)largeSteps / smallSteps, 1, 20);
+        Assert.InRange((double)largeBytes / smallBytes, 1, 20);
+
+        (long Steps, long Bytes) Work(int count)
+        {
+            var markdown = string.Concat(Enumerable.Repeat(repeated + between, count)) + end;
+            var before = GC.GetAllocatedBytesForCurrentThread();
+            MarkdownComments.Strip(markdown, out var steps);
+            return (steps, GC.GetAllocatedBytesForCurrentThread() - before);
+        }
     }
 
     [Fact]

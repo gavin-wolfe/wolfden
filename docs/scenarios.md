@@ -3609,11 +3609,17 @@ My assistant is drafting `ember:3`, and reads at that position.
   spaces. A section with only a comment reads like an empty one, and stays listed.
   A lead with only a comment reads like no lead. `line` numbers are still the file's.
 - A comment I show in a code span or code block stays, and so does one I escape with a
-  backslash. A `<!--` in a field's value is text too.
+  backslash, outside an HTML block. A `<!--` in a field's value is text too. One in a
+  fence's info string goes, and the code stays. Text that only looks like a list marker,
+  such as `1999.` right before a comment, stays.
 - If I forget the `-->`, what follows doesn't reach the assistant, up to the end of the
   block: the rest of the text for a comment on its own line, and the rest of the
-  paragraph for one inside it. Closed in a later paragraph, all of it goes. A comment
-  that looks nested goes up to the `-->` that balances it, if there is one.
+  paragraph for one inside it. Closed in a later paragraph with no other comment on the
+  way, all of it goes. With one on the way, that `-->` is the other comment's, so the
+  paragraphs between reach the assistant. A comment that looks nested goes up to the
+  `-->` that balances it only if no blank line comes first, so one stray marker can't
+  take the paragraphs after it. The guide says what's left, since nothing warns of it.
+- A section that isn't found on a write lists the note's headings without their comments.
 - With no position, `get_entity` and `canon_as_of` keep every comment, and so does the
   code the web UI reads from.
 - `append_section` after a read at a position leaves my comments where they are, and no

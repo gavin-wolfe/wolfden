@@ -3816,14 +3816,16 @@ the den's folder by hand, and made no commit.
 - A name and email given are saved before any of this, so a `.gitignore`
   or a hook that fails afterward can't leave a retry under git's own name.
   If saving them fails in a repository this run made, the repository is
-  taken away again. In one that was already there, the output says which
-  were saved, and whether signing is off. Every one of these asks for the
-  same `--author-name` and `--author-email` again, without repeating them,
-  and doesn't offer the web UI's dialog.
+  taken away again. In one that was already there, what was saved is taken
+  back, and if that can't be done, the output names the settings still
+  saved. Every one of these asks for the same `--author-name` and
+  `--author-email` again, without repeating them, and doesn't offer the web
+  UI's dialog.
 
 Spec: design.md §6, "Turning history on" (#195, #286). Covered by:
 `HistorySetupTests.AFailedSaveInARepositoryThisRunMadeTakesTheRepositoryAway`,
-`HistorySetupTests.APartialSaveSaysWhatWasSavedAndAskedAgainItFinishesUnderTheNameGiven`,
+`HistorySetupTests.AFailedSaveInARepositoryThatWasThereTakesBackWhatWasSaved`,
+`HistorySetupTests.AHeldConfigThatStopsTheTakingBackSaysWhatsLeftAndAskedAgainItFinishesUnderTheNameGiven`,
 `HistorySetupTests.AGitignoreThatFailsLeavesTheNameSavedSoTryingAgainWithoutItIsStillTheNameGiven`,
 `HistorySetupTests.AFailedFirstCheckpointWithANameGivenAsksForItAgainAndNotTheDialog`,
 `HistorySetupTests.AFailedFirstCheckpointSaysWhatWasDoneAndTryingAgainFinishes`,
@@ -3850,17 +3852,26 @@ checkpoints. A third time, on a computer without git.
   it's refused the same way, and `writing/`'s config is left alone.
 - With a name and email given, the den in `writing/` and the den with
   checkpoints also say they weren't applied, so later checkpoints stay under
-  what git has. For the den with checkpoints, it names the `git config
-  --local` commands that change that from now on.
+  what git has. For the den with checkpoints, it names every `git config
+  --local` command that changes that from now on: the name and email, the
+  `author.*` and `committer.*` settings git prefers to them, and signing off.
+  Following them records the next commit under that name, unsigned.
 - A new den given a name and email inside `writing/`, or in a folder that's
   already a repository, is refused (exit 2) before anything is made, rather
   than made under what git has. Without a name and email, it's made and left
-  as it is, as SC-CLI-12 says. In a folder that's already a repository, it
-  says to make the den first, then turn on its history with the name.
+  as it is, as SC-CLI-12 says. In a folder that's a repository with no
+  checkpoints, it says to make the den first, then turn on its history with
+  the name. In one with checkpoints, it says to make the den, then gives the
+  `git config` commands, since turning on history would be refused.
+- A repository that appears while history is being turned on was made by
+  something else, so it's never taken away.
 
 Spec: design.md §6, "Turning history on", "A den inside a larger
 repository" (maintainer decision, 2026-10-28, #195, #286). Covered by:
-`HistorySetupTests.ANameGivenToADenWithCheckpointsSaysItWasntAppliedAndHowToChangeIt`,
+`HistorySetupTests.ANameGivenToADenWithCheckpointsSaysHowToChangeItAndFollowingThatWorks`,
+`HistorySetupTests.ARepositoryMadeMeanwhileIsntTakenAwayWhenItsRefused`,
+`HistorySetupTests.ARepositoryWithCheckpointsMadeMeanwhileIsRefusedAndKept`,
+`InitHistoryTests.ANewDenInARepositoryWithCheckpointsIsRefusedWithAdviceThatWorks`,
 `HistorySetupTests.ANameGivenToADenInALargerRepositorySaysItWasntAppliedAndChangesThatRepositorysNothing`,
 `InitHistoryTests.ANewDenInALargerRepositoryIsRefusedWithANameGivenAndNothingIsMade`,
 `InitHistoryTests.ANewDenInAFolderThatIsARepositoryIsRefusedWithANameGivenAndSaysHowToGiveIt`,
@@ -3968,6 +3979,9 @@ Spec: design.md §6, "Turning history on" (maintainer decision, 2026-11-03,
 `HistorySetupTests.ASettingFromTheEnvironmentThatBeatsWhatsSavedRefusesBeforeTheFirstCheckpoint`,
 `HistorySetupTests.ALaterSettingInTheRepositoryThatBeatsWhatsSavedStopsBeforeTheFirstCheckpoint`,
 `HistorySetupTests.CharactersGitStripsFromWhatsGivenArentTakenForSomethingBeatingIt`,
+`HistorySetupTests.UnusualSpacesAndMarksArentTakenForSomethingBeatingWhatsGiven`,
+`HistorySetupTests.ABadDateInTheEnvironmentIsntBlamedOnTheNameBeingBeaten`,
+`HistorySetupTests.SeveralValuesOfASettingDontStopTheSave`,
 `HistorySetupTests.GitDirInTheEnvironmentRefusesRatherThanSaveInAnotherRepository`,
 `InitHistoryTests.AGivenNameAndEmailWinOverGitsInAnExistingOrNewDen`,
 `HistorySetupEndpointTests.ANameAndEmailInTheRequestWinOverGitsAndOneAloneIsAskedToBeCompleted`.
@@ -3987,10 +4001,13 @@ Git has the writer's everyday name and email. They run `wolfden init --git
   it's saved. The output says the email git has will be recorded beside the
   name, without quoting it, and how to use another. That email can come from
   `user.email`, `author.email`, `committer.email`, or `GIT_COMMITTER_EMAIL`.
+  The output says the same when the name is what git has but one of the last
+  three would put another email beside it.
 
 Spec: design.md §6, "Turning history on" (#286). Covered by:
 `HistorySetupTests.OneGivenAloneThatReplacesWhatGitHasIsRefusedWithNothingChanged`,
-`HistorySetupTests.OneGivenAloneThatIsWhatGitHasIsSavedAndChangesNothingElse`,
+`HistorySetupTests.OneGivenAloneThatIsWhatGitHasIsSavedAndNeedsNoOther`,
+`HistorySetupTests.ANameThatIsWhatGitHasStillSaysAnAuthorEmailGoesBesideIt`,
 `HistorySetupTests.ANameThatFillsAGapSaysAnEmailGitHasGoesBesideItWithoutQuotingIt`,
 `HistorySetupTests.AnAuthorEmailAloneIsntAnEmailGitHasSoANameAloneIsAskedForOne`,
 `InitHistoryTests.OneGivenAloneThatReplacesWhatGitHasIsRefused`,
@@ -3998,39 +4015,44 @@ Spec: design.md §6, "Turning history on" (#286). Covered by:
 
 ### SC-HIST-23. Git signs with the key of my other name
 
-The writer's git signs every commit with a key in their everyday name
-(`commit.gpgsign`, `user.signingkey`). They turn on history under a pen name.
+The writer's git signs every commit, with a key in their everyday name
+(`commit.gpgsign`, and `user.signingkey` or, with `gpg.format=ssh`,
+`gpg.ssh.defaultKeyCommand`). They turn on history under a pen name.
 
-- The den's checkpoints aren't signed. A signature would tie the pen name to
-  the other key for good, so signing is saved as off in the den's repository
-  (`commit.gpgsign`, `tag.gpgsign`, `tag.forceSignAnnotated`,
-  `push.gpgSign`), before the first checkpoint. If git was set to sign, the
-  output says so, and how to sign here with a key of this name's.
+- When a name or email is given, the den's checkpoints aren't signed. A
+  signature would tie the pen name to the other key for good, so signing is
+  saved as off in the den's repository (`commit.gpgsign`, `tag.gpgsign`,
+  `tag.forceSignAnnotated`, `push.gpgSign`), before the first checkpoint. If
+  git was set to sign, the output says so, and how to sign here with a key of
+  this name's, and that a `local-user` line in `gpg.conf` adds its key too.
+- That's so even when what's given is what git has already. The key git
+  uses needn't have anything to do with the name, and Wolfden can't see every
+  way it's chosen, so someone giving their own name again loses signing in
+  that den, and is told.
 - It stays off if signing is turned on globally later. With no signing set
   up today, the settings are saved the same way, and nothing is said.
-- A `user.signingkey` in the den's own repository was chosen for it, so it
-  still signs, unless this run made the repository: then it came from a
-  template (`init.templateDir`), and doesn't count.
-- When what's given is what git has, it still signs only if the key is in
-  the same config file as that name, or git has no key and so asks for the
-  key of that name. A name in the repository's config or an `includeIf` file
-  with a key in the plain global file is turned off like a new name. Nothing
-  changes when nothing is given.
-- If signing fails, gpg's output isn't repeated, since it can name who the
-  key belongs to. The message says to run `git commit` to see it. That holds
-  for every checkpoint and tag, not just the first.
+- The one exception is a `user.signingkey` in the den's own repository, in a
+  repository that was there before this run: it was chosen for it, so it
+  still signs. One in a repository this run made came from a template
+  (`init.templateDir`), and doesn't count.
+- Nothing changes when nothing is given.
+- If a commit or tag fails while git's settings say that call would sign,
+  git's output isn't repeated, whatever it was, since a signing program's
+  words can name who the key belongs to. The message says to run the same
+  command to see it. That holds at every checkpoint and tag, with or without
+  a name given. When that call wouldn't sign, git's output is repeated as
+  usual, even if it mentions signing.
 - A signing setting that stays on after saving (`GIT_CONFIG_COUNT`, say)
   stops it before any checkpoint.
 
 Spec: design.md §6, "Turning history on" (#286). Covered by:
 `HistorySetupTests.GitsKeyIsNotUsedForANameGivenAndSigningStaysOffForTheDen`,
 `HistorySetupTests.ANameGivenWithNoSigningSetUpSaysNothingOfItButStaysOffIfSigningIsTurnedOnLater`,
-`HistorySetupTests.WhatGitAlreadyHasGivenAgainLeavesSigningAlone`,
-`HistorySetupTests.NothingGivenLeavesSigningAlone`,
+`HistorySetupTests.WhatGitAlreadyHasGivenAgainStillTurnsSigningOffAndSaysSo`,
+`HistorySetupTests.NothingGivenLeavesSigningAloneAndItsFailureIsntRepeated`,
 `HistorySetupTests.AKeySetInTheDensOwnRepositoryIsLeftToSign`,
-`HistorySetupTests.AKeyFromAnotherFileThanTheNameIsNotUsedEvenWhenWhatsGivenIsWhatGitHas`,
-`HistorySetupTests.AKeyFromTheSameFileAsTheNameSignsAndItsFailureDoesntRepeatWhoItBelongsTo`,
-`HistorySetupTests.ASigningFailureAtACheckpointDoesntRepeatWhoTheKeyBelongsTo`,
+`HistorySetupTests.ASigningFailureAtACheckpointOrTagDoesntRepeatWhoTheKeyBelongsTo`,
+`HistorySetupTests.WithSigningOffWhatGitSaidIsRepeatedEvenIfItMentionsSigning`,
 `HistorySetupTests.AKeyFromATemplateInARepositoryThisRunMadeIsNotChosenForIt`,
 `HistorySetupTests.ASigningSettingFromTheEnvironmentThatStaysOnRefusesBeforeTheFirstCheckpoint`,
 `InitHistoryTests.AGivenNameTurnsSigningOffForTheDenAndSaysSo`.

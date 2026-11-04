@@ -1031,27 +1031,45 @@ certain folders, the dialog can't tell until the den is a repository: it
 shows the fields, but you can leave them empty, and Wolfden asks again,
 for just what's missing, only if they're really needed.)
 
-If git signs your commits, its key belongs to its own name. So when what
-you give isn't what git has, signing stays off for this den: Wolfden says
-so, and a signature can't tie your pen name to the other key. To sign
-with a key of this name's, run `git config --local user.signingkey <key>`
-and `git config --local commit.gpgsign true` in the den's folder.
+If git signs your commits, the key it uses may belong to another name, and
+Wolfden can't always tell. So when you give a name or email, signing stays
+off for this den, even if they're what git already has: Wolfden says so,
+and a signature can't tie your pen name to the other key. To sign with a key
+of this name's, run `git config --local user.signingkey <key>` and `git
+config --local commit.gpgsign true` in the den's folder. A `local-user` line
+in your `gpg.conf` adds that key's signature as well, so check for one first.
 
 A pen name given this way has limits worth knowing:
 
 - **It's saved in this copy of the den's repository only.** Git doesn't copy
   a repository's settings when it's cloned, so a clone on another computer
   starts with that computer's global name and email, and its checkpoints
-  are recorded under them. Before the first one there, run `git config
-  --local user.name <name>` and `git config --local user.email <email>` in
-  the clone.
+  are recorded under them and signed with its key. Before the first one
+  there, run the commands below in the clone.
 - **An environment variable still beats it.** If `GIT_AUTHOR_NAME` or one of
   its relatives is set when `wolfden serve` or a later checkpoint runs, git
   uses that, as it does in any repository.
 - **It can't be added this way once there are checkpoints, or in a bigger
   repository.** Wolfden refuses, and says the name wasn't applied. With
-  checkpoints, the same `git config --local` commands change it from then
-  on; earlier checkpoints keep the name they have.
+  checkpoints, the commands below change it from then on; earlier
+  checkpoints keep the name they have.
+
+To put a repository of its own under a name by hand, run these in its folder.
+The `author` and `committer` settings beat `user` if git has them, and the
+last four keep git's own key from signing under that name:
+
+```text
+git config --local user.name <name>
+git config --local user.email <email>
+git config --local author.name <name>
+git config --local author.email <email>
+git config --local committer.name <name>
+git config --local committer.email <email>
+git config --local commit.gpgsign false
+git config --local tag.gpgsign false
+git config --local tag.forcesignannotated false
+git config --local push.gpgsign false
+```
 
 A few things to know:
 
@@ -1302,7 +1320,7 @@ in it, which Wolfden calls a checkpoint.
   and saves what you give in this den's repository, never for the rest
   of your computer. A pen name is fine, and the email can be a
   placeholder. What you give wins over what git has for this den, and
-  turns signing off here, since git's key is for git's name. A clone doesn't
+  turns signing off here, since git's key may be another name's. A clone doesn't
   bring it along, and an environment variable such as `GIT_AUTHOR_NAME` still
   beats it
   ([Turning on history](#turning-on-history)).

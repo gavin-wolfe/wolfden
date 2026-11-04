@@ -642,20 +642,23 @@ such as `GIT_AUTHOR_NAME` would beat, and any given while `GIT_DIR` or
 `GIT_COMMON_DIR` points git at another repository. Neither message repeats
 what git has. One that fills in what git lacks is saved, with a step saying
 the value git has goes beside it. A save that fails in a repository the run
-made takes the repository away again. Once saved, git is asked what it would
+made takes the repository away again; in one that was there, what was saved
+is taken back if it can be, and the result names what couldn't be. Once saved, git is asked what it would
 record (`git var GIT_AUTHOR_IDENT` and `GIT_COMMITTER_IDENT`) and whether
 it would sign; anything that still beats them refuses before any commit.
 A later `GIT_AUTHOR_NAME`, when `wolfden serve` or a checkpoint runs, still
 wins, and a clone has none of this, as with any git setting. When a name or
 email is given, signing is saved as off in that repository too
 (`commit.gpgsign`, `tag.gpgsign`, `tag.forceSignAnnotated`, `push.gpgSign`),
-since git's key belongs to git's name, and a signature would tie the pen name
-to it for good; the result says so if signing was on. It's left alone only
-for a `user.signingkey` in the repository's own config, unless the run made
-the repository (a template put it there), or when what's given is what git
-has and git has no key, or the key is in the same config file as that name
-(`git config --show-origin`). A signing failure's output isn't repeated at
-any checkpoint or tag, since it can name who the key belongs to. A new den
+even if they're what git has: the key needn't follow the name
+(`gpg.ssh.defaultKeyCommand`, `local-user` in `gpg.conf`), Wolfden can't see
+every way it's chosen, and a signature would tie the pen name to it for good.
+The result says so if signing was on. The one exception is a
+`user.signingkey` in the repository's own config, in a repository the run
+didn't make (a template put it there otherwise). When a commit or tag fails
+and git's settings say that call would sign, git's output isn't repeated, at
+any checkpoint or tag, since it can name who the key belongs to; otherwise it
+is, whatever words it uses. A new den
 given a name or email inside a repository refuses (exit 2) before anything
 is made; on an existing den, the refusals say it wasn't applied. Any name will do, a pen name
 included, and the email can be a placeholder, as long as git will record

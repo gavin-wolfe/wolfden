@@ -383,6 +383,22 @@ public class ReadEndpointTests
     }
 
     [Fact]
+    [Trait("Scenario", "SC-MCP-45")]
+    public async Task APositionFieldsLaterValuesStayForTheWriter()
+    {
+        using var den = TempDen.Starfall();
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+
+        var page = await server.GetJsonAsync("/api/entity?universe=starfall&entity=The%20missing%20manifest&asOf=ember:3", HttpStatusCode.OK);
+        Assert.Contains(page.GetProperty("entity").GetProperty("fields").EnumerateArray(), f => f.GetProperty("name").GetString() == "paid_off");
+
+        var canon = await server.GetJsonAsync("/api/canon?universe=starfall&asOf=ember:3", HttpStatusCode.OK);
+        var manifest = canon.GetProperty("entities").EnumerateArray().Single(e => e.GetProperty("name").GetString() == "The missing manifest");
+        var planted = manifest.GetProperty("fields").EnumerateArray().Single(f => f.GetProperty("name").GetString() == "planted");
+        Assert.Equal(2, planted.GetProperty("value").GetArrayLength());
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-WEB-7")]
     public async Task ListsAndSearchesWithoutAPositionGiveWhatTheToolsGive()
     {

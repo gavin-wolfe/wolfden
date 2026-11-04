@@ -47,6 +47,9 @@ public sealed class IndexDbContext : DbContext
     /// <summary>Field defaults of the enabled types.</summary>
     public DbSet<FieldDefaultRecord> FieldDefaults => Set<FieldDefaultRecord>();
 
+    /// <summary>Fields of enabled types defined as <c>position</c> (types.md F-FT-10).</summary>
+    public DbSet<PositionFieldRecord> PositionFields => Set<PositionFieldRecord>();
+
     /// <summary>Entity sections.</summary>
     public DbSet<SectionRecord> Sections => Set<SectionRecord>();
 
@@ -126,6 +129,12 @@ public sealed class IndexDbContext : DbContext
         {
             e.ToTable("field_defaults");
             e.HasIndex(d => new { d.TypeKey, d.Field }).IsUnique();
+        });
+
+        modelBuilder.Entity<PositionFieldRecord>(e =>
+        {
+            e.ToTable("position_fields");
+            e.HasIndex(p => new { p.TypeKey, p.Field }).IsUnique();
         });
 
         modelBuilder.Entity<SectionRecord>(e =>

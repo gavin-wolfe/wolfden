@@ -521,7 +521,8 @@ a bad one doesn't make the file invalid. A position that doesn't resolve
 is the F-POS-4 warning. The value stays indexed and is shown as written,
 but anything that needs its place in story order, such as a thread's
 state on the page (§9.1) or F-CORE-2, skips it. A value is never read as
-some other position than the one written.
+some other position than the one written. An AI assistant's read at a story
+position leaves out the values later than it (format.md F-VIEW-5).
 
 **F-FT-11. `date`.** An in-world date is either a string or a mapping:
 

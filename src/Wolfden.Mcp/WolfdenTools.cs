@@ -72,13 +72,18 @@ public sealed class WolfdenTools
         "positions where each one starts and ends. With as_of you get only what's canon at that point in the story, as a reader " +
         "would know it then: the name is matched only among the entities the reader has met by then, " +
         "and if the reader hasn't met the entity yet, in_view is false and nothing about it is returned. A fact's 'until' is left out " +
-        "with as_of, since when it stops holding is something the reader doesn't know yet: to plan ahead, read without as_of. " +
+        "with as_of, and so are a position field's values later than as_of (such as a thread's paid_off), since when a fact stops holding " +
+        "or a thread pays off is something the reader doesn't know yet: to plan ahead, read without as_of. " +
         PositionHelp)]
     public CallToolResult GetEntity(
         [Description("The entity: its name, an alias, its file name, its id, its key, or its path.")] string entity,
         [Description(UniverseHelp + " With as_of, the position's book settles it.")] string? universe = null,
         [Description("A story position, such as 'dracula:5', to read the entity as canon stands there. Leave it out for the full view.")] string? as_of = null) =>
-        Respond(() => AsOfReads.ForAssistant(_tools.GetEntity(entity, universe, as_of)));
+        Respond(() =>
+        {
+            var result = _tools.GetEntity(entity, universe, as_of, out var horizon);
+            return AsOfReads.ForAssistant(result, horizon);
+        });
 
     /// <summary>The <c>list_entities</c> tool.</summary>
     [McpServerTool(Name = "list_entities", Title = "List entities", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
@@ -102,7 +107,8 @@ public sealed class WolfdenTools
         "What's canon at a point in the story: every entity the reader has met by then, at any scope of the universe, with the " +
         "field values and sections in effect there. Ideas, undecided questions, retconned material, and bookkeeping sections are " +
         "left out, and draft material is marked draft. Nothing the reader meets later is included, so it's safe for drafting a " +
-        "chapter without spoilers. So at a position a fact's 'until' is left out, since when it stops holding is something the reader " +
+        "chapter without spoilers. So at a position a fact's 'until' is left out, and so are a position field's values later than the position " +
+        "(such as a thread's paid_off), since when a fact stops holding or a thread pays off is something the reader " +
         "doesn't know yet: to plan ahead, use get_entity without as_of. Pinned canon (the hard facts) comes first, under 'pinned', and is also listed in place. " +
         "Without position, the view is the end of the story: all canon so far. " + PositionHelp)]
     public CallToolResult CanonAsOf(
@@ -112,7 +118,11 @@ public sealed class WolfdenTools
         [Description("Only entities filed in this book, its series, or the universe.")] string? book = null,
         [Description(TypeFilterHelp)] string? type = null,
         [Description("If true, list the entities without their fields and sections (pinned canon is still given in full).")] bool brief = false) =>
-        Respond(() => AsOfReads.ForAssistant(_tools.CanonAsOf(universe, position, series, book, type, brief)));
+        Respond(() =>
+        {
+            var result = _tools.CanonAsOf(universe, position, series, book, type, brief, out var horizon);
+            return AsOfReads.ForAssistant(result, horizon);
+        });
 
     /// <summary>The <c>check</c> tool.</summary>
     [McpServerTool(Name = "check", Title = "Check the den", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]

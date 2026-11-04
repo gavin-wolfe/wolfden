@@ -818,7 +818,10 @@ it: `until Ash ch. 5` is your plan, and readers at this point don't know it
 yet. Hover over it or click it to see that said in full. A date the position has reached
 has no tag. An AI assistant reading at that position isn't told the date at
 all, so it can't write toward it. When you're planning with one, ask it to
-read the note with no position, and it sees every date. Its instructions also
+read the note with no position, and it sees every date. A thread's `planted`
+and `paid_off`, and any other field that holds a story position, work the same
+way for it: at a position, it isn't told a value later than that, or one that
+isn't a chapter or book your universe has. You still see them all. Its instructions also
 tell it to read ahead for planning, foreshadowing, and reviewing continuity
 across chapters, and when writing a character who knows more than the reader,
 without letting later facts reach the prose. It can still tell you anything you

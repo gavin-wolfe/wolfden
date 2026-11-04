@@ -330,6 +330,24 @@ public sealed class FieldDefaultRecord
     public int Line { get; set; }
 }
 
+/// <summary>
+/// A field an enabled type defines as <c>position</c> (types.md F-FT-10), so
+/// a read at a story position can tell which values point ahead (format.md
+/// F-VIEW-5). Like <see cref="FieldDefaultRecord"/>, these rows hang off no
+/// one file: a change to any pack file rebuilds them all.
+/// </summary>
+public sealed class PositionFieldRecord
+{
+    /// <summary>Row id.</summary>
+    public int Id { get; set; }
+
+    /// <summary>The type key, as entities write it in <c>type</c>.</summary>
+    public string TypeKey { get; set; } = "";
+
+    /// <summary>The field name.</summary>
+    public string Field { get; set; } = "";
+}
+
 /// <summary>A section of an entity (format.md §9), with its effective range.</summary>
 public sealed class SectionRecord
 {

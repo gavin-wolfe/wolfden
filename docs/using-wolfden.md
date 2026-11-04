@@ -969,6 +969,24 @@ You can keep using [Obsidian](https://obsidian.md) to write in your den.
      current file**, or to **In subfolder under current folder** (and name
      the subfolder, such as `images`). A picture you paste or drag in then
      lands next to its note.
+3. Before editing frontmatter, in **Settings → Editor**, set
+   **Properties in document** to **Source**. Edit the frontmatter as YAML
+   text; the Properties panel can't display Wolfden's nested `fields`.
+   See the [Properties-panel warning](#images-and-other-editors) for the
+   risks with nested values and story positions.
+
+While editing a den in Obsidian:
+
+- In **Live Preview**, section comments such as
+  `<!-- wolfden: from=dracula:1 -->` are hidden from the rendered prose.
+  Use Source mode when you need to edit those markers.
+- Links to a note's file name without `.md`, such as `[[mina-harker]]`,
+  work in both apps. Obsidian includes these links in its **Backlinks**
+  pane, so you can see which notes refer to the current one.
+- Wolfden's `aliases` list is also Obsidian's
+  [aliases property](https://obsidian.md/help/aliases). To display an alias
+  while keeping the file name as the target, write
+  `[[mina-harker|Mina]]`.
 
 When a path doesn't lead to the file, Obsidian looks for an image with
 that file name anywhere in the vault, so an image can show in Obsidian

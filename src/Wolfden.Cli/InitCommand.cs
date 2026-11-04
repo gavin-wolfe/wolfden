@@ -169,14 +169,17 @@ internal static class InitCommand
 
         // A new den in a repository is left as it is, so a name given for it wouldn't be applied,
         // and that repository's settings aren't this den's to change (#286).
-        if (withGit && (authorName is not null || authorEmail is not null) && RepositoryAround(root, git) is { } around)
+        if (withGit && (authorName is not null || authorEmail is not null))
         {
-            return Fail(
-                string.Equals(Path.TrimEndingDirectorySeparator(around), Path.TrimEndingDirectorySeparator(root), OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase)
-                    ? $"'{folder}' is already a git repository, and 'init --git' leaves a new den's repository as it is, so the name and email given weren't applied. Nothing was created. " +
-                        "To save them, make the den first with 'wolfden init', then run 'wolfden init --git --author-name <name> --author-email <email>' in it."
-                    : $"'{folder}' is inside the git repository at '{around}', whose settings a den there shares, so the name and email given weren't applied, and later checkpoints would stay under what git has for that repository. " +
-                        "Nothing was created. To use that, run this again without --author-name and --author-email; to keep this den under the name given, choose a folder outside it.");
+            if (new GitHistorySetup(root, git).RedirectedByEnvironment() is { } redirected)
+            {
+                return Fail(redirected);
+            }
+
+            if (RepositoryAround(root, git) is { } around)
+            {
+                return Fail(NameNotApplied(folder, root, around, git));
+            }
         }
 
         var created = new List<string>();
@@ -255,10 +258,7 @@ internal static class InitCommand
         }
     }
 
-    /// <summary>
-    /// <c>--git</c> for a new den: turns on its history, unless it's already
-    /// inside a repository (#122, #195). Nothing here undoes the den.
-    /// </summary>
+    /// <summary>The repository a new den at <paramref name="root"/> would be in, if there's one.</summary>
     private static string? RepositoryAround(string root, GitOptions git)
     {
         // The folder may not exist yet: git is asked from the nearest one that does.
@@ -272,6 +272,33 @@ internal static class InitCommand
         return location.Kind == GitLocationKind.InRepository ? location.Root : null;
     }
 
+    /// <summary>The refusal of a name given for a new den in a repository, with advice that doesn't lead to a second refusal.</summary>
+    private static string NameNotApplied(string folder, string root, string around, GitOptions git)
+    {
+        var same = string.Equals(
+            Path.TrimEndingDirectorySeparator(around),
+            Path.TrimEndingDirectorySeparator(root),
+            OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase);
+        if (!same)
+        {
+            return $"'{folder}' is inside the git repository at '{around}', whose settings a den there shares, so the name and email given weren't applied, and later checkpoints would stay under what git has for that repository. " +
+                "Nothing was created. To use that, run this again without --author-name and --author-email; to keep this den under the name given, choose a folder outside it.";
+        }
+
+        var check = new GitHistorySetup(root, git).Check();
+        return check.Possible
+            ? $"'{folder}' is already a git repository, and 'init --git' leaves a new den's repository as it is, so the name and email given weren't applied. Nothing was created. " +
+                "To save them, make the den first with 'wolfden init', then run 'wolfden init --git --author-name <name> --author-email <email>' in it."
+            : check.Code == HistorySetupCodes.HasRepository
+                ? $"'{folder}' is already a git repository with checkpoints, so the name and email given weren't applied. Nothing was created. " +
+                    $"To make the den there, run 'wolfden init' without --git; to put it under that name from now on, {GitHistorySetup.ChangeNameByHand}"
+                : $"{check.Reason} {GitHistorySetup.NotApplied(check.Code ?? "")}".TrimEnd();
+    }
+
+    /// <summary>
+    /// <c>--git</c> for a new den: turns on its history, unless it's already
+    /// inside a repository (#122, #195). Nothing here undoes the den.
+    /// </summary>
     private static InitGitReport MakeRepository(string root, HistorySetupRequest request, GitOptions git)
     {
         var location = GitRepository.Locate(root, git);

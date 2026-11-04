@@ -570,7 +570,7 @@ public sealed class HistorySetupTests : IDisposable
 
     [Fact]
     [Trait("Scenario", "SC-HIST-22")]
-    public void OneGivenAloneThatIsWhatGitHasIsSavedAndChangesNothingElse()
+    public void OneGivenAloneThatIsWhatGitHasIsSavedAndNeedsNoOther()
     {
         var den = Den();
         var options = Without(Config("[user]\n\tname = Ash Calloway\n\temail = ash@example.invalid\n[commit]\n\tgpgsign = false\n"));
@@ -580,23 +580,26 @@ public sealed class HistorySetupTests : IDisposable
         Assert.Equal(HistorySetupStatus.Done, result.Status);
         Assert.Equal(["user.name"], result.IdentitySaved);
         Assert.Equal(AshOnly, FirstCommitIdentity(den, options));
-        Assert.DoesNotContain("gpgsign", File.ReadAllText(Path.Combine(den, ".git", "config")), StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
+    [Theory]
     [Trait("Scenario", "SC-HIST-23")]
-    public void GitsKeyIsNotUsedForANameGivenAndSigningStaysOffForTheDen()
+    [InlineData("gpg")]
+    [InlineData("ssh")]
+    public void GitsKeyIsNotUsedForANameGivenAndSigningStaysOffForTheDen(string format)
     {
         var den = Den();
-        var text = SignsWithANoSuchProgram;
+        var (text, attempts) = SigningConfig(format);
         var global = Config(text);
         var options = Without(global);
 
         var result = new GitHistorySetup(den, options).TurnOn(new HistorySetupRequest("Ash Calloway", "ash@example.invalid"), Token);
 
-        // gpg.program can't run, so any attempt to sign would have failed the commit.
         Assert.Equal(HistorySetupStatus.Done, result.Status);
-        Assert.Contains(result.Steps, s => s.StartsWith("Turned signing off for this den's repository only", StringComparison.Ordinal));
+        Assert.False(File.Exists(attempts));
+        var step = Assert.Single(result.Steps, s => s.StartsWith("Turned signing off for this den's repository only", StringComparison.Ordinal));
+        Assert.Contains("user.signingkey", step, StringComparison.Ordinal);
+        Assert.Contains("local-user", step, StringComparison.Ordinal);
         Assert.DoesNotContain(result.Steps, s => s.Contains("KEY-OF-MAREK", StringComparison.Ordinal));
         Assert.Equal(AshOnly, FirstCommitIdentity(den, options));
         Assert.Equal("N\n", RunGit(den, options, "log", "-1", "--format=%G?"));
@@ -607,11 +610,14 @@ public sealed class HistorySetupTests : IDisposable
 
         Assert.Equal(text, File.ReadAllText(global));
         Assert.Equal(AshOnly, LaterCommitIdentity(den, options)); // a later checkpoint, and it doesn't sign either
+        Assert.False(File.Exists(attempts));
     }
 
-    [Fact]
+    [Theory]
     [Trait("Scenario", "SC-HIST-23")]
-    public void ANameGivenWithNoSigningSetUpSaysNothingOfItButStaysOffIfSigningIsTurnedOnLater()
+    [InlineData("gpg")]
+    [InlineData("ssh")]
+    public void ANameGivenWithNoSigningSetUpSaysNothingOfItButStaysOffIfSigningIsTurnedOnLater(string format)
     {
         var den = Den();
         var global = Config("[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n");
@@ -622,66 +628,101 @@ public sealed class HistorySetupTests : IDisposable
         Assert.Equal(HistorySetupStatus.Done, result.Status);
         Assert.DoesNotContain(result.Steps, s => s.Contains("signing", StringComparison.OrdinalIgnoreCase));
 
-        File.WriteAllText(global, SignsWithANoSuchProgram, new UTF8Encoding(false));
+        var (text, attempts) = SigningConfig(format);
+        File.WriteAllText(global, text, new UTF8Encoding(false));
         Assert.Equal(AshOnly, LaterCommitIdentity(den, options));
+        Assert.False(File.Exists(attempts));
     }
 
-    [Fact]
+    [Theory]
     [Trait("Scenario", "SC-HIST-23")]
-    public void WhatGitAlreadyHasGivenAgainLeavesSigningAlone()
+    [InlineData("gpg", "global")]
+    [InlineData("ssh", "global")]
+    [InlineData("gpg", "local")]
+    [InlineData("ssh", "local")]
+    [InlineData("gpg", "includeIf")]
+    [InlineData("ssh", "includeIf")]
+    public void WhatGitAlreadyHasGivenAgainStillTurnsSigningOffAndSaysSo(string format, string where)
     {
-        // The same name and email: it's the writer's own key, so it signs, and here that fails, as it would without them.
+        // Wherever the name comes from: with gpg.ssh.defaultKeyCommand or gpg.conf's local-user,
+        // the key git would use has nothing to do with the name, and Wolfden can't see which it is.
         var den = Den();
-        var options = Without(Config(SignsWithANoSuchProgram));
-
-        var result = new GitHistorySetup(den, options).TurnOn(new HistorySetupRequest("Marek Oswin", "marek@example.invalid"), Token);
-
-        Assert.Equal(HistorySetupStatus.Incomplete, result.Status);
-        Assert.Equal(HistorySetupCodes.HistoryFailed, result.Code);
-        Assert.DoesNotContain("gpgsign", File.ReadAllText(Path.Combine(den, ".git", "config")), StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    [Trait("Scenario", "SC-HIST-23")]
-    public void NothingGivenLeavesSigningAlone()
-    {
-        var den = Den();
-        var options = Without(Config(SignsWithANoSuchProgram));
-
-        var result = new GitHistorySetup(den, options).TurnOn(new HistorySetupRequest(), Token);
-
-        Assert.Equal(HistorySetupStatus.Incomplete, result.Status);
-        Assert.DoesNotContain("gpgsign", File.ReadAllText(Path.Combine(den, ".git", "config")), StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    [Trait("Scenario", "SC-HIST-23")]
-    public void AKeySetInTheDensOwnRepositoryIsLeftToSign()
-    {
-        // Chosen for this repository, so it isn't the wrong key: it signs, and here that fails.
-        var den = Den();
-        var options = Without(Config(SignsWithANoSuchProgram));
-        RunGit(den, options, "init", "--quiet");
-        RunGit(den, options, "config", "--local", "user.signingkey", "KEY-OF-ASH");
+        var (signing, attempts) = SigningConfig(format, identity: false);
+        const string Ash = "[user]\n\tname = Ash Calloway\n\temail = ash@example.invalid\n";
+        var options = Without(Config(where switch
+        {
+            "global" => Ash + signing,
+            "includeIf" => signing + $"[includeIf \"gitdir/i:**/{Path.GetFileName(den)}/\"]\n\tpath = {Config(Ash).Replace('\\', '/')}\n",
+            _ => signing,
+        }));
+        if (where == "local")
+        {
+            RunGit(den, options, "init", "--quiet");
+            RunGit(den, options, "config", "--local", "user.name", "Ash Calloway");
+            RunGit(den, options, "config", "--local", "user.email", "ash@example.invalid");
+        }
 
         var result = new GitHistorySetup(den, options).TurnOn(new HistorySetupRequest("Ash Calloway", "ash@example.invalid"), Token);
 
+        Assert.Equal(HistorySetupStatus.Done, result.Status);
+        Assert.False(File.Exists(attempts));
+        Assert.Contains(result.Steps, s => s.StartsWith("Turned signing off", StringComparison.Ordinal));
+        Assert.Equal(AshOnly, FirstCommitIdentity(den, options));
+        Assert.Equal("N\n", RunGit(den, options, "log", "-1", "--format=%G?"));
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-HIST-23")]
+    [InlineData("gpg")]
+    [InlineData("ssh")]
+    public void NothingGivenLeavesSigningAloneAndItsFailureIsntRepeated(string format)
+    {
+        var den = Den();
+        var (signing, attempts) = SigningConfig(format);
+        var options = Without(Config(signing));
+
+        var result = new GitHistorySetup(den, options).TurnOn(new HistorySetupRequest(), Token);
+
+        Assert.True(File.Exists(attempts));
+        Assert.Equal(HistorySetupStatus.Incomplete, result.Status);
+        Assert.DoesNotContain("gpgsign", File.ReadAllText(Path.Combine(den, ".git", "config")), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("KEY-OF-MAREK", result.Problem, StringComparison.Ordinal);
+        Assert.DoesNotContain("marek", result.Problem, StringComparison.OrdinalIgnoreCase);
+        Assert.False(RepositoryHasCommits(den, options));
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-HIST-23")]
+    [InlineData("gpg")]
+    [InlineData("ssh")]
+    public void AKeySetInTheDensOwnRepositoryIsLeftToSign(string format)
+    {
+        // Chosen for this repository, so it's the one rule that leaves signing on: the program runs, and here it fails.
+        var den = Den();
+        var (signing, attempts) = SigningConfig(format);
+        var options = Without(Config(signing));
+        RunGit(den, options, "init", "--quiet");
+        RunGit(den, options, "config", "--local", "user.signingkey", format == "ssh" ? "key::ssh-ed25519 KEY-OF-ASH" : "KEY-OF-ASH");
+
+        var result = new GitHistorySetup(den, options).TurnOn(new HistorySetupRequest("Ash Calloway", "ash@example.invalid"), Token);
+
+        Assert.True(File.Exists(attempts));
+        Assert.Contains("KEY-OF-ASH", File.ReadAllText(attempts), StringComparison.Ordinal);
         Assert.Equal(HistorySetupStatus.Incomplete, result.Status);
         Assert.DoesNotContain(result.Steps, s => s.Contains("signing", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain("gpgsign", File.ReadAllText(Path.Combine(den, ".git", "config")), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("marek", result.Problem, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
     [Trait("Scenario", "SC-HIST-16")]
     public void AFailedSaveInARepositoryThisRunMadeTakesTheRepositoryAway()
     {
-        // A template whose config holds two names: git init takes it, and git config can't save over them.
         var den = Den();
-        var template = Folder();
-        File.WriteAllText(Path.Combine(template, "config"), "[user]\n\tname = Marek One\n\tname = Marek Two\n", new UTF8Encoding(false));
-        var options = Without(Config($"[init]\n\ttemplateDir = {template.Replace('\\', '/')}\n[user]\n\temail = marek@example.invalid\n"));
+        var options = Without(Config("[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n"));
+        var setup = new GitHistorySetup(den, options) { BeforeStep = FailAt("user.email") };
 
-        var result = new GitHistorySetup(den, options).TurnOn(new HistorySetupRequest("Ash Calloway", "ash@example.invalid"), Token);
+        var result = setup.TurnOn(new HistorySetupRequest("Ash Calloway", "ash@example.invalid"), Token);
 
         Assert.Equal(HistorySetupStatus.Refused, result.Status);
         Assert.Equal(HistorySetupCodes.HistoryFailed, result.Code);
@@ -693,16 +734,50 @@ public sealed class HistorySetupTests : IDisposable
 
     [Fact]
     [Trait("Scenario", "SC-HIST-16")]
-    public void APartialSaveSaysWhatWasSavedAndAskedAgainItFinishesUnderTheNameGiven()
+    public void AFailedSaveInARepositoryThatWasThereTakesBackWhatWasSaved()
     {
-        // Two emails, so the name saves and the email can't: a finished repository is left as it is.
         var den = Den();
         var (text, attempts) = SigningConfig();
         var options = Without(Config(text));
         RunGit(den, options, "init", "--quiet");
-        RunGit(den, options, "config", "--local", "--add", "user.email", "one@example.invalid");
-        RunGit(den, options, "config", "--local", "--add", "user.email", "two@example.invalid");
-        var setup = new GitHistorySetup(den, options);
+        RunGit(den, options, "config", "--local", "user.name", "Marek Local");
+        var setup = new GitHistorySetup(den, options) { BeforeStep = FailAt("user.email") };
+
+        var failed = setup.TurnOn(new HistorySetupRequest("Ash Calloway", "ash@example.invalid"), Token);
+
+        Assert.Equal(HistorySetupStatus.Incomplete, failed.Status);
+        Assert.Empty(failed.IdentitySaved);
+        Assert.DoesNotContain(failed.Steps, s => s.Contains("signing", StringComparison.OrdinalIgnoreCase) || s.StartsWith("Saved", StringComparison.Ordinal));
+        Assert.Contains("What had been saved was taken back.", failed.Problem, StringComparison.Ordinal);
+        Assert.Contains("--author-name", failed.Problem, StringComparison.Ordinal);
+        Assert.DoesNotContain("checkpoint dialog", failed.Problem, StringComparison.Ordinal);
+        Assert.DoesNotContain("Ash", failed.Problem, StringComparison.Ordinal);
+        Assert.Equal("Marek Local\n", RunGit(den, options, "config", "--local", "--get", "user.name"));
+        Assert.DoesNotContain("gpgsign", File.ReadAllText(Path.Combine(den, ".git", "config")), StringComparison.OrdinalIgnoreCase);
+        Assert.False(RepositoryHasCommits(den, options));
+        Assert.False(File.Exists(attempts));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-16")]
+    public void AHeldConfigThatStopsTheTakingBackSaysWhatsLeftAndAskedAgainItFinishesUnderTheNameGiven()
+    {
+        // The lock appears after the name is saved, so neither the email nor the taking back can write.
+        var den = Den();
+        var (text, attempts) = SigningConfig();
+        var options = Without(Config(text));
+        RunGit(den, options, "init", "--quiet");
+        var held = Path.Combine(den, ".git", "config.lock");
+        var setup = new GitHistorySetup(den, options)
+        {
+            BeforeStep = key =>
+            {
+                if (key == "user.email")
+                {
+                    File.WriteAllText(held, "");
+                }
+            },
+        };
 
         var failed = setup.TurnOn(new HistorySetupRequest("Ash Calloway", "ash@example.invalid"), Token);
 
@@ -710,19 +785,76 @@ public sealed class HistorySetupTests : IDisposable
         Assert.Equal(["user.name"], failed.IdentitySaved);
         Assert.Contains("Saved your name for this den's repository only.", failed.Steps);
         Assert.Contains(failed.Steps, s => s.StartsWith("Turned signing off", StringComparison.Ordinal));
-        Assert.Contains("The rest of the name and email wasn't saved", failed.Problem, StringComparison.Ordinal);
-        Assert.DoesNotContain("No name or email was saved", failed.Problem, StringComparison.Ordinal);
+        Assert.Contains("still saved for this den: commit.gpgsign, tag.gpgsign, tag.forcesignannotated, push.gpgsign, user.name.", failed.Problem, StringComparison.Ordinal);
         Assert.Contains("--author-name", failed.Problem, StringComparison.Ordinal);
         Assert.DoesNotContain("checkpoint dialog", failed.Problem, StringComparison.Ordinal);
-        Assert.DoesNotContain("Ash", failed.Problem, StringComparison.Ordinal);
         Assert.False(RepositoryHasCommits(den, options));
 
-        RunGit(den, options, "config", "--local", "--unset-all", "user.email");
-        var done = setup.TurnOn(new HistorySetupRequest("Ash Calloway", "ash@example.invalid"), Token);
+        File.Delete(held);
+        var done = new GitHistorySetup(den, options).TurnOn(new HistorySetupRequest("Ash Calloway", "ash@example.invalid"), Token);
 
         Assert.Equal(HistorySetupStatus.Done, done.Status);
         Assert.Equal(AshOnly, FirstCommitIdentity(den, options));
         Assert.False(File.Exists(attempts));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-21")]
+    public void SeveralValuesOfASettingDontStopTheSave()
+    {
+        var den = Den();
+        var options = Without(Config(""));
+        RunGit(den, options, "init", "--quiet");
+        RunGit(den, options, "config", "--local", "--add", "user.email", "one@example.invalid");
+        RunGit(den, options, "config", "--local", "--add", "user.email", "two@example.invalid");
+
+        var result = new GitHistorySetup(den, options).TurnOn(new HistorySetupRequest("Ash Calloway", "ash@example.invalid"), Token);
+
+        Assert.Equal(HistorySetupStatus.Done, result.Status);
+        Assert.Equal(AshOnly, FirstCommitIdentity(den, options));
+        Assert.Equal("ash@example.invalid\n", RunGit(den, options, "config", "--local", "--get-all", "user.email"));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-17")]
+    public void ARepositoryMadeMeanwhileIsntTakenAwayWhenItsRefused()
+    {
+        // Between the check and git init, something else makes the repository: this run didn't, so it stays.
+        var den = Den();
+        var options = Without(Config(""));
+        var setup = new GitHistorySetup(den, options) { BeforeStep = key => { if (key == "init") { RunGit(den, options, "init", "--quiet"); } } };
+
+        var result = setup.TurnOn(new HistorySetupRequest(), Token);
+
+        Assert.Equal(HistorySetupStatus.Refused, result.Status);
+        Assert.Equal(HistorySetupCodes.IdentityNeeded, result.Code);
+        Assert.False(result.RepositoryMade);
+        Assert.True(Directory.Exists(Path.Combine(den, ".git")));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-17")]
+    public void ARepositoryWithCheckpointsMadeMeanwhileIsRefusedAndKept()
+    {
+        var den = Den();
+        var options = Without(Config("[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n"));
+        var setup = new GitHistorySetup(den, options)
+        {
+            BeforeStep = key =>
+            {
+                if (key == "init")
+                {
+                    RunGit(den, options, "init", "--quiet");
+                    RunGit(den, options, "commit", "--quiet", "--allow-empty", "-m", "Theirs");
+                }
+            },
+        };
+
+        var result = setup.TurnOn(new HistorySetupRequest("Ash Calloway", "ash@example.invalid"), Token);
+
+        Assert.Equal(HistorySetupCodes.HasRepository, result.Code);
+        Assert.Equal("Theirs\n", RunGit(den, options, "log", "-1", "--format=%s"));
+        Assert.Equal(1, GitProcess.Run(options, den, ["config", "--local", "--get", "user.name"], cancellationToken: Token).ExitCode);
     }
 
     [Fact]
@@ -777,78 +909,79 @@ public sealed class HistorySetupTests : IDisposable
 
     [Theory]
     [Trait("Scenario", "SC-HIST-23")]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void AKeyFromAnotherFileThanTheNameIsNotUsedEvenWhenWhatsGivenIsWhatGitHas(bool nameInIncludeIf)
+    [InlineData("gpg")]
+    [InlineData("ssh")]
+    public void ASigningFailureAtACheckpointOrTagDoesntRepeatWhoTheKeyBelongsTo(string format)
     {
         var den = Den();
-        var (signing, attempts) = SigningConfig(identity: false);
-        const string Ash = "[user]\n\tname = Ash Calloway\n\temail = ash@example.invalid\n";
-        var included = Config(Ash);
-        var global = nameInIncludeIf
-            ? signing + $"[includeIf \"gitdir/i:**/{Path.GetFileName(den)}/\"]\n\tpath = {included.Replace('\\', '/')}\n"
-            : signing;
-        var options = Without(Config(global));
-        if (!nameInIncludeIf)
-        {
-            RunGit(den, options, "init", "--quiet");
-            RunGit(den, options, "config", "--local", "user.name", "Ash Calloway");
-            RunGit(den, options, "config", "--local", "user.email", "ash@example.invalid");
-        }
-
-        var result = new GitHistorySetup(den, options).TurnOn(new HistorySetupRequest("Ash Calloway", "ash@example.invalid"), Token);
-
-        Assert.Equal(HistorySetupStatus.Done, result.Status);
-        Assert.False(File.Exists(attempts));
-        Assert.Equal(AshOnly, FirstCommitIdentity(den, options));
-        Assert.Equal("N\n", RunGit(den, options, "log", "-1", "--format=%G?"));
-    }
-
-    [Fact]
-    [Trait("Scenario", "SC-HIST-23")]
-    public void AKeyFromTheSameFileAsTheNameSignsAndItsFailureDoesntRepeatWhoItBelongsTo()
-    {
-        var den = Den();
-        var (signing, attempts) = SigningConfig();
-        var included = Config(signing);
-        var options = Without(Config($"[includeIf \"gitdir/i:**/{Path.GetFileName(den)}/\"]\n\tpath = {included.Replace('\\', '/')}\n"));
-
-        var result = new GitHistorySetup(den, options).TurnOn(new HistorySetupRequest("Marek Oswin", "marek@example.invalid"), Token);
-
-        // It tried, with the writer's own key, and the program it ran said whose that is.
-        Assert.True(File.Exists(attempts));
-        Assert.Equal(HistorySetupStatus.Incomplete, result.Status);
-        Assert.DoesNotContain("KEY-OF-MAREK", result.Problem, StringComparison.Ordinal);
-        Assert.DoesNotContain("marek@", result.Problem, StringComparison.Ordinal);
-        Assert.DoesNotContain("Marek Oswin", result.Problem, StringComparison.Ordinal);
-        Assert.Contains("isn't repeated", result.Problem, StringComparison.Ordinal);
-        Assert.False(RepositoryHasCommits(den, options));
-    }
-
-    [Fact]
-    [Trait("Scenario", "SC-HIST-23")]
-    public void ASigningFailureAtACheckpointDoesntRepeatWhoTheKeyBelongsTo()
-    {
-        var den = Den();
-        var (signing, _) = SigningConfig();
+        var (signing, attempts) = SigningConfig(format);
         var options = Without(Config(signing));
         RunGit(den, options, "init", "--quiet");
+        var history = GitHistory.ForDen(den, options, Token);
 
-        var refused = Assert.Throws<HistoryException>(() => GitHistory.ForDen(den, options, Token).Checkpoint(new CheckpointRequest("Later"), Token));
+        var refused = Assert.Throws<HistoryException>(() => history.Checkpoint(new CheckpointRequest("Later"), Token));
 
+        Assert.True(File.Exists(attempts));
         Assert.StartsWith("Git refused the checkpoint, so nothing was recorded (", refused.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("KEY-OF-MAREK", refused.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("marek", refused.Message, StringComparison.OrdinalIgnoreCase);
+
+        // A tag signs by tag.gpgsign, whatever commit.gpgsign says.
+        RunGit(den, options, "config", "--local", "commit.gpgsign", "false");
+        Assert.True(history.Checkpoint(new CheckpointRequest("Start"), Token).IsAvailable);
+        var tag = Assert.Throws<HistoryException>(() => history.Tag(new TagRequest("book/final", Message: "Final"), Token));
+
+        Assert.DoesNotContain("marek", tag.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
+    [Trait("Scenario", "SC-HIST-13")]
+    public void WithSigningOffWhatGitSaidIsRepeatedEvenIfItMentionsSigning()
+    {
+        // A folder and a hook that happen to use the word aren't a signing failure.
+        var den = Path.Combine(Folder(), "gpg-notes");
+        Directory.CreateDirectory(den);
+        File.WriteAllText(Path.Combine(den, "den.yaml"), "format: 1\n", new UTF8Encoding(false));
+        var options = TestRepo.Options;
+        RunGit(den, options, "init", "--quiet");
+        var hook = Path.Combine(den, ".git", "hooks", "pre-commit");
+        File.WriteAllText(hook, "#!/bin/sh\necho 'hook says: gpg review needed' >&2\nexit 1\n", new UTF8Encoding(false));
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(hook, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+
+        var refused = Assert.Throws<HistoryException>(() => GitHistory.ForDen(den, options, Token).Checkpoint(new CheckpointRequest("Later"), Token));
+
+        Assert.Contains("hook says: gpg review needed", refused.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AConfigFilesPathIsLeftOutOfWhatGitSaidAndAFileAHookNamesIsnt()
+    {
+        foreach (var said in new[]
+        {
+            "fatal: bad config line 1 in file C:/somewhere/private/gitconfig",
+            "fatal: bad numeric config value 'x' for 'core.abbrev' in file C:/somewhere/private/gitconfig: invalid unit",
+            "fatal: bad boolean config value 'x' for 'commit.gpgsign' in file C:/somewhere/private/gitconfig",
+        })
+        {
+            Assert.DoesNotContain("private", new GitRun(128, "", said + "\n").Said, StringComparison.Ordinal);
+        }
+
+        Assert.Equal("hook: a TODO in file notes.md", new GitRun(1, "", "hook: a TODO in file notes.md\n").Said);
+    }
+
+    [Theory]
     [Trait("Scenario", "SC-HIST-23")]
-    public void AKeyFromATemplateInARepositoryThisRunMadeIsNotChosenForIt()
+    [InlineData("gpg")]
+    [InlineData("ssh")]
+    public void AKeyFromATemplateInARepositoryThisRunMadeIsNotChosenForIt(string format)
     {
         var den = Den();
         var template = Folder();
         File.WriteAllText(Path.Combine(template, "config"), "[user]\n\tsigningkey = KEY-OF-TEMPLATE\n", new UTF8Encoding(false));
-        var (signing, attempts) = SigningConfig();
+        var (signing, attempts) = SigningConfig(format);
         var options = Without(Config(signing + $"[init]\n\ttemplateDir = {template.Replace('\\', '/')}\n"));
 
         var result = new GitHistorySetup(den, options).TurnOn(new HistorySetupRequest("Ash Calloway", "ash@example.invalid"), Token);
@@ -887,12 +1020,14 @@ public sealed class HistorySetupTests : IDisposable
         Assert.False(Directory.Exists(Path.Combine(den, ".git")));
     }
 
-    [Fact]
+    [Theory]
     [Trait("Scenario", "SC-HIST-23")]
-    public void ASigningSettingFromTheEnvironmentThatStaysOnRefusesBeforeTheFirstCheckpoint()
+    [InlineData("gpg")]
+    [InlineData("ssh")]
+    public void ASigningSettingFromTheEnvironmentThatStaysOnRefusesBeforeTheFirstCheckpoint(string format)
     {
         var den = Den();
-        var (signing, attempts) = SigningConfig();
+        var (signing, attempts) = SigningConfig(format);
         var options = Without(Config(signing));
         var environment = new Dictionary<string, string?>(options.Environment)
         {
@@ -999,6 +1134,51 @@ public sealed class HistorySetupTests : IDisposable
 
     [Fact]
     [Trait("Scenario", "SC-HIST-22")]
+    public void ANameThatIsWhatGitHasStillSaysAnAuthorEmailGoesBesideIt()
+    {
+        var den = Den();
+        var options = Without(Config("[user]\n\tname = Ash Calloway\n\temail = fallback@example.invalid\n[author]\n\temail = real@example.invalid\n"));
+
+        var result = new GitHistorySetup(den, options).TurnOn(new HistorySetupRequest("Ash Calloway"), Token);
+
+        Assert.Equal(HistorySetupStatus.Done, result.Status);
+        Assert.Contains(result.Steps, s => s.StartsWith("The email git already has for this den is recorded beside the name given.", StringComparison.Ordinal));
+        Assert.DoesNotContain(result.Steps, s => s.Contains("@example.invalid", StringComparison.Ordinal));
+        Assert.Equal("Ash Calloway|real@example.invalid|Ash Calloway|fallback@example.invalid\n", FirstCommitIdentity(den, options));
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-HIST-21")]
+    [InlineData("Ash\u00A0;")]
+    [InlineData("Ash\u3000;")]
+    [InlineData("\uFEFFAsh")]
+    public void UnusualSpacesAndMarksArentTakenForSomethingBeatingWhatsGiven(string name)
+    {
+        var den = Den();
+        var options = Without(Config("[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n"));
+
+        var result = new GitHistorySetup(den, options).TurnOn(new HistorySetupRequest(name, "ash@example.invalid"), Token);
+
+        Assert.Equal(HistorySetupStatus.Done, result.Status);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-21")]
+    public void ABadDateInTheEnvironmentIsntBlamedOnTheNameBeingBeaten()
+    {
+        var den = Den();
+        var options = Without(Config("[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n"));
+        options = options with { Environment = new Dictionary<string, string?>(options.Environment) { ["GIT_AUTHOR_DATE"] = "not a date" } };
+
+        var result = new GitHistorySetup(den, options).TurnOn(new HistorySetupRequest("Ash Calloway", "ash@example.invalid"), Token);
+
+        Assert.Equal(HistorySetupStatus.Refused, result.Status);
+        Assert.Contains("GIT_AUTHOR_DATE", result.Problem, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(Path.Combine(den, ".git")));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-22")]
     public void AnAuthorEmailAloneIsntAnEmailGitHasSoANameAloneIsAskedForOne()
     {
         var den = Den();
@@ -1012,22 +1192,38 @@ public sealed class HistorySetupTests : IDisposable
         Assert.False(Directory.Exists(Path.Combine(den, ".git")));
     }
 
-    [Fact]
+    [Theory]
     [Trait("Scenario", "SC-HIST-17")]
-    public void ANameGivenToADenWithCheckpointsSaysItWasntAppliedAndHowToChangeIt()
+    [InlineData("gpg")]
+    [InlineData("ssh")]
+    public void ANameGivenToADenWithCheckpointsSaysHowToChangeItAndFollowingThatWorks(string format)
     {
         var den = Den();
-        var options = Without(Config("[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n"));
+        var options = Without(Config("[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n[author]\n\tname = Marek Author\n[committer]\n\temail = committer@example.invalid\n"));
         var setup = new GitHistorySetup(den, options);
         Assert.Equal(HistorySetupStatus.Done, setup.TurnOn(new HistorySetupRequest(), Token).Status);
 
-        var result = setup.TurnOn(new HistorySetupRequest("Ash Calloway", "ash@example.invalid"), Token);
+        // Signing goes on after the first checkpoint, which could otherwise not be made here.
+        var (signing, attempts) = SigningConfig(format, identity: false);
+        options = Without(Config(signing + "[author]\n\tname = Marek Author\n[committer]\n\temail = committer@example.invalid\n"));
+        var result = new GitHistorySetup(den, options).TurnOn(new HistorySetupRequest("Ash Calloway", "ash@example.invalid"), Token);
 
         Assert.Equal(HistorySetupCodes.HasRepository, result.Code);
         Assert.Contains("weren't applied", result.Problem, StringComparison.Ordinal);
-        Assert.Contains("git config --local user.name", result.Problem, StringComparison.Ordinal);
         Assert.DoesNotContain("Marek", result.Problem, StringComparison.Ordinal);
-        Assert.Equal("Marek Oswin|marek@example.invalid|Marek Oswin|marek@example.invalid\n", LaterCommitIdentity(den, options));
+
+        // Every command it names, exactly as it names it, with the writer's values filled in.
+        var commands = System.Text.RegularExpressions.Regex.Matches(result.Problem!, "git config --local (\\S+) (<name>|<email>|false)");
+        Assert.Equal(10, commands.Count);
+        foreach (System.Text.RegularExpressions.Match command in commands)
+        {
+            var value = command.Groups[2].Value switch { "<name>" => "Ash Calloway", "<email>" => "ash@example.invalid", _ => "false" };
+            RunGit(den, options, "config", "--local", command.Groups[1].Value, value);
+        }
+
+        Assert.Equal(AshOnly, LaterCommitIdentity(den, options));
+        Assert.False(File.Exists(attempts));
+        Assert.Equal("N\n", RunGit(den, options, "log", "-1", "--format=%G?"));
     }
 
     [Fact]
@@ -1061,35 +1257,49 @@ public sealed class HistorySetupTests : IDisposable
 
     private const string AshOnly = "Ash Calloway|ash@example.invalid|Ash Calloway|ash@example.invalid\n";
 
-    /// <summary>A global config that signs, with a key of another name's, by a program that can't run: signing fails any commit.</summary>
-    private const string SignsWithANoSuchProgram =
-        "[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n\tsigningkey = KEY-OF-MAREK\n" +
-        "[commit]\n\tgpgsign = true\n[tag]\n\tgpgsign = true\n[gpg]\n\tprogram = wolfden-test-no-such-gpg\n";
-
     /// <summary>
-    /// A global config that signs, with a key of another name's, by a program
-    /// of the test's own, which notes each attempt in the file returned, says
-    /// whose key it is as gpg would, and fails. No file: nothing tried to sign.
+    /// A global config that signs by programs of the test's own, which note each attempt in the
+    /// file returned, say whose key it is, and fail. No file: nothing tried to sign. For gpg, a
+    /// <c>user.signingkey</c> of another name's. For ssh, no key at all, but a
+    /// <c>gpg.ssh.defaultKeyCommand</c> that prints one, which git uses whatever the name is.
     /// </summary>
-    private (string Text, string Attempts) SigningConfig(bool identity = true)
+    private (string Text, string Attempts) SigningConfig(string format = "gpg", bool identity = true)
     {
         var folder = Folder();
         var attempts = Path.Combine(folder, "attempts").Replace('\\', '/');
-        var program = Path.Combine(folder, "signer.sh");
-        File.WriteAllText(
-            program,
-            $"#!/bin/sh\necho \"$*\" >> \"{attempts}\"\necho 'gpg: skipped \"KEY-OF-MAREK\": Marek Oswin <marek@example.invalid> has no secret key' >&2\nexit 1\n",
-            new UTF8Encoding(false));
-        if (!OperatingSystem.IsWindows())
+        string Script(string name, string body)
         {
-            File.SetUnixFileMode(program, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            var program = Path.Combine(folder, name);
+            File.WriteAllText(program, $"#!/bin/sh\n{body}\n", new UTF8Encoding(false));
+            if (!OperatingSystem.IsWindows())
+            {
+                File.SetUnixFileMode(program, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            }
+
+            return program.Replace('\\', '/');
         }
 
-        var who = identity ? "\tname = Marek Oswin\n\temail = marek@example.invalid\n" : "";
-        return (
-            $"[user]\n{who}\tsigningkey = KEY-OF-MAREK\n[commit]\n\tgpgsign = true\n[tag]\n\tgpgsign = true\n[gpg]\n\tprogram = {program.Replace('\\', '/')}\n",
-            attempts);
+        var who = identity ? "[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n" : "";
+        const string Signs = "[commit]\n\tgpgsign = true\n[tag]\n\tgpgsign = true\n";
+        if (format == "ssh")
+        {
+            var keyCommand = Script("key-command.sh", $"echo key-command >> \"{attempts}\"\necho 'key::ssh-ed25519 KEY-OF-MAREK'");
+            var ssh = Script("ssh-signer.sh", $"echo \"ssh $*\" >> \"{attempts}\"\ncat \"$6\" >> \"{attempts}\" 2>/dev/null\necho 'agent refused key marek@example.invalid (KEY-OF-MAREK)' >&2\nexit 1");
+            return ($"{who}{Signs}[gpg]\n\tformat = ssh\n[gpg \"ssh\"]\n\tprogram = {ssh}\n\tdefaultKeyCommand = {keyCommand}\n", attempts);
+        }
+
+        var gpg = Script("signer.sh", $"echo \"$*\" >> \"{attempts}\"\necho 'gpg: skipped \"KEY-OF-MAREK\": Marek Oswin <marek@example.invalid> has no secret key' >&2\nexit 1");
+        return ($"{who}[user]\n\tsigningkey = KEY-OF-MAREK\n{Signs}[gpg]\n\tprogram = {gpg}\n", attempts);
     }
+
+    /// <summary>A save that fails at <paramref name="failing"/> and nowhere else.</summary>
+    private static Action<string> FailAt(string failing) => key =>
+    {
+        if (key == failing)
+        {
+            throw new HistoryException("git config failed");
+        }
+    };
 
     private static bool RepositoryHasCommits(string den, GitOptions options) =>
         GitProcess.Run(options, den, ["rev-parse", "--verify", "--quiet", "HEAD^{commit}"], cancellationToken: Token).Succeeded;

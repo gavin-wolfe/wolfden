@@ -36,21 +36,21 @@ namespace Wolfden.Git;
 /// <b>Saved first, and checked.</b> What's given is saved before anything
 /// else is done, so nothing that fails later can leave a retry under git's
 /// own name. A save that fails in a repository this run made takes the
-/// repository away again. Once saved, git is asked what it would record
+/// repository away again; in one that was there, what was saved is taken back
+/// if it can be, and the result names what couldn't be. Once saved, git is asked what it would record
 /// (<c>git var</c>) and whether it would sign, and a setting that still
 /// beats what was saved (<c>extensions.worktreeConfig</c>, a later
 /// <c>[include]</c>, <c>GIT_CONFIG_COUNT</c>) refuses before any commit.
 /// </para>
 /// <para>
-/// <b>Signing.</b> A key set up for git's own name and email isn't this
-/// name's. So when a name or email is given, <see cref="SigningSettings"/>
+/// <b>Signing.</b> When a name or email is given, <see cref="SigningSettings"/>
 /// are saved as off in the den's repository, and stay off if signing is
-/// turned on globally later; the steps say so if signing was on. It's left
-/// alone only for a <c>user.signingkey</c> in the repository's own config
-/// (not in a repository this run made, where it came from a template), or
-/// when what's given is what git has and either git has no key, so it asks
-/// for the key of that name, or the key is in the same config file as that
-/// name (<c>git config --show-origin</c>).
+/// turned on globally later; the steps say so if signing was on. The key git
+/// would use can have nothing to do with the name (<c>user.signingkey</c>,
+/// <c>gpg.ssh.defaultKeyCommand</c>, <c>local-user</c> in <c>gpg.conf</c>),
+/// and Wolfden can't see them all. The one exception is a
+/// <c>user.signingkey</c> in the repository's own config, in a repository
+/// this run didn't make (in one it did, a template put it there).
 /// </para>
 /// <para>
 /// <b>Its own repository</b> is one whose top level, as git says
@@ -92,6 +92,9 @@ public sealed class GitHistorySetup : IHistorySetup
 
     private readonly string _denRoot;
     private readonly GitOptions _options;
+
+    /// <summary>For tests: called with <c>init</c>, or the setting's key, just before git is asked to make the repository or save it.</summary>
+    internal Action<string>? BeforeStep { get; init; }
 
     /// <summary>Turning history on for the den at <paramref name="denRoot"/>, with <paramref name="options"/>' git.</summary>
     public GitHistorySetup(string denRoot, GitOptions? options = null)
@@ -217,6 +220,7 @@ public sealed class GitHistorySetup : IHistorySetup
         // git has for it can depend on where it is (includeIf "gitdir:…").
         if (!check.Finishing)
         {
+            BeforeStep?.Invoke("init");
             var created = GitRepository.Create(_denRoot, _options, cancellationToken);
             if (created.Kind != GitLocationKind.InRepository)
             {
@@ -226,7 +230,16 @@ public sealed class GitHistorySetup : IHistorySetup
                     "Nothing else was done.");
             }
 
-            made = true;
+            // One made meanwhile isn't this run's to take away, and may have checkpoints by now.
+            made = !created.AlreadyThere;
+            if (created.AlreadyThere)
+            {
+                var again = Check(cancellationToken);
+                if (!again.Possible)
+                {
+                    return Refused(again.Code!, given ? $"{again.Reason} {NotApplied(again.Code!)}".TrimEnd() : again.Reason!);
+                }
+            }
         }
 
         // 2. The name and email git will use: refused, with the repository just made taken
@@ -269,8 +282,8 @@ public sealed class GitHistorySetup : IHistorySetup
         // send the writer to try again without it. Signing goes off first, so a save that stops
         // part way, and a retry that then sees nothing to change, can't sign with git's key.
         var signingOff = false;
-        var signingStarted = false;
         var signingWritten = false;
+        var written = new List<(string Key, string[] Before)>();
         if (given)
         {
             string? beatenAfterSaving;
@@ -279,13 +292,12 @@ public sealed class GitHistorySetup : IHistorySetup
             {
                 var stronger = StrongerSettings(name, email, cancellationToken);
                 changed = (name is not null && name != hasName) || (email is not null && email != hasEmail) || stronger.Count > 0;
-                if (!KeepsSigning(changed, name, email, made, cancellationToken))
+                if (!HasOwnSigningKey(made, cancellationToken))
                 {
                     var signsNow = SignsNow(cancellationToken);
-                    signingStarted = true;
                     foreach (var setting in SigningSettings)
                     {
-                        SetLocal(setting, "false", cancellationToken);
+                        Save(setting, "false");
                     }
 
                     signingWritten = true;
@@ -294,19 +306,19 @@ public sealed class GitHistorySetup : IHistorySetup
 
                 if (name is not null)
                 {
-                    SetLocal("user.name", name, cancellationToken);
+                    Save("user.name", name);
                     saved.Add("user.name");
                 }
 
                 if (email is not null)
                 {
-                    SetLocal("user.email", email, cancellationToken);
+                    Save("user.email", email);
                     saved.Add("user.email");
                 }
 
                 foreach (var (key, value) in stronger)
                 {
-                    SetLocal(key, value, cancellationToken);
+                    Save(key, value);
                 }
 
                 beatenAfterSaving = BeatenAfterSaving(name, email, signingWritten, cancellationToken);
@@ -319,8 +331,18 @@ public sealed class GitHistorySetup : IHistorySetup
                     return Undo(HistorySetupCodes.HistoryFailed, problem);
                 }
 
+                // In a repository that was already there: as it was, if git lets it be.
+                var leftover = TakeBack(written);
+                saved.RemoveAll(key => !leftover.Contains(key));
+                signingOff = signingOff && SigningSettings.All(leftover.Contains);
                 AddSavedSteps();
-                return Stop(HistorySetupCodes.HistoryFailed, problem, PartlySaved());
+                var checkpointNotDone = request.FirstCheckpoint ? " No first checkpoint was made." : "";
+                return Stop(
+                    HistorySetupCodes.HistoryFailed,
+                    problem,
+                    leftover.Count == 0
+                        ? $"What had been saved was taken back.{checkpointNotDone}"
+                        : $"These couldn't be taken back, and are still saved for this den: {string.Join(", ", leftover)}.{checkpointNotDone}");
             }
 
             if (beatenAfterSaving is not null)
@@ -338,12 +360,12 @@ public sealed class GitHistorySetup : IHistorySetup
 
             // A half given to fill a gap is what Wolfden asked for, but it goes beside a value the
             // writer may have meant to keep apart from it, so it's said. The value isn't repeated.
-            if (name is not null && email is null && (changed || EnvironmentValue("GIT_AUTHOR_EMAIL") is not null || EnvironmentValue("GIT_COMMITTER_EMAIL") is not null))
+            if (name is not null && email is null && (changed || OtherSource("email", cancellationToken)))
             {
                 steps.Add("The email git already has for this den is recorded beside the name given. To use another, give an email too.");
             }
 
-            if (email is not null && name is null && (changed || EnvironmentValue("GIT_AUTHOR_NAME") is not null || EnvironmentValue("GIT_COMMITTER_NAME") is not null))
+            if (email is not null && name is null && (changed || OtherSource("name", cancellationToken)))
             {
                 steps.Add("The name git already has for this den is recorded beside the email given. To use another, give a name too.");
             }
@@ -463,17 +485,18 @@ public sealed class GitHistorySetup : IHistorySetup
             if (signingOff)
             {
                 steps.Add(
-                    "Turned signing off for this den's repository only: git is set to sign, with a key that isn't tied to the name and email given. " +
-                    "To sign here with a key of this name's, run 'git config --local user.signingkey <key>' and 'git config --local commit.gpgsign true' in the den's folder.");
+                    "Turned signing off for this den's repository only: git is set to sign, and Wolfden can't tell whose key that would use. " +
+                    "To sign here with a key of this name's, run 'git config --local user.signingkey <key>' and 'git config --local commit.gpgsign true' in the den's folder. " +
+                    "If your gpg.conf has a 'local-user' line, gpg adds that key's signature too, so take that into account first.");
             }
         }
 
-        // What a save that stopped part way did and didn't do, after the steps above.
-        string PartlySaved()
+        void Save(string key, string value)
         {
-            var identity = saved.Count > 0 ? "The rest of the name and email wasn't saved" : "No name or email was saved";
-            var signing = signingWritten ? ", but signing is off for this den" : signingStarted ? ", and signing may be partly off for this den" : "";
-            return $"{identity}{signing}.{(request.FirstCheckpoint ? " No first checkpoint was made." : "")}";
+            var before = LocalValues(key, cancellationToken);
+            BeforeStep?.Invoke(key);
+            SetLocal(key, value, cancellationToken);
+            written.Add((key, before));
         }
     }
 
@@ -517,19 +540,33 @@ public sealed class GitHistorySetup : IHistorySetup
         return null;
     }
 
-    /// <summary>What a refusal adds when a name or email was given: that it wasn't applied, and, where there's one, the git command that would.</summary>
-    private static string NotApplied(string code) => code switch
+    /// <summary>
+    /// The git commands that put a repository with checkpoints under another name from now on:
+    /// the name and email, the <c>author.*</c> and <c>committer.*</c> settings git prefers to
+    /// them, and signing off, as turning history on with a name does.
+    /// </summary>
+    public const string ChangeNameByHand =
+        "run these in the den's folder: " +
+        "git config --local user.name <name> ; git config --local user.email <email> ; " +
+        "git config --local author.name <name> ; git config --local author.email <email> ; " +
+        "git config --local committer.name <name> ; git config --local committer.email <email> " +
+        "(git prefers those two kinds to the first, if it has them), and, so git's own key doesn't sign under that name: " +
+        "git config --local commit.gpgsign false ; git config --local tag.gpgsign false ; " +
+        "git config --local tag.forcesignannotated false ; git config --local push.gpgsign false . " +
+        "Earlier checkpoints keep the name they have.";
+
+    /// <summary>What a refusal adds when a name or email was given: that it wasn't applied, and, where there's one, the git commands that would.</summary>
+    public static string NotApplied(string code) => code switch
     {
         HistorySetupCodes.HasRepository =>
-            "The name and email given weren't applied, so later checkpoints stay under what git has for this den. " +
-            "To change that from now on, run 'git config --local user.name <name>' and 'git config --local user.email <email>' in the den's folder; if git signs, its key doesn't change with them.",
+            $"The name and email given weren't applied, so later checkpoints stay under what git has for this den. To change that from now on, {ChangeNameByHand}",
         HistorySetupCodes.InRepository =>
             "The name and email given weren't applied, so later checkpoints stay under what git has for that repository, whose settings this den shares.",
         _ => "",
     };
 
     /// <summary>Why what's given would be saved in another repository, or null: <c>GIT_DIR</c> and <c>GIT_COMMON_DIR</c> point git away from the den's folder.</summary>
-    private string? RedirectedByEnvironment()
+    public string? RedirectedByEnvironment()
     {
         var set = new[] { "GIT_DIR", "GIT_COMMON_DIR" }.Where(v => EnvironmentValue(v) is not null).ToList();
         return set.Count == 0
@@ -550,12 +587,18 @@ public sealed class GitHistorySetup : IHistorySetup
         foreach (var ident in new[] { "GIT_AUTHOR_IDENT", "GIT_COMMITTER_IDENT" })
         {
             var run = Run(["var", ident], cancellationToken);
-            var text = run.Output.Trim();
+            if (!run.Succeeded)
+            {
+                // Not what git's output said, which can name what git has.
+                return "Git couldn't say what it would record with the name and email given. Check its settings, and a GIT_AUTHOR_DATE or GIT_COMMITTER_DATE in the environment, then try again.";
+            }
+
+            var text = run.Output;
             var open = text.IndexOf('<', StringComparison.Ordinal);
             var close = open < 0 ? -1 : text.IndexOf('>', open);
-            if (!run.Succeeded || close < 0
-                || (name is not null && text[..open].Trim() != WithoutCrud(name))
-                || (email is not null && text[(open + 1)..close].Trim() != WithoutCrud(email)))
+            if (close < 0
+                || (name is not null && WithoutMark(text[..open].TrimEnd(' ')) != WithoutCrud(name))
+                || (email is not null && WithoutMark(text[(open + 1)..close]) != WithoutCrud(email)))
             {
                 return $"Git wouldn't record the name and email given, though they're saved. {Causes}";
             }
@@ -571,8 +614,11 @@ public sealed class GitHistorySetup : IHistorySetup
 
     /// <summary>A name or email as git records it: without the characters it strips from the ends, or the angle brackets and line breaks it strips anywhere.</summary>
     private static string WithoutCrud(string value) =>
-        value.Replace("<", "", StringComparison.Ordinal).Replace(">", "", StringComparison.Ordinal)
+        WithoutMark(value).Replace("<", "", StringComparison.Ordinal).Replace(">", "", StringComparison.Ordinal)
             .Trim(' ', '\t', ',', ':', ';', '"', '\\', '\'');
+
+    /// <summary>Without a byte order mark, which reading git's output can drop from the start.</summary>
+    private static string WithoutMark(string value) => value.Replace("\uFEFF", "", StringComparison.Ordinal);
 
     /// <summary>
     /// Why a name or email given wouldn't be the one git records, in words, or
@@ -623,53 +669,67 @@ public sealed class GitHistorySetup : IHistorySetup
     }
 
     /// <summary>
-    /// True if signing is left as it is with what's given. A key in the repository's own config
-    /// was chosen for it, unless this run made the repository, when it came from a template.
-    /// Otherwise, only when what's given changes nothing, and git has no key (so it asks for the
-    /// key of that name) or the key is in the same config file as what's given.
+    /// True if the repository's own config names a signing key that was chosen for it, the one
+    /// case that leaves signing on when a name or email is given. In a repository this run made,
+    /// a key there came from a template (<c>init.templateDir</c>), so it wasn't.
     /// </summary>
-    private bool KeepsSigning(bool changed, string? name, string? email, bool made, CancellationToken cancellationToken)
+    private bool HasOwnSigningKey(bool made, CancellationToken cancellationToken) =>
+        !made && LocalValues("user.signingkey", cancellationToken).Any(key => key.Trim().Length > 0);
+
+    /// <summary>The repository's own values of <paramref name="key"/>, none if it isn't set there.</summary>
+    private string[] LocalValues(string key, CancellationToken cancellationToken)
     {
-        var local = Run(["config", "--local", "--get", "user.signingkey"], cancellationToken);
-        if (local.ExitCode is not (0 or 1))
-        {
-            throw new HistoryException($"Git couldn't read its 'user.signingkey' setting: {local.Said}");
-        }
-
-        if (local.ExitCode == 0 && local.Output.Trim().Length > 0)
-        {
-            return !made;
-        }
-
-        if (changed)
-        {
-            return false;
-        }
-
-        if (Origin("user.signingkey", cancellationToken) is not { } key)
-        {
-            return true;
-        }
-
-        return (name is null || Origin("user.name", cancellationToken) == key) && (email is null || Origin("user.email", cancellationToken) == key);
-    }
-
-    /// <summary>Where git gets <paramref name="setting"/> from (<c>git config --show-origin</c>), or null if it isn't set.</summary>
-    private string? Origin(string setting, CancellationToken cancellationToken)
-    {
-        var run = Run(["config", "--show-origin", "--get", setting], cancellationToken);
+        var run = Run(["config", "--local", "--get-all", key], cancellationToken);
         if (run.ExitCode == 1)
         {
-            return null;
+            return [];
         }
 
         if (!run.Succeeded)
         {
-            throw new HistoryException($"Git couldn't read its '{setting}' setting: {run.Said}");
+            throw new HistoryException($"Git couldn't read its '{key}' setting: {run.Said}");
         }
 
-        return run.Output.Split('\t')[0];
+        return run.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(v => v.TrimEnd('\r')).ToArray();
     }
+
+    /// <summary>
+    /// Puts <paramref name="written"/> settings back as they were, last first, and returns the
+    /// keys it couldn't, in the order they were saved. Whatever stopped the save may stop this too.
+    /// It stops at the first it can't, so signing, saved first, is the last to come back on.
+    /// </summary>
+    private List<string> TakeBack(List<(string Key, string[] Before)> written)
+    {
+        for (var i = written.Count - 1; i >= 0; i--)
+        {
+            var (key, before) = written[i];
+            try
+            {
+                var unset = Run(["config", "--local", "--unset-all", key], CancellationToken.None, GitCallKind.MustFinish);
+                var restored = unset.Succeeded && before.All(value => Run(["config", "--local", "--add", key, value], CancellationToken.None, GitCallKind.MustFinish).Succeeded);
+                if (!restored)
+                {
+                    return written.Take(i + 1).Select(w => w.Key).ToList();
+                }
+            }
+            catch (HistoryException)
+            {
+                return written.Take(i + 1).Select(w => w.Key).ToList();
+            }
+        }
+
+        return [];
+    }
+
+    /// <summary>
+    /// True if something git prefers to <c>user.name</c> or <c>user.email</c> gives the
+    /// <paramref name="field"/> not given: <c>author.email</c>, say, or <c>GIT_COMMITTER_EMAIL</c>.
+    /// </summary>
+    private bool OtherSource(string field, CancellationToken cancellationToken) =>
+        EnvironmentValue($"GIT_AUTHOR_{field.ToUpperInvariant()}") is not null
+        || EnvironmentValue($"GIT_COMMITTER_{field.ToUpperInvariant()}") is not null
+        || Setting($"author.{field}", cancellationToken) is not null
+        || Setting($"committer.{field}", cancellationToken) is not null;
 
     /// <summary>True if git would sign a commit or tag made now. A value git can't read as true or false counts as on.</summary>
     private bool SignsNow(CancellationToken cancellationToken) => SignsCheckpoints.Any(key =>
@@ -882,7 +942,8 @@ public sealed class GitHistorySetup : IHistorySetup
 
     private void SetLocal(string key, string value, CancellationToken cancellationToken)
     {
-        var run = Run(["config", "--local", key, value], cancellationToken, GitCallKind.MustFinish);
+        // All of a key's values: more than one would otherwise refuse the save.
+        var run = Run(["config", "--local", "--replace-all", key, value], cancellationToken, GitCallKind.MustFinish);
         if (!run.Succeeded)
         {
             throw new HistoryException($"git config {key} failed: {run.Said}");

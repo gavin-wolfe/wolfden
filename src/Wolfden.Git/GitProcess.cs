@@ -38,19 +38,9 @@ internal sealed partial record GitRun(int ExitCode, string Output, string Error,
         }
     }
 
-    /// <summary>
-    /// <see cref="Said"/>, unless it's about signing: gpg's and ssh-keygen's
-    /// words can name who a key belongs to, so those aren't repeated (#286).
-    /// </summary>
-    public string SaidWithoutSigner => SigningOutput().IsMatch(Error.Length > 0 ? Error : Output)
-        ? "git couldn't sign it, and what it said isn't repeated here, since that can name who the key belongs to: run 'git commit' in the den's folder to see it"
-        : Said;
-
-    [GeneratedRegex(@"(bad config (?:line \d+ )?in) (?:file|blob) .*$")]
+    // Only where the line is about config: a hook can name a file of its own this way.
+    [GeneratedRegex(@"(\bconfig\b.*?\bin) (?:file|blob) .*$")]
     private static partial Regex ConfigFilePath();
-
-    [GeneratedRegex("gpg|ssh-keygen|failed to sign", RegexOptions.IgnoreCase)]
-    private static partial Regex SigningOutput();
 }
 
 /// <summary>Git can't be run at all: it isn't installed, or isn't on the PATH.</summary>

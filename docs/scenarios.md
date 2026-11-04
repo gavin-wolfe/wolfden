@@ -3355,6 +3355,23 @@ Spec: types.md F-TPL-6, format.md F-KEY-4, F-KEY-5 (#289). Covered by:
 `CreateContainerTests.ABookWithAnOldHyphenKeyKeepsItAndItsPositionsStillResolve`,
 `ImageEndpointTests.AnImagesNameDropsAnApostropheAsASlugDoes`.
 
+### SC-MCP-44. My assistant writes a character who knows more than the reader
+
+I ask my assistant to draft a scene with Renfield at `dracula:20`. He has
+already let the Count in, and the reader learns that at `dracula:21`.
+
+- `get_entity` for Renfield with `as_of` `dracula:20` has him in view, with
+  nothing about his death, that he turns on his master, or how he let the Count in,
+  and the event *Renfield lets the Count in* isn't in view at all.
+- `get_entity` with no `as_of` has all of it, so the assistant can read the two
+  together: what the reader knows, and what the note holds beyond that.
+- The server's instructions tell it when to read ahead, and that a later fact
+  can shape hints, and how a character who'd already know it behaves, without
+  the prose stating it. He's let the Count in by then, but his death hasn't
+  happened. The prose is the assistant's, so no test can hold it to that.
+
+Spec: #300. Covered by: `McpServerTests`.
+
 ## STORE: Wolfden saves, moves, and deletes notes
 
 Background: the den store (design.md §6, #121) is how Wolfden writes a

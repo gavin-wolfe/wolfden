@@ -142,7 +142,9 @@ public static class HistorySetupEndpoints
         // say which, so the page asks only for what's missing. To the page they're the same question.
         return result.Code is HistorySetupCodes.IdentityNeeded or HistorySetupCodes.IdentityHalfGiven
             ? Results.Json(new ApiError(HistorySetupCodes.IdentityNeeded, message, NeedsName: result.NeedsName, NeedsEmail: result.NeedsEmail), statusCode: status)
-            : Error(status, result.Code!, message);
+            : Results.Json(
+                new ApiError(result.Code!, message, IdentitySaved: result.Status == HistorySetupStatus.Incomplete && result.IdentitySaved.Count > 0 ? result.IdentitySaved : null),
+                statusCode: status);
     }
 
     /// <summary>The request from a POST's JSON body, checked.</summary>

@@ -280,6 +280,21 @@ public sealed class FreezeBookTests : IDisposable
 
     [Fact]
     [Trait("Scenario", "SC-HIST-13")]
+    public void ATagThatCantBeSignedEndsItsSentenceBeforeSayingTheCheckpointStands()
+    {
+        RunGit("init", "--quiet");
+        Commit("Start the Dracula notes");
+        RunGit("config", "--local", "tag.gpgsign", "true");
+        RunGit("config", "--local", "gpg.program", "no-such-signer");
+
+        var failed = WithGit().FreezeBook("dracula", null);
+
+        Assert.Equal(FreezeSnapshot.TagFailed, failed.Snapshot);
+        Assert.Contains("which makes the tag if it succeeds. The checkpoint stands.", failed.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-13")]
     public void ATagGitRefusesLeavesTheCheckpointAndFreezingAgainTagsIt()
     {
         RunGit("init", "--quiet");
@@ -297,6 +312,7 @@ public sealed class FreezeBookTests : IDisposable
         Assert.Null(failed.Tag);
         Assert.Contains($"is final and checkpointed ({frozenAt[..7]}), but the tag failed", failed.Message, StringComparison.Ordinal);
         Assert.Contains("The checkpoint stands", failed.Message, StringComparison.Ordinal);
+        Assert.Matches(@"[.!?] The checkpoint stands\.", failed.Message);
         Assert.True(tools.GetBookFreeze("dracula").Unfinished);
 
         // Later work is checkpointed meanwhile; the retry still tags the checkpoint that froze the book.

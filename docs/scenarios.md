@@ -3979,9 +3979,12 @@ the den's folder by hand, and made no commit.
   If saving them fails in a repository this run made, the repository is
   taken away again. In one that was already there, what was saved is taken
   back, and if that can't be done, the output names the settings still
-  saved. Every one of these asks for the same `--author-name` and
+  saved. Each of those asks for the same `--author-name` and
   `--author-email` again, without repeating them, and doesn't offer the web
-  UI's dialog.
+  UI's dialog. When they were saved and a later step stopped it, the output says
+  they stay, so finishing without them records them, not what git has, and
+  that giving others before the first checkpoint replaces them. It doesn't
+  offer the dialog either.
 
 Spec: design.md §6, "Turning history on" (#195, #286). Covered by:
 `HistorySetupTests.AFailedSaveInARepositoryThisRunMadeTakesTheRepositoryAway`,
@@ -4128,10 +4131,11 @@ is for what they write as Ash Calloway, so they run `wolfden init --git
   reads later still beats them (`GIT_CONFIG_COUNT`, `GIT_CONFIG_PARAMETERS`,
   `extensions.worktreeConfig`, an `[include]` in the repository's config),
   no checkpoint is made and the value isn't repeated. A repository this run
-  made is taken away again. In one that was already there, what was saved is
-  taken back, so the next commit from anywhere is under git's own name, not
-  the pen name signed by another key. The output names anything that couldn't
-  be taken back.
+  made is taken away again. In one that was already there, what this try saved
+  is put back as it was, so the next commit from anywhere isn't the pen name
+  signed by another key, unless an earlier try that stopped part way had
+  saved it (`docs/using-wolfden.md`'s limits, #311). The output names anything that couldn't
+  be put back.
 
 Spec: design.md §6, "Turning history on" (maintainer decision, 2026-11-03,
 #286). Covered by:
@@ -5211,7 +5215,8 @@ on…**, then **Turn on history**.
 - The dialog says what a checkpoint is, and not to turn history on for
   a den in a synced folder. A checkbox, ticked, makes a first
   checkpoint, "Start of history". When git has no name or email, the
-  dialog asks for them (SC-HIST-15); otherwise it doesn't.
+  dialog asks for them (SC-HIST-15); otherwise it doesn't, and offers a
+  different name instead (SC-WEB-99).
 - Once it's on, the dialog lists what was done, and the top bar goes
   quiet: the server uses the new history at once, without a restart, for
   the indicator, the History tab, the next checkpoint, and freezing.
@@ -6240,3 +6245,49 @@ A section of a note holds until chapter 5, and I'm reading at chapter 3.
 
 Spec: F-VIEW-4 (#288). Covered by: `ReadEndpointTests.AFactsFutureUntilStaysForTheWriter`,
 `web/src/AheadOfReaders.test.tsx`.
+
+### SC-WEB-99. I use a different name for this den when I turn on history
+
+Git on this computer has the writer's everyday name and email. They're turning
+on history for a den they write under a pen name, from **No history · Turn
+on…**.
+
+- The dialog has **Use a different name for this den**, closed. It's a button
+  that says whether it's open (`aria-expanded`), so a keyboard and a screen
+  reader can use it. Nothing changes if it's left closed: checkpoints record
+  what git has, and the dialog says that much without saying what git has.
+- Opened, it shows a name and an email, both required, and what that does to
+  signing. One alone, or one of only spaces, is refused in the page, with
+  focus on the one that's missing, as #286's rule goes: both or neither.
+- They're sent as `--author-name` and `--author-email` are, and do what they
+  do (SC-HIST-21, SC-HIST-23). The list of what was done says signing was
+  turned off, if git was set to sign, and how to turn it back on.
+- Closed again after typing, what's typed isn't sent, and the dialog says so.
+  Opened again, it's still there. If git turns out to need a name and email
+  after all, the usual fields appear with what was typed, so it's sent only
+  once it can be seen.
+- A den that has checkpoints by then, one inside a larger repository, or a
+  value git won't record: the dialog shows the refusal, keeps what's typed,
+  and stays open. Nothing is changed (SC-HIST-17).
+- If it stops part way (a hook refuses the first checkpoint), the dialog says
+  what was done, and trying again sends the name again (SC-HIST-16). If the
+  try left the name saved and the writer closes this part, the dialog says that
+  name stays and is what's recorded, not what git has, and that opening this and
+  giving both replaces it.
+- Enter on the first checkpoint's checkbox, where focus starts, doesn't submit,
+  so one stray key can't record git's name before the writer has read the dialog.
+  A held Enter does nothing anywhere in it. Enter in a field, or on a button, does what it usually does.
+- The heading follows a refusal: "History is already on", or "Turning on history
+  stopped", rather than "History is off" above a message saying otherwise.
+- A complaint about a missing field goes once it's filled in.
+- A repository with no commits gets the checkpoint dialog, not this one, so
+  there's no different name there; the command line still has it.
+- The browser isn't asked to fill in these two fields, since its saved name is
+  likely to be the one being kept apart.
+
+Spec: design.md §6, "Turning history on", §9 (maintainer decision, #314). Step 2,
+a picker of the den's authors, waits for #311. Covered by:
+`HistorySetupEndpointTests.ADifferentNameFromTheDialogGetsTheSameSigningNoticeAndNoSignature`,
+`HistorySetupEndpointTests.ADifferentNameIsRefusedInADenWithCheckpointsOrInALargerRepositoryWithNothingChanged`,
+`HistorySetupEndpointTests.ADifferentNameThatStopsPartWayIsKeptOnARetryFromTheDialog`,
+`Checkpoint.test.tsx` (web).

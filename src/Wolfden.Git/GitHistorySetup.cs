@@ -216,6 +216,7 @@ public sealed class GitHistorySetup : IHistorySetup
         var made = false;
         string? gitIgnore = null;
         var saved = new List<string>();
+        var tookBack = false;
 
         // 1. The repository. The name and email are checked once it's there, since what
         // git has for it can depend on where it is (includeIf "gitdir:…").
@@ -429,7 +430,8 @@ public sealed class GitHistorySetup : IHistorySetup
                 steps.Add("Made the den's folder a git repository.");
             }
 
-            var text = status == HistorySetupStatus.Refused ? $"{problem} {notDone}" : $"{problem} {notDone} {(given ? HowToFinishWithAName : HowToFinish)}";
+            var howToFinish = !given ? HowToFinish : saved.Count == 2 && !tookBack ? HowToFinishWithANameSaved : HowToFinishWithAName;
+            var text = status == HistorySetupStatus.Refused ? $"{problem} {notDone}" : $"{problem} {notDone} {howToFinish}";
             return new HistorySetupResult(status, code, text, steps, status == HistorySetupStatus.Refused ? null : _denRoot, made, gitIgnore, saved, null, needsName, needsEmail);
         }
 
@@ -454,17 +456,19 @@ public sealed class GitHistorySetup : IHistorySetup
             }
         }
 
-        // In a repository that was already there: as it was, if git lets it be. Says what's left.
+        // In a repository that was already there: as it was before this try, if git lets it be, which
+        // keeps a name an earlier try saved. So it says "put back", not that nothing's left. Says what is.
         string TakeBackWhatWasSaved()
         {
+            tookBack = true;
             var leftover = TakeBack(written);
             saved.RemoveAll(key => !leftover.Contains(key));
             signingOff = signingOff && SigningSettings.All(leftover.Contains);
             AddSavedSteps();
             var checkpointNotDone = request.FirstCheckpoint ? " No first checkpoint was made." : "";
             return leftover.Count == 0
-                ? $"What had been saved was taken back.{checkpointNotDone}"
-                : $"These couldn't be taken back, and are still saved for this den: {string.Join(", ", leftover)}.{checkpointNotDone}";
+                ? $"What this try saved was put back as it was.{checkpointNotDone}"
+                : $"These couldn't be put back as they were, and are still saved for this den: {string.Join(", ", leftover)}.{checkpointNotDone}";
         }
 
         void Save(string key, string value)
@@ -490,6 +494,15 @@ public sealed class GitHistorySetup : IHistorySetup
     private const string HowToFinishWithAName =
         "The den's folder is a git repository now, so to finish, fix the problem and run 'wolfden init --git --author-name \"<name>\" --author-email <email>' in the den again, " +
         "with the same name and email: it picks up where this stopped. Without them, its checkpoints can be recorded under what git has.";
+
+    /// <summary>
+    /// The same when the name and email were all saved, and something later stopped it. They
+    /// stay, so going on without them records them, not what git has, and only others replace them.
+    /// </summary>
+    private const string HowToFinishWithANameSaved =
+        "The den's folder is a git repository now, so to finish, fix the problem and run 'wolfden init --git' in the den again: it picks up where this stopped. " +
+        "The name and email given stay saved for this den, so its checkpoints are recorded under them, not what git has, " +
+        "whether or not they're given again. To use others, add --author-name \"<name>\" --author-email <email> to that command before the first checkpoint.";
 
     /// <summary>
     /// Why a name or email given can't be used alone, in words, or null if it

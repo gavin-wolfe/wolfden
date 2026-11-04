@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { count } from '../api'
+import { ApiRequestError, count } from '../api'
 import {
   CHECKPOINT_STATUS_KEY,
   changeWord,
@@ -8,6 +8,7 @@ import {
   groupChanges,
   IdentityNeededError,
   makeCheckpoint,
+  NameSavedError,
   turnOnHistory,
   type CheckpointMade,
   type CheckpointStatus,
@@ -427,7 +428,10 @@ function Outcome({ made }: { made: CheckpointMade }) {
  * folder becomes a git repository, `.wolfden/` goes in its `.gitignore`, and,
  * unless the writer unticks it, a first checkpoint, "Start of history", is
  * made. When git has no name or email for the den, the form asks for them;
- * they're saved for this den only. A server that can't turn it on (or a den
+ * they're saved for this den only. When git has them, "Use a different name
+ * for this den" opens the same fields, for a pen name (#314): both required,
+ * sent the way `--author-name` and `--author-email` are, and only while it's
+ * open. What git has is never shown. A server that can't turn it on (or a den
  * where it can't be) says why, and how to do it from the command line.
  */
 function TurnOnDialog({ status, onClose }: { status: CheckpointStatus; onClose: () => void }) {
@@ -437,13 +441,19 @@ function TurnOnDialog({ status, onClose }: { status: CheckpointStatus; onClose: 
   const emailId = useId()
   const firstId = useId()
   const errorId = useId()
+  const differentId = useId()
   const dialogRef = useRef<HTMLDivElement>(null)
   const doneRef = useRef<HTMLButtonElement>(null)
+  const refusalRef = useRef<HTMLDivElement>(null)
   const client = useQueryClient()
   const turnOn = status.turnOn ?? null
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [first, setFirst] = useState(true)
+  const [differentOpen, setDifferentOpen] = useState(false)
+  // A try that gave a name stopped part way, and the name stayed saved for the den. It stays true:
+  // a later try that's put back goes back to that name, not to what git has.
+  const [nameSaved, setNameSaved] = useState(false)
   const [missing, setMissing] = useState<'name' | 'email' | null>(null)
   // What the server asked for when it refused with identity_needed (#207). Kept in state, not read
   // from the mutation's error, so the fields don't go and come back while a retry is pending.
@@ -454,7 +464,12 @@ function TurnOnDialog({ status, onClose }: { status: CheckpointStatus; onClose: 
     // Whether or not every step was done, the den may have history now: everything that shows it looks again.
     onSettled: () => client.invalidateQueries(),
     onError: (error) => {
-      if (error instanceof IdentityNeededError) {
+      if (error instanceof NameSavedError) {
+        setNameSaved(true)
+      }
+
+      // With a different name open, both fields are there already, and both were sent.
+      if (error instanceof IdentityNeededError && !different) {
         // Git needs a name or email after all (it can depend on where the repository is): ask for
         // just what's missing, and keep a field the writer filled in, since it's sent again.
         setAsked((was) => ({
@@ -471,6 +486,12 @@ function TurnOnDialog({ status, onClose }: { status: CheckpointStatus; onClose: 
   // that depends on where the repository is), so the fields are optional until the server says
   // they're really missing.
   const required = (turnOn?.identityCertain ?? true) || asked !== null
+  // Once git needs a name and email, the fields are asked for anyway, so there's nothing to open.
+  const differentOffered = !askName && !askEmail
+  const different = differentOffered && differentOpen
+  const showName = askName || different
+  const showEmail = askEmail || different
+  const fieldsRequired = required || different
   const busy = mutation.isPending
 
   useEffect(() => {
@@ -485,15 +506,22 @@ function TurnOnDialog({ status, onClose }: { status: CheckpointStatus; onClose: 
     }
   }, [mutation.isSuccess, busy])
 
+  // With the fields open, the dialog can be taller than the window, and a refusal lands below its fold.
+  useEffect(() => {
+    if (mutation.isError) {
+      refusalRef.current?.scrollIntoView?.({ block: 'nearest' })
+    }
+  }, [mutation.isError, mutation.error])
+
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    if (required && askName && name.trim() === '') {
+    if (fieldsRequired && showName && name.trim() === '') {
       setMissing('name')
       document.getElementById(nameId)?.focus()
       return
     }
 
-    if (required && askEmail && email.trim() === '') {
+    if (fieldsRequired && showEmail && email.trim() === '') {
       setMissing('email')
       document.getElementById(emailId)?.focus()
       return
@@ -501,11 +529,11 @@ function TurnOnDialog({ status, onClose }: { status: CheckpointStatus; onClose: 
 
     setMissing(null)
     const request: TurnOnRequest = { firstCheckpoint: first }
-    if (askName && name.trim() !== '') {
+    if (showName && name.trim() !== '') {
       request.authorName = name.trim()
     }
 
-    if (askEmail && email.trim() !== '') {
+    if (showEmail && email.trim() !== '') {
       request.authorEmail = email.trim()
     }
 
@@ -520,8 +548,92 @@ function TurnOnDialog({ status, onClose }: { status: CheckpointStatus; onClose: 
       }
     } else if (e.key === 'Tab') {
       trapTab(e, dialogRef.current)
+    } else if (e.key === 'Enter' && e.repeat) {
+      // A key held down from whatever opened the dialog does nothing here, wherever focus landed.
+      e.preventDefault()
     }
   }
+
+  // The first checkpoint's name can't be changed afterwards, so a stray Enter on the box that has
+  // focus at first doesn't submit, before the writer has read the dialog.
+  const onFirstKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+    }
+  }
+
+  const refusedCode = mutation.error instanceof ApiRequestError ? mutation.error.code : null
+  const formTitle =
+    refusedCode === 'has_repository' || refusedCode === 'in_repository'
+      ? 'History is already on'
+      : refusedCode === 'history_failed' || refusedCode === 'write_failed'
+        ? 'Turning on history stopped'
+        : 'History is off'
+  const typedDifferent = name.trim() !== '' || email.trim() !== ''
+
+  // One set of fields, whether git needs them or the writer opened a different name, so what's
+  // typed carries over if git turns out to need them. A browser's saved name isn't offered for a
+  // different one: it's likely to be the name the writer is keeping apart from this den.
+  const identityFields = (
+    <>
+      {showName && (
+        <>
+          <label htmlFor={nameId} className="checkpoint-label">
+            Name
+          </label>
+          <input
+            id={nameId}
+            type="text"
+            autoComplete={different ? 'off' : 'name'}
+            maxLength={200}
+            required={fieldsRequired}
+            aria-required={fieldsRequired}
+            aria-invalid={missing === 'name'}
+            aria-describedby={missing === 'name' ? errorId : undefined}
+            value={name}
+            disabled={busy}
+            onChange={(e) => {
+              setName(e.target.value)
+              if (missing === 'name' && e.target.value.trim() !== '') {
+                setMissing(null)
+              }
+            }}
+          />
+        </>
+      )}
+      {showEmail && (
+        <>
+          <label htmlFor={emailId} className="checkpoint-label">
+            Email
+          </label>
+          <input
+            id={emailId}
+            type="text"
+            inputMode="email"
+            autoComplete={different ? 'off' : 'email'}
+            maxLength={200}
+            required={fieldsRequired}
+            aria-required={fieldsRequired}
+            aria-invalid={missing === 'email'}
+            aria-describedby={missing === 'email' ? errorId : undefined}
+            value={email}
+            disabled={busy}
+            onChange={(e) => {
+              setEmail(e.target.value)
+              if (missing === 'email' && e.target.value.trim() !== '') {
+                setMissing(null)
+              }
+            }}
+          />
+        </>
+      )}
+      {missing && (
+        <p id={errorId} className="field-error" role="alert">
+          {missing === 'name' ? 'Give a name for the checkpoints. A pen name will do.' : 'Give an email for the checkpoints. A placeholder will do.'}
+        </p>
+      )}
+    </>
+  )
 
   return (
     <div className="dialog-backdrop" onMouseDown={(e) => e.target === e.currentTarget && !busy && onClose()}>
@@ -558,7 +670,7 @@ function TurnOnDialog({ status, onClose }: { status: CheckpointStatus; onClose: 
           </>
         ) : turnOn?.possible ? (
           <form onSubmit={submit} noValidate>
-            <h2 id={titleId}>History is off</h2>
+            <h2 id={titleId}>{formTitle}</h2>
             <div id={descriptionId}>
               <p>
                 A checkpoint saves a version of the den's notes that you can look back at or compare with later. Turn on history to start
@@ -579,60 +691,55 @@ function TurnOnDialog({ status, onClose }: { status: CheckpointStatus; onClose: 
                   Any name will do, a pen name included, and the email can be a placeholder, such as you@example.com. They're saved for this
                   den only.
                 </p>
-                {askName && (
-                  <>
-                    <label htmlFor={nameId} className="checkpoint-label">
-                      Name
-                    </label>
-                    <input
-                      id={nameId}
-                      type="text"
-                      autoComplete="name"
-                      maxLength={200}
-                      required={required}
-                      aria-required={required}
-                      aria-invalid={missing === 'name'}
-                      aria-describedby={missing === 'name' ? errorId : undefined}
-                      value={name}
-                      disabled={busy}
-                      onChange={(e) => setName(e.target.value)}
-                    />
-                  </>
-                )}
-                {askEmail && (
-                  <>
-                    <label htmlFor={emailId} className="checkpoint-label">
-                      Email
-                    </label>
-                    <input
-                      id={emailId}
-                      type="text"
-                      inputMode="email"
-                      autoComplete="email"
-                      maxLength={200}
-                      required={required}
-                      aria-required={required}
-                      aria-invalid={missing === 'email'}
-                      aria-describedby={missing === 'email' ? errorId : undefined}
-                      value={email}
-                      disabled={busy}
-                      onChange={(e) => setEmail(e.target.value)}
-                    />
-                  </>
-                )}
-                {missing && (
-                  <p id={errorId} className="field-error" role="alert">
-                    {missing === 'name' ? 'Give a name for the checkpoints. A pen name will do.' : 'Give an email for the checkpoints. A placeholder will do.'}
-                  </p>
-                )}
+                {identityFields}
               </fieldset>
             )}
             <label htmlFor={firstId} className="turn-on-first">
-              <input id={firstId} type="checkbox" checked={first} disabled={busy} onChange={(e) => setFirst(e.target.checked)} /> Make a first
+              <input id={firstId} type="checkbox" checked={first} disabled={busy} onKeyDown={onFirstKeyDown} onChange={(e) => setFirst(e.target.checked)} /> Make a first
               checkpoint, “Start of history”, of the den as it is now
             </label>
+            {differentOffered && (
+              <div className="turn-on-different">
+                <button
+                  type="button"
+                  className="turn-on-disclosure"
+                  aria-expanded={different}
+                  aria-controls={different ? differentId : undefined}
+                  disabled={busy}
+                  onClick={() => {
+                    setMissing(null)
+                    setDifferentOpen(!differentOpen)
+                  }}
+                >
+                  <span aria-hidden="true">{different ? '▾' : '▸'}</span> Use a different name for this den
+                </button>
+                {different ? (
+                  <fieldset id={differentId} className="turn-on-identity">
+                    <legend>Who makes the checkpoints</legend>
+                    <p className="muted">
+                      Checkpoints record this name and email instead of the ones git has, and each keeps the name it was made with. Give both: any
+                      name will do, a pen name included, and the email can be a placeholder, such as you@example.com. They're saved for this den
+                      only.{nameSaved && " They replace the name and email the last try saved."}
+                    </p>
+                    <p className="muted">
+                      Signing goes off for this den when you give them, so that git's key can't sign under this name and tie the two together for
+                      good. If git is set to sign, Wolfden says so when it's done, and how to sign here with a key of this name's.
+                    </p>
+                    {identityFields}
+                  </fieldset>
+                ) : (
+                  <p className="muted turn-on-different-note">
+                    {nameSaved
+                      ? `${typedDifferent ? "What you typed isn't used while this is closed. " : ''}The name and email the last try saved stay: checkpoints will record those, not what git has. To replace them, open this and give both.`
+                      : typedDifferent
+                        ? "What you typed isn't used while this is closed: checkpoints will record the name and email git has."
+                        : 'Otherwise, checkpoints record the name and email git has.'}
+                  </p>
+                )}
+              </div>
+            )}
             {mutation.isError && (
-              <div className="error" role="alert">
+              <div className="error" role="alert" ref={refusalRef}>
                 <p>{mutation.error.message}</p>
               </div>
             )}

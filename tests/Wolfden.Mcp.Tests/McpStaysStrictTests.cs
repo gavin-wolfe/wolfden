@@ -248,6 +248,7 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
         _server = WolfdenMcpServer.RunAsync(transport, tools, "0.1.0-test", _log, watch: false, _stop.Token);
         _client = await McpClient.CreateAsync(
             new StreamClientTransport(_toServer.Writer.AsStream(), _toClient.Reader.AsStream()),
+            TestClient.Options(),
             cancellationToken: TestContext.Current.CancellationToken);
     }
 

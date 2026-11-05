@@ -234,8 +234,11 @@ prompts. This list is for knowing what the assistant can do.
 - **No lost edits.** A write to an existing file takes the hash the
   assistant read (`get_entity`, `get_chapter`, or `get_chapter_defaults`
   give it), and is refused if the file has changed since, for example
-  because you edited it in your text editor. The assistant reads it again
-  and retries.
+  because you edited it in your text editor. The file is compared again
+  just before each try at saving, so a save you make while Wolfden is
+  waiting to save stays too. The assistant reads it again and retries. A
+  save in the moment between that comparison and Wolfden's save can still
+  be lost (format.md F-GEN-5).
 - **Finished books stay finished.** Nothing in a book with `status: final`
   is written: its entities, `book.md`, or outline. A rename that would
   have to rewrite a link in one is refused as a whole, and so is a change
@@ -334,6 +337,10 @@ docs. The writer's own list is in
   again (`get_entity`, `get_chapter`, or `get_chapter_defaults`), and
   make the edit on what's there now. Never resend the old text over the
   writer's change.
+- **`write_failed` listing files means tell the writer, and don't retry yet.** A
+  write stopped part way, and those files couldn't be put back. Pass on what it says
+  of each. Only a file it says holds the edit can be restored from history. One it
+  says another program saved holds that save: restoring it would lose it.
 - **`den_busy` means wait a moment, then retry.** Another Wolfden
   (`wolfden serve`, another assistant's session, or a command) was
   writing to the den for the whole 30 seconds a write waits. Nothing of

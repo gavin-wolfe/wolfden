@@ -524,11 +524,11 @@ public sealed class RenameEntityToolTests : IDisposable
 
         public bool FolderExists(string p) => _disk.FolderExists(p);
 
-        public void WriteFile(string p, byte[] bytes, Core.Structure.DenWriteMode mode = Core.Structure.DenWriteMode.CreateOrReplace) => _disk.WriteFile(p, bytes, mode);
+        public void WriteFile(string p, byte[] bytes, Core.Structure.DenWriteMode mode, byte[]? builtOn) => _disk.WriteFile(p, bytes, mode, builtOn);
 
-        public void DeleteFile(string p) => _disk.DeleteFile(p);
+        public void DeleteFile(string p, byte[]? builtOn) => _disk.DeleteFile(p, builtOn);
 
-        public void MoveFile(string from, string to) => _disk.MoveFile(from, to);
+        public void MoveFile(string from, string to, byte[]? builtOn) => _disk.MoveFile(from, to, builtOn);
 
         public void MoveFolder(string from, string to) => _disk.MoveFolder(from, to);
 

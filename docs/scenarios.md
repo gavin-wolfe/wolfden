@@ -3397,7 +3397,7 @@ rename him.
 - The rename is refused with `den_unreadable`, naming the note, and nothing is
   written. Once the save has finished, the note is whole, the same call goes
   through, and the link follows. That holds for a save already under way when the
-  write reads the note; see the last point here for one that starts after.
+  write reads the note; for one that starts after, see SC-STORE-6.
 - The same goes for `change_alias`, `rename_section`, `move_entity`, `copy_entity`,
   `create_entity`, and an `add_idea` that makes a new note, for a freeze that will
   checkpoint, and for a freeze of the book a note is in. A new book or series is
@@ -3411,7 +3411,10 @@ rename him.
   `book.md`, and doesn't say the book is gone. If the save has stopped inside the
   frontmatter, the index can't load what it read, so the lookup fails. Then it's
   still `den_unreadable`, with the lookup's own error first, such as "has no book",
-  and then "Couldn't read `book.md` right now, which may be why."
+  and then "Couldn't read `book.md` right now, which may be why." If the lookup's
+  error is an error in the open file itself, it only names the file: that file isn't
+  broken and will be whole once the save ends, so it doesn't say how to fix it. An
+  error in a different file keeps its advice.
 - Adding an image is refused the same way if what's above the note is open, since
   that's how it knows whether the book is final. So an image can't reach a final
   book this way. The note itself being open doesn't stop it: an image doesn't read
@@ -3427,16 +3430,15 @@ rename him.
   it: a read can see that file.
 - On Linux and macOS, Wolfden can't tell a program has a file open, so none of
   these refusals come, and a write can build on part of a save, as it always could.
-- **What it can't catch, for now:** a save that starts after the write has read the
-  file. On Windows, if it stalls for a moment, about 100–250 ms in the measurements,
-  the store's retry keeps trying and replaces the file once the program closes it.
-  The write reports success, and that save is gone. #323 will compare the file again
-  before each retry. Linux and macOS have no such retry, and this wasn't measured there.
+- A save that starts after the write has read the file is SC-STORE-6: the write
+  compares again before each try, and leaves that save alone.
 
 Spec: format.md F-GEN-5, F-RT-5, F-BOOK-1 (#298). Covered by:
 `SharedFileWriteTests.ARenameIsRefusedByAStalledSaveInAnotherProcessAndTheNoteIsLeftWhole`,
 `SharedFileWriteTests.AFreezeIsRefusedByAStalledSaveInAnotherProcessAndTagsNothing`,
 `SharedFileWriteTests.AddingAChapterDuringAStalledSaveOfBookMdNamesIt`,
+`SharedFileWriteTests.ANoteUnderABookMdStalledInASaveIsntSaidToNeedAFix`,
+`SharedFileWriteTests.AnErrorInAFileThatIsntTheOneOpenKeepsItsAdvice`,
 `SharedFileWriteTests.EditingANoteDuringAStalledSaveOfItsBookMdNamesThat`,
 `SharedFileWriteTests.EditingANoteDuringAStalledSaveOfItNamesIt`,
 `SharedFileWriteTests.AnImageCantReachAFrozenBookDuringAStalledSaveOfItsBookMd`,
@@ -3746,6 +3748,68 @@ Spec: design.md §3, §6. Covered by:
 `DenStoreTests.AMoveDoesntOverwriteOrMoveAFolderIntoItself`,
 `DenStoreTests.ACaseOnlyFolderRenameGoesThroughAHiddenNameWhenThePlainMoveIsRefused`,
 `DenStoreTests.ACaseOnlyFolderRenameThatFailsHalfWayIsPutBack`.
+
+### SC-STORE-6. Another program saves a note just as Wolfden saves it
+
+Wolfden is about to save Ilse Tarrow's note, built on what it read. Another
+program starts saving the same note just after Wolfden's comparison, pauses part
+way, and closes the file. On Windows, Wolfden's save is refused while the file is
+open, and it tries again for a moment.
+
+- Before each try, the first one too, Wolfden compares the note with what its change
+  was built on. If it differs, even by part of a save still under way, or if the note
+  is gone, the try isn't made: the write is `stale_file`, naming the note. Reading it
+  again and retrying builds on the other program's save.
+- A note that's only open, unchanged, as a virus scanner or indexer has it, is tried
+  again as before, and saved once it's let go. If it's still held after the last try,
+  the refusal says another program has it open.
+- A note locked against reading can't be compared, so that try isn't made. The next
+  look decides once it's let go.
+- A rename, a move, or anything else that writes several files puts back what it had
+  written and says nothing changed, naming the first few files. The same goes for the
+  steps of a move.
+- If a file can't be put back, the write is `write_failed`, not `stale_file`, since
+  reading again and retrying isn't the answer, and the page shows the message. It says
+  what's in each file now. One that holds the edit can be checked or restored from
+  history. One another program saved since is left as that program left it, may have
+  old links, and the message says not to restore it, since that would lose the save.
+  One still open can't be told, so it says to check it once closed. If a move leaves
+  the note at its new path, it says so.
+- **What it can't catch:** a save made all at once, in the moment between the last
+  comparison and Wolfden's save, is still replaced, and the write reports success. A
+  save that stalls can't land there, since the file is open and the move is refused.
+  A temp-and-rename save can. On Windows, with real processes, on saves aimed across
+  the call: 6 of 300 lost by `append_section`, 4 of 300 by a web save, and 2 of 300 by
+  `rename_entity`, against 18, 21, and 63 of 300 before this. Stalled in place, it's 0
+  of 300 against 12–13. A file deleted in that moment can come back the same way (2
+  and 5 of 100, against 65 and 84). Those rates aren't everyday use. Linux and macOS
+  have no retry, and weren't measured. They do compare before the one try.
+  `check --fix` has no retry, and compares just before its one write.
+- A program's save that lands after Wolfden's replaces Wolfden's change, and Wolfden
+  has already reported success. That's the other order, and isn't new.
+
+Spec: format.md F-GEN-5, F-RT-5, design.md §6 (#323). Covered by:
+`DenStoreTests.ASaveMadeWhileTheStoreWaitsIsntReplaced`,
+`DenStoreTests.PartOfASaveStillUnderWayCountsAsAChange`,
+`DenStoreTests.AFileOnlyOpenAndUnchangedIsStillTriedAgain`,
+`DenStoreTests.AFileHeldUnchangedThroughEveryTryIsStillInUse`,
+`DenStoreTests.AFileThatCantBeReadIsntTriedAndTheNextLookDecides`,
+`DenStoreTests.AFileDeletedWhileTheStoreWaitsIsntBroughtBack`,
+`DenStoreTests.ASaveJustBeforeTheFirstTryIsLeftOnEveryOs`,
+`DenStoreTests.AWriteThatMatchesWhatItBuiltOnGoesThroughOnEveryOs`,
+`DenStoreTests.AMoveOrDeleteLeavesASaveMadeWhileTheStoreWaits`,
+`SaveDuringWriteTests.AnEditLeavesASaveMadeJustBeforeItsWrite`,
+`SaveDuringWriteTests.AddingAChapterLeavesASaveOfBookMdMadeJustBeforeItsWrite`,
+`SaveDuringWriteTests.ARenameLeftByASavePartWayPutsBackWhatItWroteAndKeepsTheSave`,
+`SaveDuringWriteTests.ARenameLeftPartWaySaysAFileSavedDuringThePuttingBackIsntToBeRestored`,
+`SaveDuringWriteTests.ARealSaveFromAnotherProcessDuringThePuttingBackIsKeptAndNotToBeRestored`,
+`SaveDuringWriteTests.AFileStillBeingSavedDuringThePuttingBackIsNamedAsOneToCheckOnceClosed`,
+`SaveDuringWriteTests.AFileThatStillHoldsTheEditCanBeRestoredFromHistory`,
+`SaveDuringWriteTests.AMoveLeftAtItsNewPathBySaveSaysWhereTheNoteIs`,
+`SaveDuringWriteTests.AWholeDenWriteStoppedLateListsOnlyTheFirstFewItPutBack`,
+`SaveDuringWriteTests.AMoveLeftByASavePartWayPutsBackWhatItWroteAndKeepsTheSave`,
+`SaveDuringWriteTests.AMoveDoesntReplaceASaveOfTheNoteMadeJustBeforeItIsMoved`,
+`SharedFileWriteTests.ASaveInAnotherProcessThatStartsJustAfterTheComparisonIsLeftAlone`.
 
 ## HIST: version history
 
@@ -6439,9 +6503,13 @@ On Windows, I have a note open in another program that lets others read it.
 - If a rename or section rename is stopped because a different note changed, the
   message names that note. It doesn't say this note changed, or offer it as what
   changed.
+- If a write stops part way and some file can't be put back (SC-STORE-6), the page
+  shows what the server says of each file, even if it stopped at this note. A new
+  book or series doesn't say it wasn't created.
 
-Spec: format.md F-GEN-5 (#298). Covered by: `SharedReadEndpointTests`,
-`web/src/Editing.test.tsx` ("when another file stopped the save").
+Spec: format.md F-GEN-5 (#298, #323). Covered by: `SharedReadEndpointTests`,
+`web/src/Editing.test.tsx` ("when another file stopped the save"),
+`web/src/NewContainer.test.tsx` ("a write left part way").
 
 ### SC-WEB-99. I use a different name for this den when I turn on history
 

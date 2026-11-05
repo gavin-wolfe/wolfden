@@ -1147,7 +1147,9 @@ public sealed class WriteToolTests : IDisposable
         var failed = Assert.Throws<DenToolException>(() => tools.RenameSection("Mr. Swales", "Voice", "Dialect", hash));
 
         Assert.Equal(ToolErrorCodes.WriteFailed, failed.Code);
-        Assert.Contains($"couldn't be put back, and hold the edit: {Swales}", failed.Message, StringComparison.Ordinal);
+        Assert.Contains($"Another program saved or removed these since Wolfden wrote them, so they're left as that program left them, and may have old links: {Swales}.", failed.Message, StringComparison.Ordinal);
+        Assert.Contains("Don't restore them from history", failed.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("hold the edit", failed.Message, StringComparison.Ordinal);
         Assert.Equal(theirs, _den.Read(Swales));
     }
 
@@ -1369,7 +1371,7 @@ public sealed class WriteToolTests : IDisposable
 
         public bool FolderExists(string path) => _disk.FolderExists(path);
 
-        public void WriteFile(string path, byte[] bytes, Core.Structure.DenWriteMode mode = Core.Structure.DenWriteMode.CreateOrReplace)
+        public void WriteFile(string path, byte[] bytes, Core.Structure.DenWriteMode mode, byte[]? builtOn)
         {
             if (path == failing)
             {
@@ -1377,12 +1379,12 @@ public sealed class WriteToolTests : IDisposable
                 throw failure?.Invoke() ?? new Core.Structure.DenStoreException(Core.Structure.DenStoreError.AccessDenied, path, $"'{path}' is read-only.");
             }
 
-            _disk.WriteFile(path, bytes, mode);
+            _disk.WriteFile(path, bytes, mode, builtOn);
         }
 
-        public void DeleteFile(string path) => _disk.DeleteFile(path);
+        public void DeleteFile(string path, byte[]? builtOn) => _disk.DeleteFile(path, builtOn);
 
-        public void MoveFile(string from, string to) => _disk.MoveFile(from, to);
+        public void MoveFile(string from, string to, byte[]? builtOn) => _disk.MoveFile(from, to, builtOn);
 
         public void MoveFolder(string from, string to) => _disk.MoveFolder(from, to);
 

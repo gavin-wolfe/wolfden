@@ -71,7 +71,7 @@ public sealed class DenWatcherTests
         Assert.Same(store, watcher.Store);
 
         var text = File.ReadAllText(Path.Combine(den.Root, Ilse)).Replace("name: Ilse Tarrow", "name: Ilse Ellery", StringComparison.Ordinal);
-        store.WriteFile(Ilse, System.Text.Encoding.UTF8.GetBytes(text), DenWriteMode.Replace);
+        store.WriteFile(Ilse, System.Text.Encoding.UTF8.GetBytes(text), DenWriteMode.Replace, builtOn: null);
 
         var update = WaitFor(updates, u => u.Files.Contains(Ilse) || u.Kind == IndexUpdateKind.Rebuilt);
         Assert.DoesNotContain(update.Files, f => f.Contains(FileSystemDenStore.TempPrefix, StringComparison.Ordinal));

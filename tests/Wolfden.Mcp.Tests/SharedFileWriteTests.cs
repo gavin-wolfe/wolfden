@@ -556,10 +556,100 @@ public sealed class SharedFileWriteTests : IDisposable
             var refused = Assert.Throws<DenToolException>(() => Tools.ReplaceLead(named, "New text.\n", hash));
             Assert.Equal(ToolErrorCodes.DenUnreadable, refused.Code);
             Assert.Contains(Note, refused.Message, StringComparison.Ordinal);
+            AssertNoFixAdvice(refused);
             await saving.FinishAsync();
         }
 
         Assert.Equal(Head + Tail, _den.Read(Note));
+    }
+
+    /// <summary>A file that's part way through a save isn't broken: it's whole once the save ends, so a write mustn't say to fix it (#323).</summary>
+    private static void AssertNoFixAdvice(DenToolException refused)
+    {
+        Assert.Null(refused.LeftOut);
+        Assert.DoesNotContain("left out of the den", refused.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("frontmatter", refused.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("---", refused.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-43")]
+    public async Task ANoteUnderABookMdStalledInASaveIsntSaidToNeedAFix()
+    {
+        SkipUnlessWindows();
+        var whole = _den.Read(BookFile);
+        var hash = Tools.GetEntity("Mr. Swales").Entity!.Hash!;
+
+        await using (var saving = await StalledWriter.StartAsync(Full(BookFile), whole, InsideFrontmatter))
+        {
+            // By path: the note the index couldn't place, because of the part of book.md it read.
+            var refused = Assert.Throws<DenToolException>(() => Tools.ReplaceLead(Swales, "New text.\n", hash));
+            Assert.Equal(ToolErrorCodes.DenUnreadable, refused.Code);
+            Assert.Contains(BookFile, refused.Message, StringComparison.Ordinal);
+            AssertNoFixAdvice(refused);
+            await saving.FinishAsync();
+        }
+
+        Assert.Equal(whole, _den.Read(BookFile));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-43")]
+    public void AnErrorInAFileThatIsntTheOneOpenKeepsItsAdvice()
+    {
+        SkipUnlessWindows();
+        var broken = Notes + "/broken.md";
+        _den.Write(broken, "---\nid: 01M4TF5F0EKGGWD5FNVBAEY8Z3\ntype: note\nname: Broken\n\nThe frontmatter never closes.\n");
+        _ = Tools.Check();
+
+        using (OpenToWrite(Elsewhere))
+        {
+            var refused = Assert.Throws<DenToolException>(() => Tools.ReplaceLead(broken, "New text.\n", "0"));
+            Assert.Equal(ToolErrorCodes.DenUnreadable, refused.Code);
+            Assert.Contains($"left out of the den by an error in {broken}", refused.Message, StringComparison.Ordinal);
+            Assert.Contains($"Couldn't read {Elsewhere} right now, which may be why.", refused.Message, StringComparison.Ordinal);
+            Assert.Equal(broken, refused.LeftOut?.Path);
+        }
+
+        // Open itself, a broken file can't be told from one part way through a save. Closed, the advice is back.
+        using (OpenToWrite(broken))
+        {
+            AssertNoFixAdvice(Assert.Throws<DenToolException>(() => Tools.ReplaceLead(broken, "New text.\n", "0")));
+        }
+
+        var closed = Assert.Throws<DenToolException>(() => Tools.ReplaceLead(broken, "New text.\n", "0"));
+        Assert.Equal(ToolErrorCodes.UnknownEntity, closed.Code);
+        Assert.Contains($"left out of the den by an error in {broken}", closed.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-STORE-6")]
+    public async Task ASaveInAnotherProcessThatStartsJustAfterTheComparisonIsLeftAlone()
+    {
+        SkipUnlessWindows();
+        var hash = Tools.GetEntity("Whitby dialect").Entity!.Hash!;
+        StalledWriter? saving = null;
+        var tools = new DenTools(_den.Root)
+        {
+            BeforeWrite = () => saving = StalledWriter.StartAsync(Full(Note), Head + "The new text. " + Tail, Head.Length + 5).GetAwaiter().GetResult(),
+        };
+
+        try
+        {
+            var refused = Assert.Throws<DenToolException>(() => tools.ReplaceLead("Whitby dialect", "New text.\n", hash));
+            Assert.Equal(ToolErrorCodes.StaleFile, refused.Code);
+            Assert.Equal(Note, refused.StalePath);
+            await saving!.FinishAsync();
+        }
+        finally
+        {
+            if (saving is not null)
+            {
+                await saving.DisposeAsync();
+            }
+        }
+
+        Assert.Equal(Head + "The new text. " + Tail, _den.Read(Note));
     }
 
     [Fact]

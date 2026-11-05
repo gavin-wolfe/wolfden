@@ -34,7 +34,8 @@ namespace Wolfden.Core.Structure;
 /// that, and a file made in between isn't overwritten by
 /// <see cref="DenWriteMode.Create"/> or a move. Callers that need more,
 /// such as refusing to save over an edit made since a note was read, check
-/// for it themselves.
+/// for it themselves, and give the store what they read as <c>builtOn</c>, so
+/// it's compared again just before each try. That narrows the gap, and doesn't close it.
 /// </para>
 /// </remarks>
 public interface IDenStore : IDenSource
@@ -51,25 +52,35 @@ public interface IDenStore : IDenSource
     /// <param name="path">The file's den-relative path.</param>
     /// <param name="bytes">The file's new contents.</param>
     /// <param name="mode">Whether the file must be new, must exist already, or may be either.</param>
+    /// <param name="builtOn">
+    /// What the writer read and built this on, if it's replacing a file. The file
+    /// is compared with this just before each try, and left alone if it differs
+    /// (<see cref="DenStoreError.Changed"/>), so a try can't replace a save another
+    /// program made meanwhile (#323). Another program can still save in the moment
+    /// between the last comparison and the write. Null says, on purpose, that
+    /// there's nothing to compare: it has no default, so a write can't forget it.
+    /// </param>
     /// <exception cref="DenStoreException">
     /// The path is refused (<see cref="DenStoreError.InvalidPath"/>, <see cref="DenStoreError.CaseConflict"/>),
     /// the store is read-only, the file exists for <see cref="DenWriteMode.Create"/>
     /// (<see cref="DenStoreError.AlreadyExists"/>) or doesn't for <see cref="DenWriteMode.Replace"/>
-    /// (<see cref="DenStoreError.NotFound"/>), or a folder is in the way (<see cref="DenStoreError.NotAFile"/>).
+    /// (<see cref="DenStoreError.NotFound"/>), a folder is in the way (<see cref="DenStoreError.NotAFile"/>),
+    /// or the file isn't <paramref name="builtOn"/> any more (<see cref="DenStoreError.Changed"/>).
     /// </exception>
-    void WriteFile(string path, byte[] bytes, DenWriteMode mode = DenWriteMode.CreateOrReplace);
+    void WriteFile(string path, byte[] bytes, DenWriteMode mode, byte[]? builtOn);
 
-    /// <summary>Deletes the file at <paramref name="path"/>.</summary>
-    /// <exception cref="DenStoreException">The path is refused, the store is read-only, or there's no file there (<see cref="DenStoreError.NotFound"/>).</exception>
-    void DeleteFile(string path);
+    /// <summary>Deletes the file at <paramref name="path"/>, unless it isn't <paramref name="builtOn"/> any more (see <see cref="WriteFile"/>).</summary>
+    /// <exception cref="DenStoreException">The path is refused, the store is read-only, there's no file there (<see cref="DenStoreError.NotFound"/>), or it changed (<see cref="DenStoreError.Changed"/>).</exception>
+    void DeleteFile(string path, byte[]? builtOn);
 
     /// <summary>
     /// Moves or renames the file at <paramref name="from"/> to <paramref name="to"/>,
     /// which must not exist yet. Missing folders on the way are made. A
-    /// rename that changes only the case of the name is allowed.
+    /// rename that changes only the case of the name is allowed. It's left
+    /// alone if it isn't <paramref name="builtOn"/> any more (see <see cref="WriteFile"/>).
     /// </summary>
-    /// <exception cref="DenStoreException">A path is refused, the store is read-only, <paramref name="from"/> isn't a file, or <paramref name="to"/> exists.</exception>
-    void MoveFile(string from, string to);
+    /// <exception cref="DenStoreException">A path is refused, the store is read-only, <paramref name="from"/> isn't a file, <paramref name="to"/> exists, or it changed (<see cref="DenStoreError.Changed"/>).</exception>
+    void MoveFile(string from, string to, byte[]? builtOn);
 
     /// <summary>
     /// Moves or renames the folder at <paramref name="from"/>, with
@@ -132,6 +143,9 @@ public enum DenStoreError
 
     /// <summary>Another program has the file open, so it can't be replaced, moved, or deleted now.</summary>
     InUse,
+
+    /// <summary>The file isn't what the write was built on any more, so it's left as it is.</summary>
+    Changed,
 }
 
 /// <summary>A write a den store refused, and why (<see cref="Error"/>).</summary>

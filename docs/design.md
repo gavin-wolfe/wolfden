@@ -1595,7 +1595,7 @@ docs/
   syntax, checks, and canon-as-of meaning; without it, the author's
   full view. `marksAt` is a position for the writer, which no MCP tool
   has: "Marks for the writer" below. `readers=true` on `/api/entity`,
-  `/api/search`, `/api/fields`, `/api/hierarchy`, `/api/positions`, and
+  `/api/search`, `/api/fields`, `/api/entities`, `/api/hierarchy`, `/api/positions`, and
   `/api/book/chapter-fields`, beside `asOf`, is the UI's Reader's view: "The
   Reader's view" below. An endpoint refuses a parameter it doesn't take (so
   `as_of` isn't quietly ignored) or one given twice. An empty value
@@ -1791,12 +1791,20 @@ docs/
   `section` are null unless readers know that section of a note they've met, so
   `[[a-note#Later heading]]` shows `A note` and goes to no later anchor.
 
+  **A position that can't be read** is refused with `bad_position` on every one of
+  these, as `'<position>' isn't a position in this story.`, since an `asOf` read's own
+  message lists the universe's books, later ones included, and a stale bookmark is enough
+  to get there. That's why `/api/entities` takes `readers=true`: its list is the same as
+  with `asOf` alone. Without `readers`, the message is as it was, for the writer and MCP.
+
   **Book and chapter pages and the position bar ask only for what's reached.** The
   filter is on the server, not the page, so no answer holds what a reader doesn't know,
   and a page can't let one slip.
   - `/api/hierarchy` with `readers=true` is the tree readers know: the books and chapters
     reached, and a later book or series only where a met note is filed, with no later
-    chapters. A series with nothing yet isn't there.
+    chapters. A series with nothing yet isn't there. A chapter's `heading` follows its
+    fields' rules below: no later position value, no link's heading. A labelled link
+    in a chapter's `title` is only its label, here and in the next two.
   - `/api/positions` with `asOf` and `readers=true` is the positions reached. `asOf` means
     nothing there without `readers`, and is refused.
   - `/api/positions/next` (`after`, `step=chapter|book`) gives one position and nothing
@@ -1807,8 +1815,9 @@ docs/
     their fields with a value, following a note's fields' rules: no later position value
     (the same `AsOfReads.Reached`), and every link what it shows. A link to a note not
     met is only those words, not a link, and one to a note met is written again by its
-    key with the words it shows, so no alias, target, or later name is in the answer. An
-    unknown book's error names no others.
+    key with the words it shows, so no alias, target, or later name is in the answer. A
+    book that isn't in the tree above is refused in the same words, whether it's later or
+    doesn't exist, and names no others.
   - `/api/den/errors` with `countOnly=true` is how many problems there are, and no list.
 
   The test is word by word: `ReadersBookPagesTests` puts a made-up word in each place
@@ -1816,11 +1825,20 @@ docs/
   those pages may ask for, so anything new has to be checked there too. What's filtered
   on the page's side alone is what it asks for, by view (`usePositionsInView`).
 
+  **A note's text is read from its source.** The Reader's view replaces each link in the
+  markdown before it's parsed (`readersSource`, the page's copy of `WithLinksShown`), so
+  formatting in a label can't split a link from its target: `[[a-key|the *Ardent*]]` is a
+  link to what it reaches, reading "the *Ardent*" in italics, or those words alone if readers haven't
+  met it. A link's in code only if its `[[` is. A `\[[` and a `![[` aren't links, and stay
+  as written, on the page and in search. The other views are as they were.
+
   **What still asks for more.** The banner on a note readers haven't met asks for the
   whole list and every position, for that note's own name and where it enters
-  (SC-WEB-13), because the writer asked for that note. And a note's page gets its links'
-  text as `get_entity` has them, since it has to match them to the text: a target behind
-  a label isn't on the page, but it's in that answer.
+  (SC-WEB-13), on opening that note, or on switching to the Reader's view on it. And
+  `/api/entity` keeps text as `get_entity` has it, since `ReadersViewTests` holds the two
+  equal and the page has to match links to their text. So `body`, `links`, and
+  `backlinks[].text` can hold a target behind a label, an alias a link is written by, or a
+  later section's name. None of it is on the page, but it's in that answer.
 
   `readers=true` on `/api/search` (`DenReader.SearchAsReaders`) looks for the words in
   that same text, each note read through `AsOfReads`, rather than in the search table,

@@ -913,7 +913,9 @@ Everything for the writer, such as editing, is one click away in the Author's vi
 the same position. Edit file shows the whole source, so it's the
 Author's view whichever you came from, and it keeps your position. A note's page in the
 Reader's view shows every link as it shows anywhere else: in a heading, in a table cell
-or an image's alt text, and without a later section's heading. A table's lines still
+or an image's alt text, with its label's formatting (`[[ardent|the *Ardent*]]`), and
+without a later section's heading. A link in code, a `\[[`, and an embed (`![[...]]`) stay
+as you wrote them. A table's lines still
 show as text, with their `|`s, in every view.
 
 An AI assistant reading at a position gets the Reader's view of a note, so it isn't

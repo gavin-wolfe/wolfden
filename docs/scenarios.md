@@ -4749,7 +4749,9 @@ Spec: design.md §9 (#24, #26, maintainer decision). Covered by:
   view, though the table isn't rendered and its pipes show.
 - In the Reader's view, a link in a heading, a mapping's key, an image's alt text, or
   the words of a `[text](url)` shows only what it shows, as plain words. So does a
-  labelled link split over two lines. A link with a heading names it only if readers
+  labelled link split over two lines, however it's split. A label with formatting in it,
+  `[[a-key|the *Ardent*]]`, reads "the *Ardent*" in italics, and never shows its target,
+  in bold, HTML, or code too. A link with a heading names it only if readers
   know that section, so `[[a-note#Later heading]]` shows `A note`.
 
 Spec: design.md §9 (#24). Covered by: `Browse.test.tsx`,
@@ -6621,7 +6623,7 @@ A page asks `/api/entity` with `asOf` and `readers=true` (#300).
 - A plain `asOf` still has the `until`s and later values, for the writer.
 - `readers=true` without `asOf`, or with `marksAt`, is `bad_argument`, as is any
   value but true or false. `readers=false` is the same as leaving it out.
-- `/api/canon` and `/api/entities` don't take it.
+- `/api/canon` doesn't take it.
 - `Wolfden.Api` doesn't reference `Wolfden.Mcp`, as the two share `AsOfReads` from
   `Wolfden.Index`, and `McpStaysStrictTests` didn't change for it.
 
@@ -6856,13 +6858,18 @@ I'm at Dracula chapter 3 with `?readers=1`.
   link is what it shows. One to a note met is a link, by its key, with the words it
   shows. One to a note not met is only those words, so `[[the-keeper|Marrowcove]]` shows
   `Marrowcove`, and `[[Heronfell]]` shows `Heronfell`.
+- A reached chapter's heading follows its fields' rules, wherever it shows: the book's
+  list, the chapter's title, prev and next, and the tab. With `chapter_heading: [pov,
+  when, turns_at]`, a later `turns_at` and a link's later section aren't in it. A label
+  in a chapter's title is only the label.
 - A word readers don't know is in no answer these pages get, at every position:
-  `/api/hierarchy`, `/api/positions`, and `/api/book/chapter-fields` with `asOf` and
-  `readers=true`, and `/api/entities` with `asOf`. Those pages ask for nothing else, but
+  `/api/hierarchy`, `/api/positions`, `/api/entities`, and `/api/book/chapter-fields` with
+  `asOf` and `readers=true`. Those pages ask for nothing else, but
   `/api/den`, `/api/den/files`, and `/api/den/errors?countOnly=true`.
 - Each `readers=true` goes only with `asOf`, and `asOf` on `/api/positions` and
   `/api/book/chapter-fields` goes only with `readers=true`: `bad_argument`. A book that
-  isn't there is refused without naming any others.
+  isn't in the tree readers know is refused in the same words, later or made-up, without
+  naming any others.
 
 Spec: design.md §9 (#300). Covered by: `ReadersBookPagesTests`, `web/src/ReaderBookPages.test.tsx`.
 
@@ -6880,7 +6887,12 @@ I'm at Dracula chapter 3 with `?readers=1`.
 - **Pick a later point in the Author's view…** in a menu goes there, keeping the position,
   and the menus' tooltip says why nothing's named.
 - **‹** and the menus go back, and at once nothing from where it was shows.
-- A position that can't be read says why, and keeps **Show everything** and the switch.
+- Moving forward, the bar stays while the new answer comes, and the pressed control keeps
+  focus, so a keyboard can press **›** again.
+- A position that can't be read, such as a stale bookmark, says only
+  `'ash:9' isn't a position in this story.` (`bad_position`), naming no book, on every
+  Reader's answer, and keeps **Show everything** and the switch. Without `readers`, the
+  message is as it was.
 
 Spec: design.md §9 (#300). Covered by: `web/src/ReaderBookPages.test.tsx`,
 `ReadersBookPagesTests.MovingForwardGivesOnlyTheOnePosition`.

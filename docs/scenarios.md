@@ -3188,8 +3188,8 @@ Spec: types.md F-CHAP-3, F-CHAP-5 (#233). Covered by:
 - With `as_of`, at any position, and in `canon_as_of`, it isn't there and
   nothing says it was. A heading can give away a reveal.
 - `search` finds it with no position, with `left_out: true` and `in_canon:
-  false`. `canon_only` leaves it out. The MCP `search` tool takes no position;
-  a search at a position through `/api/search` doesn't find it (SC-WEB-83).
+  false`. `canon_only` leaves it out. A search at a position doesn't find it:
+  the MCP `search` tool with `as_of` (SC-MCP-50), or `/api/search` (SC-WEB-83).
 
 Spec: F-GEN-2, F-VIEW-1, F-VIEW-2 (#50). Covered by:
 `SectionErrorToolTests.TheFullViewFlagsItInPlaceAndAViewAtAPositionDoesntNameIt`,
@@ -3652,7 +3652,8 @@ My assistant is drafting `ember:3`, and passes `as_of: ember:3` to `search` and
 - `list_entities` lists what `canon_as_of` lists at that position, with the same line for
   each note, whatever `type`, `status`, `series`, or `book` it's given. `total` counts only
   those, so a `limit` doesn't tell how many later notes there are. A book or series that
-  doesn't exist is refused without naming the others.
+  doesn't exist is refused without naming the others. A key two books share (F-KEY-5) is
+  said to be shared, naming only that key.
 - A position that can't be read is `bad_position`, and doesn't fall back to a full
   search or list. `universe: "*"` with `as_of` is `bad_argument`.
 

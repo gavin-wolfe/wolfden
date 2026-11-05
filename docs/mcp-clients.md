@@ -404,7 +404,9 @@ docs. The writer's own list is in
   them: a later note, later or undecided text, a later value, and a comment
   neither match nor show, so a word that's only there gets the same empty answer as
   a word no note has. A note's aliases don't match there, and a link matches by
-  the text it shows, not by its target. `as_of` is per call, so a search without it
+  the text it shows, not by its target. A type's default value isn't searched, with
+  or without `as_of`, though `get_entity` shows it, so no hit doesn't mean a note has
+  no such value. `as_of` is per call, so a search without it
   sees everything again. `universe: "*"` doesn't go with `as_of`, and a position
   that can't be read is `bad_position`, in `search` and `list_entities` as in
   `canon_as_of`.

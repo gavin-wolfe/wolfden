@@ -53,7 +53,8 @@ public sealed class WolfdenTools
         "include every status (ideas, undecided questions, retconned material) unless canon_only is true, and each hit says its " +
         "status and whether it's canon text. Without as_of, a search has no story position, so it can show material the reader meets later. " +
         "When drafting a chapter, pass as_of here as you do to get_entity: then only what a reader knows at that position is searched, each " +
-        "note the reader has met, as get_entity with as_of reads it, with its name, lead, section headings and text, and field values. Later notes, later or undecided " +
+        "note the reader has met, as get_entity with as_of reads it, with its name, lead, section headings and text, and field values. A value that only comes from its type's " +
+        "default isn't searched, with or without as_of, though get_entity shows it, so no hit doesn't mean a note has no such value. Later notes, later or undecided " +
         "material, and HTML comments neither match nor show. A note's aliases don't match there, and a link matches by the text it shows, not its target. " +
         "As with get_entity, that's as far as positions go: text the writer put in a section or lead, or a field the note's type doesn't define, or a ref " +
         "field's value, can still mention later events. " + PositionHelp)]

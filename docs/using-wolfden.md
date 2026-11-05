@@ -975,6 +975,20 @@ You can keep using [Obsidian](https://obsidian.md) to write in your den.
    See the [Properties-panel warning](#images-and-other-editors) for the
    risks with nested values and story positions.
 
+When a path doesn't lead to the file, Obsidian looks for an image with
+that file name anywhere in the vault, so an image can show in Obsidian
+and still be "not found" in Wolfden. Make sure the path points at the file
+itself.
+
+One thing to watch: Wolfden's links between notes use double brackets,
+as Obsidian's do, but an Obsidian image embed, `![[castle-map.png]]`,
+isn't a Wolfden image in this version: Wolfden shows
+it as plain text ([format.md F-LINK-2](format.md)). If you keep
+Obsidian's **Use [[Wikilinks]]** setting on, so your note links stay
+`[[...]]`, Obsidian will write pasted images as `![[...]]` too. Change
+those to the `![what it shows](path)` form, such as
+`![Map of the castle](images/castle-map.png)`, so they show in Wolfden.
+
 While editing a den in Obsidian:
 
 - In **Live Preview**, section comments such as
@@ -983,24 +997,13 @@ While editing a den in Obsidian:
 - Links to a note's file name without `.md`, such as `[[mina-harker]]`,
   work in both apps. Obsidian includes these links in its **Backlinks**
   pane, so you can see which notes refer to the current one.
+- Links by name or alias, such as `[[Mina Harker]]` or `[[Madam Mina]]`,
+  work in Wolfden but not in Obsidian, which matches file names. To make
+  one work in both, write `[[mina-harker|Madam Mina]]`.
 - Wolfden's `aliases` list is also Obsidian's
   [aliases property](https://obsidian.md/help/aliases). To display an alias
   while keeping the file name as the target, write
   `[[mina-harker|Mina]]`.
-
-When a path doesn't lead to the file, Obsidian looks for an image with
-that file name anywhere in the vault, so an image can show in Obsidian
-and still be "not found" in Wolfden. Make sure the path points at the file
-itself.
-
-One thing to watch: Wolfden's links between notes use double brackets,
-`[[Mina Harker]]`, as Obsidian's do, but an Obsidian image embed,
-`![[castle-map.png]]`, isn't a Wolfden image in this version: Wolfden shows
-it as plain text ([format.md F-LINK-2](format.md)). If you keep
-Obsidian's **Use [[Wikilinks]]** setting on, so your note links stay
-`[[...]]`, Obsidian will write pasted images as `![[...]]` too. Change
-those to the `![what it shows](path)` form, such as
-`![Map of the castle](images/castle-map.png)`, so they show in Wolfden.
 
 ### Using VS Code
 

@@ -728,8 +728,9 @@ Chapter 3 is headed "Ardent — Vesta Yards, 2350-04-12", and chapter 4
   its series' list rather than adding to it. `chapter_heading: []` turns
   headings from fields off for that book (or series), even if the
   universe sets one.
-- **Reading as of a chapter.** A chapter after the reading position
-  shows only its title. In the Reader's view, Wolfden never supplies the name of a note the
+- **Reading as of a chapter.** In the Author's view, headings are in full, and a chapter
+  after the position has a tag. In the Reader's view, a chapter after the position isn't
+  there, and Wolfden never supplies the name of a note the
   reader hasn't met yet: a link to one shows as you wrote it, its label
   if it has one, or else its target.
 - **Tip: label a link to a note the reader meets later.** A POV
@@ -845,6 +846,14 @@ you're in is always highlighted.
   note you're looking for is where you'd expect in its part of the list. The tags here
   are plain words, so they don't add a stop for every row when you tab through. Hover
   for the sentence, or open the note. A chapter's page lists what enters there the same way.
+
+  **A book's and a chapter's pages** have everything, and you can edit there. A chapter
+  readers haven't reached is greyed and says `ahead of readers`, in the book's list, on
+  its own page, and beside a link to it from the chapter before. In a chapter they have
+  reached, a `pov` or `setting` that links a note they haven't met says `enters at`, and
+  a field that holds a later position says `ahead of readers`. A book's count of its
+  notes says how many readers have met, such as `2 of 5`.
+
   With more than 1,000 notes, the sidebar lists 1,000, what readers have met first, says
   how many of how many, and a group's count covers only what's listed.
 
@@ -877,16 +886,35 @@ you're in is always highlighted.
   are hidden in a note's text. The Type, Field, and Scope filters list only what
   they've reached.
 
+  **A book's and a chapter's pages** have the chapters they've reached, and those
+  chapters' fields, with no later chapter's name or how many are left, and nothing to
+  edit with. A `pov` that links someone they haven't met shows as you wrote it, or its
+  label, so labelling it keeps the mystery, as for a note's fields. A chapter's previous
+  and next links stop at the position. A later chapter's or book's page says only that
+  readers haven't got there.
+
+  **The position bar** doesn't say what's ahead, so it has no slider, and the Book and
+  Chapter menus list only what they've reached. To move forward, press **›**, or pick
+  **Next chapter** or **Next book** in a menu, and you go there, so you see its name when
+  a reader would. To jump further, choose **Pick a later point in the Author's view…**,
+  pick the chapter there, and switch back: the position stays. **Show everything** is
+  still there, and at the end of the story **›** says "No later chapter."
+
+  **The top bar** has no checkpoints here, since they name changed files. **⚠ 3
+  problems** is only a count, since the list names files too. Press it to go to the
+  Author's view, where the list and **Edit file** are. It stays because what a problem
+  leaves out is missing here too.
+
 The Reader's view stays while you follow links and change chapters, and its link
 keeps it (`?readers=1`), but Wolfden doesn't remember it: opening Wolfden fresh starts
 in the Author's view.
 
-**What the Reader's view doesn't cover yet.** It's about note pages, lists of notes, and
-search, and says so on the page. The rest of the screen isn't filtered the same way,
-so don't take it as what a reader would see: the book and chapter pages and the position
-bar's Book and Chapter menus show later books' and chapters' names. "Read-only" also doesn't reach everything: checkpoints, the ⚠ list's **Edit file**, and the book and
-chapter pages' controls still work. Edit file shows the whole source, so it's the
-Author's view whichever you came from, and it keeps your position.
+Everything for the writer, such as editing, is one click away in the Author's view, at
+the same position. Edit file shows the whole source, so it's the
+Author's view whichever you came from, and it keeps your position. A note's page in the
+Reader's view shows every link as it shows anywhere else: in a heading, in a table cell
+or an image's alt text, and without a later section's heading. A table's lines still
+show as text, with their `|`s, in every view.
 
 An AI assistant reading at a position gets the Reader's view of a note, so it isn't
 told a later date at all, and can't write toward it. When you're planning with one,
@@ -1357,7 +1385,8 @@ unfreeze the book: **Unfreeze…** on its page, or `wolfden unfreeze`.
 When something in the den has an error, the top bar says so: **⚠ 3 problems**.
 It counts errors, not warnings, and updates by itself within a few seconds when
 a file changes outside Wolfden. It clears when they're fixed, and shows nothing
-when there are none. Warnings stay with `wolfden check`. That includes two notes
+when there are none. In the Reader's view, it's only the count, and pressing it goes to
+the Author's view. Warnings stay with `wolfden check`. That includes two notes
 with the same id: they drop out of views, but it's a warning, so it isn't listed
 here.
 

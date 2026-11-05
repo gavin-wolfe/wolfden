@@ -1595,7 +1595,8 @@ docs/
   syntax, checks, and canon-as-of meaning; without it, the author's
   full view. `marksAt` is a position for the writer, which no MCP tool
   has: "Marks for the writer" below. `readers=true` on `/api/entity`,
-  `/api/search`, and `/api/fields`, beside `asOf`, is the UI's Reader's view: "The
+  `/api/search`, `/api/fields`, `/api/hierarchy`, `/api/positions`, and
+  `/api/book/chapter-fields`, beside `asOf`, is the UI's Reader's view: "The
   Reader's view" below. An endpoint refuses a parameter it doesn't take (so
   `as_of` isn't quietly ignored) or one given twice. An empty value
   counts as left out, except an empty `asOf` or `marksAt`, which is `bad_argument`:
@@ -1783,6 +1784,44 @@ docs/
   and `readers=false` is the same as leaving it out. `/api/canon` doesn't take it,
   since no page needs it yet.
 
+  **Beyond `get_entity`, for the page's own words.** A heading is read as it shows: each
+  link in it, in `name`, `headingPath`, and a backlink's section, is what it shows, as
+  plain words, since `get_entity` gives a heading as written and the page prints it. So
+  that one member differs from MCP where a heading has a link. A link's `heading` and
+  `section` are null unless readers know that section of a note they've met, so
+  `[[a-note#Later heading]]` shows `A note` and goes to no later anchor.
+
+  **Book and chapter pages and the position bar ask only for what's reached.** The
+  filter is on the server, not the page, so no answer holds what a reader doesn't know,
+  and a page can't let one slip.
+  - `/api/hierarchy` with `readers=true` is the tree readers know: the books and chapters
+    reached, and a later book or series only where a met note is filed, with no later
+    chapters. A series with nothing yet isn't there.
+  - `/api/positions` with `asOf` and `readers=true` is the positions reached. `asOf` means
+    nothing there without `readers`, and is refused.
+  - `/api/positions/next` (`after`, `step=chapter|book`) gives one position and nothing
+    else. It's how that view moves forward, asked only when the writer presses, so
+    nothing's told until they go there. It says `position: null` at the end.
+  - `/api/book/chapter-fields` with `asOf` and `readers=true` is its own shape
+    (`ReadersChapters`), with none of what an edit needs. It has the chapters reached, and
+    their fields with a value, following a note's fields' rules: no later position value
+    (the same `AsOfReads.Reached`), and every link what it shows. A link to a note not
+    met is only those words, not a link, and one to a note met is written again by its
+    key with the words it shows, so no alias, target, or later name is in the answer. An
+    unknown book's error names no others.
+  - `/api/den/errors` with `countOnly=true` is how many problems there are, and no list.
+
+  The test is word by word: `ReadersBookPagesTests` puts a made-up word in each place
+  and checks each answer at every position, and `ReaderBookPages.test.tsx` holds what
+  those pages may ask for, so anything new has to be checked there too. What's filtered
+  on the page's side alone is what it asks for, by view (`usePositionsInView`).
+
+  **What still asks for more.** The banner on a note readers haven't met asks for the
+  whole list and every position, for that note's own name and where it enters
+  (SC-WEB-13), because the writer asked for that note. And a note's page gets its links'
+  text as `get_entity` has them, since it has to match them to the text: a target behind
+  a label isn't on the page, but it's in that answer.
+
   `readers=true` on `/api/search` (`DenReader.SearchAsReaders`) looks for the words in
   that same text, each note read through `AsOfReads`, rather than in the search table,
   which holds every note's whole text. So a word finds a hit exactly when the Reader's
@@ -1793,10 +1832,10 @@ docs/
   order, with comments not counted. There's no cap on what's read, so a word in many
   later notes can't push out a met one.
 
-  **Every link in text and values is what it shows on the page,** for matching and for
-  the snippet (`ReadersLinks`, from the index's link rows): its label, else the note it
-  reaches if readers have met it, else its target as written, with `: heading` if it has
-  no label. So a link written by an alias or key finds by the name it shows, not by what
+  **Every link in text, headings, and values is what it shows on the page,** for matching
+  and for the snippet (`ReadersLinks`, from the index's link rows): its label, else the
+  note it reaches if readers have met it, else its target as written, with `: heading`
+  if it has no label and readers know that section. So a link written by an alias or key finds by the name it shows, not by what
   was written; a label hides its target, even a met note's; and a later note's name
   doesn't match until readers meet it. `get_entity` gives links as written, so this is in
   the search, and MCP's reads don't change. The rule is written twice, as `linkText` in
@@ -1812,12 +1851,18 @@ docs/
     note's writing, as with no position.
   - What isn't a note's text isn't searched: field names, the note's type and scope, and
     **Linked from**.
-  - The page shows two things raw, and search is stricter or follows it. A table isn't
-    rendered, so `| [[note\|label]] |` shows its target on the page, and search finds
-    only the label. A heading is printed as written, so a link in one shows in full, and
-    search matches that. Both belong to the page, for #300's last step.
-  - A link inside `[text](url)`, and a comment inside a link, show raw on the page, and
-    search finds only the label.
+  - **A note's markup (#332).** The search looks at a note's text with only its comments
+    and links read, so it finds words in a link's URL (`[text](https://word.example/x)`),
+    an HTML attribute (`<span title="word">`), and an image's path (`![alt](word.png)`),
+    though the page doesn't show the first two, and shows the path only if the image
+    isn't found. The writer has to have typed the word, so it can wait for dogfooding.
+  - A comment inside a link shows on the page, and search finds only the label.
+
+  The rest now read the same. A table isn't rendered, in any view, so its pipes show, but
+  a link in a cell (`| [[note\|label]] |`) is a link like any other. That's on every
+  page, as `\|` is only `|` escaped. In the Reader's view, a heading, a mapping's key, an
+  image's alt text, and the words of a `[text](url)` show a link as what it shows, and
+  so does a labelled link split over two lines, which isn't a link but reads as one.
 
   **Where the Reader's search finds what the Author's doesn't.** The Author's view looks
   at the text as written, so a section with `[[Secretalias]]` isn't found there by the
@@ -1863,7 +1908,8 @@ docs/
     page, with a slider along the whole story and book and chapter
     dropdowns to jump. It starts at "Everything" (the end of the story).
     The position carries from page to page and is kept in the URL, so a
-    bookmark or a shared link keeps it.
+    bookmark or a shared link keeps it. In the Reader's view it has nothing ahead
+    in it (below).
   - **Notes the reader hasn't met** (#300, which replaces #26's "N more appear
     later"). At a position, the Author's view of a list has every note: what the
     reader has met first, then the rest, greyed, below a dashed line, and tagged
@@ -1878,6 +1924,14 @@ docs/
     every page, as the sidebar is, but for Edit file by path, which is always the
     writer's. It's kept in the URL (`?readers=1`) and isn't remembered, so a fresh
     start opens the Author's view, and it ends with the position.
+    - **The Author's view of a book or chapter** has all of it, headings and fields in
+      full, and can be edited. A chapter readers haven't reached is greyed and tagged
+      `ahead of readers`, in the book's list, in its own page's heading, and in prev
+      and next, in a list's plain words with one line to explain them. So is a link in a
+      reached chapter's field to a note they haven't met, with `enters at`, and a
+      position field's later value. In a later chapter, the chapter's tag says it. The
+      book's notes are counted as `2 of 5`. The position bar's menus aren't tagged, as
+      an option can't hold one.
     - **The Author's view** asks `marksAt`. A note the reader hasn't met shows,
       tagged `enters at chapter 11`, and it edits the real note, in the same read
       it already has. Tags are `ahead of readers`, `no longer true here`, `not
@@ -1897,13 +1951,27 @@ docs/
       and the universe's and series' pages leave out books and chapters readers haven't
       got to, and a series with nothing yet, keeping a later book or series only where a
       met note is filed. They have no New buttons or chapter defaults, and nor does the
-      top bar. Search finds only what a reader can (see the search page below). The rest of
-      the screen isn't part of it yet, and the page says so until the last step of #300
-      lands: the book and chapter pages and the position bar's Book and Chapter menus
-      aren't filtered as it is, and checkpoints, the ⚠ list, and the
-      book and chapter pages' controls still work. Edit file by path drops `readers`,
-      so it's plainly the writer's. The API's writes know nothing of views.
-      A note the reader hasn't met shows the banner, for example "Readers first
+      top bar. Search finds only what a reader can (see the search page below).
+      - **A book's and a chapter's pages** have the chapters reached and their fields to
+        read, with no Edit, Freeze, Add chapter, New, or chapter defaults. Prev and next
+        stay within what's reached. A later book or chapter says only "Readers haven't
+        got to this chapter by this point in the story", and the tab has no title, so
+        neither names it. It can't tell a later chapter from one that doesn't exist.
+      - **The position bar** has no slider, since its length and its thumb's place would
+        say how far through the story this is. The menus list only what's reached. `›`
+        and **Next chapter** and **Next book** in the menus ask for the next position
+        only when pressed, and go there. An option can't name what's further without
+        giving it away, so **Pick a later point in the Author's view…** goes there,
+        keeping the position, and the menus' tooltip says why. At the end, it says
+        "No later chapter." only when asked, and stays.
+      - **The rest of the top bar.** The checkpoint indicator isn't there, and doesn't
+        ask, since it names changed files. The ⚠ list names files and quotes them, so
+        here it's only a count, `⚠ 3 problems`, which goes to the Author's view when
+        pressed. It stays because what an error leaves out is missing from this view too.
+
+      The writer's tools are a click away: Edit file by path drops `readers`, so
+      it's plainly the writer's, and the API's writes know nothing of views. A note the
+      reader hasn't met shows the banner, for example "Readers first
       meet Quincey Morris in chapter 11", with the Author's view as a way to see
       it. Saved versions can hold anything, so its History tab fetches none of
       them and says so.
@@ -1951,8 +2019,8 @@ docs/
   - **Entity pages.** An entity page shows the name, type, status, scope
     breadcrumb, and entry point; the fields; the sections, as markdown;
     and "Linked from", grouped by source. `[[...]]` links become in-app
-    links through the API's resolved `links`, matched by exact text in
-    order. A broken link is marked as broken, and an ambiguous link
+    links through the API's resolved `links`, matched by their text in
+    order, with `\|` the same as `|`. A broken link is marked as broken, and an ambiguous link
     lists its matches in a tooltip. In the Reader's view, a link to a note
     the reader hasn't met is plain text. Markdown is rendered with
     react-markdown, which builds React elements and never HTML strings.

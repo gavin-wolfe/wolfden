@@ -1353,11 +1353,12 @@ still works while it waits.
 
 Many writers' characters are invented or composites, and they can skip
 this. If yours draw on real life, notes can pick up real facts along the
-way: a real person's name, a birth date, an address, the legal name behind
-a pen name. Two things are worth knowing:
+way: a real person's name, a birth date, an address. Two things are worth
+knowing:
 
 - **History keeps what it records.** Deleting a line takes it out of the
-  note, not out of earlier checkpoints. Removing it means rewriting the
+  note, not out of earlier checkpoints, where an AI assistant can still
+  read it through the note's history. Removing it means rewriting the
   history, and any clone or backup already made still has it.
 - **A private remote is only one setting from public.** On a hosting site,
   that one setting can show the whole history, not only the notes as they
@@ -1370,7 +1371,8 @@ A simple approach is to keep such facts out of the den:
   Wolfden's MCP server can't reach it, since its tools read only the den.
   (An assistant you've also given access to your files may still be able
   to open it.) It isn't in the den's backup either, so back it up your own
-  way.
+  way. If the den is part of a larger repository, keep the file outside
+  that too, or a plain `git add` there could take it.
 - **Leave a plain pointer in the note, if it helps,** such as "Birth date
   and address: in my private facts file." Give the file's name, not its
   full path, which can include your account name.
@@ -1378,10 +1380,11 @@ A simple approach is to keep such facts out of the den:
   Turning on history records the den as it is, unless you ask it not to.
 
 A `.gitignore` line isn't the same thing. It keeps a new file out of
-checkpoints and so out of your remote, but it does nothing for a file
-that's already in the history. And Wolfden doesn't go by it when it reads
-notes: a git-ignored note is still indexed, still found by search, and
-still there for an AI assistant.
+checkpoints and so out of your remote, but only in this copy of the den:
+checkpoints don't record the `.gitignore` itself, so a clone doesn't have
+it. It does nothing for a file that's already in the history. And Wolfden
+doesn't go by it when it reads notes: a git-ignored note is still indexed,
+still found by search, and still there for an AI assistant.
 
 ## Freezing a finished book
 

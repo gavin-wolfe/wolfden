@@ -1594,8 +1594,9 @@ docs/
   session. `asOf` is the tools' `as_of`: a position, with the same
   syntax, checks, and canon-as-of meaning; without it, the author's
   full view. `marksAt` is a position for the writer, which no MCP tool
-  has: "Marks for the writer" below. `readers=true` on `/api/entity`, beside
-  `asOf`, is the UI's Reader's view: "The Reader's view" below. An endpoint refuses a parameter it doesn't take (so
+  has: "Marks for the writer" below. `readers=true` on `/api/entity`,
+  `/api/search`, and `/api/fields`, beside `asOf`, is the UI's Reader's view: "The
+  Reader's view" below. An endpoint refuses a parameter it doesn't take (so
   `as_of` isn't quietly ignored) or one given twice. An empty value
   counts as left out, except an empty `asOf` or `marksAt`, which is `bad_argument`:
   left out it would give the full view, spoilers and all, so a page that
@@ -1616,9 +1617,9 @@ docs/
   | `/api/entities/lookup` | `query`, `universe`, `type`, `asOf`, `limit` | The notes whose name, alias, file name, or id has a word starting with each word typed, best first, each with what matched and which alias, for the link pickers (#198; "Looking notes up by name and alias" below). `type` takes several types separated by commas; with `asOf`, only notes the reader has met by then. |
   | `/api/entity` | `entity`, `universe`, `asOf`, `marksAt`, `readers` | `get_entity`, as a page: each field value or entry and each section lists its links, resolved from the index (the entity reached, or broken or ambiguous); also the scope's container chain, where the entity enters canon (its `from`, or its scope's start, inherited, format.md F-ENT-6), and its backlinks (which entity, field, section, chapter, or outline row). As of a position, a link to an entity the reader hasn't met doesn't say what it reaches, and only links in what the reader has met count as backlinks. |
   | `/api/canon` | `universe`, `asOf`, `series`, `book`, `type`, `brief` | `canon_as_of`. |
-  | `/api/search` | `query`, `universe`, `type`, `canonOnly`, `limit`, `status`, `series`, `book`, `asOf`, `field`, `marksAt` | `search`, with snippets; it can also keep entities of one status, those a series or book filter covers (as in a canon view), or, as of a position, hits in the entities, sections, and field values in the canon view there. Each hit adds `text`, the snippet without marks, and `matches`, the `start` and `length` of each match in it (UTF-16 code units), so the page never mistakes a note's own brackets for a match (#179). |
+  | `/api/search` | `query`, `universe`, `type`, `canonOnly`, `limit`, `status`, `series`, `book`, `asOf`, `field`, `marksAt`, `readers` | `search`, with snippets; it can also keep entities of one status, those a series or book filter covers (as in a canon view), or, as of a position, hits in the entities, sections, and field values in the canon view there. Each hit adds `text`, the snippet without marks, and `matches`, the `start` and `length` of each match in it (UTF-16 code units), so the page never mistakes a note's own brackets for a match (#179). |
   | `/api/den/files` | | A fingerprint of the den's files (their paths, sizes, and times, no contents), for an open page to see that something changed (#285). It's all this answers, and it doesn't bring the index up to date. |
-  | `/api/fields` | `universe`, `asOf` | The names of the fields notes give values for, for the search page's Field filter (#179); as of a position, only those of values in the canon view there. |
+  | `/api/fields` | `universe`, `asOf`, `readers` | The names of the fields notes give values for, for the search page's Field filter (#179); as of a position, only those of values in the canon view there, and with `readers=true`, of values a reader there can see. |
   | `/api/history` | `entity`, `universe`, `limit`, `before` | `get_history`'s checkpoints, a page at a time. |
   | `/api/history/diff` | `entity`, `universe`, and `checkpoint`, or `from` and `to` | The entity file's unified diff: what one checkpoint changed (against the one before it, or for the first, against nothing, through the history provider's `DiffCheckpoint`), the change between two (`from` and `to`), or since one (`from`, or by default the latest) up to the file as it is now. |
 
@@ -1740,10 +1741,18 @@ docs/
     `wolfden check` warns about) isn't ahead or ended, so it has no mark, though
     the canon view shows only the other.
   - **A search hit** has the mark of the text it found: its section's or entry's,
-    or else the note's. Links and the page's `pinned` carry no marks. So a field
-    hit found through a linked note's name or alias has the mark of the field,
-    even if readers meet that note later. (The page shows pinned facts in place,
-    where each has its own mark, and doesn't list `pinned`.)
+    or else the note's, and `noteMark`, the note's own. A field hit whose snippet
+    shows the name or alias of a linked note readers don't know has `laterLink`,
+    with that note's status and mark. A reader's search couldn't match that name.
+    `met` says whether a search in the Reader's view there finds the hit: it has no
+    mark, later value, or later name, it's in canon, and its words aren't only in
+    what a reader's read takes for a comment. Those come first, each part in rank
+    order, and a limit cuts the rest first. It reads up to 1,000 text hits, those in
+    notes readers have met first, so a word in thousands of notes doesn't lose a met
+    one. Past that, as with a filtered search, field hits aren't added and the answer
+    says `truncated`. Links and
+    the page's `pinned` carry no marks. (The page shows pinned facts in place, where
+    each has its own mark, and doesn't list `pinned`.)
   - **A backlink** has the mark of what holds it, as a search hit does: its
     section's or entry's, or else the note's. One in a chapter's fields or an
     outline compares where it's written. One with no position, such as in a
@@ -1771,6 +1780,24 @@ docs/
   link's `section`, which the index keeps as written. It goes only with `asOf`: without it, or with `marksAt`, it's `bad_argument`,
   and `readers=false` is the same as leaving it out. `/api/canon` doesn't take it,
   since no page needs it yet.
+
+  `readers=true` on `/api/search` (`DenReader.SearchAsReaders`) looks for the words in
+  that same text, each note read through `AsOfReads`, rather than in the search table,
+  which holds every note's whole text. So a word finds a hit exactly when `get_entity`
+  at that position shows it (`ReadersSearchTests`, word by word), and there's no second
+  rule: a comment in a lead, section, or heading, however badly formed, a later or
+  unplaced position value, and a later `until` neither match nor show, and a value's
+  link matches by its note's name or alias only if the reader has met that note. Text
+  and field values are matched as the search table matches them, and the table only
+  gives the order, with comments not counted. There's no cap on what's read, so a word
+  in many later notes can't push out a met one. Two things differ from `get_entity`,
+  both on purpose: a met note's aliases match, since they're how `get_entity` finds it,
+  though it doesn't list them, and a type's defaults don't, since they aren't the
+  note's writing, as with no position. `/api/fields` with `readers=true` lists only
+  fields with a value a reader can see, so a thread's `paid_off` isn't named before it
+  pays off, and a `field` with none is refused as a made-up one is. MCP's `search` has
+  no position, on purpose, and doesn't change. `asOf` alone on `/api/search` is as it
+  was, for the writer: the web no longer asks it.
 
   An `/api/entity` for a note left out is still 404 `unknown_entity`, with
   `leftOut` (`path`, `line`, `rule`, `message`), found by its path, a path under a
@@ -1838,9 +1865,10 @@ docs/
       and the universe's and series' pages leave out books and chapters readers haven't
       got to, and a series with nothing yet, keeping a later book or series only where a
       met note is filed. They have no New buttons or chapter defaults, and nor does the
-      top bar. The rest of the screen isn't part of it yet, and the page says so
-      until later steps of #300 land: search, the book and chapter pages, and the
-      position bar's Book and Chapter menus aren't filtered as it is, and checkpoints, the ⚠ list, and the
+      top bar. Search finds only what a reader can (see the search page below). The rest of
+      the screen isn't part of it yet, and the page says so until the last step of #300
+      lands: the book and chapter pages and the position bar's Book and Chapter menus
+      aren't filtered as it is, and checkpoints, the ⚠ list, and the
       book and chapter pages' controls still work. Edit file by path drops `readers`,
       so it's plainly the writer's. The API's writes know nothing of views.
       A note the reader hasn't met shows the banner, for example "Readers first
@@ -1973,13 +2001,19 @@ docs/
   from the ranges the API gives (#179), so a note's own brackets, such
   as a `[[link]]`, are never taken for a match.
   "Show more matches" asks again with a bigger `limit` (20, 50, 100,
-  200), as the API has no offset. As of a position the search sends
-  `asOf`, says so ("Searching as of Dracula chapter 9"), and offers to
-  search everything; hits the reader hasn't met aren't shown or
-  peeked at. The Type filter lists only the types the reader has met,
-  which applies the maintainer's hidden-by-default decision (#26),
-  and what those are kinds of, since filtering by a type
-  includes its kinds (types.md F-TYPE-13). A blank `at` fails closed, as on every page.
+  200), as the API has no offset. At a position, in the Author's view (#300), the
+  search sends `marksAt` and lists everything, with notes a reader can find something
+  in first, then a dashed line, then the rest. Tags are plain text, as in other lists,
+  so a row adds no Tab stop, with one legend line: a note's `enters at` by its name, and
+  a hit's own (`ahead of readers`, `no longer true here`, `not placed in the story yet`,
+  or, for a snippet that names a later linked note, that note's `enters at`, or its
+  status if it's an idea). Every type and field is offered. In the Reader's view, it
+  sends `asOf` with `readers=true`, says so ("Searching as of Dracula chapter 9"), and
+  links to the Author's view. Nothing a reader can't find shows, with no tags. The
+  Type, Field, and Scope filters list only what readers have reached, and what a type
+  is a kind of, since filtering by a type includes its kinds (types.md F-TYPE-13). Any
+  already chosen stays. A blank `at` fails closed, as on every page. A last answer stays
+  on screen while the next loads only at the same position and in the same view.
 - **Field search** (#179; the semantics are the maintainer's decision
   of 2026-10-26, the page and API shape are v0 behaviour). Search also
   finds words in field values, and a Field filter (`field=<name>` in
@@ -1993,7 +2027,8 @@ docs/
   saltmarsh" after the place is renamed "Old Saltmarsh". As of a
   position, only the values in the canon view there count, and a link
   matches by name or alias only when the reader has met the linked
-  note, so a search never confirms the name of a note they haven't. A
+  note, so a search never confirms the name of a note they haven't.
+  (`marksAt` does match it, and tags it.) A
   field hit says which field matched ("Field: home"), and its snippet is
   the value as written, then `→` and the linked note's name or alias
   where that's what matched. The Field filter lists the fields notes

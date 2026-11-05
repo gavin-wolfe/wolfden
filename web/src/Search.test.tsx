@@ -50,8 +50,8 @@ function stubSearch(answer?: (params: URLSearchParams) => SearchResult | Respons
         return undefined
       }
 
-      if (params.get('asOf') === '') {
-        // The harness answers a blank asOf as the API does: bad_argument.
+      if (params.get('asOf') === '' || params.get('marksAt') === '') {
+        // The harness answers a blank position as the API does: bad_argument.
         searches.push(params)
         return undefined
       }
@@ -61,6 +61,7 @@ function stubSearch(answer?: (params: URLSearchParams) => SearchResult | Respons
         return answer(params)
       }
 
+      // The Reader's view finds none of them; the Author's view and no position find them all.
       const hits = params.get('asOf') ? [] : bloodHits
       return { version: 1, query: params.get('query')!, count: hits.length, truncated: false, hits } satisfies SearchResult
     },
@@ -191,7 +192,7 @@ describe('SC-WEB-18: a search waiting on a pause in typing', () => {
     await act(() => vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS * 3))
     await waitFor(() => expect(history.location.pathname).toBe('/u/dracula/search'))
     expect([searchOf(history).get('at'), searchOf(history).get('q')]).toEqual(['dracula:1', 'blood'])
-    await waitFor(() => expect(searches.at(-1)?.get('asOf')).toBe('dracula:1'))
+    await waitFor(() => expect(searches.at(-1)?.get('marksAt')).toBe('dracula:1'))
   })
 
   it('runs with the filters as they are when it fires, and the box empties on leaving the page', async () => {
@@ -320,21 +321,38 @@ describe('SC-WEB-19: search filters and results', () => {
 })
 
 describe('SC-WEB-20: searching as of a story position', () => {
-  it('passes asOf, says it searches as of the position, and says there are no matches there', async () => {
+  it("in the Reader's view, sends asOf and readers, says so, and goes to the Author's view", async () => {
     const { searches } = stubSearch()
-    const { history } = renderApp('/u/dracula/search?q=blood&at=dracula:3')
+    const { history } = renderApp('/u/dracula/search?q=blood&at=dracula:3&readers=1')
     const main = await screen.findByRole('main')
 
     expect(await within(main).findByText('No matches as of Dracula chapter 3.')).toBeTruthy()
     expect(searches[0].get('asOf')).toBe('dracula:3')
+    expect(searches[0].get('readers')).toBe('true')
+    expect(searches[0].has('marksAt')).toBe(false)
     expect(within(main).getByText(/Searching as of/).textContent).toContain('Dracula chapter 3')
 
-    fireEvent.click(within(main).getByRole('link', { name: 'Search everything' }))
-    await waitFor(() => expect(searchOf(history).has('at')).toBe(false))
+    fireEvent.click(within(main).getByRole('link', { name: "Author's view" }))
+    await waitFor(() => expect(searchOf(history).has('readers')).toBe(false))
+    expect(searchOf(history).get('at')).toBe('dracula:3')
     expect(searchOf(history).get('q')).toBe('blood')
     expect(await within(main).findByText('3 matches, in 2 notes.')).toBeTruthy()
+    expect(searches.at(-1)!.get('marksAt')).toBe('dracula:3')
     expect(searches.at(-1)!.has('asOf')).toBe(false)
     expect(within(main).queryByText(/Searching as of/)).toBeNull()
+  })
+
+  it('at no position, sends neither, and has no position line', async () => {
+    const { searches } = stubSearch()
+    renderApp('/u/dracula/search?q=blood')
+    const main = await screen.findByRole('main')
+
+    expect(await within(main).findByText('3 matches, in 2 notes.')).toBeTruthy()
+    for (const name of ['asOf', 'marksAt', 'readers']) {
+      expect(searches[0].has(name)).toBe(false)
+    }
+
+    expect(main.querySelector('.search-position')).toBeNull()
   })
 
   it.each([
@@ -346,8 +364,8 @@ describe('SC-WEB-20: searching as of a story position', () => {
     const main = await screen.findByRole('main')
 
     const alert = await within(main).findByRole('alert')
-    expect(alert.textContent).toContain("'asOf' is empty")
-    expect(searches.every((p) => p.get('asOf') === '')).toBe(true)
+    expect(alert.textContent).toContain("'marksAt' is empty")
+    expect(searches.every((p) => p.get('marksAt') === '')).toBe(true)
     expect(within(main).queryByText(/Searching as of/)).toBeNull()
     expect(within(main).queryByRole('link', { name: 'Lucy Westenra' })).toBeNull()
 
@@ -375,12 +393,12 @@ describe('SC-WEB-20: searching as of a story position', () => {
         }
 
         searches.push(params)
-        const asOf = params.get('asOf')
-        if (asOf) {
+        const marksAt = params.get('marksAt')
+        if (marksAt) {
           await held
         }
 
-        const hits = asOf ? [] : bloodHits
+        const hits = marksAt ? [] : bloodHits
         return { version: 1, query: params.get('query')!, count: hits.length, truncated: false, hits } satisfies SearchResult
       },
     })
@@ -389,13 +407,13 @@ describe('SC-WEB-20: searching as of a story position', () => {
     await within(main).findByText('3 matches, in 2 notes.')
 
     fireEvent.change(await screen.findByRole('combobox', { name: 'Book' }), { target: { value: 'dracula' } })
-    await waitFor(() => expect(searches.some((p) => p.get('asOf') === 'dracula:1')).toBe(true))
+    await waitFor(() => expect(searches.some((p) => p.get('marksAt') === 'dracula:1')).toBe(true))
     expect(within(main).getByText('Loading matches…')).toBeTruthy()
     expect(within(main).queryByRole('link', { name: 'Lucy Westenra' })).toBeNull()
     expect(main.querySelector('mark')).toBeNull()
 
     release()
-    expect(await within(main).findByText('No matches as of Dracula chapter 1.')).toBeTruthy()
+    expect(await within(main).findByText('No matches for “blood”.')).toBeTruthy()
   })
 
   it('lists in the Type filter only the types the reader has met, keeping the chosen one', async () => {
@@ -422,7 +440,7 @@ describe('SC-WEB-20: searching as of a story position', () => {
         return undefined
       },
     })
-    renderApp('/u/dracula/search?q=blood&at=dracula:3&type=event')
+    renderApp('/u/dracula/search?q=blood&at=dracula:3&readers=1&type=event')
     const type = (await screen.findByRole('combobox', { name: 'Type' })) as HTMLSelectElement
     await waitFor(() => expect([...type.options].map((o) => o.value)).toEqual(['', 'character', 'location', 'event']))
     expect(type.value).toBe('event')
@@ -463,7 +481,7 @@ describe('SC-WEB-20: searching as of a story position', () => {
         return undefined
       },
     })
-    renderApp('/u/dracula/search?q=blood&at=dracula:3')
+    renderApp('/u/dracula/search?q=blood&at=dracula:3&readers=1')
     const type = (await screen.findByRole('combobox', { name: 'Type' })) as HTMLSelectElement
     // Not character: no met note is one, or a kind of one.
     await waitFor(() => expect([...type.options].map((o) => o.value)).toEqual(['', 'location', 'world']))
@@ -546,14 +564,14 @@ describe('SC-WEB-24: I search one field', () => {
 })
 
 describe('SC-WEB-25: I search a field as of a story position', () => {
-  it('lists only the fields the reader has met, keeping the chosen one', async () => {
+  it("lists only the fields the reader can see a value of in the Reader's view, keeping the chosen one", async () => {
     const { calls } = stubSearch((params) => ({ version: 1, query: params.get('query')!, count: 0, truncated: false, hits: [] }))
-    renderApp('/u/dracula/search?q=hillingham&at=dracula:3&field=home')
+    renderApp('/u/dracula/search?q=hillingham&at=dracula:3&readers=1&field=home')
     const field = (await screen.findByRole('combobox', { name: 'Field' })) as HTMLSelectElement
 
     await waitFor(() => expect([...field.options].map((o) => o.value)).toEqual(['', 'occupation', 'home']))
     expect(field.value).toBe('home')
-    expect(calls.filter((c) => c.startsWith('/api/fields'))).toEqual(['/api/fields?universe=dracula&asOf=dracula%3A3'])
+    expect(calls.filter((c) => c.startsWith('/api/fields'))).toEqual(['/api/fields?universe=dracula&asOf=dracula%3A3&readers=true'])
     expect(await screen.findByText('No matches as of Dracula chapter 3. Try without some of the filters.')).toBeTruthy()
   })
 })

@@ -4823,21 +4823,22 @@ Spec: design.md §9 (#25). Covered by: `Search.test.tsx` (web).
 The writer searches "Renfield" at Dracula chapter 3, then follows
 "Search everything".
 
-- The search is sent with `asOf=dracula:3`, so it finds only what the
-  reader has met by then, and the page says "Searching as of Dracula
-  chapter 3". With no hits it says "No matches as of Dracula chapter
-  3." There's no peek at hits met later. "Search everything" drops the
-  position and searches again. The Type filter lists only the types
-  of notes the reader has met and what those are kinds of, and keeps one
-  already chosen. Results
-  from an earlier search at another position never show while the new
-  ones load.
+- In the Author's view, it's sent with `marksAt=dracula:3` and finds
+  everything, tagged (SC-WEB-107).
+- In the Reader's view (`readers=1`), it's sent with `asOf=dracula:3` and
+  `readers=true`, finds only what a reader can (SC-WEB-106), and the page says
+  "Searching as of Dracula chapter 3". With no hits it says "No matches as of
+  Dracula chapter 3." "Author's view" keeps the position and searches again. The
+  filters list only what readers have reached (SC-WEB-108).
+- With no position, it's sent with neither, and there's no such line.
+- Results from an earlier search at another position, or in the other view, never
+  show while the new ones load.
 - A blank `at=` (or one of spaces) is sent as it is and fails closed:
   the page shows the API's error and "Show everything", never the full
   view. An error the API answers with, such as an unknown type, is
   shown in its words.
 
-Spec: design.md §9 (#25, #26). Covered by: `Search.test.tsx` (web).
+Spec: design.md §9 (#25, #26, #300). Covered by: `Search.test.tsx` (web).
 
 ### SC-WEB-21. A snippet holds HTML or brackets of its own
 
@@ -4948,7 +4949,7 @@ of 2026-10-26; phrases are #185). Covered by:
 Ilse Tarrow, met in *Ember*, has a `watch_mate:` that links Halden Pike by
 his id; the reader meets Pike in *Ash*.
 
-- As of `ember:3`, searching "Halden Pike" finds nothing, with or
+- As of `ember:3`, with `asOf` alone or in the Reader's view, searching "Halden Pike" finds nothing, with or
   without the field: a link matches by name or alias only when the
   reader has met the linked note, so search never confirms the name of
   a note they haven't. The id as written is the writer's text in a note
@@ -4957,9 +4958,9 @@ his id; the reader meets Pike in *Ash*.
   `[[<id>]] → Halden Pike`.
 - Only the values in the canon view count: Ilse's posting to Kessan
   Reach, from `ash:4`, isn't found at `ash:1`.
-- The Field filter lists only the fields of values the reader has met
-  (`/api/fields` with `asOf`), as the Type filter goes by met types,
-  and keeps one already chosen. Searching a field only notes the reader
+- In the Reader's view, the Field filter lists only the fields of values a reader can
+  see (`/api/fields` with `asOf` and `readers=true`, SC-WEB-108), as the Type filter
+  goes by met types, and keeps one already chosen. Searching a field only notes the reader
   hasn't met have, such as Pike's `debts` before *Ash*, is refused just
   as a made-up field is ("No note the reader has met by ember:3 gives a
   value for a field 'debts'"), so the answer doesn't tell them apart.
@@ -6561,7 +6562,7 @@ a picker of the den's authors, waits for #311. Covered by:
 
 I'm checking a note at chapter 3, and a page asks `/api/entity` or `/api/search`
 with `marksAt` for that position (#300). A note's tabs ask for it (SC-WEB-102), and
-the search page doesn't yet.
+so does the search page (SC-WEB-107).
 
 - I get the whole note, or every hit a search with no position finds in that
   universe, or every note in a list (SC-WEB-104). Nothing is hidden.
@@ -6724,3 +6725,69 @@ I'm at Dracula chapter 3 with `?readers=1`.
 
 Spec: format.md §9.5, design.md §9 (#300). Covered by: `web/src/ReaderLists.test.tsx`,
 `MarkedListTests.AtEveryPositionTheReadersListAndWhatsMetAreWhatCanonAsOfHolds`.
+
+### SC-WEB-106. In the Reader's view, search finds only what a reader can
+
+I search at Ember chapter 3 with `?readers=1`, and the page asks `/api/search` with
+`asOf` and `readers=true`.
+
+- A word finds a hit exactly when `get_entity` at that position shows it, word by
+  word, and no snippet, section name, or count says anything else.
+- So a word only in an HTML comment finds nothing, whether in a lead, a section, or a
+  heading, or in one nothing closes. A hit next to a comment doesn't show it, and a
+  heading reads without one, so a hit in `## Heading <!-- x --> words` is in "Heading
+  words". Words either side of a comment still find it.
+- A later note, section, or entry finds nothing, nor does an idea or bookkeeping.
+- A later or unplaced position value neither matches nor shows. A list's values
+  readers have reached still do.
+- A later `until` doesn't show as text, on a section or an entry, and its marker's
+  position finds nothing there.
+- A value's link matches by its note's name or alias only if the reader has met the
+  note. The link as written is still their text, as `get_entity` shows it.
+- A met note's alias finds it, since that's how `get_entity` finds it too, though it
+  doesn't list aliases. A type's default isn't searched, as with no position, though
+  `get_entity` shows it.
+- Later notes can't crowd out met ones, however many match.
+- MCP's `search` has no position and doesn't change (SC-MCP-47).
+
+Spec: F-VIEW-4, F-VIEW-5, F-VIEW-6, design.md §9 (#300). Covered by: `ReadersSearchTests`.
+
+### SC-WEB-107. In the Author's view, search finds everything, what a reader can find first
+
+I search at Ember chapter 3, in the Author's view.
+
+- Every hit a search with no position finds is there. Notes a reader could find
+  something in come first, and then a dashed line and the rest. Inside a note, what they
+  could find comes first. A limit cuts the rest first, so a word in many later notes
+  doesn't push out a met one.
+- A later note has its `enters at` by its name, and nothing repeats it on its hits.
+  A hit in a later fact has `ahead of readers`, one past its end `no longer true here`,
+  and a position field's later or unplaced value `ahead of readers` or `not placed in
+  the story yet`.
+- A field hit found by a linked note's name or alias, where readers haven't met that
+  note, has that note's `enters at`, or its status if it's an idea, and comes after
+  the line unless another hit in the note keeps it above.
+- A hit whose words are only in a comment has `in a comment`, even a comment nothing
+  closes or one in a heading, and comes after what readers can find. An idea or
+  bookkeeping has its own badge there too.
+- Tags are plain text, with one legend line, so no row adds a Tab stop and nothing is a
+  button inside a link. There's no legend or line where nothing is tagged.
+- Every type and field is in the filters.
+- What's before the line with no tag is what a search in the Reader's view finds there.
+  An entry that loses an overlap is the one exception (F-TMP-5).
+
+Spec: design.md §9 (#300, #302). Covered by: `web/src/ReaderSearch.test.tsx`, `ReadersSearchTests`.
+
+### SC-WEB-108. The search page's filters and links know the view
+
+- In the Reader's view, Type, Field, and Scope list only what readers have reached. A
+  later book or series isn't named, unless a met note is filed there (SC-WEB-105), and
+  a thread's `paid_off` isn't a Field to pick before it pays off. Asking for it anyway
+  is refused in the words a made-up field gets. One already chosen in the address stays.
+- The top search box, a hit, and Back all keep `at` and `readers=1`, and so does a
+  filter. The position bar's switch searches again in the other view.
+- With no position, the search page and `/api/search` are as they were. `readers=true`
+  goes only with `asOf`: without it, or with `marksAt`, it's `bad_argument`.
+  `readers=false` is the same as leaving it out. `asOf` alone is unchanged.
+
+Spec: design.md §9 (#300). Covered by: `web/src/ReaderSearch.test.tsx`, `ReadersSearchTests`.

@@ -847,6 +847,11 @@ you're in is always highlighted.
   for the sentence, or open the note. A chapter's page lists what enters there the same way.
   With more than 1,000 notes, the sidebar lists 1,000, what readers have met first, says
   how many of how many, and a group's count covers only what's listed.
+
+  **Search** finds everything. Notes with something a reader could find come first, then
+  a dashed line, then the rest, with tags saying why. Hits in a comment say `in a
+  comment`. If you find a note by the name or alias of a note it links to, and readers
+  haven't met that one, the hit says where they do.
 - **The Reader's view** shows what a reader at that chapter knows, and nothing else:
   no tags, no later dates, no comments, and no sections with an error. A note they
   haven't met says where they first meet it. It's read-only, and it has no history,
@@ -860,15 +865,22 @@ you're in is always highlighted.
   list only the books they've got to. There's nowhere to make a new note from here, so
   switch to the Author's view for that.
 
+  **Search** finds only what a reader could: a word in a comment, a later section or
+  value, or a note they haven't met finds nothing, and no snippet shows it. The
+  name or alias of a note they haven't met finds nothing either, though the link
+  itself, as you wrote it, is text they can see. The Type, Field, and Scope filters
+  list only what they've reached. An AI assistant at a position would see the
+  same words, except that search also finds a met note by its aliases, and doesn't
+  look in a type's default values.
+
 The Reader's view stays while you follow links and change chapters, and its link
 keeps it (`?readers=1`), but Wolfden doesn't remember it: opening Wolfden fresh starts
 in the Author's view.
 
-**What the Reader's view doesn't cover yet.** It's about note pages and lists of notes,
-and says so on the page. The rest of the screen isn't filtered the same way,
-so don't take it as what a reader would see: search finds comments and later values,
-and the book and chapter pages and the position bar's Book and Chapter menus show later
-books' and chapters' names. "Read-only" also doesn't reach everything: checkpoints, the ⚠ list's **Edit file**, and the book and
+**What the Reader's view doesn't cover yet.** It's about note pages, lists of notes, and
+search, and says so on the page. The rest of the screen isn't filtered the same way,
+so don't take it as what a reader would see: the book and chapter pages and the position
+bar's Book and Chapter menus show later books' and chapters' names. "Read-only" also doesn't reach everything: checkpoints, the ⚠ list's **Edit file**, and the book and
 chapter pages' controls still work. Edit file shows the whole source, so it's the
 Author's view whichever you came from, and it keeps your position.
 

@@ -27,7 +27,7 @@ export function isTextEntry(target: EventTarget | null): boolean {
 /**
  * The search box in the top bar (#25). Typing searches once it pauses, and
  * Enter searches at once, on the search page (`/u/<universe>/search?q=`),
- * keeping the story position. `/` anywhere outside a text box focuses it.
+ * keeping the story position and the view. `/` anywhere outside a text box focuses it.
  */
 export function SearchBox({ universe }: { universe: string | undefined }) {
   if (!universe) {
@@ -69,7 +69,7 @@ function UniverseSearchBox({ universe }: { universe: string }) {
     void navigate({
       to: '/u/$universe/search',
       params: { universe: u },
-      search: (prev: SearchPageSearch) => (on ? { ...prev, q: words || undefined } : { at: prev.at, q: words }),
+      search: (prev: SearchPageSearch) => (on ? { ...prev, q: words || undefined } : { at: prev.at, readers: prev.readers, q: words }),
       // Typing on the search page refines it rather than adding to history.
       replace: on,
     })

@@ -783,6 +783,12 @@ button.ahead-of-readers {
   border-bottom: 1px solid var(--border);
 }
 
+/* Where a search goes from what readers can find to what they can't. */
+.hit-groups > li.later-first {
+  border-top: 1px dashed var(--border);
+  padding-top: 0.75rem;
+}
+
 .hit-entity {
   margin: 0;
   font-weight: 600;

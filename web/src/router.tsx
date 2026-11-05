@@ -117,7 +117,7 @@ export function validateSearchPageSearch(search: Record<string, unknown>): Searc
   const text = (name: string) => (typeof search[name] === 'string' ? (search[name] as string).trim() : '') || undefined
   const book = text('book')
   return {
-    at: validateStorySearch(search).at,
+    ...validateStorySearch(search),
     q: text('q'),
     field: text('field'),
     type: text('type'),

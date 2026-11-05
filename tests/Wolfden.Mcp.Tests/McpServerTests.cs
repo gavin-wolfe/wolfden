@@ -33,6 +33,7 @@ public sealed class McpServerTests : IAsyncLifetime
         _server = WolfdenMcpServer.RunAsync(transport, new DenTools(_den.Root), "0.1.0-test", _log, watch: true, _stop.Token);
         _client = await McpClient.CreateAsync(
             new StreamClientTransport(_toServer.Writer.AsStream(), _toClient.Reader.AsStream()),
+            TestClient.Options(),
             cancellationToken: TestContext.Current.CancellationToken);
     }
 

@@ -2,8 +2,8 @@ import type { PositionView, ReaderMark } from './api'
 import { describePosition, placeWords } from './story'
 
 // The words of the tags that say what readers at a story position don't know
-// (#300), in one place, for the note pages now and the lists after them. The
-// API's marks say what's so, and these are how a page says it.
+// (#300), in one place, for the note pages and the lists. The API's marks say
+// what's so, and these are how a page says it.
 
 export const AHEAD_OF_READERS = 'ahead of readers'
 export const AHEAD_WHY = "Readers at this point in the story don't know this yet."
@@ -11,14 +11,29 @@ export const NO_LONGER_TRUE = 'no longer true here'
 export const NOT_PLACED = 'not placed in the story yet'
 export const NEVER_TRUE = "never true (its dates don't overlap)"
 
-/** The line above a list with tags in it, which are plain text there (#302). */
+/** The line above a list with tags in it, which are plain text there (#302), so a keyboard or a touch reads it where it can't hover. */
 export const MARKS_LEGEND = "Tags say what readers at this point in the story don't see. Each note's page has the details."
 
 /**
  * What the Reader's view doesn't cover yet. Remove this, and where it's shown,
- * when steps 4 to 6 of #300 give lists, search, and the book page the two views.
+ * when steps 5 and 6 of #300 give search, the book and chapter pages, and the
+ * position bar's Book and Chapter menus the two views.
  */
-export const READERS_VIEW_REACH = "This covers this note's page. The sidebar, search, and other pages aren't part of the Reader's view yet."
+export const READERS_VIEW_REACH = "This covers note pages and lists of notes. Search, book and chapter pages, and the Book and Chapter menus aren't part of the Reader's view yet."
+
+/** The words for a list longer than the API's limit, with what it does list. `metFirst` is for the Author's view, which puts them first. */
+export function listCutWords(listed: number, total: number, metFirst: boolean): string {
+  return `${number(listed)} of ${number(total)} notes are listed; groups count only what's listed.${metFirst ? ' What readers have met is listed first.' : ''}`
+}
+
+/** The same, for a list of what enters at one chapter, which can't say none does. */
+export function chapterListCutWords(listed: number, total: number): string {
+  return `Only ${number(listed)} of ${number(total)} notes could be checked, so more may enter the story here.`
+}
+
+function number(n: number): string {
+  return n.toLocaleString('en-US')
+}
 
 /** Why a position isn't placed, naming it if there's one to name. */
 export function notPlacedWhy(position: string | null): string {

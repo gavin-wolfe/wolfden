@@ -231,6 +231,49 @@ export function UnsavedPrompt({ question, discard, onKeep, onDiscard }: { questi
   )
 }
 
+/** Where a navigation is from or to, as a leave prompt is asked about it. */
+export interface LeaveLocation {
+  pathname: string
+  search: { at?: string }
+}
+
+/**
+ * Asks before going anywhere that would drop `dirty` changes in a form of its own,
+ * with the prompt to show, or null. That includes moving the position or changing
+ * view, which are changes of location too. `keeps` says which of those leave the
+ * form where it is, so there's nothing to ask. Closing or reloading the tab, the
+ * browser asks.
+ */
+export function useLeavePrompt(dirty: boolean, keeps: (current: LeaveLocation, next: LeaveLocation) => boolean = () => false): ReactNode {
+  const dirtyRef = useRef(dirty)
+  dirtyRef.current = dirty
+  const keepsRef = useRef(keeps)
+  keepsRef.current = keeps
+  const shouldBlockFn = useCallback(({ current, next }: { current: LeaveLocation; next: LeaveLocation }) => dirtyRef.current && !keepsRef.current(current, next), [])
+  const blocker = useBlocker({ shouldBlockFn, enableBeforeUnload: false, withResolver: true })
+  useEffect(() => {
+    if (!dirty) {
+      return
+    }
+
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [dirty])
+
+  return blocker.status === 'blocked' ? (
+    <UnsavedPrompt
+      question="You have changes that aren't saved. Leave without saving them?"
+      discard="Leave without saving"
+      onKeep={() => blocker.reset()}
+      onDiscard={() => blocker.proceed()}
+    />
+  ) : null
+}
+
 /** Asks before Cancel or Escape drops unsaved changes, in the editor that has them. */
 export function DiscardPrompt() {
   const editing = useEditing()!

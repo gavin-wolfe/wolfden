@@ -6,6 +6,7 @@ import { EntityList } from '../components/EntityList'
 import { ErrorState, Loading } from '../components/States'
 import { useShownError } from '../formHold'
 import { useDocumentTitle, useEntitiesInView, usePosition } from '../hooks'
+import { MARKS_LEGEND, chapterListCutWords } from '../readerWords'
 import { chapterLabel, entryOf } from '../story'
 import { findBook } from './BookPage'
 
@@ -69,8 +70,7 @@ export function ChapterPage() {
   const c = b.chapters[index]
   const prev = b.chapters[index - 1]
   const next = b.chapters[index + 1]
-  const entering = view.all ? view.all.entities.filter((e) => entryOf(e, view.positions ?? []) === c.position) : []
-  const { shown, hidden } = view.split(entering)
+  const entering = view.entities ? view.entities.filter((e) => entryOf(e, view.positions ?? []) === c.position) : []
 
   return (
     <div className="page-body">
@@ -102,13 +102,17 @@ export function ChapterPage() {
       ) : view.error ? (
         <ErrorState error={view.error} />
       ) : (
-        <EntityList
-          key={`${b.key}:${c.key}:${at ?? ''}`}
-          universe={universe}
-          shown={shown}
-          hidden={hidden}
-          empty="No notes enter the story in this chapter."
-        />
+        <>
+          {view.truncated && <p className="muted list-legend">{chapterListCutWords(view.entities?.length ?? 0, view.total)}</p>}
+          {entering.some((e) => e.readerMark) && <p className="muted list-legend">{MARKS_LEGEND}</p>}
+          <EntityList
+            universe={universe}
+            entities={entering}
+            positions={view.positions ?? []}
+            // It says nothing of a chapter readers haven't reached, whose notes they haven't met either.
+            empty={view.truncated ? 'None of those enter the story here.' : view.readers ? 'Readers have met no notes that enter the story here.' : 'No notes enter the story in this chapter.'}
+          />
+        </>
       )}
       <nav className="prev-next" aria-label="Chapters">
         {prev ? (

@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using ModelContextProtocol.Protocol;
+using Wolfden.Index.Reading;
 using Wolfden.Mcp;
 
 namespace Wolfden.Api.Tests;
@@ -332,8 +333,16 @@ public sealed class ReadersViewTests : IDisposable
     [Trait("Scenario", "SC-WEB-102")]
     public async Task AtEveryPositionABacklinkWithNoMarkIsOneAReaderSees()
     {
+        WriteLinksWithNoPosition();
         await using var server = await Start();
         var positions = await server.GetJsonAsync("/api/positions?universe=starfall", HttpStatusCode.OK);
+        var noPosition = LinksWithNoPosition();
+
+        // The kinds F-LINK-13 gives no position, so the exemption below is about all of them.
+        Assert.Equal(["chapter_default", "chapter_field", "container_body", "outline_notes"], noPosition.Select(l => l.Site).Distinct().Order(StringComparer.Ordinal));
+
+        // A chapter value that's held has its chapter as its position, so it isn't one of them.
+        Assert.True(new DenReader(_den.Root).WithIndex(index => index.Context.Links.Any(l => l.Site == "chapter_field" && l.Text == "[[The salt tithe]]" && l.PositionOrdinal != null)));
 
         foreach (var at in positions.GetProperty("positions").EnumerateArray().Select(p => p.GetProperty("position").GetString()!))
         {
@@ -349,16 +358,38 @@ public sealed class ReadersViewTests : IDisposable
                 Assert.Equal(
                     Backlinks(strict).Select(Place).Order(StringComparer.Ordinal),
                     Backlinks(marked).Where(ReachesAReader).Select(Place).Order(StringComparer.Ordinal));
+                Assert.DoesNotContain(Backlinks(marked), b => noPosition.Select(l => l.Place).Contains(Place(b)) && b.TryGetProperty("readerMark", out _));
             }
         }
 
         static string Place(JsonElement b) => $"{b.GetProperty("path").GetString()}:{b.GetProperty("line").GetInt32()}:{b.GetProperty("column").GetInt32()}";
 
-        static bool ReachesAReader(JsonElement b) =>
+        bool ReachesAReader(JsonElement b) =>
             !b.TryGetProperty("readerMark", out _)
             && !b.TryGetProperty("leftOut", out _)
-            && b.GetProperty("site").GetString() != "container_body"
+            && !noPosition.Select(l => l.Place).Contains(Place(b))
             && !b.GetProperty("bookkeeping").GetBoolean()
             && (b.GetProperty("status").ValueKind == JsonValueKind.Null || b.GetProperty("status").GetString() is "draft" or "canon");
     }
+
+    /// <summary>A link to the tithe where F-LINK-13 gives none a position: a book's own text, an outline's notes, and a chapter value or default that isn't held.</summary>
+    private void WriteLinksWithNoPosition()
+    {
+        const string Book = "universes/starfall/series/long-dark/books/ember";
+        var book = File.ReadAllText(Path.Combine(_den.Root, Book, "book.md")).Replace("\r\n", "\n", StringComparison.Ordinal);
+        book = book
+            .Replace("status: draft\n", "status: draft\nchapter_defaults:\n  narration: \"[[The salt tithe]]\"\n", StringComparison.Ordinal)
+            .Replace("title: Kessan Reach }", "title: Kessan Reach, fields: { narration: \"[[The salt tithe]]\" } }", StringComparison.Ordinal)
+            .Replace("{ key: \"2\", number: 2 }", "{ key: \"2\", number: 2, fields: { pov: [\"[[The salt tithe]]\"] } }", StringComparison.Ordinal);
+        _den.Write($"{Book}/book.md", $"{book}\nA word on [[The salt tithe]] in the book's own text.\n");
+        _den.Write($"{Book}/outline.md", $"{File.ReadAllText(Path.Combine(_den.Root, Book, "outline.md"))}\n\nA working note on [[The salt tithe]].\n");
+    }
+
+    private List<(string Site, string Place)> LinksWithNoPosition() =>
+        new DenReader(_den.Root).WithIndex(index => index.Context.Links
+            .Where(l => l.SourceEntityId == null && l.PositionOrdinal == null)
+            .Select(l => new { l.Site, l.Path, l.Line, l.Column })
+            .AsEnumerable()
+            .Select(l => (l.Site, $"{l.Path}:{l.Line}:{l.Column}"))
+            .ToList());
 }

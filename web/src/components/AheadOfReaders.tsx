@@ -37,8 +37,8 @@ export function MarkTag({ mark, positions, note = false }: { mark: ReaderMark; p
  * every row would be a Tab stop each and can't go inside a link. The list has one
  * line that explains them all (#302).
  */
-export function MarkList({ mark, positions }: { mark: ReaderMark; positions: readonly PositionView[] }) {
-  const { words, why } = markWords(mark, positions)
+export function MarkList({ mark, positions, note = false }: { mark: ReaderMark; positions: readonly PositionView[]; note?: boolean }) {
+  const { words, why } = markWords(mark, positions, note)
   return (
     <span className="ahead-of-readers" title={why}>
       {words}

@@ -120,6 +120,25 @@ export interface EntityListResult {
   entities: EntitySummary[]
 }
 
+/**
+ * A note in a list at a position, for the Author's view (`marksAt`, #300). `met`
+ * says readers there know it: an idea has no mark, but they don't.
+ */
+export interface MarkedEntity extends EntitySummary {
+  met: boolean
+  readerMark?: ReaderMark
+}
+
+export interface MarkedEntityListResult {
+  version: number
+  count: number
+  total: number
+  truncated: boolean
+  /** What readers have met, then the rest, each in the list's usual order. */
+  entities: MarkedEntity[]
+  marksAt: string
+}
+
 export interface EntityRef {
   key: string
   id: string | null
@@ -399,6 +418,14 @@ export function entitiesQuery(universe: string, at: string | undefined) {
   return queryOptions({
     queryKey: ['entities', universe, at ?? null],
     queryFn: () => getJson<EntityListResult>(apiPath('/api/entities', { universe, asOf: at, limit: ENTITY_LIMIT })),
+  })
+}
+
+/** Every note, for the Author's view at a position: what readers have met first, and the rest marked (#300). */
+export function markedEntitiesQuery(universe: string, at: string) {
+  return queryOptions({
+    queryKey: ['entities', universe, at, 'marked'],
+    queryFn: () => getJson<MarkedEntityListResult>(apiPath('/api/entities', { universe, marksAt: at, limit: ENTITY_LIMIT })),
   })
 }
 

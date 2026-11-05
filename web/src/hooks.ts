@@ -1,10 +1,9 @@
 import { useCallback, useEffect } from 'react'
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { entitiesQuery, positionsQuery } from './api'
+import { entitiesQuery, markedEntitiesQuery, positionsQuery } from './api'
 import { useShownError } from './formHold'
-import { splitByView, type LaterEntity } from './story'
-import type { EntitySummary } from './api'
+import type { EntitySummary, ReaderMark } from './api'
 import type { StorySearch } from './router'
 
 /**
@@ -53,26 +52,52 @@ export function useUniverseKey(): string | undefined {
   return (useParams({ strict: false }) as { universe?: string }).universe
 }
 
+/** A note in a list: `met` if the reader at the position knows it, with its mark in the Author's view. */
+export interface ListedEntity extends EntitySummary {
+  met: boolean
+  readerMark?: ReaderMark
+}
+
 /**
- * The universe's entities, and which of them the reader has met at the
- * position: the unfiltered list, compared with the list as of the position.
+ * The universe's notes as this view lists them (#300). With no position, every
+ * one. In the Author's view, every one, with what the reader has met first and
+ * the rest marked. In the Reader's view, only what the reader has met, from the
+ * same list MCP's `canon_as_of` holds: this doesn't ask for the rest, so no list
+ * can name them or count them.
  */
 export function useEntitiesInView(universe: string) {
-  const { at } = usePosition()
-  const all = useQuery(entitiesQuery(universe, undefined))
-  const inView = useQuery({ ...entitiesQuery(universe, at), enabled: at !== undefined })
+  const { at, readers } = usePosition()
+  const marked = at !== undefined && !readers
+  const plain = useQuery({ ...entitiesQuery(universe, at), enabled: !marked })
+  const all = useQuery({ ...markedEntitiesQuery(universe, at ?? ''), enabled: marked })
   const positions = useQuery(positionsQuery(universe))
 
-  const isPending = all.isPending || positions.isPending || (at !== undefined && inView.isPending)
+  const failedPlain = useShownError(plain)
   const failedAll = useShownError(all)
   const failedPositions = useShownError(positions)
-  const failedInView = useShownError(inView)
-  const error = failedAll ?? failedPositions ?? (at !== undefined ? failedInView : null)
-  const viewKeys = at !== undefined && inView.data ? new Set(inView.data.entities.map((e) => e.key)) : null
+  const list = marked ? all.data : plain.data
+  const entities: ListedEntity[] | undefined = marked ? all.data?.entities : plain.data?.entities.map((e) => ({ ...e, met: true }))
 
-  /** Splits some of the universe's entities into those met and those met later. */
-  const split = (entities: readonly EntitySummary[]): { shown: EntitySummary[]; hidden: LaterEntity[] } =>
-    splitByView(entities, viewKeys, at, positions.data?.positions ?? [])
+  return {
+    at,
+    readers,
+    entities,
+    truncated: list?.truncated ?? false,
+    /** How many notes the list holds in all, before the limit. */
+    total: list?.total ?? 0,
+    positions: positions.data?.positions,
+    isPending: (marked ? all.isPending : plain.isPending) || positions.isPending,
+    error: (marked ? failedAll : failedPlain) ?? failedPositions,
+  }
+}
 
-  return { at, all: all.data, positions: positions.data?.positions, isPending, error, split }
+/**
+ * What's known of a note a read at a position didn't give, for the banner on a note
+ * the reader hasn't met. It's the one thing in the Reader's view that asks for the
+ * whole list, later names included, and it shows only that note's own name
+ * (SC-WEB-13). Nothing asks for it otherwise.
+ */
+export function useNoteSummary(universe: string, key: string, enabled: boolean): EntitySummary | undefined {
+  const all = useQuery({ ...entitiesQuery(universe, undefined), enabled })
+  return all.data?.entities.find((e) => e.key === key || e.id === key || e.path === key)
 }

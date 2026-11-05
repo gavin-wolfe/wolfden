@@ -5,6 +5,7 @@ import { wasHistoryStep } from '../router'
 import {
   ApiRequestError,
   entityQuery,
+  positionsQuery,
   type LeftOutNote,
   type BacklinkView,
   type ContainerRef,
@@ -37,7 +38,7 @@ import { AddField, FieldEditor, FieldTools } from '../components/FieldEditing'
 import { denErrorsQuery } from '../denErrorsApi'
 import { sourceQuery, type EntitySource } from '../editApi'
 import { ErrorState, Loading, StatusBadge } from '../components/States'
-import { useDocumentTitle, useEntitiesInView, usePosition } from '../hooks'
+import { useDocumentTitle, useNoteSummary, usePosition } from '../hooks'
 import { chapterWords, describePosition, entryOf, isAheadOf, ordinalOf } from '../story'
 import { NOT_PLACED, MARKS_LEGEND, READERS_VIEW_REACH, notPlacedWhy } from '../readerWords'
 
@@ -65,7 +66,8 @@ export function EntityPageView() {
     opened.current = live.data
   }
   const data = opened.current ?? live.data
-  const view = useEntitiesInView(universe)
+  const positions = useQuery(positionsQuery(universe)).data?.positions ?? []
+  const summary = useNoteSummary(universe, key, data !== undefined && data.entity === null)
   // Only the API's page names the note, and it's null when the reader hasn't met it.
   useDocumentTitle(data ? (data.entity?.name ?? 'Not met yet') : undefined)
 
@@ -83,17 +85,16 @@ export function EntityPageView() {
 
   const { entity } = data
   if (!entity) {
-    const summary = view.all?.entities.find((e) => e.key === key || e.id === key || e.path === key)
-    return <NotInView summary={summary} note={data.note} positions={view.positions ?? []} at={at} />
+    return <NotInView summary={summary} note={data.note} positions={positions} at={at} />
   }
 
   if (readers) {
-    return <EntityArticle universe={universe} entity={entity} positions={view.positions ?? []} readersView />
+    return <EntityArticle universe={universe} entity={entity} positions={positions} readersView />
   }
 
   return (
     <EditingProvider universe={universe} entityKey={key} frozen={entity.frozen ?? null} target={target} setTarget={setTarget}>
-      <EntityArticle universe={universe} entity={entity} positions={view.positions ?? []} />
+      <EntityArticle universe={universe} entity={entity} positions={positions} />
     </EditingProvider>
   )
 }

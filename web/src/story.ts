@@ -1,4 +1,4 @@
-import type { EntitySummary, PositionView } from './api'
+import type { BookNode, EntitySummary, PositionView, UniverseNode } from './api'
 
 // Story positions as the pages show them, and which notes the reader has met.
 // A position is what the API's asOf takes: "book:chapter", or a bare book key
@@ -112,46 +112,26 @@ export function entryOf(entity: Pick<EntitySummary, 'from' | 'scopeKind' | 'scop
   }
 }
 
-/** A note the reader hasn't met at a position, and why. */
-export interface LaterEntity {
-  entity: EntitySummary
-  /** Where it enters, in words, or null when it's out of view for its status instead. */
-  entersAt: string | null
-  /** The position to jump to for it, if any. */
-  entry: string | null
-  /** True if it enters after the position; false if it's out of view for another reason, such as its status. */
-  later: boolean
+/** True if readers at `at` have got to `position`. False when either isn't in the list, since nothing says they have. */
+function reached(position: string, at: string, positions: readonly PositionView[]): boolean {
+  const here = ordinalOf(at, positions)
+  const there = ordinalOf(position, positions)
+  return here !== null && there !== null && Math.ceil(there) <= Math.ceil(here)
 }
 
 /**
- * Splits `all` (the unfiltered list) into what the reader has met at a
- * position (those in `inView`, the list as of it) and what they haven't. With
- * no position (`inView` null), everything is shown.
+ * The universe's tree as the Reader's view shows it (#300), from the hierarchy as
+ * of `at`: a book or chapter readers have got to, and a book or series filed with
+ * a note they've met, so no met note is left without a place. The rest aren't
+ * there, so nothing names or counts them. A series with no books yet isn't at any
+ * position, so it's only there for a note.
  */
-export function splitByView(
-  all: readonly EntitySummary[],
-  inView: ReadonlySet<string> | null,
-  at: string | undefined,
-  positions: readonly PositionView[],
-): { shown: EntitySummary[]; hidden: LaterEntity[] } {
-  if (inView === null || at === undefined) {
-    return { shown: [...all], hidden: [] }
+export function readersTree(u: UniverseNode, at: string, positions: readonly PositionView[]): UniverseNode {
+  const book = (b: BookNode): BookNode => ({ ...b, chapters: b.chapters.filter((c) => reached(c.position, at, positions)) })
+  const books = (bs: readonly BookNode[]) => bs.filter((b) => reached(b.position, at, positions) || b.entities.total > 0).map(book)
+  return {
+    ...u,
+    series: u.series.map((s) => ({ ...s, books: books(s.books) })).filter((s) => s.books.length > 0 || s.entities.total > 0),
+    books: books(u.books),
   }
-
-  const here = ordinalOf(at, positions)
-  const shown: EntitySummary[] = []
-  const hidden: LaterEntity[] = []
-  for (const entity of all) {
-    if (inView.has(entity.key)) {
-      shown.push(entity)
-      continue
-    }
-
-    const entry = entryOf(entity, positions)
-    const entryOrdinal = entry === null ? -1 : ordinalOf(entry, positions)
-    const later = here !== null && entryOrdinal !== null && entryOrdinal > here
-    hidden.push({ entity, entry, entersAt: later && entry !== null ? describePosition(entry, positions) : null, later })
-  }
-
-  return { shown, hidden }
 }

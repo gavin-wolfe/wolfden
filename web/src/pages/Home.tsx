@@ -43,7 +43,7 @@ export function Home() {
           <ul className="card-list">
             {universes.map((u) => (
               <li key={u.key}>
-                <Link to="/u/$universe" params={{ universe: u.key }} search={{ at: undefined }}>
+                <Link to="/u/$universe" params={{ universe: u.key }} search={{ at: undefined, readers: undefined }}>
                   {u.name}
                 </Link>{' '}
                 <code>{u.key}</code>: {count(u.series, 'series', 'series')}, {count(u.books, 'book', 'books')}, {count(u.entities, 'note', 'notes')}

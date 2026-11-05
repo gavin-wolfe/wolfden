@@ -1612,7 +1612,7 @@ docs/
   |---|---|---|
   | `/api/hierarchy` | `universe`, `asOf` | The universe, its series in story order with their books, its standalone books, and each book's chapters (key, number, title, position). Each scope counts the entities filed in it, in all and by type; as of a position, only those in the canon view there. |
   | `/api/positions` | `universe` | Every story position in order, with its book's name and series and the chapter's number and title, for a position picker. A book with no chapters yet is listed by its bare key. |
-  | `/api/entities` | `universe`, `type`, `status`, `series`, `book`, `asOf`, `limit` | `list_entities`; with `asOf`, only the entities in the canon view there, in its order. |
+  | `/api/entities` | `universe`, `type`, `status`, `series`, `book`, `asOf`, `limit`, `marksAt` | `list_entities`; with `asOf`, only the entities in the canon view there, in its order; with `marksAt`, all of them, those in that view first ("Marks for the writer" below). |
   | `/api/entities/lookup` | `query`, `universe`, `type`, `asOf`, `limit` | The notes whose name, alias, file name, or id has a word starting with each word typed, best first, each with what matched and which alias, for the link pickers (#198; "Looking notes up by name and alias" below). `type` takes several types separated by commas; with `asOf`, only notes the reader has met by then. |
   | `/api/entity` | `entity`, `universe`, `asOf`, `marksAt`, `readers` | `get_entity`, as a page: each field value or entry and each section lists its links, resolved from the index (the entity reached, or broken or ambiguous); also the scope's container chain, where the entity enters canon (its `from`, or its scope's start, inherited, format.md F-ENT-6), and its backlinks (which entity, field, section, chapter, or outline row). As of a position, a link to an entity the reader hasn't met doesn't say what it reaches, and only links in what the reader has met count as backlinks. |
   | `/api/canon` | `universe`, `asOf`, `series`, `book`, `type`, `brief` | `canon_as_of`. |
@@ -1751,6 +1751,15 @@ docs/
     for, so it's a second exception to "no mark means a reader sees it". One in a
     section an error leaves out has `leftOut`, for the page's badge, and no mark.
 
+  **Lists.** `marksAt` on `/api/entities` gives every note the filters keep, as
+  `MarkedEntity`: `list_entities`' line with `met`, true if it's in the canon view at
+  the position, and its own `readerMark`, `ahead` or `unplaced`. An idea isn't met and
+  has no mark. `met` comes from the view, so one answer can't mix two readings of the
+  den, and the page needs no second list. What's met comes first, then the rest, each
+  in the usual order, and only then the `limit`, so a long list cuts what readers
+  haven't met first. It reads no note's facts. `list_entities` and `EntitySummary` don't
+  change, as `MarkedEntity` is only in `Wolfden.Api`.
+
   **The Reader's view** (#300). `readers=true` beside `asOf` on `/api/entity` gives
   the page as an AI assistant's read at that position has it, since `asOf` alone
   keeps later `until`s, position values, and comments for the writer (F-VIEW-4,
@@ -1796,35 +1805,42 @@ docs/
     dropdowns to jump. It starts at "Everything" (the end of the story).
     The position carries from page to page and is kept in the URL, so a
     bookmark or a shared link keeps it.
-  - **Notes the reader hasn't met: hidden, with a peek.** At a position,
-    lists and the tree show only what the reader knows by then, plus a
-    "N more appear later" control that reveals them greyed, each with
-    its entry point. (#300 changes this in later steps, as it has for a
-    note's own pages.)
+  - **Notes the reader hasn't met** (#300, which replaces #26's "N more appear
+    later"). At a position, the Author's view of a list has every note: what the
+    reader has met first, then the rest, greyed, below a dashed line, and tagged
+    with where they enter. Nothing collapses. The Reader's view has only what the
+    reader has met.
   - **The Author's view and the Reader's view** (maintainer decisions on #300,
     which replace #26's "Show it anyway" on a note's pages). At a position, a
     note's page and History tab show everything by default, since the writer is
     the author, and tag what readers there don't know. A two-way control,
     `Author's view` and `Reader's view`, appears once a position is picked, with
-    the current one always visible, so the page always says which it is. On note
-    pages only, until the lists and search have the two views. It's kept in the
-    URL (`?readers=1`) and isn't remembered, so a fresh start opens the Author's
-    view, and it ends with the position.
+    the current one always visible, so the page always says which it is. It's on
+    every page, as the sidebar is, but for Edit file by path, which is always the
+    writer's. It's kept in the URL (`?readers=1`) and isn't remembered, so a fresh
+    start opens the Author's view, and it ends with the position.
     - **The Author's view** asks `marksAt`. A note the reader hasn't met shows,
       tagged `enters at chapter 11`, and it edits the real note, in the same read
       it already has. Tags are `ahead of readers`, `no longer true here`, `not
       placed in the story yet`, and `never true (its dates don't overlap)`, in one
       place (`readerWords.ts`), with the sentence on hover. A note-page tag is a
       button, as a keyboard or touch can't hover. A list uses plain text and one
-      line to explain it (#302), as "Linked from" does. Nothing has two tags, and
+      line to explain it (#302), as "Linked from" and the sidebar do. Nothing has two tags, and
       what keeps its own badge (out of canon, bookkeeping, left out) has none. A
       type's field defaults aren't listed, as with no position, since they aren't
       in the note.
     - **The Reader's view** asks `asOf` with `readers=true`, so it holds what an
       AI assistant reads there, a type's defaults included, badged. The note's page
-      is read-only. The rest of the screen isn't part of it yet, and the page says so
-      until later steps of #300 land: the sidebar, search, and the book page and
-      chapter menu aren't filtered as it is, and the New buttons, checkpoints, and the
+      is read-only. A list asks `/api/entities` with `asOf`, what `canon_as_of`
+      holds, and doesn't ask for the rest, so it can't name or count them. (The banner
+      for a note the reader hasn't met does ask for the whole list, for that note's own
+      name and where it enters, and shows nothing else of it.) The sidebar
+      and the universe's and series' pages leave out books and chapters readers haven't
+      got to, and a series with nothing yet, keeping a later book or series only where a
+      met note is filed. They have no New buttons or chapter defaults, and nor does the
+      top bar. The rest of the screen isn't part of it yet, and the page says so
+      until later steps of #300 land: search, the book and chapter pages, and the
+      position bar's Book and Chapter menus aren't filtered as it is, and checkpoints, the ⚠ list, and the
       book and chapter pages' controls still work. Edit file by path drops `readers`,
       so it's plainly the writer's. The API's writes know nothing of views.
       A note the reader hasn't met shows the banner, for example "Readers first
@@ -1864,9 +1880,12 @@ docs/
     `serve --universe`, or of a den with one. On a narrow screen the
     tree folds behind a Contents button and opens over the page, below
     the top bar. Focus moves into it, and Escape closes it.
-  - **Hidden notes.** A note out of view for its status rather than its
-    entry point is listed in the peek as "not in canon: <status>". The
-    peek closes when the position or the list changes. The banner for a
+  - **Notes out of view.** In a list's Author's view, a note out of view for its
+    status rather than its entry point comes after what the reader has met, with its
+    status badge and no tag. One no position places says `not placed in the story yet`.
+    Each group's count says how many the reader has met of them, `2 of 5`. A list longer
+    than the API's limit says how many of how many it has, and that groups count only what's
+    listed, and a chapter's list says more may enter there instead of saying none do. The banner for a
     note not met yet also offers to go to where it enters, or to show
     everything. In the Reader's view, the tab's title names only what's in view.
   - **Entity pages.** An entity page shows the name, type, status, scope
@@ -1958,8 +1977,8 @@ docs/
   `asOf`, says so ("Searching as of Dracula chapter 9"), and offers to
   search everything; hits the reader hasn't met aren't shown or
   peeked at. The Type filter lists only the types the reader has met,
-  which applies the maintainer's hidden-by-default decision (#26) as
-  the tree does, and what those are kinds of, since filtering by a type
+  which applies the maintainer's hidden-by-default decision (#26),
+  and what those are kinds of, since filtering by a type
   includes its kinds (types.md F-TYPE-13). A blank `at` fails closed, as on every page.
 - **Field search** (#179; the semantics are the maintainer's decision
   of 2026-10-26, the page and API shape are v0 behaviour). Search also

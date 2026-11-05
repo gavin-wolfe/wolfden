@@ -21,6 +21,12 @@ export const MARKS_LEGEND = "Tags say what readers at this point in the story do
  */
 export const READERS_VIEW_REACH = "This covers note pages, lists of notes, and search. Book and chapter pages, and the Book and Chapter menus, aren't part of the Reader's view yet."
 
+/** Tags for a search hit whose words are where a reader's page doesn't show them. */
+export const ONLY_IN_ALIAS = 'only in an alias'
+export const ONLY_IN_ALIAS_WHY = "A note's page doesn't list its aliases in the Reader's view, so a search there doesn't look at them."
+export const ONLY_IN_LINK_TARGET = "only in a link's target"
+export const ONLY_IN_LINK_TARGET_WHY = 'Readers see only the label of a labelled link, so a search in the Reader\'s view looks only at that.'
+
 /** What a position field's values in a search hit are, for its tag: `value` for one, or the sentence for several. */
 export function aheadValuesWhy(values: readonly string[]): string {
   return `${AHEAD_WHY} ${values.length === 1 ? `It names ${values[0]}.` : `It names ${values.join(', ')}.`}`

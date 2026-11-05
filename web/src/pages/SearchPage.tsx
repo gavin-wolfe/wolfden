@@ -24,7 +24,17 @@ import { ErrorState, Loading, StatusBadge } from '../components/States'
 import { useDocumentTitle } from '../hooks'
 import { typesQuery, type TypeView } from '../createApi'
 import { snippetParts, type TextMatch } from '../snippet'
-import { AHEAD_OF_READERS, MARKS_LEGEND, NOT_PLACED, aheadValuesWhy, notPlacedWhy } from '../readerWords'
+import {
+  AHEAD_OF_READERS,
+  MARKS_LEGEND,
+  NOT_PLACED,
+  ONLY_IN_ALIAS,
+  ONLY_IN_ALIAS_WHY,
+  ONLY_IN_LINK_TARGET,
+  ONLY_IN_LINK_TARGET_WHY,
+  aheadValuesWhy,
+  notPlacedWhy,
+} from '../readerWords'
 import { describePosition, readersTree } from '../story'
 import type { SearchPageSearch } from '../router'
 
@@ -369,7 +379,7 @@ function Results({
 
 /** A hit's own tag or note's tag, so the list needs its one line to explain them. */
 function hasTag(hit: SearchHit): boolean {
-  return !!(hit.noteMark || hit.readerMark || hit.aheadValues || hit.unplacedValues || hit.laterLink?.readerMark)
+  return !!(hit.noteMark || hit.readerMark || hit.aheadValues || hit.unplacedValues || hit.laterLink?.readerMark || hit.hiddenIn)
 }
 
 /** True if two marks say the same, so a hit whose mark is its note's doesn't repeat it. */
@@ -407,6 +417,14 @@ function HitTag({ hit, positions }: { hit: SearchHit; positions: readonly Positi
     return hit.laterLink.readerMark ? <MarkList mark={hit.laterLink.readerMark} positions={positions} note /> : <StatusBadge status={hit.laterLink.status} />
   }
 
+  if (hit.hiddenIn) {
+    return (
+      <span className="ahead-of-readers" title={hit.hiddenIn === 'alias' ? ONLY_IN_ALIAS_WHY : ONLY_IN_LINK_TARGET_WHY}>
+        {hit.hiddenIn === 'alias' ? ONLY_IN_ALIAS : ONLY_IN_LINK_TARGET}
+      </span>
+    )
+  }
+
   return null
 }
 
@@ -420,7 +438,7 @@ function Hit({ universe, hit, positions }: { universe: string; hit: SearchHit; p
           params={{ universe, _splat: hit.entity.key }}
           hash={hit.section ? sectionAnchor(hit.section) : undefined}
         >
-          {hit.field ? `Field: ${hit.field}` : (hit.section ?? 'Name or opening')}
+          {hit.field ? `Field: ${hit.field}` : hit.section === null ? 'Name or opening' : hit.section || 'A section with no heading'}
         </Link>
         {hit.status !== hit.entity.status && <StatusBadge status={hit.status} />}
         {bookkeeping && <span className="badge">bookkeeping</span>}

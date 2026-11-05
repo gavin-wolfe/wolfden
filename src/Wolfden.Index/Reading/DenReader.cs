@@ -355,18 +355,25 @@ public sealed partial class DenReader
         // Field values come after the text hits, so they're only worth
         // matching while there's room, and while no text hit past the
         // cap could still come before them (the result is truncated then).
-        if (views.Count <= limit && !cutOff)
+        // A wide search takes them anyway, as its caller sorts by what readers can
+        // find: there, they're read from notes readers have met first, too.
+        if (metFirstAt is not null || (views.Count <= limit && !cutOff))
         {
             var met = metView?.Entities.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
             var search = new FieldSearch(index, SearchWords.Parse(query), universeId, fieldName, met);
             var candidates = view is null
                 ? search.AllValues(e => (types is null || types.Contains(e.Type)) && (status is null || e.Status == status) && (kept is null || kept.Contains(e.Path)))
                 : search.ValuesIn(view, e => (types is null || types.Contains(e.Type)) && (status is null || e.Status == status));
+            if (metFirstAt is { } at)
+            {
+                candidates = candidates.OrderByDescending(c => c.Entity.Status is "draft" or "canon" && c.Entity.FromOrdinal <= at);
+            }
+
             views.AddRange(candidates
                 .Where(c => !canonOnly || c.Status is "draft" or "canon")
                 .Select(search.Match)
                 .OfType<FieldHit>()
-                .Take(limit + 1 - views.Count)
+                .Take(metFirstAt is null ? limit + 1 - views.Count : limit + 1)
                 .Select(h => new SearchHitView(
                     Summary(h.Entity, universes, scopes), null, h.Line, h.Snippet.Bracketed(), h.Status, h.Status is "draft" or "canon", false, h.Field)
                 {
@@ -379,7 +386,7 @@ public sealed partial class DenReader
 
         // Raw hits past the cap may hold more that pass the filters.
         var truncated = views.Count > limit || cutOff;
-        views = views.Take(limit).ToList();
+        views = metFirstAt is null ? views.Take(limit).ToList() : views;
         return new SearchResult(ResultVersion, query, views.Count, truncated, views);
     }
 

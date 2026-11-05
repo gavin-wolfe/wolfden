@@ -54,6 +54,10 @@ internal static class BodyLinkScanner
         return result;
     }
 
+    /// <summary>Where <paramref name="markdown"/> has code or HTML comments, which hold no links; null if it's too deep to parse (F-FM-2).</summary>
+    internal static RangeSet? CodeAndComments(string markdown) =>
+        Parse(markdown, 0, Plain) is { } document ? Exclusions(document, 0, markdown) : null;
+
     /// <summary>The links in an outline's body, in file order.</summary>
     public static List<FoundLink> ScanOutline(MarkdownFile file)
     {

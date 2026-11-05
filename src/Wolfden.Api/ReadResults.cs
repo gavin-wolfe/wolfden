@@ -326,7 +326,8 @@ public sealed record SearchPageHit(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReaderMark? NoteMark = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] LaterLink? LaterLink = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? Met = null,
-    [property: JsonIgnore] IReadOnlyList<string>? LinkedNotes = null);
+    [property: JsonIgnore] IReadOnlyList<string>? LinkedNotes = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? HiddenIn = null);
 
 /// <summary>
 /// For a field hit whose snippet shows the name or alias of a linked note readers

@@ -1743,14 +1743,16 @@ docs/
   - **A search hit** has the mark of the text it found: its section's or entry's,
     or else the note's, and `noteMark`, the note's own. A field hit whose snippet
     shows the name or alias of a linked note readers don't know has `laterLink`,
-    with that note's status and mark. A reader's search couldn't match that name.
-    `met` says whether a search in the Reader's view there finds the hit: it has no
-    mark, later value, or later name, it's in canon, and its words aren't only in
-    what a reader's read takes for a comment. Those come first, each part in rank
-    order, and a limit cuts the rest first. It reads up to 1,000 text hits, those in
-    notes readers have met first, so a word in thousands of notes doesn't lose a met
-    one. Past that, as with a filtered search, field hits aren't added and the answer
-    says `truncated`. Links and
+    with that note's status and mark. A reader's search can't match by that name,
+    though it may find the hit by the value as written. `hiddenIn` says the words are
+    only in `alias`es or a labelled link's `linkTarget`, which a reader's page doesn't
+    show. `met` says whether a search in the Reader's view there finds the hit: it has
+    no mark or later value, it's in canon, and its words are in what that page shows.
+    Those come first, each part in rank order. It reads up to 1,000 text hits and 1,000
+    field values, each from notes readers have met first, and then cuts to the limit, so
+    a word in thousands of later notes doesn't lose a met one. What it can't promise,
+    with `truncated` then true: over 1,000 matches in met notes that readers can't find,
+    such as in their later sections, can push out one they can. Links and
     the page's `pinned` carry no marks. (The page shows pinned facts in place, where
     each has its own mark, and doesn't list `pinned`.)
   - **A backlink** has the mark of what holds it, as a search hit does: its
@@ -1783,17 +1785,23 @@ docs/
 
   `readers=true` on `/api/search` (`DenReader.SearchAsReaders`) looks for the words in
   that same text, each note read through `AsOfReads`, rather than in the search table,
-  which holds every note's whole text. So a word finds a hit exactly when `get_entity`
-  at that position shows it (`ReadersSearchTests`, word by word), and there's no second
-  rule: a comment in a lead, section, or heading, however badly formed, a later or
-  unplaced position value, and a later `until` neither match nor show, and a value's
-  link matches by its note's name or alias only if the reader has met that note. Text
-  and field values are matched as the search table matches them, and the table only
-  gives the order, with comments not counted. There's no cap on what's read, so a word
-  in many later notes can't push out a met one. Two things differ from `get_entity`,
-  both on purpose: a met note's aliases match, since they're how `get_entity` finds it,
-  though it doesn't list them, and a type's defaults don't, since they aren't the
-  note's writing, as with no position. `/api/fields` with `readers=true` lists only
+  which holds every note's whole text. So a word finds a hit exactly when the Reader's
+  page at that position shows it (`ReadersSearchTests`, word by word), and there's no
+  second rule: a comment in a lead, section, or heading, however badly formed, a later
+  or unplaced position value, and a later `until` neither match nor show, and a value's
+  link matches by its note's name only if the reader has met that note. Text and field
+  values are matched as the search table matches them, and the table only gives the
+  order, with comments not counted. There's no cap on what's read, so a word in many
+  later notes can't push out a met one. Three things go by the page rather than
+  `get_entity`'s text, or differ from both, on purpose. A labelled link, to any note, is
+  only its label in text and values, as the page shows it, where `get_entity` gives the
+  link as written. This is `LinkSyntax.WithOnlyLabels`, applied in the search, so MCP's
+  reads don't change. A note's aliases don't match, since the page and `get_entity` don't
+  list them and a secret identity is a natural alias (a maintainer can revisit this
+  while dogfooding, and #67 looks at aliases at a position). And a type's defaults don't
+  match, though both show them, since they aren't the note's writing, as with no
+  position. A comment in a field value isn't a comment to a read (F-VIEW-6 is about leads
+  and sections), so it shows and matches there as on the page. `/api/fields` with `readers=true` lists only
   fields with a value a reader can see, so a thread's `paid_off` isn't named before it
   pays off, and a `field` with none is refused as a made-up one is. MCP's `search` has
   no position, on purpose, and doesn't change. `asOf` alone on `/api/search` is as it

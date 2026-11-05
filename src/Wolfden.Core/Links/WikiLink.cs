@@ -59,6 +59,35 @@ public static partial class LinkSyntax
         return result;
     }
 
+    /// <summary>
+    /// <paramref name="text"/> with each labelled link (<c>[[target|label]]</c>) as
+    /// only its label, which is all a page shows of it (F-LINK-1). A link with no label
+    /// stays as written. For markdown, a <c>[[</c> in code isn't a link, so it stays;
+    /// otherwise, as for a frontmatter string, every one counts.
+    /// </summary>
+    public static string WithOnlyLabels(string text, bool markdown)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        if (!text.Contains("[[", StringComparison.Ordinal) || !text.Contains('|', StringComparison.Ordinal))
+        {
+            return text;
+        }
+
+        var excluded = markdown ? BodyLinkScanner.CodeAndComments(text) : null;
+        var result = new System.Text.StringBuilder(text.Length);
+        var at = 0;
+        foreach (var link in Scan(text, 0, text.Length, excluded))
+        {
+            if (!link.IsEmpty && link.Label is { } label)
+            {
+                result.Append(text, at, link.Offset - at).Append(label);
+                at = link.Offset + link.Length;
+            }
+        }
+
+        return result.Append(text, at, text.Length - at).ToString();
+    }
+
     /// <summary>A link found by <see cref="Scan"/>, before it has a line and column.</summary>
     internal readonly record struct RawLink(int Offset, int Length, string Target, string? Heading, string? Label)
     {

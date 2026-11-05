@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Wolfden.Core.Links;
 
 namespace Wolfden.Index.Reading;
 
@@ -41,6 +42,7 @@ internal sealed class FieldSearch
     private readonly int? _universeId;
     private readonly string? _field;
     private readonly IReadOnlySet<string>? _met;
+    private readonly bool _asReaders;
     private ILookup<(int EntityId, string Field), int>? _lines;
     private ILookup<(int EntityId, string Field, int Line), (string Path, string[] Names)>? _links;
 
@@ -50,8 +52,13 @@ internal sealed class FieldSearch
     /// <param name="universeId">The universe, or null for every universe.</param>
     /// <param name="field">The one field to search, or null for every field.</param>
     /// <param name="met">As of a position, the paths of the notes the reader has met, whatever a filter shows; null without a position.</param>
-    public FieldSearch(DenIndex index, SearchWords words, int? universeId, string? field, IReadOnlySet<string>? met)
+    /// <param name="asReaders">
+    /// True to search what a reader's page shows (<see cref="DenReader.SearchAsReaders"/>):
+    /// a labelled link is its label, and a linked note matches by its name, not its aliases.
+    /// </param>
+    public FieldSearch(DenIndex index, SearchWords words, int? universeId, string? field, IReadOnlySet<string>? met, bool asReaders = false)
     {
+        _asReaders = asReaders;
         _db = index.Context;
         _words = words;
         _universeId = universeId;
@@ -94,6 +101,11 @@ internal sealed class FieldSearch
         }
 
         var written = ValueText(value.ValueJson);
+        if (_asReaders)
+        {
+            written = LinkSyntax.WithOnlyLabels(written, markdown: false);
+        }
+
         var own = _words.Find(written);
         var names = LinkedNames(value).Select(n => (Name: n, Found: _words.Find(n.Text))).ToList();
         for (var i = 0; i < _words.Count; i++)
@@ -154,7 +166,7 @@ internal sealed class FieldSearch
     private IEnumerable<(string Text, int Group, string Path)> LinkedNames(FieldCandidate value)
     {
         LoadLinks();
-        return _links![(value.Entity.Id, value.Field, value.Line)].SelectMany((note, i) => note.Names.Select(n => (n, i, note.Path)));
+        return _links![(value.Entity.Id, value.Field, value.Line)].SelectMany((note, i) => (_asReaders ? note.Names.Take(1) : note.Names).Select(n => (n, i, note.Path)));
     }
 
     /// <summary>

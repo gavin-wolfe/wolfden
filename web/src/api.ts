@@ -474,6 +474,8 @@ export interface SearchHit {
   unplacedValues?: string[]
   /** With `marksAt`: the snippet names a linked note readers there don't know, so they couldn't have found it by that name. */
   laterLink?: { status: string; readerMark?: ReaderMark }
+  /** With `marksAt`: the words are only where a reader's page doesn't show them: a note's aliases, or a labelled link's target. */
+  hiddenIn?: 'alias' | 'linkTarget'
   /** With `marksAt`: true if a search in the Reader's view there finds this. They come first. */
   met?: boolean
 }

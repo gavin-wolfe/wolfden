@@ -110,6 +110,22 @@ describe("SC-WEB-107: search in the Author's view", () => {
     expect(main.querySelector('.ahead-of-readers')).toBeNull()
   })
 
+  it('says when the words are only in an alias or a link’s target, and a hit in a heading with no words has a link with words', async () => {
+    stubSearch([
+      hit('E-MINA', null, 'Mina Harker Miss Murray', { met: false, hiddenIn: 'alias' }),
+      hit('E-LUCY', 'Letters', 'See [[E-QUINCEY|the Texan]].', { met: false, hiddenIn: 'linkTarget' }),
+      hit('E-JONATHAN', '', 'Under no heading.', { met: true }),
+    ])
+    renderApp('/u/dracula/search?q=murray&at=dracula:3')
+    const main = await screen.findByRole('main')
+    await within(main).findByText('Under no heading.')
+
+    expect(within(main).getByText('only in an alias').tagName).toBe('SPAN')
+    expect(within(main).getByText("only in a link's target").tagName).toBe('SPAN')
+    expect(within(main).getByRole('link', { name: 'A section with no heading' })).toBeTruthy()
+    expect(within(main).getByText(MARKS_LEGEND)).toBeTruthy()
+  })
+
   it('offers every type and field, as it finds them all', async () => {
     const { calls } = stubSearch()
     renderApp('/u/dracula/search?q=blood&at=dracula:3')

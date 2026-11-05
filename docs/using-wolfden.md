@@ -850,8 +850,9 @@ you're in is always highlighted.
 
   **Search** finds everything. Notes with something a reader could find come first, then
   a dashed line, then the rest, with tags saying why. Hits in a comment say `in a
-  comment`. If you find a note by the name or alias of a note it links to, and readers
-  haven't met that one, the hit says where they do.
+  comment`, and `only in an alias` or `only in a link's target` means a reader's search
+  wouldn't find it there. If you find a note by the name or alias of a note it links to,
+  and readers haven't met that one, the hit says where they do.
 - **The Reader's view** shows what a reader at that chapter knows, and nothing else:
   no tags, no later dates, no comments, and no sections with an error. A note they
   haven't met says where they first meet it. It's read-only, and it has no history,
@@ -866,12 +867,14 @@ you're in is always highlighted.
   switch to the Author's view for that.
 
   **Search** finds only what a reader could: a word in a comment, a later section or
-  value, or a note they haven't met finds nothing, and no snippet shows it. The
-  name or alias of a note they haven't met finds nothing either, though the link
-  itself, as you wrote it, is text they can see. The Type, Field, and Scope filters
-  list only what they've reached. An AI assistant at a position would see the
-  same words, except that search also finds a met note by its aliases, and doesn't
-  look in a type's default values.
+  value, or a note they haven't met finds nothing, and no snippet shows it. It goes by
+  what the Reader's page shows. So `[[halden-pike|the stranger]]` is found by "stranger"
+  and never by "pike", which is why the tip above works. A link with no label shows
+  as you wrote it if they haven't met the note, so it's found that way too. Aliases
+  aren't searched here, since the page doesn't list them, and nor are a type's default
+  values. A comment inside a field's value isn't hidden, here or on the page: comments
+  are hidden in a note's text. The Type, Field, and Scope filters list only what
+  they've reached.
 
 The Reader's view stays while you follow links and change chapters, and its link
 keeps it (`?readers=1`), but Wolfden doesn't remember it: opening Wolfden fresh starts

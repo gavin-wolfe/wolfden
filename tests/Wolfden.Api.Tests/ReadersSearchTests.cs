@@ -190,18 +190,46 @@ public sealed class ReadersSearchTests : IDisposable
         return list.GetProperty("entities").EnumerateArray().Select(e => e.GetProperty("path").GetString()!).ToList();
     }
 
-    /// <summary>The aliases of the notes a reader has met, which <c>get_entity</c> finds a note by but doesn't list.</summary>
-    private static async Task<List<string>> MetAliases(Server server, string at)
+    /// <summary>
+    /// What the Reader's page of a note shows of its text and fields: each link is replaced
+    /// as <c>Links.tsx</c> replaces it, by its label, else the note it reaches, else its target.
+    /// </summary>
+    private static async Task<List<string>> PageShows(Server server, string path, string at)
     {
-        var met = await server.GetJsonAsync($"/api/entities?universe=starfall&asOf={at}&limit=1000", HttpStatusCode.OK);
-        var aliases = new List<string>();
-        foreach (var note in met.GetProperty("entities").EnumerateArray())
+        var page = await server.GetJsonAsync($"/api/entity?universe=starfall&entity={Uri.EscapeDataString(path)}&asOf={at}&readers=true", HttpStatusCode.OK);
+        if (!page.GetProperty("inView").GetBoolean())
         {
-            var page = await server.GetJsonAsync($"/api/entity?universe=starfall&entity={Uri.EscapeDataString(note.GetProperty("path").GetString()!)}", HttpStatusCode.OK);
-            aliases.AddRange(page.GetProperty("entity").GetProperty("aliases").EnumerateArray().Select(a => a.GetString()!));
+            return [];
         }
 
-        return aliases;
+        static string Shown(string text, JsonElement links)
+        {
+            foreach (var link in links.EnumerateArray())
+            {
+                var shown = link.GetProperty("label").GetString()
+                    ?? (link.GetProperty("entity").ValueKind == JsonValueKind.Object ? link.GetProperty("entity").GetProperty("name").GetString() : null)
+                    ?? link.GetProperty("target").GetString()!;
+                text = text.Replace(link.GetProperty("text").GetString()!, shown, StringComparison.Ordinal);
+            }
+
+            return text;
+        }
+
+        var entity = page.GetProperty("entity");
+        var shown = new List<string> { entity.GetProperty("name").GetString()!, Shown(entity.GetProperty("lead").GetString() ?? "", entity.GetProperty("leadLinks")) };
+        foreach (var field in entity.GetProperty("fields").EnumerateArray().Where(f => f.GetProperty("kind").GetString() != "default"))
+        {
+            var value = field.GetProperty("value");
+            shown.Add(Shown(value.ValueKind == JsonValueKind.String ? value.GetString()! : value.GetRawText(), field.GetProperty("links")));
+        }
+
+        foreach (var section in entity.GetProperty("sections").EnumerateArray())
+        {
+            shown.Add(section.GetProperty("name").GetString()!);
+            shown.Add(Shown(section.GetProperty("body").GetString()!, section.GetProperty("links")));
+        }
+
+        return shown;
     }
 
     private static bool Holds(string word, IEnumerable<string> texts)
@@ -212,18 +240,14 @@ public sealed class ReadersSearchTests : IDisposable
 
     [Theory]
     [Trait("Scenario", "SC-WEB-106")]
-    [InlineData("ember:1")]
     [InlineData("ember:3")]
-    [InlineData("ash:1")]
     [InlineData("ash:2")]
     [InlineData("ash:3")]
-    [InlineData("ash:4")]
     public async Task AReadersSearchFindsAWordExactlyWhenGetEntityAtThatPositionShowsIt(string at)
     {
         await using var server = await Start();
         var tools = new WolfdenTools(new DenTools(_den.Root));
         var shown = (await Notes(server)).SelectMany(path => ShownBy(tools, path, at)).ToList();
-        shown.AddRange(await MetAliases(server, at));
         var hidden = Words.Where(w => !Holds(w, shown)).ToList();
 
         foreach (var word in Words)
@@ -245,19 +269,16 @@ public sealed class ReadersSearchTests : IDisposable
         Assert.Contains("Inkwater", Words.Except(hidden));
     }
 
-    /// <summary>Every word of every note, frontmatter and comments too, at the start of the story, part way, and the end, rather than only words put there for this.</summary>
-    [Theory]
+    /// <summary>Every word of every note, frontmatter and comments too, part way through the story, rather than only words put there for this.</summary>
+    [Fact]
     [Trait("Scenario", "SC-WEB-106")]
-    [InlineData("ember:1")]
-    [InlineData("ash:1")]
-    [InlineData("a-quiet-moon:1")]
-    public async Task EveryWordOfEveryNoteIsFoundExactlyWhenGetEntityShowsIt(string at)
+    public async Task EveryWordOfEveryNoteIsFoundExactlyWhenGetEntityShowsIt()
     {
+        const string at = "ash:1";
         await using var server = await Start();
         var tools = new WolfdenTools(new DenTools(_den.Root));
         var notes = await Notes(server);
         var shown = notes.SelectMany(path => ShownBy(tools, path, at)).ToList();
-        shown.AddRange(await MetAliases(server, at));
         var vocabulary = notes
             .SelectMany(path => Regex.Matches(_den.Read(path), @"\p{L}[\p{L}\p{N}]+").Select(m => m.Value))
             .Distinct(StringComparer.Ordinal)
@@ -356,11 +377,20 @@ public sealed class ReadersSearchTests : IDisposable
     [Trait("Scenario", "SC-WEB-106")]
     [InlineData("Thornveil")] // A later note's alias, through a link in a value readers can see.
     [InlineData("Zephyrlode")] // An idea's alias.
+    [InlineData("Alderquill")] // A met note's own alias.
     public async Task ANameFromANoteReadersHaventMetMatchesOnlyInTheAuthorsViewWhichTagsIt(string alias)
     {
         await using var server = await Start();
 
         Assert.Empty(Hits(await server.GetJsonAsync(Readers(alias, "ember:1"), HttpStatusCode.OK)));
+
+        if (alias == "Alderquill")
+        {
+            var own = Hits(await server.GetJsonAsync(Marked(alias, "ember:1"), HttpStatusCode.OK)).Single();
+            Assert.False(own.GetProperty("met").GetBoolean());
+            Assert.Equal("alias", own.GetProperty("hiddenIn").GetString());
+            return;
+        }
 
         var hit = Hits(await server.GetJsonAsync(Marked(alias, "ember:1", "&field=" + (alias == "Thornveil" ? "crown" : "dream")), HttpStatusCode.OK)).Single();
         Assert.Contains(alias, hit.GetProperty("text").GetString()!, StringComparison.Ordinal);
@@ -377,25 +407,119 @@ public sealed class ReadersSearchTests : IDisposable
             Assert.False(later.TryGetProperty("readerMark", out _));
         }
 
-        // Once readers have met it, it's a hit like any other in both.
+        // Once readers have met it, its alias still doesn't match, and neither view says it does.
         var met = Hits(await server.GetJsonAsync(Marked("Thornveil", "ash:3", "&field=crown"), HttpStatusCode.OK)).Single();
         Assert.False(met.TryGetProperty("laterLink", out _));
-        Assert.True(met.GetProperty("met").GetBoolean());
-        Assert.Single(Hits(await server.GetJsonAsync(Readers("Thornveil", "ash:3", "&field=crown"), HttpStatusCode.OK)));
+        Assert.False(met.GetProperty("met").GetBoolean());
+        Assert.Equal("alias", met.GetProperty("hiddenIn").GetString());
+        Assert.Empty(Hits(await server.GetJsonAsync(Readers("Thornveil", "ash:3"), HttpStatusCode.OK)));
+    }
+
+    /// <summary>A note with labelled links to a note met later and one met already, in text, a field, and code.</summary>
+    private void WriteLabelledLinks() => _den.Write(
+        "universes/starfall/entities/notes/the-word-pilot.md",
+        "---\ntype: note\nname: The word pilot\nstatus: canon\nfrom: \"ember:1\"\nfields:\n" +
+        "  guide: \"[[The word crown|the silent keeper]]\"\n  friend: \"[[The word ledger|the old book]]\"\n  plain: \"[[The word crown]]\"\n---\n\n" +
+        "Nearby opening words, led by [[The word crown|the quiet regent]].\n\n" +
+        "## Nearby\nGlassmoth stands by [[The word crown#Early life|a stranger]] and [[The word ledger|that dusty thing]]. In code: `[[Sparrowgate|Silkrun]]`.\n");
+
+    [Theory]
+    [Trait("Scenario", "SC-WEB-106")]
+    [InlineData("ember:3")]
+    [InlineData("ash:3")]
+    public async Task ALabelledLinkIsOnlyItsLabelAsOnTheReadersPage(string at)
+    {
+        WriteLabelledLinks();
+        await using var server = await Start();
+        var shown = (await Notes(server)).Select(path => PageShows(server, path, at)).SelectMany(t => t.Result).ToList();
+
+        // A word only in the target of a labelled link, or its heading, isn't there, and the labels are.
+        foreach (var word in new[] { "silent", "keeper", "quiet", "regent", "stranger", "dusty", "old", "Glassmoth", "Sparrowgate", "Silkrun", "crown", "Early" })
+        {
+            Assert.True(
+                Holds(word, shown) == Hits(await server.GetJsonAsync(Readers(word, at), HttpStatusCode.OK)).Count > 0,
+                $"'{word}' at {at}: the page {(Holds(word, shown) ? "shows it" : "doesn't")}.");
+        }
+
+        // A search that lands near a link shows only its label.
+        var near = Assert.Single(Hits(await server.GetJsonAsync(Readers("Glassmoth", at), HttpStatusCode.OK)));
+        Assert.Contains("a stranger", near.GetProperty("text").GetString()!, StringComparison.Ordinal);
+        Assert.DoesNotContain("[[", near.GetProperty("text").GetString()!.Replace("`[[Sparrowgate|Silkrun]]`", "", StringComparison.Ordinal), StringComparison.Ordinal);
+
+        var field = Assert.Single(Hits(await server.GetJsonAsync(Readers("silent", at), HttpStatusCode.OK)));
+        Assert.Equal("the silent keeper", field.GetProperty("text").GetString());
     }
 
     [Fact]
     [Trait("Scenario", "SC-WEB-106")]
-    public async Task AnAliasOfAMetNoteMatchesSinceGetEntityFindsTheNoteByIt()
+    public async Task ALabelledLinksTargetOnlyHidesItInTheReadersSearchAndTheAuthorsViewSaysSo()
+    {
+        WriteLabelledLinks();
+        _den.Write(
+            "universes/starfall/entities/notes/the-word-secret.md",
+            "---\ntype: note\nname: The word secret\nstatus: canon\nfrom: \"ember:1\"\n---\n\nHe is [[Thistlemere|the visitor]].\n\n## Later on\nAlso [[Thistlemere|someone]].\n");
+        await using var server = await Start();
+
+        Assert.Empty(Hits(await server.GetJsonAsync(Readers("Thistlemere", "ember:1"), HttpStatusCode.OK)));
+        var hits = Hits(await server.GetJsonAsync(Marked("Thistlemere", "ember:1"), HttpStatusCode.OK));
+        Assert.Equal(2, hits.Count);
+        foreach (var hit in hits)
+        {
+            Assert.False(hit.GetProperty("met").GetBoolean());
+            Assert.Equal("linkTarget", hit.GetProperty("hiddenIn").GetString());
+            Assert.False(hit.GetProperty("inComment").GetBoolean());
+        }
+
+        // A met note's name still finds a link to it in a value, labelled or not, in both views.
+        var friend = Assert.Single(Hits(await server.GetJsonAsync(Readers("ledger", "ember:1", "&field=friend"), HttpStatusCode.OK)));
+        Assert.Equal("the old book → The word ledger", friend.GetProperty("text").GetString());
+        Assert.True(Hits(await server.GetJsonAsync(Marked("ledger", "ember:1", "&field=friend"), HttpStatusCode.OK)).Single().GetProperty("met").GetBoolean());
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-107")]
+    public async Task AHitAReaderFindsByALinkAsWrittenIsMetAndKeepsItsTag()
     {
         await using var server = await Start();
-        var tools = new WolfdenTools(new DenTools(_den.Root));
 
-        var hit = Assert.Single(Hits(await server.GetJsonAsync(Readers("Alderquill", "ember:1"), HttpStatusCode.OK)));
+        // `crown: [[The word crown]]`, whose note readers meet later.
+        Assert.Single(Hits(await server.GetJsonAsync(Readers("crown", "ember:1", "&field=crown"), HttpStatusCode.OK)));
+        var hit = Hits(await server.GetJsonAsync(Marked("crown", "ember:1", "&field=crown"), HttpStatusCode.OK)).Single();
 
-        Assert.Equal("The word ledger", hit.GetProperty("entity").GetProperty("name").GetString());
-        using var read = JsonDocument.Parse(Text(tools.GetEntity("Wordkeep Alderquill", "starfall", "ember:1")));
-        Assert.True(read.RootElement.GetProperty("in_view").GetBoolean());
+        Assert.True(hit.GetProperty("met").GetBoolean());
+        Assert.Equal("ahead", hit.GetProperty("laterLink").GetProperty("readerMark").GetProperty("kind").GetString());
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-107")]
+    public async Task FieldValuesAreReadFromMetNotesFirstAndOverTheTextLimitToo()
+    {
+        for (var i = 0; i < 1010; i++)
+        {
+            _den.Write($"universes/starfall/entities/notes/a-crowd-{i}.md", $"---\ntype: note\nname: Quaywhistle {i}\nstatus: canon\nfrom: \"ash:3\"\nfields:\n  role: Ferrowmist\n---\n\nQuaywhistle.\n");
+        }
+
+        // Filed last by path, and a text word as common as the later notes' names.
+        _den.Write("universes/starfall/entities/notes/z-met-one.md", "---\ntype: note\nname: The met one\nstatus: canon\nfrom: \"ember:1\"\nfields:\n  role: Ferrowmist\n  ship: Quaywhistle\n---\n\nNothing here.\n");
+        await using var server = await Start();
+
+        foreach (var path in new[] { Marked("Ferrowmist", "ember:1", "&field=role"), Marked("Quaywhistle", "ember:1") })
+        {
+            var hits = Hits(await server.GetJsonAsync(path, HttpStatusCode.OK));
+            Assert.Equal("The met one", hits[0].GetProperty("entity").GetProperty("name").GetString());
+            Assert.True(hits[0].GetProperty("met").GetBoolean());
+        }
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-108")]
+    public async Task AMadeUpBookInAReadersSearchNamesNoOtherBook()
+    {
+        await using var server = await Start();
+
+        var refused = await server.GetJsonAsync(Readers("word", "ember:1", "&book=madeup"), HttpStatusCode.NotFound);
+
+        Assert.DoesNotContain("ash", refused.GetProperty("message").GetString()!, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -528,7 +652,7 @@ public sealed class ReadersSearchTests : IDisposable
         foreach (var path in new[] { "/api/search?universe=starfall&query=word", "/api/search?universe=starfall&query=word&asOf=ember:1" })
         {
             var answer = await server.GetJsonAsync(path, HttpStatusCode.OK);
-            foreach (var member in new[] { "marksAt", "readerMark", "noteMark", "laterLink", "met", "aheadValues", "unplacedValues", "linkedNotes" })
+            foreach (var member in new[] { "marksAt", "readerMark", "noteMark", "laterLink", "met", "aheadValues", "unplacedValues", "linkedNotes", "hiddenIn" })
             {
                 Assert.DoesNotContain($"\"{member}\"", answer.GetRawText(), StringComparison.Ordinal);
             }

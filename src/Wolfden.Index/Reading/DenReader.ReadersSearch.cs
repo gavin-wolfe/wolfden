@@ -1,4 +1,5 @@
 using Wolfden.Core.Documents;
+using Wolfden.Core.Links;
 
 namespace Wolfden.Index.Reading;
 
@@ -14,14 +15,14 @@ public sealed partial class DenReader
     /// </summary>
     /// <remarks>
     /// <para>
-    /// A note's text is every word of its name, its aliases, and its lead, and a
-    /// section's is its heading and its own text, as the search table has them. A
-    /// note's aliases aren't in <c>get_entity</c>'s answer, but they're how it finds the
-    /// note, so they hold wherever the note does. Types' defaults aren't searched, as
-    /// with no position: they aren't the note's writing. A value's link matches by its
-    /// note's name or alias only if the reader has met that note, as in every search as
-    /// of a position (#179). The search table only gives the order, by how well a
-    /// note's text matches there, with no comments counted.
+    /// A note's text is its name and its lead, and a section's is its heading and its own
+    /// text. It's what the Reader's page shows, so in text and field values a labelled
+    /// link is only its label (<see cref="LinkSyntax.WithOnlyLabels"/>), and a note's
+    /// aliases, which that page and <c>get_entity</c> don't list and which can hold a
+    /// secret, don't match. Types' defaults aren't searched, as with no position: they
+    /// aren't the note's writing. A value's link matches by its note's name only if the
+    /// reader has met that note (#179). The search table only gives the order, by how
+    /// well a note's text matches there, with no comments counted.
     /// </para>
     /// <para>
     /// MCP's <c>search</c> has no position, on purpose, and doesn't use this.
@@ -41,6 +42,7 @@ public sealed partial class DenReader
                 CheckTypes(db, u.Id, [type], listUsed: false);
             }
 
+            CheckFilterNamingNothing(db, u, filter);
             var types = TypesMatching(type);
             var view = CanonView(index, u.Key, asOf, filter);
             var whole = filter is null ? view : CanonView(index, u.Key, asOf, null);
@@ -66,10 +68,9 @@ public sealed partial class DenReader
             var hits = new List<SearchHitView>();
             if (fieldName is null)
             {
-                var aliases = db.Aliases.Select(a => new { a.EntityId, a.Order, a.Alias }).ToList().ToLookup(a => a.EntityId);
                 var ranks = index.SearchRanks(query);
                 hits.AddRange(known
-                    .SelectMany(e => TextHits(e, records[e.Path], aliases[records[e.Path].Id].OrderBy(a => a.Order).Select(a => a.Alias), words))
+                    .SelectMany(e => TextHits(e, records[e.Path], words))
                     .OrderBy(h => ranks.TryGetValue((h.Entity.Path, h.Line), out var rank) ? rank : double.MaxValue)
                     .ThenBy(h => h.Entity.Path, StringComparer.Ordinal)
                     .ThenBy(h => h.Line ?? -1)
@@ -81,7 +82,7 @@ public sealed partial class DenReader
             if (hits.Count <= limit)
             {
                 var met = whole.Entities.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
-                var search = new FieldSearch(index, words, u.Id, fieldName, met);
+                var search = new FieldSearch(index, words, u.Id, fieldName, met, asReaders: true);
                 hits.AddRange(known
                     .SelectMany(e => (e.Fields ?? [])
                         .Where(f => f.Kind != "default" && (fieldName is null || f.Name == fieldName))
@@ -107,12 +108,49 @@ public sealed partial class DenReader
 
     /// <summary>
     /// Whether every word of <paramref name="query"/> is in <paramref name="title"/> or
-    /// <paramref name="text"/> with their HTML comments taken out as a reader's read takes
-    /// them out (<see cref="MarkdownComments.Strip(string)"/>). For a caller comparing a
-    /// search table's hit with what a Reader's search finds, so that's one rule too.
+    /// <paramref name="text"/> as a reader's page has them, with HTML comments taken out as
+    /// a reader's read takes them out (<see cref="MarkdownComments.Strip(string)"/>), and
+    /// the text's labelled links only their labels. For a caller comparing a search
+    /// table's hit with what a Reader's search finds, so that's one rule too.
     /// </summary>
     public static bool ReadersCanFind(string query, string title, string text) =>
+        Found(SearchWords.Parse(query), MarkdownComments.Strip(title), ReadersText(text)) is not null;
+
+    /// <summary>
+    /// Whether every word of <paramref name="query"/> is there once HTML comments are out,
+    /// labelled links as written: so a hit a reader can't find this way is only in a comment.
+    /// </summary>
+    public static bool FoundWithoutComments(string query, string title, string text) =>
         Found(SearchWords.Parse(query), MarkdownComments.Strip(title), MarkdownComments.Strip(text)) is not null;
+
+    /// <summary>
+    /// Whether every word of <paramref name="query"/> is in a field's value as a reader's
+    /// page has it, where a labelled link is its label, or in <paramref name="names"/>, the
+    /// names of the notes it links to that readers have met.
+    /// </summary>
+    public static bool ReadersCanFindValue(string query, string valueJson, IEnumerable<string> names) =>
+        Found(SearchWords.Parse(query), string.Join("\n", names), LinkSyntax.WithOnlyLabels(FieldSearch.ValueText(valueJson), markdown: false)) is not null;
+
+    /// <summary>Whether every word of <paramref name="query"/> is in a field's value as written, or in <paramref name="names"/>.</summary>
+    public static bool FoundInValueAsWritten(string query, string valueJson, IEnumerable<string> names) =>
+        Found(SearchWords.Parse(query), string.Join("\n", names), FieldSearch.ValueText(valueJson)) is not null;
+
+    /// <summary>A lead or section's text as a reader's page has it, from what a reader's read gives or as written.</summary>
+    private static string ReadersText(string text) => LinkSyntax.WithOnlyLabels(MarkdownComments.Strip(text), markdown: true);
+
+    /// <summary>Refuses a series or book the universe doesn't have, naming neither the others nor which are later.</summary>
+    private static void CheckFilterNamingNothing(IndexDbContext db, ContainerRecord universe, CanonFilter? filter)
+    {
+        try
+        {
+            CheckFilter(db, universe, filter);
+        }
+        catch (DenToolException e) when (e.Code == ToolErrorCodes.UnknownScope)
+        {
+            var kind = filter!.Kind == CanonFilterKind.Series ? "series" : "book";
+            throw new DenToolException(ToolErrorCodes.UnknownScope, $"There's no {kind} '{filter.Key}' to search in here.");
+        }
+    }
 
     /// <summary>The names of the fields with a value a reader at <paramref name="at"/> can see, not the types' defaults.</summary>
     private static IEnumerable<string> FieldsKnownIn(CanonView view, string universe, StoryHorizon at) =>
@@ -122,17 +160,16 @@ public sealed partial class DenReader
             .Select(f => f.Name)
             .Distinct();
 
-    private static IEnumerable<ReadersTextHit> TextHits(EntityView note, EntityRecord record, IEnumerable<string> aliases, SearchWords words)
+    private static IEnumerable<ReadersTextHit> TextHits(EntityView note, EntityRecord record, SearchWords words)
     {
-        var names = string.Join("\n", aliases.Prepend(note.Name));
-        if (Found(words, names, note.Lead ?? "") is { } own)
+        if (Found(words, note.Name, ReadersText(note.Lead ?? "")) is { } own)
         {
             yield return new ReadersTextHit(record, null, null, own, note.Status);
         }
 
         foreach (var section in note.Sections ?? [])
         {
-            if (Found(words, section.Name, section.Body) is { } found)
+            if (Found(words, section.Name, ReadersText(section.Body)) is { } found)
             {
                 yield return new ReadersTextHit(record, section.Name, section.Line, found, section.Status);
             }

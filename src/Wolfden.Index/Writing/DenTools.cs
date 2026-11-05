@@ -86,10 +86,16 @@ public sealed partial class DenTools
         string entity, string? universe = null, int limit = 20, string? before = null, bool diff = false, string? diffFrom = null) =>
         Reader.GetHistory(entity, universe, limit, before, diff, diffFrom);
 
-    /// <summary>Full-text search. See <see cref="DenReader.Search"/>.</summary>
+    /// <summary>
+    /// Full-text search. Without <paramref name="asOf"/>, of everything: see <see cref="DenReader.Search(string, string?, string?, bool, int, string?, string?, string?, string?, string?)"/>.
+    /// With it, of what a reader knows there, by the one rule the web's Reader's view
+    /// uses: see <see cref="DenReader.SearchAsReaders"/>.
+    /// </summary>
     public SearchResult Search(
-        string query, string? universe = null, string? type = null, bool canonOnly = false, int limit = 20, string? field = null) =>
-        Reader.Search(query, universe, type, canonOnly, limit, field: field);
+        string query, string? universe = null, string? type = null, bool canonOnly = false, int limit = 20, string? field = null, string? asOf = null) =>
+        asOf is null
+            ? Reader.Search(query, universe, type, canonOnly, limit, field: field)
+            : Reader.SearchAsReaders(query, universe, type, canonOnly, limit, null, null, null, asOf, field);
 
     /// <summary>One entity, in the full view or as of a position. See <see cref="DenReader.GetEntity(string, string?, string?)"/>.</summary>
     public GetEntityResult GetEntity(string entity, string? universe = null, string? asOf = null) => Reader.GetEntity(entity, universe, asOf);
@@ -100,8 +106,8 @@ public sealed partial class DenTools
 
     /// <summary>The entities of the den or of one universe. See <see cref="DenReader.ListEntities"/>.</summary>
     public ListEntitiesResult ListEntities(
-        string? universe = null, string? type = null, string? status = null, string? series = null, string? book = null, int limit = 200) =>
-        Reader.ListEntities(universe, type, status, series, book, limit);
+        string? universe = null, string? type = null, string? status = null, string? series = null, string? book = null, int limit = 200, string? asOf = null) =>
+        Reader.ListEntities(universe, type, status, series, book, limit, asOf);
 
     /// <summary>The canon-as-of view of a universe. See <see cref="DenReader.CanonAsOf"/>.</summary>
     public CanonAsOfResult CanonAsOf(

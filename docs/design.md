@@ -1027,9 +1027,9 @@ it to Claude Code, Claude Desktop, and other clients is in
 
 | Tool | Status | Purpose |
 |---|---|---|
-| `search` | shipped (#20) | Full-text search across the den, or one universe or type; field values too, or one field's (#179) |
+| `search` | shipped (#20) | Full-text search across the den, or one universe or type; field values too, or one field's (#179); optionally `as_of` a position (#67) |
 | `get_entity` | shipped (#20) | One entity, optionally `as_of` a position |
-| `list_entities` | shipped (#20) | By universe, type, status, series, or book |
+| `list_entities` | shipped (#20) | By universe, type, status, series, or book; optionally `as_of` a position (#67) |
 | `canon_as_of` | shipped (#20) | Canon at a position, with an optional series or book filter |
 | `check` | shipped (#20) | Run continuity checks and return findings |
 | `get_history` | shipped (#19) | Commit history and diffs for an entity |
@@ -1071,6 +1071,16 @@ same code (§9):
   matches does it ask all the entities, to tell one the reader hasn't met
   (`in_view: false`, and nothing about it) from one that doesn't exist
   (`unknown_entity`). Aliases aren't positional (format.md §9.5).
+- **`search` and `list_entities` take `as_of` too** (#67, maintainer decision
+  2026-11-05), so an assistant drafting a chapter can't search or list its way to
+  later notes. `search` with `as_of` calls `DenReader.SearchAsReaders`, the Reader's
+  view's search (§9), so there's no second rule, and no marks: those stay in the web's
+  Author's path, in `Wolfden.Api`, which `Wolfden.Mcp` can't reach. `list_entities` with
+  `as_of` lists the canon-as-of view's entities, and its `total` counts only those. A
+  series or book that doesn't exist is refused there without naming the others. An
+  unreadable position is `bad_position`, as in `canon_as_of`, and `universe: "*"`
+  is refused. `as_of` is per call, so an assistant can still forget it; a session
+  default (`wolfden mcp --at`) is left for dogfooding.
 - **A future `until` is left out** (maintainer decision on #288). With a
   position, `canon_as_of` and `get_entity` leave out each fact's `until`
   (format.md F-VIEW-4), since it tells an assistant drafting that chapter
@@ -1890,8 +1900,9 @@ docs/
   A comment in a field value isn't a comment to a read (F-VIEW-6 is about leads
   and sections), so it shows and matches there as on the page. `/api/fields` with `readers=true` lists only
   fields with a value a reader can see, so a thread's `paid_off` isn't named before it
-  pays off, and a `field` with none is refused as a made-up one is. MCP's `search` has
-  no position, on purpose, and doesn't change. `asOf` alone on `/api/search` is as it
+  pays off, and a `field` with none is refused as a made-up one is. MCP's `search`
+  with `as_of` calls this same search (#67), without the page's `text` and `matches`, and
+  with no marks; with no `as_of` it's the full search, as it was. `asOf` alone on `/api/search` is as it
   was, for the writer: the web no longer asks it.
 
   An `/api/entity` for a note left out is still 404 `unknown_entity`, with

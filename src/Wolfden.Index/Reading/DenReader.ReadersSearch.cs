@@ -23,7 +23,8 @@ public sealed partial class DenReader
     /// order, by how well a note's text matches there, with no comments counted.
     /// </para>
     /// <para>
-    /// MCP's <c>search</c> has no position, on purpose, and doesn't use this.
+    /// MCP's <c>search</c> with <c>as_of</c> calls this too, so a reader and an assistant at a
+    /// position find the same hits. Without <c>as_of</c>, it searches everything and doesn't.
     /// </para>
     /// </remarks>
     public SearchResult SearchAsReaders(
@@ -146,7 +147,7 @@ public sealed partial class DenReader
         catch (DenToolException e) when (e.Code == ToolErrorCodes.UnknownScope)
         {
             var kind = filter!.Kind == CanonFilterKind.Series ? "series" : "book";
-            throw new DenToolException(ToolErrorCodes.UnknownScope, $"There's no {kind} '{filter.Key}' to search in here.");
+            throw new DenToolException(ToolErrorCodes.UnknownScope, $"There's no {kind} '{filter.Key}' here.");
         }
     }
 

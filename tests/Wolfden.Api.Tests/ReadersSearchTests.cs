@@ -614,6 +614,53 @@ public sealed class ReadersSearchTests : IDisposable
         Assert.DoesNotContain("ash", refused.GetProperty("message").GetString()!, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// There's no second rule (#67): an assistant's <c>search</c> and <c>list_entities</c> at a
+    /// position find, word by word, what the Reader's view finds, in the same order, and differ
+    /// only in that a hit leaves out the page's <c>text</c> and <c>matches</c>.
+    /// </summary>
+    [Theory]
+    [Trait("Scenario", "SC-MCP-50")]
+    [InlineData("ember:3")]
+    [InlineData("ash:1")]
+    [InlineData("ash:2")]
+    [InlineData("ash:3")]
+    public async Task AnAssistantAtAPositionFindsWhatTheReadersViewFinds(string at)
+    {
+        await using var server = await Start();
+        var tools = new WolfdenTools(new DenTools(_den.Root));
+        var vocabulary = (await Notes(server))
+            .SelectMany(path => Regex.Matches(_den.Read(path), @"\p{L}[\p{L}\p{N}]+").Select(m => m.Value))
+            .Concat(Words)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        Assert.True(vocabulary.Count > 200, $"Only {vocabulary.Count} words.");
+
+        var wrong = new List<string>();
+        foreach (var word in vocabulary)
+        {
+            var page = Hits(await server.GetJsonAsync(Readers(word, at), HttpStatusCode.OK))
+                .Select(h => (Note: h.GetProperty("entity").GetProperty("path").GetString(), Section: Member(h, "section"), Line: Member(h, "line"), Field: Member(h, "field"), Snippet: h.GetProperty("snippet").GetString(), Status: h.GetProperty("status").GetString()));
+            using var answer = JsonDocument.Parse(Text(tools.Search(word, "starfall", limit: 200, as_of: at)));
+            var mcp = answer.RootElement.GetProperty("hits").EnumerateArray()
+                .Select(h => (Note: h.GetProperty("entity").GetProperty("path").GetString(), Section: Member(h, "section"), Line: Member(h, "line"), Field: Member(h, "field"), Snippet: h.GetProperty("snippet").GetString(), Status: h.GetProperty("status").GetString()));
+            if (!page.SequenceEqual(mcp))
+            {
+                wrong.Add(word);
+            }
+        }
+
+        Assert.Empty(wrong);
+
+        var listed = await server.GetJsonAsync($"/api/entities?universe=starfall&asOf={at}&readers=true&limit=1000", HttpStatusCode.OK);
+        using var list = JsonDocument.Parse(Text(tools.ListEntities("starfall", limit: 1000, as_of: at)));
+        Assert.Equal(
+            listed.GetProperty("entities").EnumerateArray().Select(e => e.GetProperty("path").GetString()),
+            list.RootElement.GetProperty("entities").EnumerateArray().Select(e => e.GetProperty("path").GetString()));
+
+        static string? Member(JsonElement hit, string name) => hit.TryGetProperty(name, out var value) && value.ValueKind != JsonValueKind.Null ? value.ToString() : null;
+    }
+
     [Fact]
     [Trait("Scenario", "SC-WEB-106")]
     public async Task ATypesDefaultIsNotSearchedThoughGetEntityShowsIt()

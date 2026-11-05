@@ -46,8 +46,8 @@ public static class WolfdenMcpServer
         Every entity, section, and field entry has a status: idea, undecided, or candidate (not decided yet), draft or canon (in
         canon; draft isn't settled), or retconned (replaced). Pinned facts are hard canon: check them before writing.
 
-        To draft or review a chapter without spoilers, use canon_as_of with that chapter's position, or get_entity with as_of.
-        Without a position, get_entity, list_entities, and search give the author's full view, including ideas and material the
+        To draft or review a chapter without spoilers, use canon_as_of with that chapter's position, and pass the same position as as_of
+        to get_entity, search, and list_entities. Without a position, those three give the author's full view, including ideas and material the
         reader meets later. Read ahead (get_entity without as_of) to plan, outline, foreshadow, or review continuity across chapters,
         when the writer asks, or to write a character who knows more than the reader, since a read at a position leaves that out. In
         prose, the view at the chapter is what the reader knows. A later fact can shape hints, and how a character who'd already know

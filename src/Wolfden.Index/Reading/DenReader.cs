@@ -208,8 +208,9 @@ public sealed partial class DenReader
     /// With <paramref name="field"/>, only that field's values are searched.
     /// </summary>
     /// <remarks>
-    /// The MCP <c>search</c> tool gives the first five parameters and
-    /// <paramref name="field"/>. The web API also narrows the hits to
+    /// The MCP <c>search</c> tool, with no <c>as_of</c>, gives the first five parameters and
+    /// <paramref name="field"/>; with <c>as_of</c>, it uses <see cref="SearchAsReaders"/>, not
+    /// <paramref name="asOf"/> here. The web API also narrows the hits to
     /// entities of one <paramref name="status"/>, to the entities a
     /// <paramref name="series"/> or <paramref name="book"/> filter covers (as
     /// in a canon view, F-VIEW-1), or to what the reader has met by
@@ -572,9 +573,11 @@ public sealed partial class DenReader
     /// inside it or holding it.
     /// </summary>
     /// <remarks>
-    /// The MCP <c>list_entities</c> tool never gives <paramref name="asOf"/>.
-    /// The web API does: then only the entities in the canon-as-of view at
-    /// that position are listed (in canon, and met by then), in the same order.
+    /// With <paramref name="asOf"/>, as the MCP <c>list_entities</c> tool and the
+    /// web API can give it, only the entities in the canon-as-of view at that
+    /// position are listed (in canon, and met by then), in the same order, and
+    /// <c>total</c> counts only those. A series or book that doesn't exist is then
+    /// refused without listing those that do, some of which can be later.
     /// </remarks>
     public ListEntitiesResult ListEntities(
         string? universe = null, string? type = null, string? status = null, string? series = null, string? book = null, int limit = 200,
@@ -626,7 +629,15 @@ public sealed partial class DenReader
         var all = new List<EntitySummary>();
         foreach (var u in chosen)
         {
-            CheckFilter(db, u, filter, Words);
+            if (asOf is null)
+            {
+                CheckFilter(db, u, filter, Words);
+            }
+            else
+            {
+                CheckFilterNamingNothing(db, u, filter);
+            }
+
             var inView = asOf is null ? null : CanonView(index, u.Key, asOf, filter).Entities.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
             all.AddRange(index.Entities(u.Key, filter)
                 .Where(e => inView is null || inView.Contains(e.Path))

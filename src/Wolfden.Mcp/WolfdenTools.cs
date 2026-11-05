@@ -51,16 +51,21 @@ public sealed class WolfdenTools
         "'home' with query 'saltmarsh' finds home: Saltmarsh Docks); each hit in a field names it in 'field', and its snippet " +
         "shows the value, then '→' and a linked entity's name if that's what matched. Matches are in [square brackets]. Results " +
         "include every status (ideas, undecided questions, retconned material) unless canon_only is true, and each hit says its " +
-        "status and whether it's canon text. Search has no story position, so it can show material the reader meets later: use " +
-        "canon_as_of or get_entity with as_of for spoiler-safe reading.")]
+        "status and whether it's canon text. Without as_of, a search has no story position, so it can show material the reader meets later. " +
+        "When drafting a chapter, pass as_of here as you do to get_entity: then only what a reader knows at that position is searched, each " +
+        "note the reader has met, as get_entity with as_of reads it, with its name, lead, section headings and text, and field values. Later notes, later or undecided " +
+        "material, and HTML comments neither match nor show. A note's aliases don't match there, and a link matches by the text it shows, not its target. " +
+        "As with get_entity, that's as far as positions go: text the writer put in a section or lead, or a field the note's type doesn't define, or a ref " +
+        "field's value, can still mention later events. " + PositionHelp)]
     public CallToolResult Search(
         [Description("The words to search for.")] string query,
-        [Description(UniverseHelp + " Here '*' searches every universe.")] string? universe = null,
+        [Description(UniverseHelp + " Here '*' searches every universe, though not with as_of. With as_of, the position's book settles it.")] string? universe = null,
         [Description(TypeFilterHelp)] string? type = null,
         [Description("If true, only canon text: draft or canon material, not ideas, retconned material, or bookkeeping sections.")] bool canon_only = false,
         [Description("The most hits to return, 1 to 200.")] int limit = 20,
-        [Description("Search only this field's values (the frontmatter key, such as 'home'), not names, leads, or sections.")] string? field = null) =>
-        Respond(() => _tools.Search(query, universe, type, canon_only, limit, field));
+        [Description("Search only this field's values (the frontmatter key, such as 'home'), not names, leads, or sections.")] string? field = null,
+        [Description("A story position, such as 'dracula:5', to search only what the reader knows there. Pass it when drafting a chapter. Leave it out to search everything.")] string? as_of = null) =>
+        Respond(() => _tools.Search(query, universe, type, canon_only, limit, field, as_of));
 
     /// <summary>The <c>get_entity</c> tool.</summary>
     [McpServerTool(Name = "get_entity", Title = "Read one entity", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]
@@ -94,15 +99,18 @@ public sealed class WolfdenTools
         "Lists entities as one-line summaries (key, name, type, status, where it's filed, and where it enters canon), of every " +
         "status unless status is given. A den holds universes; a universe holds series of books and standalone books. Each entity " +
         "is filed at one scope: the universe, a series, or a book. A series or book filter keeps the entities of that series or " +
-        "book, of the scopes inside it, and of the scopes that hold it (as canon_as_of's filter does). Use get_entity to read one.")]
+        "book, of the scopes inside it, and of the scopes that hold it (as canon_as_of's filter does). Use get_entity to read one. " +
+        "Without as_of, the list names notes the reader meets later. When drafting a chapter, pass as_of here as you do to get_entity: then only " +
+        "the entities in canon at that position are listed, those the reader has met by then, draft or canon, and 'total' counts only those. " + PositionHelp)]
     public CallToolResult ListEntities(
-        [Description(UniverseHelp + " Here '*' lists every universe (not with series or book).")] string? universe = null,
+        [Description(UniverseHelp + " Here '*' lists every universe (not with series, book, or as_of). With as_of, the position's book settles it.")] string? universe = null,
         [Description(TypeFilterHelp)] string? type = null,
         [Description("Only this status: idea, undecided, candidate, draft, canon, or retconned.")] string? status = null,
         [Description("Only this series (its key) and what it holds.")] string? series = null,
         [Description("Only this book (its key) and the scopes that hold it.")] string? book = null,
-        [Description("The most entities to return, 1 to 1000.")] int limit = 200) =>
-        Respond(() => _tools.ListEntities(universe, type, status, series, book, limit));
+        [Description("The most entities to return, 1 to 1000.")] int limit = 200,
+        [Description("A story position, such as 'dracula:5', to list only the entities in canon there. Pass it when drafting a chapter. Leave it out to list everything.")] string? as_of = null) =>
+        Respond(() => _tools.ListEntities(universe, type, status, series, book, limit, as_of));
 
     /// <summary>The <c>canon_as_of</c> tool.</summary>
     [McpServerTool(Name = "canon_as_of", Title = "Canon as of a story position", ReadOnly = true, Idempotent = true, Destructive = false, OpenWorld = false)]

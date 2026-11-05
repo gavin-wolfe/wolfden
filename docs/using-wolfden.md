@@ -923,7 +923,9 @@ told a later date at all, and can't write toward it. When you're planning with o
 ask it to read the note with no position, and it sees every date. A thread's `planted`
 and `paid_off`, and any other field that holds a story position, work the same
 way for it: at a position, it isn't told a value later than that, or one that
-isn't a chapter or book your universe has.
+isn't a chapter or book your universe has. It can search and list your notes at a
+position too. A search there finds what a search in the Reader's view finds, so a
+later word gets it nothing, and a list has only the notes your reader has met.
 
 **Comments don't reach an assistant drafting at a position.** An HTML comment in
 a lead or section (`<!-- She dies at ash:4 -->`) is safe for notes to yourself:

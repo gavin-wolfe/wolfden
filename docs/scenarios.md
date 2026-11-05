@@ -3589,10 +3589,10 @@ The web UI is going to show me everything and tag what readers don't know yet
   more is a decision and not a side effect. The server offers no prompts or resources.
 - A position that can't be read is refused, and doesn't fall back to a full read.
   An error at a position names no note the reader hasn't met.
-- `search`, `list_entities`, and `get_history` still take no position, and show
-  later material as it's written, unmarked. Only `get_entity` and `canon_as_of`
-  read at a position, and a new tool or argument, on any tool, fails a test until
-  someone has checked that.
+- `get_history`, and `search` and `list_entities` with no `as_of`, show later
+  material as it's written, unmarked. Only `canon_as_of`, and `get_entity`, `search`,
+  and `list_entities` with `as_of` (SC-MCP-50), read at a position, and a new tool or
+  argument, on any tool, fails a test until someone has checked that.
 - Wolfden.Mcp can't reach the web API's project, so it can't use its marks.
 
 Spec: F-GEN-2, F-VIEW-1, F-VIEW-2, F-VIEW-4, F-VIEW-5, F-VIEW-6 (#300). Covered by:
@@ -3632,6 +3632,35 @@ My assistant is drafting `ember:3`, and reads at that position.
 
 Spec: F-SEC-11, F-VIEW-6 (#306). Covered by: `CommentsAtAPositionTests`,
 `MarkdownCommentsTests`, `McpStaysStrictTests`.
+
+### SC-MCP-50. Searching and listing at a chapter
+
+My assistant is drafting `ember:3`, and passes `as_of: ember:3` to `search` and
+`list_entities`, as it does to `get_entity`.
+
+- `search` for a word that's only in a later note, a later section or value, an idea,
+  a retconned or left-out note, a bookkeeping section, or an HTML comment has no hits,
+  and the answer is word for word what a word no note has gets, except for the query.
+  A query with one word the reader knows and one they don't has no hits either. With
+  `as_of: ash:3`, a word that entered by then is found. With no `as_of`, it's found
+  whatever the position, as before (SC-MCP-47).
+- The hits at any position are the Reader's view's, word by word and in the same order
+  (SC-WEB-106). A hit has no `left_out`, and no mark.
+- A note's aliases don't match at a position. A link in a field matches by the label
+  it shows, not by its later note's name or alias.
+- A `field` that only later or out-of-canon values give is refused as a made-up one is.
+- `list_entities` lists what `canon_as_of` lists at that position, with the same line for
+  each note, whatever `type`, `status`, `series`, or `book` it's given. `total` counts only
+  those, so a `limit` doesn't tell how many later notes there are. A book or series that
+  doesn't exist is refused without naming the others.
+- A position that can't be read is `bad_position`, and doesn't fall back to a full
+  search or list. `universe: "*"` with `as_of` is `bad_argument`.
+
+(SC-MCP-49 is reserved for the names that arrive during the story, #67.)
+
+Spec: F-VIEW-1, design.md §8, §9 (#67). Covered by: `McpStaysStrictTests`,
+`ReadersSearchTests.AnAssistantAtAPositionFindsWhatTheReadersViewFinds`,
+`UniverseChoiceTests`.
 
 ## STORE: Wolfden saves, moves, and deletes notes
 
@@ -6775,7 +6804,8 @@ I search at Ember chapter 3 with `?readers=1`, and the page asks `/api/search` w
   heading finds that heading only if readers know that section. A word in a note's
   markup, such as a URL, is the one difference left (#332, design.md §9).
 - Later notes can't crowd out met ones, however many match.
-- MCP's `search` has no position and doesn't change (SC-MCP-47).
+- MCP's `search` with `as_of` finds the same hits (SC-MCP-50). With no `as_of`, it
+  doesn't change (SC-MCP-47).
 
 Spec: F-VIEW-4, F-VIEW-5, F-VIEW-6, design.md §9 (#300). Covered by: `ReadersSearchTests`.
 

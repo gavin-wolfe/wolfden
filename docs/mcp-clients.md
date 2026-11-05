@@ -198,9 +198,9 @@ prompts. This list is for knowing what the assistant can do.
 
 | Tool | What it does |
 |---|---|
-| `search` | Full-text search over names, aliases, leads, section text, and field values (a link in a field matches its note's name and aliases too); `field` searches one field's values. A hit in a field has `field` (its name) and `line` (the entry's line), with no `section`, such as `{"field": "occupation", "line": 10, "snippet": "[physician], professor", …}`. A query's words match anywhere in any order; words in double quotes (`"silver key"`) match as a phrase, side by side and in order. A hit in a section a bad comment leaves out has `left_out: true` and `in_canon: false`, so `canon_only` drops it. |
+| `search` | Full-text search over names, aliases, leads, section text, and field values (a link in a field matches its note's name and aliases too); `field` searches one field's values. A hit in a field has `field` (its name) and `line` (the entry's line), with no `section`, such as `{"field": "occupation", "line": 10, "snippet": "[physician], professor", …}`. A query's words match anywhere in any order; words in double quotes (`"silver key"`) match as a phrase, side by side and in order. A hit in a section a bad comment leaves out has `left_out: true` and `in_canon: false`, so `canon_only` drops it. With `as_of`, it searches only what the reader knows at that position, as the Reader's view does: see [Read by position](#7-gotchas-for-ai-assistants). |
 | `get_entity` | One entity, by name, alias, file name, id, key, or path; with `as_of`, only what the reader knows at that position. Without `as_of`, a section a bad comment leaves out comes in its place with `left_out` (each error's `line`, `rule`, and `message`). With `as_of` it isn't there at all, and nothing says so, since a heading can give away a reveal. With `as_of`, a fact's `until` is left out too, and so are a position field's values later than `as_of` and the writer's HTML comments. |
-| `list_entities` | Entities by type, status, series, or book. A type includes its kinds here and in `search` and `canon_as_of`: `location` also finds a den's worlds ([types.md F-TYPE-13](types.md#3-type-definitions)), and each result says its own type. |
+| `list_entities` | Entities by type, status, series, or book. A type includes its kinds here and in `search` and `canon_as_of`: `location` also finds a den's worlds ([types.md F-TYPE-13](types.md#3-type-definitions)), and each result says its own type. With `as_of`, only the entities in canon at that position: met by then, and draft or canon. `total` counts only those. |
 | `canon_as_of` | Canon at a story position (or the end of the story), pinned canon first. Sections a bad comment leaves out aren't in it, at any position. At a position, a fact's `until` is left out, and so are a position field's values later than the position and the writer's HTML comments. |
 | `get_chapter` | A book's chapters and their fields, with each value's source (the chapter, or `chapter_defaults` above it), and each chapter's `heading`: its title, then the fields a `chapter_heading` lists, such as `"Ardent — Vesta Yards, 2350-04-12"`. A field the chapter writes with a value that's ignored is listed in the chapter's `ignored`, as written and why, such as `{"field": "setting", "as_written": "Whitby harbour", "reason": "setting is a link to one entity, …"}`; a list item that's left out has its number in `item`. A field written with no value (null) isn't a fault, so it isn't listed. |
 | `get_chapter_defaults` | A universe's, series', or book's `chapter_defaults`, and the books they reach. A default written with a value that's ignored has `ignored: true`, the value in `written`, and why in `reason`. |
@@ -299,6 +299,8 @@ described in [Pick a den](#2-pick-a-den).
 | "Draft a short scene with Renfield at chapter 20. He has already let the Count in, which the reader learns in chapter 21, so let that show in how he behaves without saying it." | `get_entity` with `as_of`, then with no `as_of` |
 | "Where do my notes mention the bloofer lady?" | `search` |
 | "Which characters are physicians?" | `search` with `field: occupation` |
+| "I'm drafting chapter 20. What has the reader heard about the bloofer lady so far?" | `search` with `as_of` |
+| "I'm drafting chapter 9. Which locations could I use without introducing a new one?" | `list_entities` with `type` and `as_of` |
 | "Whose point of view is chapter 4, and when and where is it set?" | `get_chapter` |
 | "Run a continuity check on the den and explain anything it finds." | `check` |
 | "Add to Renfield's Want section: he wants to be trusted with something alive and large." | `get_entity`, then `append_section` |
@@ -395,8 +397,17 @@ docs. The writer's own list is in
 - **Read by position to avoid spoilers.** Without a position,
   `get_entity`, `list_entities`, and `search` give the author's full
   view, ideas and later reveals included. To draft or review a chapter,
-  use `canon_as_of` at that chapter, or `get_entity` with `as_of`.
-  `search` and `get_history` have no position.
+  use `canon_as_of` at that chapter, and pass the same position as `as_of`
+  to `get_entity`, `search`, and `list_entities`. `get_history` has no position.
+- **A search at a position finds what the reader can.** `search` with `as_of`
+  looks only in the notes the reader has met, as `get_entity` with `as_of` reads
+  them: a later note, later or undecided text, a later value, and a comment
+  neither match nor show, so a word that's only there gets the same empty answer as
+  a word no note has. A note's aliases don't match there, and a link matches by
+  the text it shows, not by its target. `as_of` is per call, so a search without it
+  sees everything again. `universe: "*"` doesn't go with `as_of`, and a position
+  that can't be read is `bad_position`, in `search` and `list_entities` as in
+  `canon_as_of`.
 - **Read ahead when the work needs more than the reader knows.** Read the
   note with `get_entity` and no `as_of` for planning, outlining, foreshadowing,
   and reviewing continuity across chapters, or whenever the writer asks. A full

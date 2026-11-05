@@ -6742,13 +6742,17 @@ I search at Ember chapter 3 with `?readers=1`, and the page asks `/api/search` w
   readers have reached still do.
 - A later `until` doesn't show as text, on a section or an entry, and its marker's
   position finds nothing there.
-- A labelled link, `[[halden-pike|the stranger]]`, to any note, is only its label in
-  text and values, as on the page: "stranger" finds it, "pike" doesn't, and a snippet
-  near it shows the label. In code, it's the text it is.
-- A value's link matches by its note's name only if the reader has met the note. An
-  unlabelled link is their text as written, as on the page.
+- Every link in text and values is what it shows on the page, for matching and for the
+  snippet. A labelled link, `[[halden-pike|the stranger]]`, to any note, is only its
+  label: "stranger" finds it, "pike" doesn't, even once he's met. In code, it's the text
+  it is.
+- With no label, a link to a met note is that note's name, with `: heading` if it has
+  one, however it's written: `[[Old Salt]]`, an alias of Halden Pike, is found by "pike",
+  and not by "salt", and never reads `Old Salt`. A link to a note they haven't met is
+  its target as written, and that note's name finds nothing until they meet it.
 - A note's aliases don't match, its own or a linked note's, since the page doesn't list
   them. A type's default isn't searched, as with no position, though the page shows it.
+- A table's cells and a heading are what the page shows raw (design.md §9).
 - Later notes can't crowd out met ones, however many match.
 - MCP's `search` has no position and doesn't change (SC-MCP-47).
 

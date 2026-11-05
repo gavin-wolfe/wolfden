@@ -868,11 +868,12 @@ you're in is always highlighted.
 
   **Search** finds only what a reader could: a word in a comment, a later section or
   value, or a note they haven't met finds nothing, and no snippet shows it. It goes by
-  what the Reader's page shows. So `[[halden-pike|the stranger]]` is found by "stranger"
-  and never by "pike", which is why the tip above works. A link with no label shows
-  as you wrote it if they haven't met the note, so it's found that way too. Aliases
-  aren't searched here, since the page doesn't list them, and nor are a type's default
-  values. A comment inside a field's value isn't hidden, here or on the page: comments
+  what the Reader's page shows, so each link is found by what it shows there.
+  `[[halden-pike|the stranger]]` is found by "stranger" and never by "pike", even once
+  they've met him, which is why the tip above works. With no label, a link to a note
+  they've met is found by that note's name, however you wrote it, and one to a note
+  they haven't met is found as you wrote it. Aliases aren't searched here, since the
+  page doesn't list them, and nor are a type's default values. A comment inside a field's value isn't hidden, here or on the page: comments
   are hidden in a note's text. The Type, Field, and Scope filters list only what
   they've reached.
 

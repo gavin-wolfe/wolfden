@@ -1,0 +1,9 @@
+[
+  { "about": "a label wins", "label": "the stranger", "name": "Halden Pike", "target": "halden-pike", "heading": null, "shown": "the stranger" },
+  { "about": "a label hides a heading too", "label": "the stranger", "name": "Halden Pike", "target": "halden-pike", "heading": "Early life", "shown": "the stranger" },
+  { "about": "a label on a note not met", "label": "the stranger", "name": null, "target": "halden-pike", "heading": "Early life", "shown": "the stranger" },
+  { "about": "a met note shows its name, however it's written", "label": null, "name": "Halden Pike", "target": "the-old-pilot", "heading": null, "shown": "Halden Pike" },
+  { "about": "a met note with a heading", "label": null, "name": "Halden Pike", "target": "halden-pike", "heading": "Early life", "shown": "Halden Pike: Early life" },
+  { "about": "a note not met shows its target as written", "label": null, "name": null, "target": "halden-pike", "heading": null, "shown": "halden-pike" },
+  { "about": "a note not met with a heading", "label": null, "name": null, "target": "halden-pike", "heading": "Early life", "shown": "halden-pike: Early life" }
+]

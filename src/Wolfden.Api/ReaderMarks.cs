@@ -38,6 +38,7 @@ internal sealed class ReaderMarks
     private readonly Dictionary<long, string> _names;
     private readonly long _point;
     private readonly int _universeId;
+    private ReadersLinks? _links;
 
     private ReaderMarks(DenIndex index, ContainerRecord universe, string position, long point)
     {
@@ -65,6 +66,9 @@ internal sealed class ReaderMarks
 
     /// <summary>The story point of the position.</summary>
     public long Point => _point;
+
+    /// <summary>The links of the universe's notes as a Reader's page at the position shows them. A note a reader has met has no mark and is in canon.</summary>
+    private ReadersLinks Links => _links ??= new ReadersLinks(_db, _universeId, e => IsInCanon(e.Status) && OfNote(e) is null);
 
     /// <summary>
     /// The marks at <paramref name="position"/>. Its universe is chosen as an
@@ -322,7 +326,7 @@ internal sealed class ReaderMarks
             {
                 if (_sections.GetValueOrDefault(line) is not { } section
                     || !MayHide(section.Name, section.Body)
-                    || DenReader.ReadersCanFind(query, section.Name, section.Body))
+                    || DenReader.ReadersCanFind(query, section.Name, section.Body, _marks.Links, _note.Id))
                 {
                     return null;
                 }
@@ -330,7 +334,7 @@ internal sealed class ReaderMarks
                 return DenReader.FoundWithoutComments(query, section.Name, section.Body) ? InALinkTarget : InAComment;
             }
 
-            if (DenReader.ReadersCanFind(query, _note.Name, _note.Lead))
+            if (DenReader.ReadersCanFind(query, _note.Name, _note.Lead, _marks.Links, _note.Id))
             {
                 return null;
             }
@@ -338,7 +342,7 @@ internal sealed class ReaderMarks
             var noteId = _note.Id;
             var aliases = _marks._db.Aliases.Where(a => a.EntityId == noteId).Select(a => a.Alias).ToList();
             var names = string.Join("\n", aliases.Prepend(_note.Name));
-            return DenReader.ReadersCanFind(query, names, _note.Lead) ? InAnAlias
+            return DenReader.ReadersCanFind(query, names, _note.Lead, _marks.Links, _note.Id) ? InAnAlias
                 : DenReader.FoundWithoutComments(query, names, _note.Lead) ? InALinkTarget
                 : InAComment;
         }
@@ -360,7 +364,7 @@ internal sealed class ReaderMarks
                 .Where(n => IsInCanon(n.Status) && _marks.OfNote(n) is null)
                 .Select(n => n.Name)
                 .ToList();
-            if (DenReader.ReadersCanFindValue(query, row.ValueJson, names))
+            if (DenReader.ReadersCanFindValue(query, row.ValueJson, _marks.Links, _note.Id))
             {
                 return null;
             }

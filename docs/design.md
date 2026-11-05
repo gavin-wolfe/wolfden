@@ -1744,9 +1744,9 @@ docs/
     or else the note's, and `noteMark`, the note's own. A field hit whose snippet
     shows the name or alias of a linked note readers don't know has `laterLink`,
     with that note's status and mark. A reader's search can't match by that name,
-    though it may find the hit by the value as written. `hiddenIn` says the words are
-    only in `alias`es or a labelled link's `linkTarget`, which a reader's page doesn't
-    show. `met` says whether a search in the Reader's view there finds the hit: it has
+    though it may find the hit by what the link shows until then. `hiddenIn` says the
+    words are only in `alias`es or a link's `linkTarget`, as written, which a reader's
+    page doesn't show. `met` says whether a search in the Reader's view there finds the hit: it has
     no mark or later value, it's in canon, and its words are in what that page shows.
     Those come first, each part in rank order. It reads up to 1,000 text hits and 1,000
     field values, each from notes readers have met first, and then cuts to the limit, so
@@ -1788,19 +1788,43 @@ docs/
   which holds every note's whole text. So a word finds a hit exactly when the Reader's
   page at that position shows it (`ReadersSearchTests`, word by word), and there's no
   second rule: a comment in a lead, section, or heading, however badly formed, a later
-  or unplaced position value, and a later `until` neither match nor show, and a value's
-  link matches by its note's name only if the reader has met that note. Text and field
+  or unplaced position value, and a later `until` neither match nor show. Text and field
   values are matched as the search table matches them, and the table only gives the
   order, with comments not counted. There's no cap on what's read, so a word in many
-  later notes can't push out a met one. Three things go by the page rather than
-  `get_entity`'s text, or differ from both, on purpose. A labelled link, to any note, is
-  only its label in text and values, as the page shows it, where `get_entity` gives the
-  link as written. This is `LinkSyntax.WithOnlyLabels`, applied in the search, so MCP's
-  reads don't change. A note's aliases don't match, since the page and `get_entity` don't
-  list them and a secret identity is a natural alias (a maintainer can revisit this
-  while dogfooding, and #67 looks at aliases at a position). And a type's defaults don't
-  match, though both show them, since they aren't the note's writing, as with no
-  position. A comment in a field value isn't a comment to a read (F-VIEW-6 is about leads
+  later notes can't push out a met one.
+
+  **Every link in text and values is what it shows on the page,** for matching and for
+  the snippet (`ReadersLinks`, from the index's link rows): its label, else the note it
+  reaches if readers have met it, else its target as written, with `: heading` if it has
+  no label. So a link written by an alias or key finds by the name it shows, not by what
+  was written; a label hides its target, even a met note's; and a later note's name
+  doesn't match until readers meet it. `get_entity` gives links as written, so this is in
+  the search, and MCP's reads don't change. The rule is written twice, as `linkText` in
+  `Links.tsx` and `ReadersLinks.Shown`, since the server can't call the web. Both are
+  tested against `tests/shared/link-text-cases.json`, and `ReadersSearchTests` compares
+  search with the Reader's page data word by word.
+
+  **Where search and the page still differ.**
+  - A note's aliases don't match, since the page doesn't list them and a secret identity
+    is a natural alias (the maintainer can revisit this while dogfooding, and #67 looks
+    at aliases at a position).
+  - A type's defaults don't match, though the page shows them, since they aren't the
+    note's writing, as with no position.
+  - What isn't a note's text isn't searched: field names, the note's type and scope, and
+    **Linked from**.
+  - The page shows two things raw, and search is stricter or follows it. A table isn't
+    rendered, so `| [[note\|label]] |` shows its target on the page, and search finds
+    only the label. A heading is printed as written, so a link in one shows in full, and
+    search matches that. Both belong to the page, for #300's last step.
+  - A link inside `[text](url)`, and a comment inside a link, show raw on the page, and
+    search finds only the label.
+
+  **Where the Reader's search finds what the Author's doesn't.** The Author's view looks
+  at the text as written, so a section with `[[Secretalias]]` isn't found there by the
+  name the page shows, as with no position. A word split by a comment
+  (`gluea<!-- x -->glueb`) reads as one word only to a reader.
+
+  A comment in a field value isn't a comment to a read (F-VIEW-6 is about leads
   and sections), so it shows and matches there as on the page. `/api/fields` with `readers=true` lists only
   fields with a value a reader can see, so a thread's `paid_off` isn't named before it
   pays off, and a `field` with none is refused as a made-up one is. MCP's `search` has

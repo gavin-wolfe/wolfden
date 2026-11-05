@@ -9,6 +9,8 @@
 
   <ItemGroup>
     <Compile Include="..\Wolfden.Mcp.Tests\LockedFile.cs" Link="LockedFile.cs" />
+    <!-- Also read by web/src/linkText.test.ts, so the server's rule and the page's stay in step. -->
+    <None Include="..\shared\link-text-cases.json" Link="link-text-cases.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

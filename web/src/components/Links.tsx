@@ -27,15 +27,30 @@ export function sectionAnchor(name: string): string {
 export const WIKI_LINK = /\[\[[^[\]\n]+?\]\]/g
 
 /**
- * Finds each `[[...]]` link's resolution in the API's `links`, by exact text,
+ * What reads as a labelled link with a line break in it, which isn't a link
+ * (F-LINK-1): the server's `SplitLinkPattern` in `WikiLink.cs`. The label is group 1.
+ */
+const SPLIT_LINK = /\[\[(?:[^[\]|\r\n]*[\r\n][^[\]|]*\\?\||[^[\]|\r\n]*\\?\|(?=[^[\]\r\n]*[\r\n]))([^[\]]+)\]\]/g
+
+/**
+ * A link's text as compared with the API's: a `\|`, written so a table cell doesn't
+ * split, is the same as `|` (F-OUT-12), and markdown has already read it as `|`.
+ */
+function linkKey(text: string): string {
+  return text.replace(/\\\|/g, '|')
+}
+
+/**
+ * Finds each `[[...]]` link's resolution in the API's `links`, by its text,
  * taking them in order, so two links with the same text get one each.
  */
 export function createLinkMatcher(links: readonly LinkView[]): (text: string) => LinkView | undefined {
   const used = new Set<number>()
-  return (text) => {
-    let index = links.findIndex((l, i) => l.text === text && !used.has(i))
+  return (written) => {
+    const text = linkKey(written)
+    let index = links.findIndex((l, i) => linkKey(l.text) === text && !used.has(i))
     if (index < 0) {
-      index = links.findIndex((l) => l.text === text)
+      index = links.findIndex((l) => linkKey(l.text) === text)
     }
 
     if (index < 0) {
@@ -102,18 +117,42 @@ export function WikiLink({ link, universe }: { link: LinkView; universe: string 
   )
 }
 
-/** Plain text with its `[[...]]` links rendered as links. */
-export function LinkedText({ text, match, universe }: { text: string; match: (text: string) => LinkView | undefined; universe: string }) {
+/** The label of what's written as a labelled link, for one the API has no record of, or null. The server's `WithLinksShown` does the same. */
+export function labelOf(written: string): string | null {
+  const bar = written.indexOf('|')
+  return bar < 0 ? null : written.slice(bar + 1, -2).trim() || null
+}
+
+/** Text as the Reader's view has it where it can't hold a link, such as an image's alt text: each link is the words it shows. */
+export function linkWords(text: string, match: (text: string) => LinkView | undefined): string {
+  return text.replace(SPLIT_LINK, (_, label: string) => label.trim()).replace(WIKI_LINK, (written) => {
+    const link = match(written)
+    return link ? linkText(link) : (labelOf(written) ?? written)
+  })
+}
+
+/** What reads as a labelled link split over two lines, as its label: the Reader's view's rule for it. */
+export function withoutSplitLinks(text: string): string {
+  return text.replace(SPLIT_LINK, (_, label: string) => label.trim())
+}
+
+/**
+ * Plain text with its `[[...]]` links rendered as links. With `readers`, for the
+ * Reader's view, what's written as a labelled link but has no link record shows only its label.
+ */
+export function LinkedText({ text: written, match, universe, readers = false }: { text: string; match: (text: string) => LinkView | undefined; universe: string; readers?: boolean }) {
+  const text = readers ? withoutSplitLinks(written) : written
   const parts: ReactNode[] = []
   let last = 0
   for (const m of text.matchAll(WIKI_LINK)) {
     const link = match(m[0])
-    if (!link) {
+    const label = !link && readers ? labelOf(m[0]) : null
+    if (!link && label === null) {
       continue
     }
 
     parts.push(text.slice(last, m.index))
-    parts.push(<WikiLink key={m.index} link={link} universe={universe} />)
+    parts.push(link ? <WikiLink key={m.index} link={link} universe={universe} /> : label)
     last = m.index + m[0].length
   }
 

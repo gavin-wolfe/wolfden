@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, getRouteApi } from '@tanstack/react-router'
-import { count, hierarchyQuery, positionsQuery, type BookNode, type EntityCounts, type PositionView, type SeriesNode, type UniverseNode } from '../api'
+import { count, hierarchyQuery, type BookNode, type EntityCounts, type SeriesNode, type UniverseNode } from '../api'
 import { typePlural } from '../components/Links'
 import { ChapterDefaultsSection } from '../components/ChapterFields'
 import { NewContainerButton } from '../components/NewContainer'
@@ -8,29 +8,22 @@ import { NewMenu } from '../components/NewEntity'
 import { ErrorState, Loading } from '../components/States'
 import { useShownError } from '../formHold'
 import { useDocumentTitle, usePosition } from '../hooks'
-import { readersTree } from '../story'
 
 const route = getRouteApi('/u/$universe')
 
 /**
  * The hierarchy for a universe's or series' page at the position (#300). In the
- * Reader's view it's the tree readers know, and it waits for the story's positions
- * until it can say what that is, so nothing later shows meanwhile. That view is
- * read-only, so these pages have no New buttons or chapter defaults there.
+ * Reader's view it's the tree readers know, and nothing else is asked for. That
+ * view is read-only, so these pages have no New buttons or chapter defaults there.
  */
 export function useHierarchyInView(universe: string) {
   const { at, readers } = usePosition()
-  const hierarchy = useQuery(hierarchyQuery(universe, at))
-  const positions = useQuery(positionsQuery(universe))
-  const failedHierarchy = useShownError(hierarchy)
-  const failedPositions = useShownError(positions)
-  const list: PositionView[] | undefined = positions.data?.positions
-  const whole = hierarchy.data?.universe
+  const hierarchy = useQuery(hierarchyQuery(universe, at, readers))
   return {
     readers,
-    isPending: hierarchy.isPending || (readers && positions.isPending),
-    failed: failedHierarchy ?? (readers ? failedPositions : null),
-    universe: whole && readers && list && at !== undefined ? readersTree(whole, at, list) : readers ? undefined : whole,
+    isPending: hierarchy.isPending,
+    failed: useShownError(hierarchy),
+    universe: hierarchy.data?.universe,
   }
 }
 
@@ -117,8 +110,8 @@ export function BookList({ universe, books, empty }: { universe: string; books: 
   )
 }
 
-/** How many notes of each type are filed at a scope. */
-export function Counts({ counts, title }: { counts: EntityCounts; title: string }) {
+/** How many notes of each type are filed at a scope. With `met`, in the Author's view at a position, how many of them readers have met, where that isn't all. */
+export function Counts({ counts, title, met }: { counts: EntityCounts; title: string; met?: Readonly<Record<string, number>> }) {
   const types = Object.entries(counts.byType)
   if (types.length === 0) {
     return null
@@ -128,11 +121,17 @@ export function Counts({ counts, title }: { counts: EntityCounts; title: string 
     <section>
       <h2>{title}</h2>
       <ul className="counts">
-        {types.map(([type, n]) => (
-          <li key={type}>
-            {typePlural(type)} <span className="count">{n}</span>
-          </li>
-        ))}
+        {types.map(([type, n]) => {
+          const known = met === undefined ? n : (met[type] ?? 0)
+          return (
+            <li key={type}>
+              {typePlural(type)}{' '}
+              <span className="count" title={known < n ? `Readers have met ${known} of these ${n} by this point.` : undefined}>
+                {known < n ? `${known} of ${n}` : n}
+              </span>
+            </li>
+          )
+        })}
       </ul>
     </section>
   )

@@ -102,6 +102,24 @@ export function bookChapterFieldsQuery(universe: string, book: string) {
   })
 }
 
+/** What the Reader's view has of a chapter's field: what holds, with nothing to edit by. Links left in it are to notes readers have met. */
+export type ChapterValueShown = Pick<ChapterValueView, 'name' | 'value' | 'from' | 'fromKey' | 'none' | 'links'>
+
+/** GET /api/book/chapter-fields with asOf and readers=true: only the chapters readers have reached (#300). */
+export interface ReadersChapterFields {
+  version: number
+  universe: string
+  book: string
+  chapters: { key: string; position: string; number: number | null; title: string | null; fields: ChapterValueShown[] }[]
+}
+
+export function readersChapterFieldsQuery(universe: string, book: string, at: string) {
+  return queryOptions({
+    queryKey: ['bookChapterFields', universe, book, at],
+    queryFn: () => getJson<ReadersChapterFields>(apiPath('/api/book/chapter-fields', { universe, book, asOf: at, readers: 'true' })),
+  })
+}
+
 export function chapterDefaultsQuery(scope: DefaultsScope) {
   return queryOptions({
     queryKey: ['chapterDefaults', scope.universe, scope.series ?? null, scope.book ?? null],
@@ -143,12 +161,8 @@ async function post(path: string, body: object): Promise<WriteResult> {
   return json as unknown as WriteResult
 }
 
-/**
- * A value's links as the page's link views, so a value renders as a note's
- * field does. With `met` (as of a story position, the notes the reader has
- * met), a link to any other note doesn't say what it reaches (#26).
- */
-export function linkViews(links: ChapterLinkView[], met?: ReadonlySet<string>): LinkView[] {
+/** A value's links as the page's link views, so a value renders as a note's field does. */
+export function linkViews(links: ChapterLinkView[]): LinkView[] {
   return links.map((l) => ({
     text: l.text,
     target: l.target,
@@ -157,11 +171,11 @@ export function linkViews(links: ChapterLinkView[], met?: ReadonlySet<string>): 
     line: 0,
     column: 0,
     outcome: l.outcome,
-    entity: l.entity && (!met || met.has(l.entity)) ? { key: l.entity, id: null, name: l.name ?? l.target, type: l.type ?? '' } : null,
+    entity: l.entity ? { key: l.entity, id: null, name: l.name ?? l.target, type: l.type ?? '' } : null,
     section: null,
     matches: null,
-    problem: met && l.outcome !== 'resolved' ? null : l.problem,
-    inView: met && l.entity ? met.has(l.entity) : null,
+    problem: l.problem,
+    inView: null,
   }))
 }
 

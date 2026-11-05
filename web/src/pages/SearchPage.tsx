@@ -8,7 +8,6 @@ import {
   count,
   fieldsQuery,
   hierarchyQuery,
-  positionsQuery,
   searchQuery,
   type HierarchyResult,
   type SearchFilters,
@@ -21,7 +20,7 @@ import {
 import { MarkList } from '../components/AheadOfReaders'
 import { EntityLink, sectionAnchor } from '../components/Links'
 import { ErrorState, Loading, StatusBadge } from '../components/States'
-import { useDocumentTitle } from '../hooks'
+import { useDocumentTitle, usePositionsInView } from '../hooks'
 import { typesQuery, type TypeView } from '../createApi'
 import { snippetParts, type TextMatch } from '../snippet'
 import {
@@ -35,7 +34,7 @@ import {
   aheadValuesWhy,
   notPlacedWhy,
 } from '../readerWords'
-import { describePosition, readersTree } from '../story'
+import { describePosition } from '../story'
 import type { SearchPageSearch } from '../router'
 
 const route = getRouteApi('/u/$universe/search')
@@ -54,12 +53,13 @@ export function SearchPage() {
   // A blank `at` is '' (it fails closed, as on every page), never everything.
   const at = search.at
   const readers = at !== undefined && search.readers === '1'
-  const hierarchy = useQuery(hierarchyQuery(universe, undefined))
+  const whole = useQuery({ ...hierarchyQuery(universe, undefined), enabled: !readers })
   // In the Reader's view, types, fields, and scopes are only what readers there have
   // reached, so a filter doesn't name what's later. Otherwise, every one.
-  const metHierarchy = useQuery({ ...hierarchyQuery(universe, readers ? at : undefined), enabled: at !== '' })
+  const metHierarchy = useQuery({ ...hierarchyQuery(universe, readers ? at : undefined, readers), enabled: at !== '' })
+  const hierarchy = readers ? metHierarchy : whole
   const fields = useQuery({ ...fieldsQuery(universe, readers ? at : undefined), enabled: at !== '' })
-  const positions = useQuery(positionsQuery(universe))
+  const positions = usePositionsInView(universe)
   const q = search.q
   const filters: SearchFilters = {
     field: search.field,
@@ -83,7 +83,7 @@ export function SearchPage() {
       <p className="eyebrow">Search</p>
       <h1>{q ? <>Matches for “{q}”</> : 'Search'}</h1>
       <Filters
-        hierarchy={readers ? readersScopes(metHierarchy.data, at, positions.data?.positions) : hierarchy.data}
+        hierarchy={hierarchy.data}
         metHierarchy={metHierarchy.data}
         fields={fields.data?.fields}
         search={search}
@@ -120,15 +120,6 @@ export function SearchPage() {
       )}
     </div>
   )
-}
-
-/** The hierarchy with only the books and series readers at `at` have reached, for the Scope filter. Nothing until it can be worked out. */
-function readersScopes(
-  hierarchy: HierarchyResult | undefined,
-  at: string | undefined,
-  positions: readonly PositionView[] | undefined,
-): HierarchyResult | undefined {
-  return hierarchy && at && positions ? { ...hierarchy, universe: readersTree(hierarchy.universe, at, positions) } : undefined
 }
 
 function Filters({

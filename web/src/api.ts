@@ -397,18 +397,43 @@ export function remoteImagesAtLoad(client: QueryClient): boolean | undefined {
 // Every query that depends on the story position has the position in its key
 // (null for the full view), so each position is cached on its own.
 
-export function hierarchyQuery(universe: string, at: string | undefined) {
+/**
+ * The universe's series, books, and chapters. With `readers`, the Reader's view at
+ * `at`: only the books and chapters readers there have reached, or that a note
+ * they've met is filed in, so nothing in the answer names the rest (#300).
+ */
+export function hierarchyQuery(universe: string, at: string | undefined, readers = false) {
+  const asked = readers && at !== undefined
   return queryOptions({
-    queryKey: ['hierarchy', universe, at ?? null],
-    queryFn: () => getJson<HierarchyResult>(apiPath('/api/hierarchy', { universe, asOf: at })),
+    queryKey: asked ? ['hierarchy', universe, at, 'readers'] : ['hierarchy', universe, at ?? null],
+    queryFn: () => getJson<HierarchyResult>(apiPath('/api/hierarchy', { universe, asOf: at, readers: asked ? 'true' : undefined })),
   })
 }
 
+/** Every position in the story, later chapters' titles and later books' names included. The Reader's view asks for {@link readersPositionsQuery} instead. */
 export function positionsQuery(universe: string) {
   return queryOptions({
     queryKey: ['positions', universe],
     queryFn: () => getJson<PositionsResult>(apiPath('/api/positions', { universe })),
   })
+}
+
+/** The positions readers at `at` have reached, up to `at` (#300). */
+export function readersPositionsQuery(universe: string, at: string) {
+  return queryOptions({
+    queryKey: ['positions', universe, at],
+    queryFn: () => getJson<PositionsResult>(apiPath('/api/positions', { universe, asOf: at, readers: 'true' })),
+  })
+}
+
+/**
+ * The one position after `after`, or the next book's first, or null if there's none.
+ * It's how the Reader's view moves forward: it's asked only when the writer moves,
+ * and says nothing else of what's ahead (#300).
+ */
+export async function nextPosition(universe: string, after: string, step: 'chapter' | 'book'): Promise<string | null> {
+  const { position } = await getJson<{ position: string | null }>(apiPath('/api/positions/next', { universe, after, step }))
+  return position
 }
 
 /** The most entities one list asks for: the API's own limit. */

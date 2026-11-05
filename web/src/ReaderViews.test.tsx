@@ -80,24 +80,6 @@ describe('SC-WEB-103: the Author’s view and the Reader’s view', () => {
     expect((await screen.findByRole('button', { name: "Author's view" })).getAttribute('aria-pressed')).toBe('true')
   })
 
-  it('says what it doesn’t cover yet, beside read-only, on both tabs', async () => {
-    stubApi()
-    const note = renderApp('/u/dracula/e/E-MINA?at=dracula:3&readers=1')
-    expect(await screen.findByText(/Book and chapter pages, and the Book and Chapter menus, aren't part of the Reader's view yet/)).toBeTruthy()
-    note.unmount()
-
-    renderApp('/u/dracula/e/E-MINA?view=history&at=dracula:3&readers=1')
-    expect(await screen.findByText(/Book and chapter pages, and the Book and Chapter menus, aren't part of the Reader's view yet/)).toBeTruthy()
-  })
-
-  it('doesn’t say so in the Author’s view', async () => {
-    stubApi()
-    renderApp('/u/dracula/e/E-MINA?at=dracula:3')
-    await screen.findByRole('heading', { level: 1, name: 'Mina Harker' })
-
-    expect(screen.queryByText(/aren't part of the Reader's view yet/)).toBeNull()
-  })
-
   it('switches back, leaving the position alone', async () => {
     stubApi()
     const { history } = renderApp('/u/dracula/e/E-MINA?at=dracula:3&readers=1')
@@ -126,7 +108,7 @@ describe('SC-WEB-103: the Author’s view and the Reader’s view', () => {
     expect(readersIn(history)).toBe('1')
     expect(atOf(history)).toBe('dracula:3')
 
-    fireEvent.keyDown(screen.getByRole('slider', { name: 'Story position' }), { key: 'ArrowRight' })
+    fireEvent.click(screen.getByRole('button', { name: 'Next chapter' }))
     await waitFor(() => expect(atOf(history)).toBe('dracula:4'))
     expect(readersIn(history)).toBe('1')
   })

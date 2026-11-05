@@ -1,48 +1,38 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, getRouteApi } from '@tanstack/react-router'
 import { hierarchyQuery, type ChapterNode } from '../api'
-import { ChapterFieldsSection } from '../components/ChapterFields'
+import { MarkList } from '../components/AheadOfReaders'
+import { ChapterFieldsSection, ReadersChapterFieldsSection } from '../components/ChapterFields'
 import { EntityList } from '../components/EntityList'
 import { ErrorState, Loading } from '../components/States'
 import { useShownError } from '../formHold'
 import { useDocumentTitle, useEntitiesInView, usePosition } from '../hooks'
 import { MARKS_LEGEND, chapterListCutWords } from '../readerWords'
-import { chapterLabel, entryOf } from '../story'
-import { findBook } from './BookPage'
+import { chapterLabel, entryOf, isAheadOf } from '../story'
+import { NotReached, findBook } from './BookPage'
 
 const route = getRouteApi('/u/$universe/b/$book/c/$chapter')
 
 /**
  * A chapter: its number and heading, its chapter fields (POV, when, …), a
  * way to read the den as of it, and the notes that enter the story there.
+ * At a position, the Author's view has all of it, and tags a chapter readers
+ * haven't reached, in this page's heading and its prev and next, and a link in a
+ * field to a note they haven't met. The Reader's view has only what readers
+ * know, so it has no later chapter's page or prev or next, and it's read-only (#300).
  */
 export function ChapterPage() {
   const { universe, book, chapter } = route.useParams()
-  const { at, setAt } = usePosition()
-  const hierarchy = useQuery(hierarchyQuery(universe, undefined))
+  const { at, setAt, readers } = usePosition()
+  const hierarchy = useQuery(hierarchyQuery(universe, readers ? at : undefined, readers))
   const failed = useShownError(hierarchy)
-  // Headings as of the position (#227): the page's structure comes from the
-  // full hierarchy, so a change of position doesn't reload it (or close a
-  // field's form), but a heading names only what the reader has met (#26).
-  const asOf = useQuery({ ...hierarchyQuery(universe, at), enabled: at !== undefined })
-  const headingOf = (ch: ChapterNode): string | null => {
-    if (at === undefined) {
-      return ch.heading
-    }
-
-    // Until the answer as of the position is in (or if it fails), the title alone, which is shown whatever the position.
-    const there = asOf.data ? findBook(asOf.data.universe, book)?.book.chapters.find((x) => x.key === ch.key) : undefined
-    return there ? there.heading : ch.title
-  }
   const view = useEntitiesInView(universe)
+  const positions = view.positions ?? []
   const titled = hierarchy.data ? findBook(hierarchy.data.universe, book) : null
   const titledChapter = titled?.book.chapters.find((x) => x.key === chapter)
-  useDocumentTitle(titled && titledChapter ? `${headingOf(titledChapter) ?? chapterLabel(titledChapter)} · ${titled.book.name}` : undefined)
+  useDocumentTitle(titled && titledChapter ? `${titledChapter.heading ?? chapterLabel(titledChapter)} · ${titled.book.name}` : undefined)
   // In prev and next: "3. The Quiet Hour", or for an untitled chapter what its own page is headed.
-  const stepLabel = (ch: ChapterNode): string => {
-    const heading = headingOf(ch)
-    return heading === null ? chapterLabel(ch) : `${ch.number ?? ch.key}. ${heading}`
-  }
+  const stepLabel = (ch: ChapterNode): string => (ch.heading === null ? chapterLabel(ch) : `${ch.number ?? ch.key}. ${ch.heading}`)
 
   if (hierarchy.isPending) {
     return <Loading what="the chapter" />
@@ -56,6 +46,10 @@ export function ChapterPage() {
   const found = findBook(u, book)
   const index = found?.book.chapters.findIndex((c) => c.key === chapter) ?? -1
   if (!found || index < 0) {
+    if (readers) {
+      return <NotReached what="chapter" />
+    }
+
     return (
       <div className="page-body">
         <h1>No such chapter</h1>
@@ -70,7 +64,12 @@ export function ChapterPage() {
   const c = b.chapters[index]
   const prev = b.chapters[index - 1]
   const next = b.chapters[index + 1]
-  const entering = view.entities ? view.entities.filter((e) => entryOf(e, view.positions ?? []) === c.position) : []
+  const entering = view.entities ? view.entities.filter((e) => entryOf(e, positions) === c.position) : []
+  const later = (ch: ChapterNode) => !readers && isAheadOf(ch.position, at, positions)
+  const tag = (ch: ChapterNode) => later(ch) && <MarkList mark={{ kind: 'ahead', at: ch.position }} positions={positions} />
+  const tagged = later(c) || (next !== undefined && later(next)) || (prev !== undefined && later(prev)) || entering.some((e) => e.readerMark)
+  // A chapter with its own tag needs no more on what's in it.
+  const notes = at === undefined || readers || later(c) ? undefined : new Map((view.entities ?? []).flatMap((e) => (e.readerMark ? [[e.key, e.readerMark] as const] : [])))
 
   return (
     <div className="page-body">
@@ -83,8 +82,11 @@ export function ChapterPage() {
           {b.name}
         </Link>
       </nav>
-      <p className="eyebrow">Chapter {c.number ?? c.key}</p>
-      <h1>{headingOf(c) ?? chapterLabel(c)}</h1>
+      <p className="eyebrow">
+        Chapter {c.number ?? c.key} {tag(c)}
+      </p>
+      <h1>{c.heading ?? chapterLabel(c)}</h1>
+      {tagged && <p className="muted list-legend">{MARKS_LEGEND}</p>}
       <p>
         {at === c.position ? (
           <span className="badge">You are reading as of this chapter</span>
@@ -95,7 +97,11 @@ export function ChapterPage() {
         )}
       </p>
       <h2>Fields</h2>
-      <ChapterFieldsSection key={`${b.key}:${c.key}`} universe={universe} book={b.key} chapter={c.key} label="this chapter" />
+      {readers ? (
+        <ReadersChapterFieldsSection universe={universe} book={b.key} chapter={c.key} at={at!} />
+      ) : (
+        <ChapterFieldsSection key={`${b.key}:${c.key}`} universe={universe} book={b.key} chapter={c.key} label="this chapter" marks={notes && at !== undefined ? { notes, positions, at } : undefined} />
+      )}
       <h2>Enters the story here</h2>
       {view.isPending ? (
         <Loading what="the notes" />
@@ -104,28 +110,32 @@ export function ChapterPage() {
       ) : (
         <>
           {view.truncated && <p className="muted list-legend">{chapterListCutWords(view.entities?.length ?? 0, view.total)}</p>}
-          {entering.some((e) => e.readerMark) && <p className="muted list-legend">{MARKS_LEGEND}</p>}
           <EntityList
             universe={universe}
             entities={entering}
-            positions={view.positions ?? []}
-            // It says nothing of a chapter readers haven't reached, whose notes they haven't met either.
+            positions={positions}
             empty={view.truncated ? 'None of those enter the story here.' : view.readers ? 'Readers have met no notes that enter the story here.' : 'No notes enter the story in this chapter.'}
           />
         </>
       )}
       <nav className="prev-next" aria-label="Chapters">
         {prev ? (
-          <Link to="/u/$universe/b/$book/c/$chapter" params={{ universe, book: b.key, chapter: prev.key }} rel="prev">
-            ‹ {stepLabel(prev)}
-          </Link>
+          <span>
+            <Link to="/u/$universe/b/$book/c/$chapter" params={{ universe, book: b.key, chapter: prev.key }} rel="prev">
+              ‹ {stepLabel(prev)}
+            </Link>{' '}
+            {tag(prev)}
+          </span>
         ) : (
           <span />
         )}
         {next && (
-          <Link to="/u/$universe/b/$book/c/$chapter" params={{ universe, book: b.key, chapter: next.key }} rel="next">
-            {stepLabel(next)} ›
-          </Link>
+          <span>
+            <Link to="/u/$universe/b/$book/c/$chapter" params={{ universe, book: b.key, chapter: next.key }} rel="next">
+              {stepLabel(next)} ›
+            </Link>{' '}
+            {tag(next)}
+          </span>
         )}
       </nav>
     </div>

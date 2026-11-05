@@ -1,15 +1,14 @@
 import { useState } from 'react'
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { getRouteApi } from '@tanstack/react-router'
-import { entityQuery, positionsQuery, type ContainerRef, type PositionView, type ReaderMark } from '../api'
+import { entityQuery, type ContainerRef, type PositionView, type ReaderMark } from '../api'
 import { FileDiffView } from '../components/DiffView'
 import { MarkTag } from '../components/AheadOfReaders'
 import { EntityTabs } from '../components/EntityTabs'
 import { ErrorState, Loading } from '../components/States'
 import type { EntitySearch } from '../entitySearch'
-import { useDocumentTitle, useNoteSummary, usePosition } from '../hooks'
+import { useDocumentTitle, useNoteSummary, usePosition, usePositionsInView } from '../hooks'
 import { historyDiffQuery, historyQuery, type DiffSelection, type HistoryDiffResult, type HistoryEntry, type HistoryResult } from '../historyApi'
-import { READERS_VIEW_REACH } from '../readerWords'
 import { Breadcrumb, NotInView } from './EntityPageView'
 import '../history.css'
 
@@ -34,7 +33,7 @@ export function HistoryPage() {
   const { universe, _splat: key = '' } = route.useParams()
   const { at, readers } = usePosition()
   const page = useQuery(entityQuery(universe, key, at, readers))
-  const positions = useQuery(positionsQuery(universe)).data?.positions ?? []
+  const positions = usePositionsInView(universe).data?.positions ?? []
   const summary = useNoteSummary(universe, key, page.data !== undefined && page.data.entity === null)
   useDocumentTitle(page.data ? (page.data.entity ? `${page.data.entity.name}: history` : 'Not met yet') : undefined)
 
@@ -51,7 +50,7 @@ export function HistoryPage() {
       <NotInView
         summary={summary}
         note={page.data.note}
-        positions={positions}
+        universe={universe}
         at={at}
         className="page-body history"
       />
@@ -69,7 +68,6 @@ export function HistoryPage() {
           <h1>{entity.name}</h1>
         </header>
         <p className="muted history-note">History isn't part of the Reader's view, since saved versions can hold what readers don't know yet. Switch to the Author's view to see it.</p>
-        <p className="muted history-note">{READERS_VIEW_REACH}</p>
       </div>
     )
   }

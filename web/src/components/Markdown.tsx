@@ -2,7 +2,7 @@ import { createContext, useContext, useMemo, useState, type ReactNode } from 're
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import ReactMarkdown, { defaultUrlTransform, type Components } from 'react-markdown'
 import { denQuery, remoteImagesAtLoad, type LinkView } from '../api'
-import { WIKI_LINK, WikiLink, createLinkMatcher } from './Links'
+import { WIKI_LINK, WikiLink, createLinkMatcher, labelOf, linkWords, withoutSplitLinks } from './Links'
 
 // Notes' markdown, rendered safely. react-markdown builds React elements
 // (never HTML strings), `skipHtml` drops any raw HTML in a note, and its URL
@@ -22,13 +22,34 @@ interface MdNode {
   type: string
   value?: string
   url?: string
+  alt?: string | null
+  title?: string | null
   children?: MdNode[]
 }
 
-/** A remark plugin: turns each `[[...]]` in text into a link to the index of its resolution in `resolved`. */
-function wikiLinks(links: readonly LinkView[], resolved: LinkView[]) {
+/**
+ * A remark plugin: turns each `[[...]]` in text into a link to the index of its resolution in `resolved`.
+ * With `readers`, for the Reader's view, what can't hold a link shows the words a link would (an image's
+ * alt text and title, the words of a `[text](url)`), and anything written as a labelled link but not
+ * recorded as one, such as one split over two lines, shows only its label, as a Reader's search reads it.
+ */
+function wikiLinks(links: readonly LinkView[], resolved: LinkView[], readers: boolean) {
   const rewrite = (node: MdNode, match: (text: string) => LinkView | undefined) => {
-    if (!node.children || node.type === 'link' || node.type === 'linkReference') {
+    if (readers && (node.type === 'image' || node.type === 'imageReference')) {
+      node.alt = node.alt && linkWords(node.alt, match)
+      node.title = node.title && linkWords(node.title, match)
+      return
+    }
+
+    if (!node.children) {
+      return
+    }
+
+    if (node.type === 'link' || node.type === 'linkReference') {
+      if (readers) {
+        words(node, match)
+      }
+
       return
     }
 
@@ -40,11 +61,17 @@ function wikiLinks(links: readonly LinkView[], resolved: LinkView[]) {
         continue
       }
 
-      const text = child.value
+      const text = readers ? withoutSplitLinks(child.value) : child.value
       let last = 0
       for (const m of text.matchAll(WIKI_LINK)) {
         const link = match(m[0])
         if (!link) {
+          const label = readers ? labelOf(m[0]) : null
+          if (label !== null) {
+            children.push({ type: 'text', value: `${text.slice(last, m.index)}${label}` })
+            last = m.index + m[0].length
+          }
+
           continue
         }
 
@@ -58,6 +85,17 @@ function wikiLinks(links: readonly LinkView[], resolved: LinkView[]) {
     }
 
     node.children = children
+  }
+
+  const words = (node: MdNode, match: (text: string) => LinkView | undefined) => {
+    for (const child of node.children ?? []) {
+      if (child.type === 'text' && child.value) {
+        child.value = linkWords(child.value, match)
+      } else {
+        rewrite(child, match)
+        words(child, match)
+      }
+    }
   }
 
   // Each run starts afresh, so a re-render matches the links in the same order.
@@ -275,15 +313,15 @@ function NoteLink({ href, children }: { href: string; children: ReactNode }) {
 /**
  * A note's markdown, with its `[[...]]` links resolved as the API resolved
  * them. `file` is the den-relative path of the file the markdown is written
- * in, which its images' relative paths start from.
+ * in, which its images' relative paths start from. `readers` is for the Reader's view.
  */
-export function Markdown({ text, links, universe, file }: { text: string; links: readonly LinkView[]; universe: string; file: string }) {
+export function Markdown({ text, links, universe, file, readers = false }: { text: string; links: readonly LinkView[]; universe: string; file: string; readers?: boolean }) {
   const { allowed, reload } = useRemoteImages()
   const remoteImages = useMemo(() => ({ allowed, reload }), [allowed, reload])
   const { plugin, resolved } = useMemo(() => {
     const resolved: LinkView[] = []
-    return { plugin: wikiLinks(links, resolved), resolved }
-  }, [links])
+    return { plugin: wikiLinks(links, resolved, readers), resolved }
+  }, [links, readers])
 
   const components = useMemo<Components>(
     () => ({

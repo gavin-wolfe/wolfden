@@ -35,12 +35,12 @@ import {
   type EditTarget,
 } from '../components/Editing'
 import { AddField, FieldEditor, FieldTools } from '../components/FieldEditing'
-import { denErrorsQuery } from '../denErrorsApi'
+import { denErrorCountQuery, denErrorsQuery } from '../denErrorsApi'
 import { sourceQuery, type EntitySource } from '../editApi'
 import { ErrorState, Loading, StatusBadge } from '../components/States'
-import { useDocumentTitle, useNoteSummary, usePosition } from '../hooks'
+import { useDocumentTitle, useNoteSummary, usePosition, usePositionsInView } from '../hooks'
 import { chapterWords, describePosition, entryOf, isAheadOf, ordinalOf } from '../story'
-import { NOT_PLACED, MARKS_LEGEND, READERS_VIEW_REACH, notPlacedWhy } from '../readerWords'
+import { NOT_PLACED, MARKS_LEGEND, notPlacedWhy } from '../readerWords'
 
 const route = getRouteApi('/u/$universe/e/$')
 
@@ -66,7 +66,7 @@ export function EntityPageView() {
     opened.current = live.data
   }
   const data = opened.current ?? live.data
-  const positions = useQuery(positionsQuery(universe)).data?.positions ?? []
+  const positions = usePositionsInView(universe).data?.positions ?? []
   const summary = useNoteSummary(universe, key, data !== undefined && data.entity === null)
   // Only the API's page names the note, and it's null when the reader hasn't met it.
   useDocumentTitle(data ? (data.entity?.name ?? 'Not met yet') : undefined)
@@ -85,7 +85,7 @@ export function EntityPageView() {
 
   const { entity } = data
   if (!entity) {
-    return <NotInView summary={summary} note={data.note} positions={positions} at={at} />
+    return <NotInView summary={summary} note={data.note} universe={universe} at={at} />
   }
 
   if (readers) {
@@ -107,9 +107,9 @@ export function EntityPageView() {
  * becomes the note once that's fixed, wherever it was fixed.
  */
 function LeftOutPage({ message, note, at, onErrorsChanged }: { message: string; note: LeftOutNote; at: string | undefined; onErrorsChanged: () => void }) {
-  const { setAt } = usePosition()
-  const errors = useQuery(denErrorsQuery)
-  const signature = errors.data ? errors.data.errors.map((e) => `${e.path}:${e.line}:${e.rule}`).join('|') : null
+  const { setAt, readers } = usePosition()
+  const errors = useQuery(readers ? denErrorCountQuery : denErrorsQuery)
+  const signature = errors.data ? `${errors.data.count}:${errors.data.errors.map((e) => `${e.path}:${e.line}:${e.rule}`).join('|')}` : null
   const [seen, setSeen] = useState(signature)
   useEffect(() => {
     if (signature !== seen) {
@@ -147,22 +147,25 @@ function LeftOutPage({ message, note, at, onErrorsChanged }: { message: string; 
 
 /**
  * The banner of the Reader's view for an entity the reader hasn't met at the
- * position. The Author's view is the way to see it from here (#300).
+ * position. The Author's view is the way to see it from here (#300). This is the one
+ * place in that view that names what's ahead, since the writer came here for this
+ * note, so it's the one that asks for the whole story's positions (SC-WEB-13).
  */
 export function NotInView({
   summary,
   note,
-  positions,
+  universe,
   at,
   className = 'page-body',
 }: {
   summary: EntitySummary | undefined
   note: string | null
-  positions: PositionView[]
+  universe: string
   at: string | undefined
   className?: string
 }) {
   const { setAt, setReaders } = usePosition()
+  const positions = useQuery(positionsQuery(universe)).data?.positions ?? []
   const entry = summary ? entryOf(summary, positions) : null
   const entryOrdinal = entry === null ? -1 : ordinalOf(entry, positions)
   const here = at === undefined ? null : ordinalOf(at, positions)
@@ -247,10 +250,7 @@ function EntityArticle({ universe, entity, positions, readersView = false }: { u
         </p>
         <FrozenNotice />
         {readersView && (
-          <>
-            <p className="muted">The Reader's view is read-only. Switch to the Author's view to edit.</p>
-            <p className="muted">{READERS_VIEW_REACH}</p>
-          </>
+          <p className="muted">The Reader's view is read-only. Switch to the Author's view to edit.</p>
         )}
       </header>
       <EditingStatus />
@@ -262,7 +262,7 @@ function EntityArticle({ universe, entity, positions, readersView = false }: { u
             <PieceEditor target={target} what="the opening" file={entity.path} />
           ) : (
             <div className="lead">
-              {lead && <Markdown text={lead} links={entity.leadLinks} universe={universe} file={entity.path} />}
+              {lead && <Markdown text={lead} links={entity.leadLinks} universe={universe} file={entity.path} readers={readersView} />}
               <p className="piece-tools">
                 <EditButton target={{ kind: 'lead' }} label="Edit the opening, the text before the sections">
                   {lead ? 'Edit opening' : 'Write an opening'}
@@ -271,7 +271,7 @@ function EntityArticle({ universe, entity, positions, readersView = false }: { u
             </div>
           )}
           {(entity.fields.length > 0 || editing !== null) && (
-            <Fields universe={universe} fields={entity.fields} positions={positions} target={target} source={editing ? source.data : undefined} quiet={quiet} />
+            <Fields universe={universe} fields={entity.fields} positions={positions} target={target} source={editing ? source.data : undefined} quiet={quiet} readers={readersView} />
           )}
           {entity.sections.map((s, i) => (
             <Section
@@ -283,6 +283,7 @@ function EntityArticle({ universe, entity, positions, readersView = false }: { u
               file={entity.path}
               target={target}
               quiet={quiet}
+              readers={readersView}
             />
           ))}
           {target?.kind === 'add' ? (
@@ -407,6 +408,7 @@ function Fields({
   target,
   source,
   quiet,
+  readers,
 }: {
   universe: string
   fields: PageField[]
@@ -416,6 +418,8 @@ function Fields({
   source: EntitySource | undefined
   /** The note keeps its own badge, or its own tag, so its facts have no reader tags. */
   quiet: boolean
+  /** The Reader's view: every link in a value shows only what it shows. */
+  readers: boolean
 }) {
   // A field's entries are listed one after another; show them under one name.
   const groups: PageField[][] = []
@@ -443,7 +447,7 @@ function Fields({
                 </dd>
               ) : (
                 <>
-                  <FieldEntries universe={universe} entries={entries} positions={positions} quiet={quiet} />
+                  <FieldEntries universe={universe} entries={entries} positions={positions} quiet={quiet} readers={readers} />
                   {source && (
                     <dd className="field-tools">
                       <FieldTools name={entries[0].name} source={source} />
@@ -476,7 +480,7 @@ function Fields({
   )
 }
 
-function FieldEntries({ universe, entries, positions, quiet }: { universe: string; entries: PageField[]; positions: PositionView[]; quiet: boolean }) {
+function FieldEntries({ universe, entries, positions, quiet, readers }: { universe: string; entries: PageField[]; positions: PositionView[]; quiet: boolean; readers: boolean }) {
   // One value of a position field can be later than the position, or not place at all. A fact with its own mark needs no more.
   const valueTag = (f: PageField) => (value: string) =>
     quiet || f.readerMark ? null
@@ -487,7 +491,7 @@ function FieldEntries({ universe, entries, positions, quiet }: { universe: strin
     <>
       {entries.map((f, i) => (
         <dd key={`${f.line}:${f.entryIndex ?? i}`} className={f.live === false ? 'not-live' : undefined} title={f.live === false ? 'No view of the story shows this entry.' : undefined}>
-          <FieldValue value={f.value} links={f.links} universe={universe} tagValue={valueTag(f)} />{' '}
+          <FieldValue value={f.value} links={f.links} universe={universe} tagValue={valueTag(f)} readers={readers} />{' '}
           {f.kind === 'default' && <span className="badge">type default</span>}
           <Span from={f.from} until={f.until} positions={positions} mark={quiet ? undefined : f.readerMark} quiet={quiet || !reachesReaders(f.status)} />
           {f.pinned && <span className="badge">pinned</span>}
@@ -498,8 +502,23 @@ function FieldEntries({ universe, entries, positions, quiet }: { universe: strin
   )
 }
 
-/** A field's value: text with its links, a list, or a mapping (such as a date's text and sort key). `tagValue` can add a tag after a piece of text. */
-export function FieldValue({ value, links, universe, tagValue }: { value: unknown; links: LinkView[]; universe: string; tagValue?: (text: string) => ReactNode }) {
+/**
+ * A field's value: text with its links, a list, or a mapping (such as a date's text and sort key). `tagValue` can add a tag after a piece of text.
+ * With `readers`, for the Reader's view, a mapping's key is read for links too, and nothing written as a labelled link shows more than its label.
+ */
+export function FieldValue({
+  value,
+  links,
+  universe,
+  tagValue,
+  readers = false,
+}: {
+  value: unknown
+  links: LinkView[]
+  universe: string
+  tagValue?: (text: string) => ReactNode
+  readers?: boolean
+}) {
   const match = useMemo(() => createLinkMatcher(links), [links])
   const render = (v: unknown): ReactNode => {
     if (v === null || v === undefined || v === '') {
@@ -509,7 +528,7 @@ export function FieldValue({ value, links, universe, tagValue }: { value: unknow
     if (typeof v === 'string') {
       return (
         <>
-          <LinkedText text={v} match={match} universe={universe} />
+          <LinkedText text={v} match={match} universe={universe} readers={readers} />
           {tagValue?.(v)}
         </>
       )
@@ -535,7 +554,7 @@ export function FieldValue({ value, links, universe, tagValue }: { value: unknow
         <dl className="mapping">
           {Object.entries(o).map(([k, item]) => (
             <div key={k}>
-              <dt>{k}</dt>
+              <dt>{readers ? <LinkedText text={k} match={match} universe={universe} readers /> : k}</dt>
               <dd>{render(item)}</dd>
             </div>
           ))}
@@ -557,6 +576,7 @@ function Section({
   file,
   target,
   quiet,
+  readers,
 }: {
   universe: string
   section: PageSection
@@ -566,6 +586,8 @@ function Section({
   target: EditTarget | null
   /** The note keeps its own badge, or its own tag, so its sections have no reader tags. */
   quiet: boolean
+  /** The Reader's view: every link in the text shows only what it shows. */
+  readers: boolean
 }) {
   const Heading = `h${Math.min(Math.max(section.level, 2), 6)}` as 'h2'
   const here = target !== null && 'line' in target && target.line === section.line && target.name === section.name ? target : null
@@ -607,7 +629,7 @@ function Section({
       {here?.kind === 'section' ? (
         <PieceEditor target={here} what={`the section “${name}”`} file={file} />
       ) : (
-        section.body.trim() && <Markdown text={section.body} links={section.links} universe={universe} file={file} />
+        section.body.trim() && <Markdown text={section.body} links={section.links} universe={universe} file={file} readers={readers} />
       )}
     </section>
   )

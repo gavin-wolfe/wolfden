@@ -1,4 +1,4 @@
-import type { BookNode, EntitySummary, PositionView, UniverseNode } from './api'
+import type { EntitySummary, PositionView } from './api'
 
 // Story positions as the pages show them, and which notes the reader has met.
 // A position is what the API's asOf takes: "book:chapter", or a bare book key
@@ -109,29 +109,5 @@ export function entryOf(entity: Pick<EntitySummary, 'from' | 'scopeKind' | 'scop
       return positions.find((p) => p.series === entity.scopeKey)?.book ?? null
     default:
       return null
-  }
-}
-
-/** True if readers at `at` have got to `position`. False when either isn't in the list, since nothing says they have. */
-function reached(position: string, at: string, positions: readonly PositionView[]): boolean {
-  const here = ordinalOf(at, positions)
-  const there = ordinalOf(position, positions)
-  return here !== null && there !== null && Math.ceil(there) <= Math.ceil(here)
-}
-
-/**
- * The universe's tree as the Reader's view shows it (#300), from the hierarchy as
- * of `at`: a book or chapter readers have got to, and a book or series filed with
- * a note they've met, so no met note is left without a place. The rest aren't
- * there, so nothing names or counts them. A series with no books yet isn't at any
- * position, so it's only there for a note.
- */
-export function readersTree(u: UniverseNode, at: string, positions: readonly PositionView[]): UniverseNode {
-  const book = (b: BookNode): BookNode => ({ ...b, chapters: b.chapters.filter((c) => reached(c.position, at, positions)) })
-  const books = (bs: readonly BookNode[]) => bs.filter((b) => reached(b.position, at, positions) || b.entities.total > 0).map(book)
-  return {
-    ...u,
-    series: u.series.map((s) => ({ ...s, books: books(s.books) })).filter((s) => s.books.length > 0 || s.entities.total > 0),
-    books: books(u.books),
   }
 }

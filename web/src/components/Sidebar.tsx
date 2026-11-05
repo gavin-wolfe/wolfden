@@ -5,7 +5,7 @@ import { denQuery, hierarchyQuery, type BookNode, type PositionView, type ScopeK
 import { useShownError } from '../formHold'
 import { useEntitiesInView, type ListedEntity } from '../hooks'
 import { MARKS_LEGEND, listCutWords } from '../readerWords'
-import { chapterLabel, readersTree } from '../story'
+import { chapterLabel } from '../story'
 import { EntityList } from './EntityList'
 import { NewTypeButton } from './NewEntity'
 import { typePlural } from './Links'
@@ -53,7 +53,7 @@ export function Sidebar({ universe }: { universe: string | undefined }) {
 
 function UniverseTree({ universe }: { universe: string }) {
   const view = useEntitiesInView(universe)
-  const hierarchy = useQuery(hierarchyQuery(universe, view.readers ? view.at : undefined))
+  const hierarchy = useQuery(hierarchyQuery(universe, view.readers ? view.at : undefined, view.readers))
   const failedHierarchy = useShownError(hierarchy)
   const params = useParams({ strict: false }) as { book?: string; chapter?: string; _splat?: string }
 
@@ -67,7 +67,7 @@ function UniverseTree({ universe }: { universe: string }) {
   }
 
   const positions = view.positions!
-  const u = view.readers ? readersTree(hierarchy.data!.universe, view.at!, positions) : hierarchy.data!.universe
+  const u = hierarchy.data!.universe
   const all = view.entities!
   const current = all.find((e) => e.key === params._splat || e.id === params._splat || e.path === params._splat)
   const byScope = groupByScope(all)

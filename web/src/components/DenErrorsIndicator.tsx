@@ -3,9 +3,31 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { count } from '../api'
 import { useRefreshHeld } from '../formHold'
-import { denErrorsQuery, fixElsewhere, leavesOut, type DenErrors, type DenErrorView } from '../denErrorsApi'
+import { denErrorCountQuery, denErrorsQuery, fixElsewhere, leavesOut, type DenErrors, type DenErrorView } from '../denErrorsApi'
+import { usePosition } from '../hooks'
 import { trapTab } from './CheckpointIndicator'
 import '../denErrors.css'
+
+/**
+ * The Reader's view of the top bar's "⚠ 3 problems" (#300). The list names files and
+ * quotes them, whatever readers know, so this asks only how many, and a press goes to
+ * the Author's view, where the list is. It stays because what an error leaves out is
+ * missing from this view too, and the writer checking it should know.
+ */
+export function ReadersErrorCount() {
+  const { setReaders } = usePosition()
+  const errors = useQuery(denErrorCountQuery)
+  if (!errors.data || errors.data.count === 0) {
+    return null
+  }
+
+  return (
+    <button type="button" className="den-errors-indicator" title="What these leave out is missing here. See them in the Author's view." onClick={() => setReaders(false)}>
+      <span aria-hidden="true">⚠ </span>
+      {count(errors.data.count, 'problem', 'problems')}
+    </button>
+  )
+}
 
 /**
  * The top bar's "⚠ 3 problems" (#280): the den's errors, not its warnings. It
@@ -14,8 +36,8 @@ import '../denErrors.css'
  * there are none. It opens the list: each error's file and line, what it says,
  * what it leaves out, and a way to fix it.
  *
- * It isn't affected by the story position: like editing, it's for the writer,
- * and shows everything.
+ * It isn't affected by the story position in the Author's view: like editing,
+ * it's for the writer, and shows everything. The Reader's view has {@link ReadersErrorCount}.
  */
 export function DenErrorsIndicator({ universe }: { universe: string | undefined }) {
   const errors = useQuery(denErrorsQuery)

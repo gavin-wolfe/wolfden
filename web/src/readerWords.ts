@@ -14,12 +14,17 @@ export const NEVER_TRUE = "never true (its dates don't overlap)"
 /** The line above a list with tags in it, which are plain text there (#302), so a keyboard or a touch reads it where it can't hover. */
 export const MARKS_LEGEND = "Tags say what readers at this point in the story don't see. Each note's page has the details."
 
-/**
- * What the Reader's view doesn't cover yet. Remove this, and where it's shown,
- * when step 6 of #300 gives the book and chapter pages and the position bar's
- * Book and Chapter menus the two views.
- */
-export const READERS_VIEW_REACH = "This covers note pages, lists of notes, and search. Book and chapter pages, and the Book and Chapter menus, aren't part of the Reader's view yet."
+/** The position bar's words for moving forward in the Reader's view, which names nothing ahead (#300). */
+export const FURTHER_ON = 'Further on'
+export const NEXT_CHAPTER = 'Next chapter'
+export const NEXT_BOOK = 'Next book'
+export const PICK_IN_AUTHORS_VIEW = "Pick a later point in the Author's view…"
+export const MENUS_NAME_NOTHING_AHEAD = "Readers here don't know what's ahead, so this doesn't name it. Step forward with Next, or pick a later point in the Author's view: the position stays when you switch back."
+
+/** The banner for a book or chapter the Reader's view has nothing of. It may well exist: it doesn't say, or name it. */
+export function notReachedWords(what: 'book' | 'chapter' | 'series'): string {
+  return `Readers haven't got to this ${what} by this point in the story.`
+}
 
 /** Tags for a search hit whose words are where a reader's page doesn't show them. */
 export const ONLY_IN_ALIAS = 'only in an alias'

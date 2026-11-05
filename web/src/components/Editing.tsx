@@ -234,7 +234,7 @@ export function UnsavedPrompt({ question, discard, onKeep, onDiscard }: { questi
 /** Where a navigation is from or to, as a leave prompt is asked about it. */
 export interface LeaveLocation {
   pathname: string
-  search: { at?: string }
+  search: { at?: string; readers?: '1' }
 }
 
 /**

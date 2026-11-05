@@ -207,15 +207,20 @@ describe('the top bar’s problems', () => {
     expect(links[2]).toContain('at=dracula:1')
   })
 
-  it('SC-WEB-103: Edit file is the writer’s, so it leaves the Reader’s view behind, and keeps the position', async () => {
-    stubApi({ override: (path) => (path === '/api/den/errors' ? list(error()) : undefined) })
+  it('SC-WEB-103: in the Reader’s view, it asks only how many there are, and a press goes to the Author’s view for the list', async () => {
+    const { calls } = stubApi({ override: (path, params) => (path === '/api/den/errors' ? (params.get('countOnly') === 'true' ? { ...list(error()), errors: [] } : list(error())) : undefined) })
     const { history } = renderApp('/u/dracula/e/E-MINA?at=dracula:1&readers=1')
 
     fireEvent.click(await screen.findByRole('button', { name: /1 problem/ }))
-    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('link', { name: 'Edit file' }))
 
-    await waitFor(() => expect(history.location.pathname).toBe('/file'))
     await waitFor(() => expect(new URLSearchParams(history.location.search).get('readers')).toBeNull())
+    expect(new URLSearchParams(history.location.search).get('at')).toBe('dracula:1')
+    expect(calls.indexOf('/api/den/errors')).toBeGreaterThan(calls.indexOf('/api/den/errors?countOnly=true'))
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    fireEvent.click(await screen.findByRole('button', { name: /1 problem/ }))
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('link', { name: 'Edit file' }))
+    await waitFor(() => expect(history.location.pathname).toBe('/file'))
     expect(new URLSearchParams(history.location.search).get('at')).toBe('dracula:1')
   })
 

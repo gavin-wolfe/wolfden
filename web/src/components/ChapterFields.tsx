@@ -1,6 +1,6 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { Fragment, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ApiRequestError, positionsQuery, type PositionView } from '../api'
+import { ApiRequestError, positionsQuery, type PositionView, type ReaderMark } from '../api'
 import { useHoldRefresh, useShownError } from '../formHold'
 import {
   bookChapterFieldsQuery,
@@ -9,7 +9,8 @@ import {
   editChapterDefault,
   editChapterField,
   linkViews,
-  type ChapterFieldsView,
+  readersChapterFieldsQuery,
+  type ChapterValueShown,
   type ChapterValueView,
   type DefaultsScope,
   type ValueFrom,
@@ -29,6 +30,8 @@ import {
   type Problem,
 } from '../fieldModel'
 import { FieldValue } from '../pages/EntityPageView'
+import { isAheadOf } from '../story'
+import { MarkList } from './AheadOfReaders'
 import { Conflict, useAfterSave, useLeavePrompt, type LeaveLocation } from './Editing'
 import { ValueEditor, typeWords } from './FieldEditing'
 import { ErrorMark, ErrorState, Loading, fileProblemsHeading } from './States'
@@ -75,8 +78,38 @@ export function valueWords(v: Json | null): string {
   return v === null ? '' : String(v)
 }
 
-/** The value that holds: with its links, "none" for [], or "not set". */
-export function ChapterValueText({ universe, view, none = 'none here', met }: { universe: string; view: ChapterValueView; none?: string; met?: ReadonlySet<string> }) {
+/** In the Author's view at a position, the tags for what readers there don't know: each note's mark, and the positions to word them with. */
+export interface ChapterFieldMarks {
+  notes: ReadonlyMap<string, ReaderMark>
+  positions: readonly PositionView[]
+  at: string
+  /** The chapter fields that hold a story position, so a later one can be tagged. */
+  positionFields?: ReadonlySet<string>
+}
+
+/** The den's chapter fields that hold a story position. */
+export function positionFieldsOf(fieldTypes: readonly SourceFieldType[]): ReadonlySet<string> {
+  return new Set(fieldTypes.filter((t) => t.type === 'position').map((t) => t.name))
+}
+
+/**
+ * The value that holds: with its links, "none" for [], or "not set". With `marks`, a
+ * link to a note readers haven't met has its tag, in a list's plain words (#302).
+ * `readers` is for the Reader's view, whose values come with only what it shows.
+ */
+export function ChapterValueText({
+  universe,
+  view,
+  none = 'none here',
+  marks,
+  readers = false,
+}: {
+  universe: string
+  view: Pick<ChapterValueView, 'name' | 'value' | 'none' | 'links'>
+  none?: string
+  marks?: ChapterFieldMarks
+  readers?: boolean
+}) {
   if (view.value === null) {
     return <span className="muted">not set</span>
   }
@@ -89,11 +122,31 @@ export function ChapterValueText({ universe, view, none = 'none here', met }: { 
     )
   }
 
-  return <FieldValue value={shown(view.value)} links={linkViews(view.links, met)} universe={universe} />
+  const tagValue = marks
+    ? (text: string) => (
+        <>
+          {view.links
+            .filter((l) => l.entity !== null && marks.notes.has(l.entity) && text.includes(l.text))
+            .map((l) => (
+              <Fragment key={l.text}>
+                {' '}
+                <MarkList mark={marks.notes.get(l.entity!)!} positions={marks.positions} note />
+              </Fragment>
+            ))}
+          {marks.positionFields?.has(view.name) && isAheadOf(text, marks.at, marks.positions) && (
+            <>
+              {' '}
+              <MarkList mark={{ kind: 'ahead', at: text }} positions={marks.positions} />
+            </>
+          )}
+        </>
+      )
+    : undefined
+  return <FieldValue value={shown(view.value)} links={linkViews(view.links)} universe={universe} tagValue={tagValue} readers={readers} />
 }
 
 /** Where an inherited value comes from: "from book 'ember' defaults". Nothing for a value set here. */
-function Origin({ view, own, short = false }: { view: ChapterValueView; own: ValueFrom; short?: boolean }) {
+function Origin({ view, own, short = false }: { view: Pick<ChapterValueView, 'value' | 'from' | 'fromKey'>; own: ValueFrom; short?: boolean }) {
   if (view.value === null || view.from === null || view.from === own || view.from === 'chapter') {
     return null
   }
@@ -108,11 +161,19 @@ function Origin({ view, own, short = false }: { view: ChapterValueView; own: Val
 
 /**
  * A chapter's fields under its title in the book's chapter list: what holds,
- * inherited values marked. As of a story position, `met` holds the notes the
- * reader has met, and a link to any other is plain text that doesn't say
- * what it reaches, as links are in the rest of the reading view (#26).
+ * inherited values marked. `marks` and `readers` are as in {@link ChapterValueText}.
  */
-export function ChapterFieldSummary({ universe, chapter, met }: { universe: string; chapter: ChapterFieldsView; met?: ReadonlySet<string> }) {
+export function ChapterFieldSummary({
+  universe,
+  chapter,
+  marks,
+  readers = false,
+}: {
+  universe: string
+  chapter: { fields: readonly ChapterValueShown[] }
+  marks?: ChapterFieldMarks
+  readers?: boolean
+}) {
   const shownFields = chapter.fields.filter((f) => f.value !== null)
   if (shownFields.length === 0) {
     return null
@@ -124,7 +185,7 @@ export function ChapterFieldSummary({ universe, chapter, met }: { universe: stri
         <div key={f.name} className={f.from === 'chapter' ? undefined : 'inherited-value'}>
           <dt>{f.name}</dt>
           <dd>
-            <ChapterValueText universe={universe} view={f} met={met} /> <Origin view={f} own="chapter" short />
+            <ChapterValueText universe={universe} view={f} marks={marks} readers={readers} /> <Origin view={f} own="chapter" short />
           </dd>
         </div>
       ))}
@@ -167,6 +228,7 @@ function ChapterValues({
   hash,
   locked,
   label,
+  marks,
 }: {
   target: Target
   fieldTypes: SourceFieldType[]
@@ -175,6 +237,7 @@ function ChapterValues({
   /** Why nothing here can be edited, or null. */
   locked: string | null
   label: string
+  marks?: ChapterFieldMarks
 }) {
   const positions = useQuery(positionsQuery(target.universe))
   const afterSave = useAfterSave()
@@ -312,7 +375,7 @@ function ChapterValues({
               ) : (
                 <>
                   <dd className={view.value !== null && view.from !== null && view.from !== target.own && view.from !== 'chapter' ? 'inherited-value' : undefined}>
-                    <ChapterValueText universe={target.universe} view={view} none={target.noneWords} /> <Origin view={view} own={target.own} />
+                    <ChapterValueText universe={target.universe} view={view} none={target.noneWords} marks={marks} /> <Origin view={view} own={target.own} />
                     <IgnoredNote view={view} />
                     {!type && <span className="muted"> (not a chapter field the den's packs define: change it in the file)</span>}
                   </dd>
@@ -479,14 +542,13 @@ function Refused({ error }: { error: Error }) {
  * Ctrl/⌘+Enter) sends only what changed; Cancel (or Escape) leaves it.
  */
 /**
- * Which moves leave a field's form on its page. A chapter's page doesn't reload for
- * a new position or view. A book's reloads for a new position, and has one form for
- * both views for now. A universe's or series' reloads, and has no defaults in the
- * Reader's view, so any move drops it.
+ * Which moves leave a field's form on its page. A chapter's or book's page doesn't
+ * reload for a new position, and has nothing to edit in the Reader's view. A
+ * universe's or series' reloads, and has no defaults in that view, so any move drops it.
  */
 const FORM_STAYS: Record<ValueFrom, (current: LeaveLocation, next: LeaveLocation) => boolean> = {
-  chapter: (current, next) => current.pathname === next.pathname,
-  book: (current, next) => current.pathname === next.pathname && current.search.at === next.search.at,
+  chapter: (current, next) => current.pathname === next.pathname && next.search.readers !== '1',
+  book: (current, next) => current.pathname === next.pathname && next.search.readers !== '1',
   series: () => false,
   universe: () => false,
 }
@@ -767,8 +829,39 @@ function InheritChoice({
   )
 }
 
-/** A chapter's fields on its page, with what each inherits, editable unless the book is final. */
-export function ChapterFieldsSection({ universe, book, chapter, label }: { universe: string; book: string; chapter: string; label: string }) {
+/** A chapter's fields in the Reader's view: only what readers there know, and nothing to edit them with, so no way to be offered a later name (#300). */
+export function ReadersChapterFieldsSection({ universe, book, chapter, at }: { universe: string; book: string; chapter: string; at: string }) {
+  const fields = useQuery(readersChapterFieldsQuery(universe, book, at))
+  const failed = useShownError(fields)
+  if (fields.isPending) {
+    return <Loading what="the chapter's fields" />
+  }
+
+  if (failed) {
+    return <ErrorState error={failed} />
+  }
+
+  const values = fields.data!.chapters.find((c) => c.key === chapter)?.fields ?? []
+  if (values.length === 0) {
+    return <p className="muted">Nothing's set here that readers know.</p>
+  }
+
+  return (
+    <dl className="fields chapter-fields">
+      {values.map((view) => (
+        <div key={view.name} className="field">
+          <dt>{view.name}</dt>
+          <dd className={view.from !== null && view.from !== 'chapter' ? 'inherited-value' : undefined}>
+            <ChapterValueText universe={universe} view={view} none="none in this chapter" readers /> <Origin view={view} own="chapter" />
+          </dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
+/** A chapter's fields on its page, with what each inherits, editable unless the book is final. `marks` is as in {@link ChapterValueText}. */
+export function ChapterFieldsSection({ universe, book, chapter, label, marks }: { universe: string; book: string; chapter: string; label: string; marks?: ChapterFieldMarks }) {
   const fields = useQuery(bookChapterFieldsQuery(universe, book))
   const failed = useShownError(fields)
   const client = useQueryClient()
@@ -805,7 +898,17 @@ export function ChapterFieldsSection({ universe, book, chapter, label }: { unive
       return here ? { hash: now.hash, values: here.fields } : null
     },
   }
-  return <ChapterValues target={target} fieldTypes={data.fieldTypes} values={c.fields} hash={data.hash} locked={locked} label={`Fields of ${label}`} />
+  return (
+    <ChapterValues
+      target={target}
+      fieldTypes={data.fieldTypes}
+      values={c.fields}
+      hash={data.hash}
+      locked={locked}
+      label={`Fields of ${label}`}
+      marks={marks && { ...marks, positionFields: positionFieldsOf(data.fieldTypes) }}
+    />
+  )
 }
 
 /** A universe's, series', or book's chapter_defaults: what the chapters below have unless they set their own. */

@@ -65,7 +65,7 @@ public sealed partial class DenReader
             var scopes = Scopes(db);
             var hits = new List<SearchHitView>();
             var metPaths = whole.Entities.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
-            var links = new ReadersLinks(db, u.Id, e => metPaths.Contains(e.Path));
+            var links = new ReadersLinks(db, u.Id, e => metPaths.Contains(e.Path), ReadersLinks.SectionsIn(whole));
             if (fieldName is null)
             {
                 var ranks = index.SearchRanks(query);
@@ -109,13 +109,13 @@ public sealed partial class DenReader
     /// Whether every word of <paramref name="query"/> is in <paramref name="title"/> or
     /// <paramref name="text"/> as a reader's page has them, with HTML comments taken out as
     /// a reader's read takes them out (<see cref="MarkdownComments.Strip(string)"/>), and
-    /// the text's links as they show there. For a caller comparing a search table's hit
+    /// the links as they show there. For a caller comparing a search table's hit
     /// with what a Reader's search finds, so that's one rule too.
     /// </summary>
     public static bool ReadersCanFind(string query, string title, string text, ReadersLinks links, int note)
     {
         ArgumentNullException.ThrowIfNull(links);
-        return Found(SearchWords.Parse(query), MarkdownComments.Strip(title), links.Text(note, text)) is not null;
+        return Found(SearchWords.Parse(query), links.Text(note, title), links.Text(note, text)) is not null;
     }
 
     /// <summary>
@@ -167,9 +167,10 @@ public sealed partial class DenReader
 
         foreach (var section in note.Sections ?? [])
         {
-            if (Found(words, section.Name, links.Text(record.Id, section.Body)) is { } found)
+            var heading = links.Text(record.Id, section.Name);
+            if (Found(words, heading, links.Text(record.Id, section.Body)) is { } found)
             {
-                yield return new ReadersTextHit(record, section.Name, section.Line, found, section.Status);
+                yield return new ReadersTextHit(record, heading, section.Line, found, section.Status);
             }
         }
     }

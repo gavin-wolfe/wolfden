@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useRouterState } from '@tanstack/react-router'
-import { positionsQuery, type PositionView } from '../api'
+import { nextPosition, positionsQuery, readersPositionsQuery, type PositionView, type PositionsResult } from '../api'
 import { usePosition } from '../hooks'
+import { FURTHER_ON, MENUS_NAME_NOTHING_AHEAD, NEXT_BOOK, NEXT_CHAPTER, PICK_IN_AUTHORS_VIEW } from '../readerWords'
 import { chapterWords, ordinalOf, positionLabel } from '../story'
 
 /**
@@ -11,8 +13,11 @@ import { chapterWords, ordinalOf, positionLabel } from '../story'
  * everything, the end of the story. The slider's last step is "Everything",
  * so the arrow keys step chapter by chapter up to the end, and Home and End
  * jump to the first chapter and to everything.
+ *
+ * In the Reader's view, it's {@link ReadersPositionBar}.
  */
 export function PositionBar({ universe }: { universe: string | undefined }) {
+  const { readers } = usePosition()
   if (!universe) {
     return (
       <div className="position-bar" role="group" aria-label="Story position">
@@ -21,7 +26,7 @@ export function PositionBar({ universe }: { universe: string | undefined }) {
     )
   }
 
-  return <UniversePositionBar universe={universe} />
+  return readers ? <ReadersPositionBar universe={universe} /> : <UniversePositionBar universe={universe} />
 }
 
 function UniversePositionBar({ universe }: { universe: string }) {
@@ -112,6 +117,169 @@ function UniversePositionBar({ universe }: { universe: string }) {
         </button>
       )}
       {at !== undefined && <ViewSwitch />}
+    </div>
+  )
+}
+
+/** What's in the menus' Further on groups. */
+const NEXT = 'next'
+const PICK = 'pick'
+
+/**
+ * What the bar lists while a new position's answer comes, so its controls stay where they are and keep
+ * focus: the last answer. Moving back, it's cut at `at`, so it doesn't show what's now ahead. Moving
+ * forward, it's all of it, which is only what's already been reached.
+ */
+function upTo(previous: PositionsResult | undefined, at: string): PositionsResult | undefined {
+  if (!previous) {
+    return undefined
+  }
+
+  const list = previous.positions
+  const exact = list.findIndex((p) => p.position === at)
+  const last = exact >= 0 ? exact : list.findIndex((p) => p.book === at)
+  return last < 0 ? previous : { ...previous, count: last + 1, positions: list.slice(0, last + 1) }
+}
+
+/**
+ * The position bar in the Reader's view (#300). It's the bar with nothing ahead in
+ * it: the menus list only the books and chapters readers have reached, so there's no
+ * later title or name, or how many there are, and no slider, whose length and whose
+ * thumb's place would say how far through the story this is. To move forward, `›` and
+ * Next in the menus ask for the next one only when pressed, so nothing is told until
+ * the writer goes there. A menu can't pick further without naming, so it says that's
+ * in the Author's view, where the position stays. The request for the list asks for
+ * only what's reached.
+ */
+function ReadersPositionBar({ universe }: { universe: string }) {
+  const { at: position, setAt, setReaders } = usePosition()
+  const at = position!
+  const positions = useQuery({
+    ...readersPositionsQuery(universe, at),
+    placeholderData: (previous: PositionsResult | undefined) => upTo(previous, at),
+  })
+  const [said, setSaid] = useState<{ at: string; words: string } | null>(null)
+
+  const forward = async (step: 'chapter' | 'book') => {
+    setSaid(null)
+    try {
+      const next = await nextPosition(universe, at, step)
+      if (next === null) {
+        setSaid({ at, words: step === 'book' ? 'No later book.' : 'No later chapter.' })
+      } else {
+        setAt(next)
+      }
+    } catch (e) {
+      setSaid({ at, words: `It can't move on: ${(e as Error).message}` })
+    }
+  }
+
+  if (!positions.data) {
+    return (
+      <div className="position-bar" role="group" aria-label="Story position">
+        <span className="muted">{positions.isError ? positions.error.message : "Loading the story's chapters…"}</span>
+        {positions.isError && (
+          <button type="button" className="reset" onClick={() => setAt(undefined)}>
+            Show everything
+          </button>
+        )}
+        {positions.isError && <ViewSwitch />}
+      </div>
+    )
+  }
+
+  const list = positions.data.positions
+  const exact = list.findIndex((p) => p.position === at)
+  // A bare book key (the start of a book) sits on that book's first chapter.
+  const found = exact >= 0 ? exact : list.findIndex((p) => p.book === at)
+  // Moving forward, the last answer's end, until the new one comes.
+  const index = found >= 0 ? found : list.length - 1
+  const shownAt = found >= 0 ? at : list[index]?.position
+  const current: PositionView | undefined = list[index]
+  const label = shownAt === current?.book ? `${current.bookName}, start` : current ? positionLabel(current) : at
+  const books = [...new Map(list.map((p) => [p.book, p.bookName])).entries()]
+  const book = current?.book ?? ''
+  const chapters = list.filter((p) => p.book === book && p.chapter !== null)
+  const atChapter = chapters.some((p) => p.position === shownAt)
+  const further = (next: string) => (
+    <optgroup label={FURTHER_ON}>
+      <option value={NEXT}>{next}</option>
+      <option value={PICK}>{PICK_IN_AUTHORS_VIEW}</option>
+    </optgroup>
+  )
+  const pickFurther = (value: string, step: 'chapter' | 'book') => {
+    if (value === PICK) {
+      setReaders(false)
+    } else if (value === NEXT) {
+      void forward(step)
+    }
+  }
+
+  return (
+    <div className="position-bar" role="group" aria-label="Story position">
+      <button type="button" className="step" onClick={() => setAt(list[index - 1].position)} disabled={index <= 0} aria-label="Previous chapter" title="Previous chapter">
+        ‹
+      </button>
+      <button type="button" className="step" onClick={() => void forward('chapter')} aria-label={NEXT_CHAPTER} title={`${NEXT_CHAPTER}. ${MENUS_NAME_NOTHING_AHEAD}`}>
+        ›
+      </button>
+      <select
+        aria-label="Book"
+        title={MENUS_NAME_NOTHING_AHEAD}
+        value={book}
+        onChange={(e) => {
+          const { value } = e.currentTarget
+          if (value === '') {
+            setAt(undefined)
+          } else if (value === NEXT || value === PICK) {
+            pickFurther(value, 'book')
+          } else {
+            setAt(list.find((p) => p.book === value)!.position)
+          }
+        }}
+      >
+        <option value="">Everything</option>
+        {books.map(([key, name]) => (
+          <option key={key} value={key}>
+            {name}
+          </option>
+        ))}
+        {further(NEXT_BOOK)}
+      </select>
+      <select
+        aria-label="Chapter"
+        title={MENUS_NAME_NOTHING_AHEAD}
+        value={atChapter ? shownAt : ''}
+        onChange={(e) => {
+          const { value } = e.currentTarget
+          if (value === NEXT || value === PICK) {
+            pickFurther(value, 'chapter')
+          } else if (value) {
+            setAt(value)
+          }
+        }}
+      >
+        {!atChapter && <option value="">Start</option>}
+        {chapters.map((p) => (
+          <option key={p.position} value={p.position}>
+            {chapterWords(p)}
+            {p.title && p.number !== null ? `: ${p.title}` : ''}
+          </option>
+        ))}
+        {further(NEXT_CHAPTER)}
+      </select>
+      <output className="position-label" aria-live="polite">
+        As of <strong>{label}</strong>
+      </output>
+      {said?.at === at && (
+        <span className="muted position-note" role="status">
+          {said.words}
+        </span>
+      )}
+      <button type="button" className="reset" onClick={() => setAt(undefined)}>
+        Show everything
+      </button>
+      <ViewSwitch />
     </div>
   )
 }

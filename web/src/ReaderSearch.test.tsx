@@ -178,9 +178,9 @@ describe("SC-WEB-108: search in the Reader's view", () => {
     const second = { ...u.books[0], key: 'sequel', name: 'The Sequel', position: 'sequel', chapters: [], entities: { total: 0, byType: {} } }
     // The harness' one book is reached; a later one with nothing met isn't named.
     stubApi({
-      override: (path) =>
+      override: (path, params) =>
         path === '/api/hierarchy'
-          ? { ...hierarchy, universe: { ...u, books: [...u.books, second] } }
+          ? { ...hierarchy, universe: { ...u, books: params.get('readers') === 'true' ? u.books : [...u.books, second] } }
           : path === '/api/search'
             ? ({ version: 1, query: 'blood', count: 0, truncated: false, hits: [] } satisfies SearchResult)
             : undefined,

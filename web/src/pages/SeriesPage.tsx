@@ -3,7 +3,8 @@ import { ChapterDefaultsSection } from '../components/ChapterFields'
 import { NewContainerButton } from '../components/NewContainer'
 import { NewMenu } from '../components/NewEntity'
 import { ErrorState, Loading } from '../components/States'
-import { useDocumentTitle, usePosition } from '../hooks'
+import { useDocumentTitle } from '../hooks'
+import { NotReached } from './BookPage'
 import { BookList, Counts, useHierarchyInView } from './UniversePage'
 
 const route = getRouteApi('/u/$universe/s/$series')
@@ -11,7 +12,6 @@ const route = getRouteApi('/u/$universe/s/$series')
 /** A series: its books in series order. */
 export function SeriesPage() {
   const { universe, series } = route.useParams()
-  const { setReaders } = usePosition()
   const hierarchy = useHierarchyInView(universe)
   const failed = hierarchy.failed
   useDocumentTitle(hierarchy.universe?.series.find((x) => x.key === series)?.name)
@@ -27,19 +27,8 @@ export function SeriesPage() {
   const u = hierarchy.universe
   const s = u.series.find((x) => x.key === series)
   if (!s && hierarchy.readers) {
-    // It may well exist: the Reader's view doesn't say, or name it.
-    return (
-      <div className="page-body">
-        <div className="banner" role="status">
-          <p>Readers haven't got to this series by this point in the story.</p>
-          <p className="banner-actions">
-            <button type="button" onClick={() => setReaders(false)}>
-              Author's view
-            </button>
-          </p>
-        </div>
-      </div>
-    )
+    return <NotReached what="series" />
+
   }
 
   if (!s) {

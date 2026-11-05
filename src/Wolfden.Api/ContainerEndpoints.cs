@@ -65,6 +65,10 @@ namespace Wolfden.Api;
 /// and an edit of a series' or universe's defaults that would change a final
 /// book's chapters are refused, as for the MCP tools.
 /// </para>
+/// <para>
+/// With <c>asOf</c> and <c>readers=true</c>, <c>/api/book/chapter-fields</c> is the Reader's
+/// view (<see cref="ReadersChapters"/>): only what readers there know, with nothing to edit by.
+/// </para>
 /// </remarks>
 public static class ContainerEndpoints
 {
@@ -74,8 +78,8 @@ public static class ContainerEndpoints
     /// <summary>The paths under <c>/api</c> that answer POST.</summary>
     public static readonly IReadOnlyList<string> PostPaths = ["series/create", "book/create", "chapter/create", "chapter/edit", "chapter-defaults/edit"];
 
-    /// <summary>Maps the endpoints onto <paramref name="api"/>, writing through <paramref name="tools"/>, the server's one set of write tools.</summary>
-    internal static void Map(RouteGroupBuilder api, DenTools tools)
+    /// <summary>Maps the endpoints onto <paramref name="api"/>, writing through <paramref name="tools"/>, the server's one set of write tools, and with <paramref name="reader"/> for the Reader's view.</summary>
+    internal static void Map(RouteGroupBuilder api, DenTools tools, DenReader reader)
     {
         api.MapGet("/works", (HttpContext c) => ReadEndpoints.Answer(c, ["universe", "series"], q => tools.GetWorks(q.Text("universe"), q.Text("series"))));
         api.MapPost("/series/create", (Func<HttpContext, Task<IResult>>)(c => Create(c, tools, ["name", "universe", "after", "first", "expectedHash"], body =>
@@ -97,8 +101,16 @@ public static class ContainerEndpoints
                 body.OptionalText("universe"),
                 body.OptionalJson("fields")))));
 
-        api.MapGet("/book/chapter-fields", (HttpContext c) => ReadEndpoints.Answer(
-            c, ["book", "universe"], q => tools.GetBookChapterFields(q.Text("book") ?? "", q.Text("universe"))));
+        api.MapGet("/book/chapter-fields", (HttpContext c) => ReadEndpoints.Answer<object>(
+            c,
+            ["book", "universe", "asOf", "readers"],
+            q =>
+            {
+                ReadEndpoints.CheckReadersOnly(q.Position("asOf"), q.Bool("readers"));
+                return q.Bool("readers")
+                    ? ReadEndpoints.AsReaders(q, () => ReadersChapters.Get(reader, tools, q.Text("book") ?? "", q.Text("universe"), q.Position("asOf")!))
+                    : tools.GetBookChapterFields(q.Text("book") ?? "", q.Text("universe"));
+            }));
         api.MapPost("/chapter/edit", (Func<HttpContext, Task<IResult>>)(c => Create(
             c,
             tools,

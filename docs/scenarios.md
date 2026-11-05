@@ -4706,6 +4706,7 @@ bookmarked at chapter 3.
 - Each position's answers are cached on their own: while a new position
   loads, the page says so rather than showing the last position's
   page, and going back to everything shows its page at once.
+- In the Reader's view, the bar has nothing ahead in it (SC-WEB-111).
 
 Spec: design.md §9 (#26, maintainer decision). Covered by:
 `PositionBar.test.tsx`, `Navigation.test.tsx` (web).
@@ -4744,6 +4745,14 @@ Spec: design.md §9 (#24, #26, maintainer decision). Covered by:
   note the reader hasn't met is plain text that doesn't say what it
   reaches. "Linked from" groups backlinks by the note or book they're
   in, and says where each one is.
+- A link in a table cell, written `[[note\|label]]`, is a link like any other, in every
+  view, though the table isn't rendered and its pipes show.
+- In the Reader's view, a link in a heading, a mapping's key, an image's alt text, or
+  the words of a `[text](url)` shows only what it shows, as plain words. So does a
+  labelled link split over two lines, however it's split. A label with formatting in it,
+  `[[a-key|the *Ardent*]]`, reads "the *Ardent*" in italics, and never shows its target,
+  in bold, HTML, or code too. A link with a heading names it only if readers
+  know that section, so `[[a-note#Later heading]]` shows `A note`.
 
 Spec: design.md §9 (#24). Covered by: `Browse.test.tsx`,
 `Navigation.test.tsx` (web).
@@ -4767,6 +4776,8 @@ The writer opens Dracula chapter 5 from the book's page.
   Morris), tagged in the Author's view as of an earlier position (SC-WEB-104),
   and not named in the Reader's view (SC-WEB-105). A button reads
   the den as of this chapter. A chapter the book doesn't have says so.
+- At a position, the Author's view has all of it (SC-WEB-109), and the Reader's view
+  only what's reached (SC-WEB-110).
 
 Spec: design.md §9 (#24). Covered by: `Navigation.test.tsx` (web).
 
@@ -6037,13 +6048,14 @@ Halden Pike enters at the start of Ash.
   the chapters before and after it.
 - Renaming Ilse Tarrow's note changes every heading that links her, with
   no change to `book.md`.
-- Reading as of `ember:2`, chapter 2 is "halden-pike & the Commander —
+- In the Reader's view as of `ember:2`, chapter 2 is "halden-pike & the Commander —
   Kessan Reach": the reader hasn't met Pike, so his link shows as
-  written. The Long Watch, after the position, shows its title alone,
-  and an untitled chapter after it is "Chapter 3". As of
-  `ember:prologue`, Kessan Reach (met at chapter 1) shows as written.
+  written. The Long Watch, after the position, isn't there (SC-WEB-110). As of
+  `ember:prologue`, Kessan Reach (met at chapter 1) shows as written. The Author's
+  view has every heading in full (SC-WEB-109).
 - `/api/hierarchy` gives each chapter's `heading`, as of `asOf` when
-  given; `/api/book/chapters` gives the full one.
+  given, where a chapter after it shows its title alone, and an untitled one is
+  "Chapter 3"; `/api/book/chapters` gives the full one.
 - Without `chapter_heading`, or with `chapter_heading: []` nearer the
   book, chapters show their titles as before. The nearest container's
   list wins, whole.
@@ -6605,10 +6617,13 @@ A page asks `/api/entity` with `asOf` and `readers=true` (#300).
 - A note the reader hasn't met is `inView: false`, and nothing of it.
 - A link or backlink in text the filter takes for a comment is gone too, and a
   comment in a heading isn't in a backlink's section name or a link's section.
+- The one difference from `get_entity`: a heading with a link in it has the words the
+  link shows, in `name`, `headingPath`, and a backlink's section. A link's `heading` and
+  `section` are null unless readers know that section of a note they've met.
 - A plain `asOf` still has the `until`s and later values, for the writer.
 - `readers=true` without `asOf`, or with `marksAt`, is `bad_argument`, as is any
   value but true or false. `readers=false` is the same as leaving it out.
-- `/api/canon`, `/api/search`, and `/api/entities` don't take it.
+- `/api/canon` doesn't take it.
 - `Wolfden.Api` doesn't reference `Wolfden.Mcp`, as the two share `AsOfReads` from
   `Wolfden.Index`, and `McpStaysStrictTests` didn't change for it.
 
@@ -6660,21 +6675,22 @@ Spec: F-VIEW-4, F-VIEW-5, design.md §9 (#300). Covered by: `web/src/ReaderViews
   start opens the Author's view, and nothing is remembered.
 - **Show everything** ends it, and `?readers=1` with no position means nothing.
 - The Reader's view of a note's page shows only what readers know (SC-WEB-101), with
-  no tags, and has no way to edit: no Edit buttons, and it says so. It also says
-  search, book and chapter pages, and the Book and Chapter menus aren't part of it yet, as every
-  other page in that view does.
-- The ⚠ list's **Edit file** leaves the Reader's view behind and keeps the position,
-  since it's the whole source, for the writer.
+  no tags, and has no way to edit: no Edit buttons, and it says so.
+- In the Reader's view, the top bar has no checkpoint indicator and doesn't ask for one.
+  `⚠ 1 problem` is only a count (`/api/den/errors` with `countOnly=true`), and pressing it
+  goes to the Author's view at the same position, where the list is. Its **Edit file**
+  keeps the position, as it's the whole source, for the writer.
 - A note readers haven't met there has only the banner (SC-WEB-13), and the History
   tab fetches no saved version, since one can hold anything. It says so.
 - With an unsaved edit open, switching asks first, as moving the position does. That's
   a note's edit, and a chapter default's on a universe's or series' page, which also
-  asks before moving the position. A book's page keeps its form through a switch for
-  now, and asks before moving the position. A chapter's own fields on its page stay
-  open through both, so only going to another page asks.
+  asks before moving the position. On a book's or a chapter's page, a form stays
+  through a new position, and switching to the Reader's view, which has no form, asks.
 
 Spec: design.md §9 (#300). Covered by: `web/src/ReaderViews.test.tsx`,
-`web/src/History.test.tsx`, `web/src/Browse.test.tsx`, `web/src/Editing.test.tsx`.
+`web/src/History.test.tsx`, `web/src/Browse.test.tsx`, `web/src/Editing.test.tsx`,
+`web/src/LeaveChapterDefaults.test.tsx`, `web/src/DenErrors.test.tsx`,
+`web/src/ReaderBookPages.test.tsx`, `ReadersBookPagesTests.TheCountOfTheDensProblemsNamesNoFile`.
 
 ### SC-WEB-104. In the Author's view, a list has everything, what readers have met first
 
@@ -6717,14 +6733,16 @@ I'm at Dracula chapter 3 with `?readers=1`.
   got to a book in this series". A series readers haven't got to otherwise says so,
   without its name.
 - A chapter's "Enters the story here" lists what they've met, and otherwise says
-  "Readers have met no notes that enter the story here", at a later chapter too.
+  "Readers have met no notes that enter the story here". A later chapter has no page
+  (SC-WEB-110).
 - There's no tag, legend, or New button, and the universe's and series' pages have no
   chapter defaults.
 - Following a note from a list and coming back keeps `readers=1`.
 - A note they haven't met still has its banner (SC-WEB-13).
 
 Spec: format.md §9.5, design.md §9 (#300). Covered by: `web/src/ReaderLists.test.tsx`,
-`MarkedListTests.AtEveryPositionTheReadersListAndWhatsMetAreWhatCanonAsOfHolds`.
+`MarkedListTests.AtEveryPositionTheReadersListAndWhatsMetAreWhatCanonAsOfHolds`,
+`ReadersBookPagesTests.TheTreeKeepsOnlyWhatsReachedAndWhereAMetNoteIsFiled`.
 
 ### SC-WEB-106. In the Reader's view, search finds only what a reader can
 
@@ -6752,7 +6770,10 @@ I search at Ember chapter 3 with `?readers=1`, and the page asks `/api/search` w
   its target as written, and that note's name finds nothing until they meet it.
 - A note's aliases don't match, its own or a linked note's, since the page doesn't list
   them. A type's default isn't searched, as with no position, though the page shows it.
-- A table's cells and a heading are what the page shows raw (design.md §9).
+- A link in a heading, a table cell, an alt text, or a mapping's key is found by what
+  it shows, and one split over two lines by its label, as on the page. A link with a
+  heading finds that heading only if readers know that section. A word in a note's
+  markup, such as a URL, is the one difference left (#332, design.md §9).
 - Later notes can't crowd out met ones, however many match.
 - MCP's `search` has no position and doesn't change (SC-MCP-47).
 
@@ -6802,3 +6823,76 @@ Spec: design.md §9 (#300, #302). Covered by: `web/src/ReaderSearch.test.tsx`, `
   `readers=false` is the same as leaving it out. `asOf` alone is unchanged.
 
 Spec: design.md §9 (#300). Covered by: `web/src/ReaderSearch.test.tsx`, `ReadersSearchTests`.
+
+### SC-WEB-109. In the Author's view, a book's and a chapter's pages have everything, tagged
+
+I'm at Dracula chapter 3 with no `readers`.
+
+- A book's page lists every chapter, with its heading and fields in full. Chapters 4, 5,
+  and Note are greyed and say `ahead of readers`, plain words with a tooltip saying
+  where readers reach it, and one line above the list explains them.
+- In a chapter readers have reached, a field's link to a note they haven't met is a
+  real link, followed by `enters at chapter 5`. A position field's later value says
+  `ahead of readers`. In a later chapter, the chapter's tag is enough.
+- A book's count of what's filed in it says `2 of 4` where readers haven't met them all.
+- A chapter's page has it all, and can be edited. A later one says `ahead of readers`
+  by its number, and so do prev and next beside a link to a later one.
+- A bare book's first chapter isn't later than the book (F-POS-7).
+- With no position, none of this shows, and the pages ask what they asked before.
+
+Spec: design.md §9 (#300). Covered by: `web/src/ReaderBookPages.test.tsx`,
+`web/src/ChapterFields.test.tsx`, `web/src/ChapterHeading.test.tsx`.
+
+### SC-WEB-110. In the Reader's view, a book's and a chapter's pages have only what's reached
+
+I'm at Dracula chapter 3 with `?readers=1`.
+
+- A book's page has chapters 1 to 3, with what holds in their fields. There's no
+  Freeze, New, Add chapter, or chapter defaults, and nothing asks for them.
+- A chapter's page has its fields to read, with no Edit, so no form or picker can offer
+  a later name. Prev and next stay within what's reached.
+- A later chapter or book says only "Readers haven't got to this chapter by this point in
+  the story", whether it exists or not, and the tab's title doesn't name it.
+- A chapter's fields follow a note's fields' rules: no position value later than the
+  position, a value the chapter doesn't set is inherited as usual, and each
+  link is what it shows. One to a note met is a link, by its key, with the words it
+  shows. One to a note not met is only those words, so `[[the-keeper|Marrowcove]]` shows
+  `Marrowcove`, and `[[Heronfell]]` shows `Heronfell`.
+- A reached chapter's heading follows its fields' rules, wherever it shows: the book's
+  list, the chapter's title, prev and next, and the tab. With `chapter_heading: [pov,
+  when, turns_at]`, a later `turns_at` and a link's later section aren't in it. A label
+  in a chapter's title is only the label.
+- A word readers don't know is in no answer these pages get, at every position:
+  `/api/hierarchy`, `/api/positions`, `/api/entities`, and `/api/book/chapter-fields` with
+  `asOf` and `readers=true`. Those pages ask for nothing else, but
+  `/api/den`, `/api/den/files`, and `/api/den/errors?countOnly=true`.
+- Each `readers=true` goes only with `asOf`, and `asOf` on `/api/positions` and
+  `/api/book/chapter-fields` goes only with `readers=true`: `bad_argument`. A book that
+  isn't in the tree readers know is refused in the same words, later or made-up, without
+  naming any others.
+
+Spec: design.md §9 (#300). Covered by: `ReadersBookPagesTests`, `web/src/ReaderBookPages.test.tsx`.
+
+### SC-WEB-111. In the Reader's view, the position bar doesn't say what's ahead
+
+I'm at Dracula chapter 3 with `?readers=1`.
+
+- There's no slider. The Book and Chapter menus list only what's reached, so no later
+  title, name, or count is there. It doesn't ask for the rest.
+- Pressing **›**, or picking **Next chapter** or **Next book** in a menu, asks for one
+  position (`/api/positions/next`), and goes there, keeping the Reader's view. Nothing
+  is asked until then.
+- At the end of the story, it says "No later chapter." or "No later book." when asked,
+  and stays.
+- **Pick a later point in the Author's view…** in a menu goes there, keeping the position,
+  and the menus' tooltip says why nothing's named.
+- **‹** and the menus go back, and at once nothing from where it was shows.
+- Moving forward, the bar stays while the new answer comes, and the pressed control keeps
+  focus, so a keyboard can press **›** again.
+- A position that can't be read, such as a stale bookmark, says only
+  `'ash:9' isn't a position in this story.` (`bad_position`), naming no book, on every
+  Reader's answer, and keeps **Show everything** and the switch. Without `readers`, the
+  message is as it was.
+
+Spec: design.md §9 (#300). Covered by: `web/src/ReaderBookPages.test.tsx`,
+`ReadersBookPagesTests.MovingForwardGivesOnlyTheOnePosition`.

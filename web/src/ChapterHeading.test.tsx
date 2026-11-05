@@ -35,7 +35,14 @@ function stubHeadings() {
     override: (path, params) => {
       if (path === '/api/hierarchy') {
         const at = params.get('asOf')
-        return at === 'dracula:1' ? withHeadings(AS_OF_1, at) : withHeadings(FULL, at)
+        if (params.get('readers') === 'true') {
+          // Only the chapters reached, and the rest aren't in the answer.
+          const known = withHeadings(AS_OF_1, at)
+          const [book] = known.universe.books
+          return { ...known, universe: { ...known.universe, books: [{ ...book, chapters: book.chapters.slice(0, 1) }] } }
+        }
+
+        return withHeadings(FULL, at)
       }
 
       return undefined
@@ -115,15 +122,15 @@ describe('SC-WEB-84: untitled chapters read the same everywhere', () => {
     expect(within(screen.getByRole('navigation', { name: 'Chapters' })).getByRole('link').textContent).toBe('‹ Chapter 5')
   })
 
-  it('as of an earlier position, a later chapter’s heading names nothing the position hides', async () => {
-    // As of dracula:1, chapter 2 has its title alone: prev and next and the tab show that, not the full heading.
+  it('in the Reader’s view, no next chapter past the position is named, nor is a later note in a heading', async () => {
     stubHeadings()
-    renderApp('/u/dracula/b/dracula/c/1?at=dracula:1')
+    renderApp('/u/dracula/b/dracula/c/1?at=dracula:1&readers=1')
 
     const nav = await screen.findByRole('navigation', { name: 'Chapters' })
-    await waitFor(() => expect(within(nav).getByRole('link', { name: `2. ${AS_OF_1[1]} ›` })).toBeTruthy())
+    expect(within(nav).queryByRole('link', { name: /›/ })).toBeNull()
     expect(document.body.textContent).not.toContain(FULL[1])
     expect(document.title).not.toContain(FULL[1])
+    expect(document.title).not.toContain('Bistritz')
   })
 })
 
@@ -138,14 +145,23 @@ describe('SC-WEB-77: chapter headings built from chapter fields', () => {
     expect(screen.getByText('Letters—Lucy and Mina')).toBeTruthy()
   })
 
-  it('as of a position, the book page shows the headings the API gives as of it', async () => {
+  it('in the Reader’s view, the book page shows the headings the API gives as of the position', async () => {
     const { calls } = stubHeadings()
-    renderApp('/u/dracula/b/dracula?at=dracula:1')
+    renderApp('/u/dracula/b/dracula?at=dracula:1&readers=1')
 
     expect(await screen.findByText(AS_OF_1[0])).toBeTruthy()
     expect(screen.queryByText(FULL[0])).toBeNull()
     expect(screen.queryByText(FULL[1])).toBeNull()
-    expect(calls).toContain('/api/hierarchy?universe=dracula&asOf=dracula%3A1')
+    expect(calls).toContain('/api/hierarchy?universe=dracula&asOf=dracula%3A1&readers=true')
+    expect(calls).not.toContain('/api/hierarchy?universe=dracula')
+  })
+
+  it('in the Author’s view at a position, the book page has every heading in full', async () => {
+    stubHeadings()
+    renderApp('/u/dracula/b/dracula?at=dracula:1')
+
+    expect(await screen.findByText(FULL[0])).toBeTruthy()
+    expect(screen.getByText(FULL[1])).toBeTruthy()
   })
 
   it('the chapter page heads itself with its heading, and its neighbours with theirs', async () => {
@@ -158,12 +174,12 @@ describe('SC-WEB-77: chapter headings built from chapter fields', () => {
     await waitFor(() => expect(document.title).toContain(FULL[0]))
   })
 
-  it('while the headings as of a position are on their way, or if they fail, the chapter page shows titles', async () => {
+  it('in the Reader’s view, the chapter page shows nothing until it knows what readers know, and nothing if that fails', async () => {
     let release: () => void = () => {}
     const pending = new Promise<void>((resolve) => {
       release = resolve
     })
-    stubApi({
+    const { calls } = stubApi({
       override: async (path, params) => {
         if (path === '/api/hierarchy') {
           if (params.get('asOf') === 'dracula:1') {
@@ -177,29 +193,24 @@ describe('SC-WEB-77: chapter headings built from chapter fields', () => {
         return undefined
       },
     })
-    renderApp('/u/dracula/b/dracula/c/1?at=dracula:1')
+    renderApp('/u/dracula/b/dracula/c/1?at=dracula:1&readers=1')
 
-    const title = "Jonathan Harker's Journal"
-    expect((await screen.findByRole('heading', { level: 1 })).textContent).toBe(title)
-    const nav = screen.getByRole('navigation', { name: 'Chapters' })
-    expect(within(nav).getByRole('link', { name: `2. ${title} ›` })).toBeTruthy()
-    expect(screen.queryByText(FULL[0])).toBeNull()
-
+    await screen.findByText(/Loading the chapter/)
+    expect(document.body.textContent).not.toContain("Jonathan Harker's Journal")
     release()
-    await new Promise((resolve) => setTimeout(resolve, 50))
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(title)
-    expect(within(nav).getByRole('link', { name: `2. ${title} ›` })).toBeTruthy()
+
+    expect(await within(await screen.findByRole('main')).findByText(/No such position/)).toBeTruthy()
     expect(document.body.textContent).not.toContain('Bistritz')
+    expect(calls.filter((c) => c.startsWith('/api/hierarchy')).every((c) => c.includes('readers=true'))).toBe(true)
   })
 
-  it('as of a position, the chapter page names only what the reader has met', async () => {
+  it('in the Reader’s view, the chapter page names only what the reader has met', async () => {
     stubHeadings()
-    renderApp('/u/dracula/b/dracula/c/1?at=dracula:1')
+    renderApp('/u/dracula/b/dracula/c/1?at=dracula:1&readers=1')
 
     expect(await screen.findByRole('heading', { level: 1, name: AS_OF_1[0] })).toBeTruthy()
-    const nav = screen.getByRole('navigation', { name: 'Chapters' })
-    expect(within(nav).getByRole('link', { name: `2. ${AS_OF_1[1]} ›` })).toBeTruthy()
     expect(screen.queryByText(FULL[0])).toBeNull()
+    await waitFor(() => expect(document.title).toContain(AS_OF_1[0]))
     expect(document.title).not.toContain('Bistritz')
   })
 })

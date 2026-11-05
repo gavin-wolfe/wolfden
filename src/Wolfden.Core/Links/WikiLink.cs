@@ -64,22 +64,38 @@ public static partial class LinkSyntax
     /// for it as written. If that's null, as for a link the index has no record of, a
     /// labelled link is still only its label, and any other stays as written. For
     /// markdown, a <c>[[</c> in code isn't a link, so it stays; otherwise, as for a
-    /// frontmatter string, every one counts.
+    /// frontmatter string, every one counts. A labelled link split over two lines
+    /// isn't a link (F-LINK-1), but it reads as one, so it's only its label too, and so
+    /// is one with code in its label: it's in code only if its <c>[[</c> is.
     /// </summary>
     public static string WithLinksShown(string text, bool markdown, Func<string, string?> shown)
     {
         ArgumentNullException.ThrowIfNull(text);
         ArgumentNullException.ThrowIfNull(shown);
         var excluded = markdown ? BodyLinkScanner.CodeAndComments(text) : null;
+        var replaced = new List<(int Offset, int Length, string Text)>();
+        foreach (var link in Scan(text, 0, text.Length, null))
+        {
+            if (!link.IsEmpty && excluded?.Overlaps(link.Offset, link.Offset + 2) != true && (shown(text.Substring(link.Offset, link.Length)) ?? link.Label) is { } replacement)
+            {
+                replaced.Add((link.Offset, link.Length, replacement));
+            }
+        }
+
+        foreach (Match split in SplitLinkPattern().Matches(text))
+        {
+            if (excluded?.Overlaps(split.Index, split.Index + 2) != true)
+            {
+                replaced.Add((split.Index, split.Length, split.Groups["l"].Value.Trim()));
+            }
+        }
+
         var result = new System.Text.StringBuilder(text.Length);
         var at = 0;
-        foreach (var link in Scan(text, 0, text.Length, excluded))
+        foreach (var (offset, length, replacement) in replaced.OrderBy(r => r.Offset))
         {
-            if (!link.IsEmpty && (shown(text.Substring(link.Offset, link.Length)) ?? link.Label) is { } replacement)
-            {
-                result.Append(text, at, link.Offset - at).Append(replacement);
-                at = link.Offset + link.Length;
-            }
+            result.Append(text, at, offset - at).Append(replacement);
+            at = offset + length;
         }
 
         return result.Append(text, at, text.Length - at).ToString();
@@ -232,6 +248,15 @@ public static partial class LinkSyntax
         """\[\[(?<t>(?:[^\[\]|#\r\n\\]|\\(?!\|))*)(?:\#(?<h>(?:[^\[\]|#\r\n\\]|\\(?!\|))+))?(?:\\?\|(?<l>[^\[\]\r\n]+))?\]\]""",
         RegexOptions.CultureInvariant)]
     private static partial Regex LinkPattern();
+
+    /// <summary>
+    /// What reads as a labelled link with a line break in it, which <see cref="LinkPattern"/>
+    /// doesn't take: the break is in the target or heading, or in the label.
+    /// </summary>
+    [GeneratedRegex(
+        """\[\[(?:[^\[\]|\r\n]*[\r\n][^\[\]|]*\\?\||[^\[\]|\r\n]*\\?\|(?=[^\[\]\r\n]*[\r\n]))(?<l>[^\[\]]+)\]\]""",
+        RegexOptions.CultureInvariant)]
+    private static partial Regex SplitLinkPattern();
 }
 
 /// <summary>

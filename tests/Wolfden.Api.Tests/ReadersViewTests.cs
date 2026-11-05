@@ -233,14 +233,27 @@ public sealed class ReadersViewTests : IDisposable
     [Theory]
     [Trait("Scenario", "SC-WEB-101")]
     [InlineData("/api/canon?universe=starfall&asOf=ember:1&readers=true")]
-    [InlineData("/api/entities?universe=starfall&asOf=ember:1&readers=true")]
-    public async Task CanonAndListsDontTakeReaders(string path)
+    [InlineData("/api/entities?universe=starfall&readers=true")]
+    [InlineData("/api/entities?universe=starfall&marksAt=ember:1&readers=true")]
+    public async Task CanonDoesntTakeReadersAndAListTakesItOnlyWithAsOf(string path)
     {
         await using var server = await Start();
 
         var error = await server.GetJsonAsync(path, HttpStatusCode.BadRequest);
 
         Assert.Equal("bad_argument", error.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-110")]
+    public async Task AListWithReadersIsTheListWithAsOf()
+    {
+        await using var server = await Start();
+
+        var plain = await server.GetJsonAsync("/api/entities?universe=starfall&asOf=ember:1&limit=1000", HttpStatusCode.OK);
+        var readers = await server.GetJsonAsync("/api/entities?universe=starfall&asOf=ember:1&readers=true&limit=1000", HttpStatusCode.OK);
+
+        Assert.Equal(plain.GetRawText(), readers.GetRawText());
     }
 
     [Fact]

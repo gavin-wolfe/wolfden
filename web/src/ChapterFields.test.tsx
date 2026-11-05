@@ -442,7 +442,7 @@ describe('SC-WEB-76: chapter field edits are guarded', () => {
     expect((await screen.findByText(/was already taken out of the file/)).textContent).toContain('pov was already taken out of the file by something else meanwhile')
   })
 
-  it('as of a position, later chapters keep their fields to themselves, and links to notes not met yet don’t say what they reach', async () => {
+  it('SC-WEB-109: in the Author’s view at a position, every chapter has its fields, and a link to a note readers haven’t met has its tag', async () => {
     const quincey = { text: '[[quincey-harker]]', target: 'quincey-harker', label: null, outcome: 'resolved' as const, entity: 'E-QUINCEY-H', name: 'Quincey Harker', type: 'character', problem: null }
     const withQuincey = () => {
       const b = bookChapterFields()
@@ -451,30 +451,27 @@ describe('SC-WEB-76: chapter field edits are guarded', () => {
     }
     stubFields({ book: withQuincey })
     renderApp('/u/dracula/b/dracula?at=dracula:1')
-    await waitFor(() => expect(document.querySelector('ol.chapters li .chapter-field-summary')).not.toBeNull())
-    const items = [...document.querySelectorAll<HTMLElement>('ol.chapters li')]
+    await waitFor(() => expect(document.querySelector('ol.chapters li .chapter-field-summary .ahead-of-readers')).not.toBeNull())
+    const items = [...document.querySelectorAll<HTMLElement>('ol.chapters li')].filter((li) => li.parentElement!.matches('ol.chapters'))
     const first = items[0].querySelector<HTMLElement>('.chapter-field-summary')!
     expect(within(first).getByRole('link', { name: 'Jonathan Harker' })).toBeTruthy()
-    expect(within(first).queryByRole('link', { name: /Quincey/ })).toBeNull()
-    expect(first.textContent).not.toContain('Quincey Harker')
-    // Chapters after the position show no fields.
-    expect(items.slice(1).every((li) => li.querySelector('.chapter-field-summary') === null)).toBe(true)
+    expect(within(first).getByRole('link', { name: 'Quincey Harker' })).toBeTruthy()
+    const tag = first.querySelector('.ahead-of-readers')!
+    expect(tag.tagName).toBe('SPAN')
+    expect(tag.textContent).toBe('enters at “Note”')
+    // Chapters after the position show their fields, and the chapter's own tag says the rest.
+    expect(items.slice(1).every((li) => li.querySelector(':scope > .chapter-field-summary') !== null)).toBe(true)
+    expect(items.slice(1).every((li) => li.querySelector(':scope > .ahead-of-readers')?.textContent === 'ahead of readers')).toBe(true)
+    expect(items[0].querySelector(':scope > .ahead-of-readers')).toBeNull()
   })
 
-  it('as of a position, no chapter shows its fields while the story’s positions are unknown', async () => {
-    const api = stubApi({
+  it('as of a position, the book’s page says so if the story’s positions can’t be read, rather than leave out tags', async () => {
+    stubApi({
       override: (path) =>
         path === '/api/positions' ? new Response(JSON.stringify({ code: 'internal', message: 'The positions failed.' }), { status: 500 }) : undefined,
     })
     renderApp('/u/dracula/b/dracula?at=dracula:1')
-    await screen.findByRole('heading', { name: 'Dracula', level: 1 })
-    // The fields and what the reader has met have arrived; only the positions are missing.
-    await waitFor(() => expect(api.calls.some((c) => c.startsWith('/api/book/chapter-fields'))).toBe(true))
-    await waitFor(() => expect(api.calls.some((c) => c.startsWith('/api/entities') && c.includes('asOf='))).toBe(true))
-    await waitFor(() => expect(api.calls.some((c) => c.startsWith('/api/positions'))).toBe(true))
-    await new Promise((resolve) => setTimeout(resolve, 50))
-    expect(document.querySelectorAll('ol.chapters li').length).toBeGreaterThan(0)
-    expect(document.querySelector('.chapter-field-summary')).toBeNull()
+    expect(await within(await screen.findByRole('main')).findByText(/The positions failed/)).toBeTruthy()
   })
 
   it('a chapter written as a bare key says how to give it fields', async () => {

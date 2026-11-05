@@ -94,7 +94,7 @@ public static partial class WriteEndpoints
         CreateEndpoints.Map(api, tools);
 
         // New series and books (#213), through the same tools.
-        ContainerEndpoints.Map(api, tools);
+        ContainerEndpoints.Map(api, tools, ReadEndpoints.NewReader(options));
 
         // Images added from the editor (#187), through the same tools, so they take turns with the other writes and land in the ledger.
         ImageEndpoints.Map(api, tools);

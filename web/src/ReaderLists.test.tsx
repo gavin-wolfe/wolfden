@@ -1,10 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
-import type { BookNode, ChapterNode, MarkedEntity, PositionView, UniverseNode } from './api'
+import type { MarkedEntity } from './api'
 import { entities, hierarchy, renderApp, stubApi } from './test/harness'
-import { MARKS_LEGEND, READERS_VIEW_REACH } from './readerWords'
-import { readersTree } from './story'
+import { MARKS_LEGEND } from './readerWords'
 
 afterEach(() => {
   cleanup()
@@ -158,7 +157,7 @@ describe('SC-WEB-104: in the Author’s view, a list has everything, what reader
 
   it('has no tags on a chapter’s page once readers have got there', async () => {
     stubApi()
-    renderApp('/u/dracula/b/dracula/c/5?at=dracula:5')
+    renderApp('/u/dracula/b/dracula/c/5?at=dracula:note')
     const main = await screen.findByRole('main')
 
     await within(main).findByRole('link', { name: 'Lucy Westenra' })
@@ -237,7 +236,7 @@ describe('SC-WEB-105: in the Reader’s view, a list has only what readers know'
 
   it('says only what readers have met enters at a chapter’s page, naming nothing later', async () => {
     stubApi()
-    renderApp('/u/dracula/b/dracula/c/5?at=dracula:3&readers=1')
+    renderApp('/u/dracula/b/dracula/c/4?at=dracula:4&readers=1')
     const main = await screen.findByRole('main')
 
     expect(await within(main).findByText('Readers have met no notes that enter the story here.')).toBeTruthy()
@@ -254,7 +253,7 @@ describe('SC-WEB-105: in the Reader’s view, a list has only what readers know'
   })
 
   it('doesn’t say a later series has no books, or name what it’s kept for', async () => {
-    const later = { key: 'later', name: 'The Later Saga', id: null, path: 'later', entities: { total: 1, byType: { note: 1 } }, books: [{ ...hierarchy.universe.books[0], key: 'farbook', name: 'Far Book', position: 'farbook', entities: { total: 0, byType: {} } }] }
+    const later = { key: 'later', name: 'The Later Saga', id: null, path: 'later', entities: { total: 1, byType: { note: 1 } }, books: [] }
     const answer = { ...hierarchy, universe: { ...hierarchy.universe, series: [later] } }
     stubApi({ override: (path): unknown => (path === '/api/hierarchy' ? answer : undefined) })
     renderApp('/u/dracula?at=dracula:3&readers=1')
@@ -269,22 +268,6 @@ describe('SC-WEB-105: in the Reader’s view, a list has only what readers know'
     const page = await screen.findByRole('main')
     expect(await within(page).findByText("Readers haven't got to a book in this series.")).toBeTruthy()
     expect(within(page).queryByText('This series has no books yet.')).toBeNull()
-  })
-
-  it('says what it doesn’t reach on every page, once', async () => {
-    stubApi()
-    renderApp('/u/dracula?at=dracula:3&readers=1')
-    expect(await screen.findAllByText(READERS_VIEW_REACH)).toHaveLength(1)
-    cleanup()
-
-    renderApp('/u/dracula/e/E-MINA?at=dracula:3&readers=1')
-    await screen.findByRole('heading', { level: 1, name: 'Mina Harker' })
-    expect(screen.getAllByText(READERS_VIEW_REACH)).toHaveLength(1)
-    cleanup()
-
-    renderApp('/u/dracula?at=dracula:3')
-    await screen.findByRole('group', { name: 'Whose view' })
-    expect(screen.queryByText(READERS_VIEW_REACH)).toBeNull()
   })
 
   it('keeps the banner for a note readers haven’t met, asking for the list only then', async () => {
@@ -302,61 +285,5 @@ describe('SC-WEB-105: in the Reader’s view, a list has only what readers know'
     await screen.findByRole('heading', { level: 1, name: 'Mina Harker' })
 
     expect(calls).not.toContain('/api/entities?universe=dracula&limit=1000')
-  })
-})
-
-describe('SC-WEB-105: the tree readers know', () => {
-  const chapter = (book: string, key: number): ChapterNode => ({ key: String(key), number: key, title: `${book} ${key}`, position: `${book}:${key}`, heading: null })
-  const book = (key: string, chapters: number, total = 0): BookNode => ({
-    key,
-    name: key,
-    id: null,
-    path: key,
-    status: 'draft',
-    position: key,
-    entities: { total, byType: {} },
-    chapters: Array.from({ length: chapters }, (_, i) => chapter(key, i + 1)),
-  })
-  const place = (b: string, c: number): PositionView => ({ position: `${b}:${c}`, book: b, bookName: b, series: 'long', chapter: String(c), number: c, title: null })
-  const positions = [place('ember', 1), place('ember', 2), place('ash', 1), place('ash', 2)]
-  const universe = (ash: BookNode, empty = 0): UniverseNode => ({
-    key: 'u',
-    name: 'U',
-    id: null,
-    path: 'u',
-    entities: { total: 0, byType: {} },
-    series: [
-      { key: 'long', name: 'Long', id: null, path: 'long', entities: { total: 0, byType: {} }, books: [book('ember', 2), ash] },
-      { key: 'empty', name: 'Empty', id: null, path: 'empty', entities: { total: empty, byType: {} }, books: [] },
-    ],
-    books: [],
-  })
-
-  it('leaves out a later book and its chapters, and a series with nothing yet', () => {
-    const known = readersTree(universe(book('ash', 2)), 'ember:2', positions)
-
-    expect(known.series.map((s) => s.key)).toEqual(['long'])
-    expect(known.series[0].books.map((b) => b.key)).toEqual(['ember'])
-    expect(known.series[0].books[0].chapters.map((c) => c.key)).toEqual(['1', '2'])
-  })
-
-  it('cuts a book’s chapters at the position, and a bare book reaches its first chapter', () => {
-    expect(readersTree(universe(book('ash', 2)), 'ember:1', positions).series[0].books[0].chapters.map((c) => c.key)).toEqual(['1'])
-    const bare = readersTree(universe(book('ash', 2)), 'ash', positions).series[0].books
-    expect(bare.map((b) => b.key)).toEqual(['ember', 'ash'])
-    expect(bare[1].chapters.map((c) => c.key)).toEqual(['1'])
-  })
-
-  it('keeps a later book or a series with no books if a met note is filed there, with no later chapters', () => {
-    const known = readersTree(universe(book('ash', 2, 1), 1), 'ember:1', positions)
-
-    expect(known.series.map((s) => s.key)).toEqual(['long', 'empty'])
-    expect(known.series[0].books.map((b) => b.key)).toEqual(['ember', 'ash'])
-    expect(known.series[0].books[1].chapters).toEqual([])
-  })
-
-  it('fails closed where the positions aren’t known', () => {
-    expect(readersTree(universe(book('ash', 2)), 'ember:1', []).series).toEqual([])
-    expect(readersTree(universe(book('ash', 2)), 'nowhere', positions).series).toEqual([])
   })
 })

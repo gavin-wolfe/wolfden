@@ -48,6 +48,7 @@ internal static class EntityPages
             var containers = db.Containers.Where(c => c.UniverseId == record.UniverseId).ToList().ToDictionary(c => c.Id);
             var canon = canonView?.Entities.ToDictionary(e => e.Path, StringComparer.Ordinal);
             var noteMarks = marks?.Of(record);
+            var shown = readers ? new ReadersLinks(db, record.UniverseId, e => canon!.ContainsKey(e.Path), ReadersLinks.SectionsIn(canonView!)) : null;
 
             // The entity's own links, and every entity they reach or match.
             var links = db.Links.Where(l => l.SourceEntityId == record.Id).ToList().OrderBy(l => l.Line).ThenBy(l => l.Column).ToList();
@@ -63,14 +64,17 @@ internal static class EntityPages
                 var target = l.TargetKey is { } key ? targets.GetValueOrDefault(key) : null;
                 bool? inView = target is not null && canon is not null ? canon.ContainsKey(target.Path) : null;
                 var reached = inView == false ? null : target;
+
+                // A Reader's page names a section of another note only if readers know it, so a link doesn't give away a later heading.
+                var knownSection = readers && (reached is null || !canon![reached.Path].Sections.Any(s => s.Name == l.TargetSection)) ? null : l.TargetSection;
                 var all = Matches(l.MatchesJson).ToList();
                 var matches = l.MatchesJson is null
                     ? null
                     : all.Select(k => targets.GetValueOrDefault(k)).OfType<EntityRecord>()
                         .Where(e => canon is null || canon.ContainsKey(e.Path)).Select(Ref).ToList();
                 return new LinkView(
-                    l.Text, l.Target, l.Heading, l.Label, l.Line, l.Column, l.Outcome, reached is null ? null : Ref(reached),
-                    reached is null ? null : readers && l.TargetSection is { } aimed ? MarkdownComments.Strip(aimed) : l.TargetSection, matches, Problem(l, view.Universe, canon is not null, reader.PinnedUniverse is not null, matches, all.Count), inView);
+                    l.Text, l.Target, readers && knownSection is null ? null : l.Heading, l.Label, l.Line, l.Column, l.Outcome, reached is null ? null : Ref(reached),
+                    reached is null ? null : readers && knownSection is not null ? shown!.Text(reached.Id, knownSection) : knownSection, matches, Problem(l, view.Universe, canon is not null, reader.PinnedUniverse is not null, matches, all.Count), inView);
             }
 
             var bySection = links.Where(l => l.SourceSectionId is not null).ToLookup(l => sectionLines.GetValueOrDefault(l.SourceSectionId!.Value));
@@ -84,13 +88,15 @@ internal static class EntityPages
                     f.Kind == "default" ? [] : byEntry[(f.Name, f.Line)].Select(Link).ToList(),
                     noteMarks?.Field(f.Name, f.EntryIndex), noteMarks?.AheadValues(f.Name, f.EntryIndex), noteMarks?.UnplacedValues(f.Name, f.EntryIndex))).ToList(),
                 (view.Sections ?? []).Select(s => new PageSection(
-                    s.Name, s.Level, s.HeadingPath, s.Status, s.Pinned, s.From, s.Until, s.Line, s.Body, s.Bookkeeping,
-                    bySection[s.Line].Where(l => !readers || s.Name.Contains(l.Text, StringComparison.Ordinal) || s.Body.Contains(l.Text, StringComparison.Ordinal)).Select(Link).ToList(), s.LeftOut, noteMarks?.Section(s.Line))).ToList(),
+                    shown?.Text(record.Id, s.Name) ?? s.Name, s.Level, shown is null ? s.HeadingPath : s.HeadingPath.Select(h => shown.Text(record.Id, h)).ToList(), s.Status, s.Pinned, s.From, s.Until, s.Line, s.Body, s.Bookkeeping,
+
+                    // A Reader's page has a heading's links as the plain words they show, so it has only those in the text to match.
+                    bySection[s.Line].Where(l => !readers || s.Body.Contains(l.Text, StringComparison.Ordinal)).Select(Link).ToList(), s.LeftOut, noteMarks?.Section(s.Line))).ToList(),
                 view.Hash,
                 Chain(containers, record.ScopeId),
                 Entry(record, containers),
                 links.Where(l => l.Site == "entity_lead" && (!readers || (view.Lead ?? "").Contains(l.Text, StringComparison.Ordinal))).Select(Link).ToList(),
-                Backlinks(index, record, containers, canon, asOf is null ? null : index.PointOf(view.Universe, asOf), marks, readers),
+                Backlinks(index, record, containers, canon, asOf is null ? null : index.PointOf(view.Universe, asOf), marks, shown),
                 Frozen(record, containers),
                 noteMarks?.Note);
             return new EntityPageResult(ReadEndpoints.ResultVersion, found.View, found.Position, found.InView, found.Note, page, marksAt);
@@ -144,14 +150,15 @@ internal static class EntityPages
     /// value of an entity in the view that the view shows, or in a container
     /// file or outline at or before the position, in canon text. With
     /// <paramref name="marks"/>, all of them, each marked as what holds it is.
-    /// With <paramref name="readers"/>, not one in text the Reader's view
+    /// With <paramref name="shown"/>, for the Reader's view, not one in text it
     /// leaves out as a comment (format.md F-VIEW-6), which reads comments more
     /// widely than links do.
     /// </summary>
     private static List<BacklinkView> Backlinks(
         DenIndex index, EntityRecord entity, Dictionary<int, ContainerRecord> containers, Dictionary<string, CanonEntity>? canon, long? point,
-        ReaderMarks? marks, bool readers)
+        ReaderMarks? marks, ReadersLinks? shown)
     {
+        var readers = shown is not null;
         var db = index.Context;
         var links = index.Backlinks(entity.Key).Where(l => l.UniverseId == entity.UniverseId).ToList();
         var sourceIds = links.Select(l => l.SourceEntityId).OfType<int>().Distinct().ToList();
@@ -229,8 +236,8 @@ internal static class EntityPages
                 l.SourceEntityId is { } id ? Ref(sources[id]) : null,
                 l.SourceEntityId is null ? Container(containers[l.ScopeId]) : null,
                 l.Site, l.Path, l.Line, l.Column, l.Text, l.Field,
-                // The index keeps a heading's name as written, and a comment in one is part of it (F-SEC-3, F-VIEW-6).
-                l.SourceSectionId is { } s ? (readers ? MarkdownComments.Strip(sections[s].Name) : sections[s].Name) : null,
+                // The index keeps a heading's name as written, and a comment or a link in one is part of it (F-SEC-3, F-VIEW-6).
+                l.SourceSectionId is { } s ? (shown is not null ? shown.Text(l.SourceEntityId!.Value, sections[s].Name) : sections[s].Name) : null,
                 l.ChapterId is { } c ? $"{containers[chapters[c].BookId].Key}:{chapters[c].Key}" : null,
                 l.OutlineRow, l.Status, l.IsBookkeeping, Mark(l), l.SourceSectionId is { } held && sections[held].LeftOutJson is not null ? true : null))
             .ToList();

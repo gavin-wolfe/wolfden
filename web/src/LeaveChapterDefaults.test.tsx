@@ -66,20 +66,21 @@ describe('SC-WEB-103: an open chapter default asks before it’s lost', () => {
     expect(atOf(history)).toBe('dracula:3')
   })
 
-  it('on a book’s page, the form stays through a view it’s in too, and a new position asks', async () => {
+  it('on a book’s page, the form stays through a new position, and the Reader’s view, which has none, asks', async () => {
     stubApi()
     const { history } = renderApp('/u/dracula/b/dracula?at=dracula:3')
     const main = await screen.findByRole('main')
     const form = await editADefault((await within(main).findByRole('heading', { name: 'Chapter defaults' })).closest('section'))
 
-    fireEvent.click(await screen.findByRole('button', { name: "Reader's view" }))
-    await waitFor(() => expect(readersIn(history)).toBe('1'))
+    fireEvent.keyDown(screen.getByRole('slider', { name: 'Story position' }), { key: 'ArrowRight' })
+    await waitFor(() => expect(atOf(history)).toBe('dracula:4'))
     expect(screen.queryByRole('alertdialog')).toBeNull()
     expect(form.isConnected).toBe(true)
 
-    fireEvent.keyDown(screen.getByRole('slider', { name: 'Story position' }), { key: 'ArrowRight' })
+    fireEvent.click(await screen.findByRole('button', { name: "Reader's view" }))
     await prompt()
-    expect(atOf(history)).toBe('dracula:3')
+    expect(readersIn(history)).toBeNull()
+    expect(form.isConnected).toBe(true)
   })
 
   it('following a link asks first too', async () => {
@@ -108,17 +109,20 @@ describe('SC-WEB-103: an open chapter default asks before it’s lost', () => {
     expect(screen.queryByRole('alertdialog')).toBeNull()
   })
 
-  it('on a chapter’s page, the form stays through a new position or view, and only another page asks', async () => {
+  it('on a chapter’s page, the form stays through a new position, and the Reader’s view or another page asks', async () => {
     stubApi()
     const { history } = renderApp('/u/dracula/b/dracula/c/5?at=dracula:3')
     const form = await editADefault(null)
 
-    fireEvent.click(await screen.findByRole('button', { name: "Reader's view" }))
-    await waitFor(() => expect(readersIn(history)).toBe('1'))
     fireEvent.keyDown(screen.getByRole('slider', { name: 'Story position' }), { key: 'ArrowRight' })
     await waitFor(() => expect(atOf(history)).toBe('dracula:4'))
     expect(screen.queryByRole('alertdialog')).toBeNull()
     expect(form.isConnected).toBe(true)
+
+    fireEvent.click(await screen.findByRole('button', { name: "Reader's view" }))
+    fireEvent.click(within(await prompt()).getByRole('button', { name: 'Keep editing' }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    expect(readersIn(history)).toBeNull()
 
     fireEvent.click(within(screen.getByRole('main')).getByRole('link', { name: /Note ›/ }))
     await prompt()

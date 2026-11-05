@@ -17,7 +17,7 @@ import type {
   PositionsResult,
 } from '../api'
 import type { TypeListResult, TypeView } from '../createApi'
-import type { BookChapterFields, ChapterDefaultsSource, ChapterValueView } from '../chapterFieldsApi'
+import type { BookChapterFields, ChapterDefaultsSource, ChapterValueView, ReadersChapterFields } from '../chapterFieldsApi'
 import type { SourceFieldType } from '../editApi'
 
 // A small den for the UI's tests, from Dracula (public domain): one book of
@@ -208,6 +208,41 @@ export function chapterDefaults(kind: ChapterDefaultsSource['kind'] = 'book', ex
   }
 }
 
+/** The positions readers at a position have reached, as `readers=true` gives them. */
+export function reachedAt(at: string): PositionView[] {
+  const last = positions.findIndex((p) => p.position === at)
+  return positions.slice(0, (last < 0 ? 0 : last) + 1)
+}
+
+/** The hierarchy as `readers=true` gives it: only the chapters readers at a position have reached. */
+export function readersHierarchy(at: string): HierarchyResult {
+  const reached = new Set(reachedAt(at).map((p) => p.position))
+  return {
+    ...hierarchy,
+    position: at,
+    universe: { ...hierarchy.universe, books: hierarchy.universe.books.map((b) => ({ ...b, chapters: b.chapters.filter((c) => reached.has(c.position)) })) },
+  }
+}
+
+/** A book's chapter fields as `readers=true` gives them: only the chapters reached, with what holds. */
+export function readersChapterFields(at: string): ReadersChapterFields {
+  const reached = new Set(reachedAt(at).map((p) => p.position))
+  return {
+    version: 1,
+    universe: 'dracula',
+    book: 'dracula',
+    chapters: bookChapterFields()
+      .chapters.filter((c) => reached.has(c.position))
+      .map((c) => ({
+        key: c.key,
+        position: c.position,
+        number: c.number,
+        title: c.title,
+        fields: c.fields.filter((f) => f.value !== null).map(({ name, value, from, fromKey, none, links }) => ({ name, value, from, fromKey, none, links })),
+      })),
+  }
+}
+
 export type Responder = (path: string, params: URLSearchParams, init?: RequestInit) => unknown | Promise<unknown>
 
 /**
@@ -268,6 +303,10 @@ function answer(path: string, params: URLSearchParams, at: string | null, option
         autoCheckpoint: { every: null, problem: null, runs: true },
       }
     case '/api/book/chapter-fields':
+      if (params.get('readers') === 'true') {
+        return readersChapterFields(at!)
+      }
+
       return bookChapterFields()
     case '/api/chapter-defaults':
       return chapterDefaults(params.get('book') ? 'book' : params.get('series') ? 'series' : 'universe')
@@ -288,12 +327,18 @@ function answer(path: string, params: URLSearchParams, at: string | null, option
         unfinished: false,
         otherChanges: 0,
       }
-    case '/api/positions':
-      return { version: 1, universe: 'dracula', count: positions.length, positions } satisfies PositionsResult
+    case '/api/positions': {
+      const list = params.get('readers') === 'true' ? reachedAt(at!) : positions
+      return { version: 1, universe: 'dracula', count: list.length, positions: list } satisfies PositionsResult
+    }
+    case '/api/positions/next': {
+      const index = positions.findIndex((p) => p.position === params.get('after'))
+      return { version: 1, position: params.get('step') === 'book' ? null : (positions[index + 1]?.position ?? null) }
+    }
     case '/api/types':
       return { version: 1, types } satisfies TypeListResult
     case '/api/hierarchy':
-      return { ...hierarchy, position: at }
+      return params.get('readers') === 'true' ? readersHierarchy(at!) : { ...hierarchy, position: at }
     case '/api/fields': {
       // As of a position, only the fields of values the reader has met.
       const fields = at ? ['occupation'] : ['home', 'occupation']

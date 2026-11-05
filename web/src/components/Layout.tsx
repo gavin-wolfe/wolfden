@@ -3,9 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, Outlet, useRouterState } from '@tanstack/react-router'
 import { denQuery } from '../api'
 import { usePosition, useUniverseKey } from '../hooks'
-import { READERS_VIEW_REACH } from '../readerWords'
 import { CheckpointIndicator } from './CheckpointIndicator'
-import { DenErrorsIndicator } from './DenErrorsIndicator'
+import { DenErrorsIndicator, ReadersErrorCount } from './DenErrorsIndicator'
 import { ContainerCreatedNotice, NewContainerProvider } from './NewContainer'
 import { CreatedNotice, NewEntityProvider, NewMenu } from './NewEntity'
 import { PositionBar } from './PositionBar'
@@ -22,13 +21,6 @@ import { Sidebar } from './Sidebar'
  * a note from a type's template (#29), and the universe's and series'
  * pages make series and books (#213).
  */
-function ReadersReach() {
-  const { readers } = usePosition()
-  // A note's page says it beside "read-only".
-  const onNote = useRouterState({ select: (s) => s.matches.some((m) => m.routeId === '/u/$universe/e/$') })
-  return readers && !onNote ? <p className="muted readers-reach">{READERS_VIEW_REACH}</p> : null
-}
-
 export function Layout() {
   const den = useQuery(denQuery)
   const pathname = useRouterState({ select: (s) => s.location.pathname })
@@ -106,8 +98,9 @@ export function Layout() {
             {universe && !readers && <NewMenu universe={universe} />}
             <SearchBox universe={universe} />
             <PositionBar universe={universe} />
-            <DenErrorsIndicator universe={universe} />
-            <CheckpointIndicator />
+            {/* The Reader's view is read-only, and the list of problems and of what's changed name files, whatever readers know (#300). */}
+            {readers ? <ReadersErrorCount /> : <DenErrorsIndicator universe={universe} />}
+            {!readers && <CheckpointIndicator />}
             <LiveRefresh />
           </header>
           <div className="body">
@@ -117,7 +110,6 @@ export function Layout() {
             <main className="page">
               <CreatedNotice />
               <ContainerCreatedNotice />
-              <ReadersReach />
               <Outlet />
             </main>
           </div>

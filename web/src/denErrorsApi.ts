@@ -44,6 +44,15 @@ export const denErrorsQuery = queryOptions({
   staleTime: 0,
 })
 
+/** How many errors there are, and no more, for the Reader's view: the list names files and quotes them, whatever readers know (#300). */
+export const denErrorCountQuery = queryOptions({
+  queryKey: ['den-errors', 'count'],
+  queryFn: () => getJson<DenErrors>('/api/den/errors?countOnly=true'),
+  refetchInterval: DEN_ERRORS_POLL_MS,
+  refetchOnWindowFocus: true,
+  staleTime: 0,
+})
+
 /** What the error leaves out, in words. */
 export function leavesOut(error: Pick<DenErrorView, 'reach' | 'kind' | 'section'>): string {
   switch (error.reach) {

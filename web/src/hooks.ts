@@ -1,7 +1,7 @@
 import { useCallback, useEffect } from 'react'
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { entitiesQuery, markedEntitiesQuery, positionsQuery } from './api'
+import { entitiesQuery, markedEntitiesQuery, positionsQuery, readersPositionsQuery } from './api'
 import { useShownError } from './formHold'
 import type { EntitySummary, ReaderMark } from './api'
 import type { StorySearch } from './router'
@@ -52,6 +52,12 @@ export function useUniverseKey(): string | undefined {
   return (useParams({ strict: false }) as { universe?: string }).universe
 }
 
+/** The story's positions as this view has them: all of them, or in the Reader's view those readers have reached, so nothing asked for names the rest (#300). */
+export function usePositionsInView(universe: string) {
+  const { at, readers } = usePosition()
+  return useQuery(readers ? readersPositionsQuery(universe, at!) : positionsQuery(universe))
+}
+
 /** A note in a list: `met` if the reader at the position knows it, with its mark in the Author's view. */
 export interface ListedEntity extends EntitySummary {
   met: boolean
@@ -70,7 +76,7 @@ export function useEntitiesInView(universe: string) {
   const marked = at !== undefined && !readers
   const plain = useQuery({ ...entitiesQuery(universe, at), enabled: !marked })
   const all = useQuery({ ...markedEntitiesQuery(universe, at ?? ''), enabled: marked })
-  const positions = useQuery(positionsQuery(universe))
+  const positions = usePositionsInView(universe)
 
   const failedPlain = useShownError(plain)
   const failedAll = useShownError(all)

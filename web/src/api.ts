@@ -442,7 +442,8 @@ export const ENTITY_LIMIT = 1000
 export function entitiesQuery(universe: string, at: string | undefined) {
   return queryOptions({
     queryKey: ['entities', universe, at ?? null],
-    queryFn: () => getJson<EntityListResult>(apiPath('/api/entities', { universe, asOf: at, limit: ENTITY_LIMIT })),
+    // Only the Reader's view asks for a list at a position, and `readers` is so a position it can't read names no book.
+    queryFn: () => getJson<EntityListResult>(apiPath('/api/entities', { universe, asOf: at, readers: at === undefined ? undefined : 'true', limit: ENTITY_LIMIT })),
   })
 }
 

@@ -73,10 +73,10 @@ export function linkText(link: LinkView): string {
  * reaches; a broken link, marked so, with why; an ambiguous one, with the
  * entities it matches in its tooltip; or, as of a position, plain text for a
  * link to an entity the reader hasn't met yet, which doesn't say what it
- * reaches.
+ * reaches. `children`, for the Reader's view of a note's text, is its words as markdown read them.
  */
-export function WikiLink({ link, universe }: { link: LinkView; universe: string }) {
-  const text = linkText(link)
+export function WikiLink({ link, universe, children }: { link: LinkView; universe: string; children?: ReactNode }) {
+  const text = children ?? linkText(link)
   if (link.outcome === 'resolved' && link.entity) {
     return (
       <Link
@@ -123,12 +123,73 @@ export function labelOf(written: string): string | null {
   return bar < 0 ? null : written.slice(bar + 1, -2).trim() || null
 }
 
-/** Text as the Reader's view has it where it can't hold a link, such as an image's alt text: each link is the words it shows. */
-export function linkWords(text: string, match: (text: string) => LinkView | undefined): string {
-  return text.replace(SPLIT_LINK, (_, label: string) => label.trim()).replace(WIKI_LINK, (written) => {
-    const link = match(written)
-    return link ? linkText(link) : (labelOf(written) ?? written)
-  })
+/** The server's `LinkPattern` in `WikiLink.cs`: what's a link, whatever's in its label. The target is group 1. */
+const SOURCE_LINK = /\[\[((?:[^[\]|#\r\n\\]|\\(?!\|))*)(?:#(?:[^[\]|#\r\n\\]|\\(?!\|))+)?(?:\\?\|[^[\]\r\n]+)?\]\]/g
+
+/** A range of a note's source, by offset. */
+export interface SourceRange {
+  start: number
+  end: number
+}
+
+const within = (ranges: readonly SourceRange[], at: number) => ranges.some((r) => r.start <= at && at < r.end)
+
+function escapedAt(text: string, index: number): boolean {
+  let count = 0
+  for (let i = index - 1; i >= 0 && text[i] === '\\'; i--) {
+    count++
+  }
+
+  return count % 2 === 1
+}
+
+/** A name as markdown source, so it reads as written. A label is left as it is, since its formatting is the writer's. */
+function asMarkdown(words: string): string {
+  return words.replace(/[\\`*_[\]<&]/g, '\\$&')
+}
+
+/**
+ * A note's markdown source as the Reader's view reads it (#300), with each link replaced
+ * before markdown parses it, so formatting in a label can't split it from its target.
+ * It's the server's `WithLinksShown`: a link in code stays (`code`), as does a `\[[` or a
+ * `![[`, and so does an unlabelled one with no record. `link` gives what becomes of one with a
+ * record, in a place that can hold a link. In `plain`, such as an image's alt text or the words
+ * of a `[text](url)`, it's only the words it shows.
+ */
+export function readersSource(
+  source: string,
+  code: readonly SourceRange[],
+  plain: readonly SourceRange[],
+  match: (text: string) => LinkView | undefined,
+  linkTo: (link: LinkView, words: string) => string,
+): string {
+  const replaced: { start: number; end: number; text: string }[] = []
+  for (const m of source.matchAll(SOURCE_LINK)) {
+    if (m[1].trim() === '' || escapedAt(source, m.index) || (source[m.index - 1] === '!' && !escapedAt(source, m.index - 1)) || within(code, m.index)) {
+      continue
+    }
+
+    const link = match(m[0])
+    const words = link ? (link.label ?? asMarkdown(linkText(link))) : labelOf(m[0])
+    if (words !== null) {
+      replaced.push({ start: m.index, end: m.index + m[0].length, text: link && !within(plain, m.index) ? linkTo(link, words) : words })
+    }
+  }
+
+  for (const m of source.matchAll(SPLIT_LINK)) {
+    if (!within(code, m.index)) {
+      replaced.push({ start: m.index, end: m.index + m[0].length, text: m[1].trim() })
+    }
+  }
+
+  let shown = ''
+  let at = 0
+  for (const r of replaced.sort((a, b) => a.start - b.start)) {
+    shown += source.slice(at, r.start) + r.text
+    at = r.end
+  }
+
+  return shown + source.slice(at)
 }
 
 /** What reads as a labelled link split over two lines, as its label: the Reader's view's rule for it. */

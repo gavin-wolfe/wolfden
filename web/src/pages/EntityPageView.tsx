@@ -140,7 +140,9 @@ function LeftOutPage({ message, note, at, onErrorsChanged }: { message: string; 
           </p>
         )
       )}
-      <p className="muted">Nothing is lost: the text stays in the file. The ⚠ in the top bar lists every problem in the den.</p>
+      <p className="muted">
+        Nothing is lost: the text stays in the file. {readers ? "The ⚠ in the top bar counts the den's problems, and the Author's view lists them." : 'The ⚠ in the top bar lists every problem in the den.'}
+      </p>
     </div>
   )
 }

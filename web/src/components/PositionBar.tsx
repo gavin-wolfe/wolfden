@@ -125,7 +125,11 @@ function UniversePositionBar({ universe }: { universe: string }) {
 const NEXT = 'next'
 const PICK = 'pick'
 
-/** The list up to `at`, from what the last position's answer had, while the new one comes: moving back mustn't show what's now ahead. */
+/**
+ * What the bar lists while a new position's answer comes, so its controls stay where they are and keep
+ * focus: the last answer. Moving back, it's cut at `at`, so it doesn't show what's now ahead. Moving
+ * forward, it's all of it, which is only what's already been reached.
+ */
 function upTo(previous: PositionsResult | undefined, at: string): PositionsResult | undefined {
   if (!previous) {
     return undefined
@@ -134,7 +138,7 @@ function upTo(previous: PositionsResult | undefined, at: string): PositionsResul
   const list = previous.positions
   const exact = list.findIndex((p) => p.position === at)
   const last = exact >= 0 ? exact : list.findIndex((p) => p.book === at)
-  return last < 0 ? undefined : { ...previous, count: last + 1, positions: list.slice(0, last + 1) }
+  return last < 0 ? previous : { ...previous, count: last + 1, positions: list.slice(0, last + 1) }
 }
 
 /**
@@ -187,13 +191,16 @@ function ReadersPositionBar({ universe }: { universe: string }) {
   const list = positions.data.positions
   const exact = list.findIndex((p) => p.position === at)
   // A bare book key (the start of a book) sits on that book's first chapter.
-  const index = exact >= 0 ? exact : list.findIndex((p) => p.book === at)
+  const found = exact >= 0 ? exact : list.findIndex((p) => p.book === at)
+  // Moving forward, the last answer's end, until the new one comes.
+  const index = found >= 0 ? found : list.length - 1
+  const shownAt = found >= 0 ? at : list[index]?.position
   const current: PositionView | undefined = list[index]
-  const label = at === current?.book ? `${current.bookName}, start` : current ? positionLabel(current) : at
+  const label = shownAt === current?.book ? `${current.bookName}, start` : current ? positionLabel(current) : at
   const books = [...new Map(list.map((p) => [p.book, p.bookName])).entries()]
   const book = current?.book ?? ''
   const chapters = list.filter((p) => p.book === book && p.chapter !== null)
-  const atChapter = chapters.some((p) => p.position === at)
+  const atChapter = chapters.some((p) => p.position === shownAt)
   const further = (next: string) => (
     <optgroup label={FURTHER_ON}>
       <option value={NEXT}>{next}</option>
@@ -242,7 +249,7 @@ function ReadersPositionBar({ universe }: { universe: string }) {
       <select
         aria-label="Chapter"
         title={MENUS_NAME_NOTHING_AHEAD}
-        value={atChapter ? at : ''}
+        value={atChapter ? shownAt : ''}
         onChange={(e) => {
           const { value } = e.currentTarget
           if (value === NEXT || value === PICK) {

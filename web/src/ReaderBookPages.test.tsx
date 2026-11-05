@@ -26,7 +26,7 @@ const READERS_REQUESTS = [
   /^\/api\/hierarchy\?universe=dracula&asOf=[^&]+&readers=true$/,
   /^\/api\/positions\?universe=dracula&asOf=[^&]+&readers=true$/,
   /^\/api\/book\/chapter-fields\?universe=dracula&book=dracula&asOf=[^&]+&readers=true$/,
-  /^\/api\/entities\?universe=dracula&asOf=[^&]+&limit=1000$/,
+  /^\/api\/entities\?universe=dracula&asOf=[^&]+&readers=true&limit=1000$/,
 ]
 
 function expectOnlyReadersRequests(calls: readonly string[]) {
@@ -229,6 +229,40 @@ describe('SC-WEB-111: the position bar in the Reader’s view', () => {
     expect(await screen.findByRole('slider', { name: 'Story position' })).toBeTruthy()
   })
 
+  it.each([
+    ['›', () => screen.getByRole('button', { name: NEXT_CHAPTER }), (el: HTMLElement) => fireEvent.click(el)],
+    ['Next chapter in the menu', () => screen.getByRole('combobox', { name: 'Chapter' }), (el: HTMLElement) => fireEvent.change(el, { target: { value: 'next' } })],
+  ])('%s keeps focus, and the bar stays while it loads', async (_, control, press) => {
+    let release: () => void = () => {}
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    stubApi({
+      override: async (path, params) => {
+        if (path === '/api/positions' && params.get('asOf') === 'dracula:4') {
+          await held
+        }
+
+        return undefined
+      },
+    })
+    const { history } = renderApp('/u/dracula?at=dracula:3&readers=1')
+    await screen.findByRole('combobox', { name: 'Chapter' })
+    const el = control()
+    el.focus()
+    press(el)
+
+    await waitFor(() => expect(atOf(history)).toBe('dracula:4'))
+    expect(screen.queryByText(/Loading the story/)).toBeNull()
+    expect(control()).toBe(el)
+    expect(document.activeElement).toBe(el)
+    release()
+
+    await waitFor(() => expect(options(screen.getByRole('combobox', { name: 'Chapter' }))).toContain("chapter 4: Jonathan Harker's Journal"))
+    expect(control()).toBe(el)
+    expect(document.activeElement).toBe(el)
+  })
+
   it('moving back leaves nothing from where it was', async () => {
     stubApi()
     const { history } = renderApp('/u/dracula?at=dracula:5&readers=1')
@@ -328,6 +362,39 @@ describe('SC-WEB-101: links on a note’s page in the Reader’s view show only 
     expect(section.textContent).not.toContain(later)
   })
 
+  it.each([
+    ['italic', `[[${later}|*Emlabel*]]`, 'Emlabel', 'em'],
+    ['bold', `[[${later}|**Boldlabel**]]`, 'Boldlabel', 'strong'],
+    ['italic in the middle', `[[${later}|a *b* Multilabel]]`, 'a b Multilabel', 'em'],
+    ['HTML', `[[${later}|<b>Htmllabel</b>]]`, 'Htmllabel', null],
+    ['code', `[[${later}|\`Ticklabel\`]]`, 'Ticklabel', 'code'],
+    ['a hard break', `[[${later}  \n|Hardsplit]]`, 'Hardsplit', null],
+    ['a backslash break', `[[${later}\\\n|Bsplit]]`, 'Bsplit', null],
+    ['a break and italics', `[[${later}\n|*Emsplit*]]`, 'Emsplit', 'em'],
+  ])('with %s in it, a label shows and the target doesn’t', async (_, body, words, tag) => {
+    const section = await shown(`See ${body} there.`, [])
+    expect(section.textContent).toContain(`See ${words} there.`)
+    expect(section.innerHTML).not.toContain(later)
+    expect(section.textContent).not.toContain('[[')
+    if (tag) {
+      expect(section.querySelector(tag)).not.toBeNull()
+    }
+  })
+
+  it('with a record, a formatted label is the link’s words', async () => {
+    const met = { key: 'E-JONATHAN', id: 'E-JONATHAN', name: 'Jonathan Harker', type: 'character' }
+    const section = await shown('See [[jonathan|the *clerk*]] there.', [link('[[jonathan|the *clerk*]]', 'jonathan', { label: 'the *clerk*', entity: met, inView: true })])
+    const a = within(section).getByRole('link', { name: 'the clerk' })
+    expect(a.querySelector('em')?.textContent).toBe('clerk')
+  })
+
+  it('in code, it stays as written, and a name with markdown in it reads as written', async () => {
+    const met = { key: 'E-JONATHAN', id: 'E-JONATHAN', name: 'Jonathan *the* Harker', type: 'character' }
+    const section = await shown('`[[code-key|x]]` and [[jonathan]].', [link('[[jonathan]]', 'jonathan', { entity: met, inView: true })])
+    expect(section.querySelector('code')!.textContent).toBe('[[code-key|x]]')
+    expect(within(section).getByRole('link', { name: 'Jonathan *the* Harker' })).toBeTruthy()
+  })
+
   it('with no record, a labelled link is only its label', async () => {
     const section = await shown(`See [[${later}|the stranger]] there.`, [])
     expect(section.textContent).toContain('See the stranger there.')
@@ -357,6 +424,12 @@ describe('SC-WEB-101: links on a note’s page in the Reader’s view show only 
     const a = within(section).getByRole('link', { name: 'Jonathan Harker' })
     expect(a.getAttribute('href')).not.toContain('later')
     expect(section.textContent).not.toContain('Later heading')
+  })
+
+  it('in the Author’s view, a formatted label stays as it was', async () => {
+    const section = await shown(`See [[${later}|*Emlabel*]] there.`, [], '/u/dracula/e/E-MINA?at=dracula:3')
+    expect(section.textContent).toContain(later)
+    expect(section.textContent).toContain('[[')
   })
 
   it('in the Author’s view, a split link and an alt text stay as written', async () => {

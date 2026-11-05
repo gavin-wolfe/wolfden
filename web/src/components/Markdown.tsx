@@ -2,7 +2,7 @@ import { createContext, useContext, useMemo, useState, type ReactNode } from 're
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import ReactMarkdown, { defaultUrlTransform, type Components } from 'react-markdown'
 import { denQuery, remoteImagesAtLoad, type LinkView } from '../api'
-import { WIKI_LINK, WikiLink, createLinkMatcher, labelOf, linkWords, withoutSplitLinks } from './Links'
+import { WIKI_LINK, WikiLink, createLinkMatcher, readersSource, type SourceRange } from './Links'
 
 // Notes' markdown, rendered safely. react-markdown builds React elements
 // (never HTML strings), `skipHtml` drops any raw HTML in a note, and its URL
@@ -22,34 +22,56 @@ interface MdNode {
   type: string
   value?: string
   url?: string
-  alt?: string | null
-  title?: string | null
   children?: MdNode[]
+  position?: { start: { offset?: number }; end: { offset?: number } }
+}
+
+/** What in a parsed note can't hold a link: its code, and where a link inside would be plain words. */
+function placesOf(tree: MdNode): { code: SourceRange[]; plain: SourceRange[] } {
+  const code: SourceRange[] = []
+  const plain: SourceRange[] = []
+  const walk = (node: MdNode) => {
+    const range = { start: node.position?.start.offset ?? 0, end: node.position?.end.offset ?? 0 }
+    if (node.type === 'code' || node.type === 'inlineCode') {
+      code.push(range)
+    } else if (['link', 'linkReference', 'image', 'imageReference', 'definition'].includes(node.type)) {
+      plain.push(range)
+    }
+
+    node.children?.forEach(walk)
+  }
+  walk(tree)
+  return { code, plain }
 }
 
 /**
- * A remark plugin: turns each `[[...]]` in text into a link to the index of its resolution in `resolved`.
- * With `readers`, for the Reader's view, what can't hold a link shows the words a link would (an image's
- * alt text and title, the words of a `[text](url)`), and anything written as a labelled link but not
- * recorded as one, such as one split over two lines, shows only its label, as a Reader's search reads it.
+ * A remark plugin for the Reader's view: reads the note's source again with each `[[...]]` replaced
+ * ({@link readersSource}), a link becoming a link to the index of its resolution in `resolved`. So a label
+ * shows as written, formatting and all, and its target isn't there to show, however markdown would have split it.
  */
-function wikiLinks(links: readonly LinkView[], resolved: LinkView[], readers: boolean) {
-  const rewrite = (node: MdNode, match: (text: string) => LinkView | undefined) => {
-    if (readers && (node.type === 'image' || node.type === 'imageReference')) {
-      node.alt = node.alt && linkWords(node.alt, match)
-      node.title = node.title && linkWords(node.title, match)
-      return
-    }
-
-    if (!node.children) {
-      return
-    }
-
-    if (node.type === 'link' || node.type === 'linkReference') {
-      if (readers) {
-        words(node, match)
+function readersLinks(links: readonly LinkView[], resolved: LinkView[]) {
+  return function (this: { parse: (text: string) => unknown }) {
+    return (tree: MdNode, file: { value: unknown }): MdNode => {
+      resolved.length = 0
+      const source = String(file.value)
+      if (!source.includes('[[')) {
+        return tree
       }
 
+      const { code, plain } = placesOf(tree)
+      const shown = readersSource(source, code, plain, createLinkMatcher(links), (link, words) => {
+        resolved.push(link)
+        return `[${words}](${WIKI_PROTOCOL}${resolved.length - 1})`
+      })
+      return this.parse(shown) as MdNode
+    }
+  }
+}
+
+/** A remark plugin: turns each `[[...]]` in text into a link to the index of its resolution in `resolved`. */
+function wikiLinks(links: readonly LinkView[], resolved: LinkView[]) {
+  const rewrite = (node: MdNode, match: (text: string) => LinkView | undefined) => {
+    if (!node.children || node.type === 'link' || node.type === 'linkReference') {
       return
     }
 
@@ -61,17 +83,11 @@ function wikiLinks(links: readonly LinkView[], resolved: LinkView[], readers: bo
         continue
       }
 
-      const text = readers ? withoutSplitLinks(child.value) : child.value
+      const text = child.value
       let last = 0
       for (const m of text.matchAll(WIKI_LINK)) {
         const link = match(m[0])
         if (!link) {
-          const label = readers ? labelOf(m[0]) : null
-          if (label !== null) {
-            children.push({ type: 'text', value: `${text.slice(last, m.index)}${label}` })
-            last = m.index + m[0].length
-          }
-
           continue
         }
 
@@ -85,17 +101,6 @@ function wikiLinks(links: readonly LinkView[], resolved: LinkView[], readers: bo
     }
 
     node.children = children
-  }
-
-  const words = (node: MdNode, match: (text: string) => LinkView | undefined) => {
-    for (const child of node.children ?? []) {
-      if (child.type === 'text' && child.value) {
-        child.value = linkWords(child.value, match)
-      } else {
-        rewrite(child, match)
-        words(child, match)
-      }
-    }
   }
 
   // Each run starts afresh, so a re-render matches the links in the same order.
@@ -320,7 +325,7 @@ export function Markdown({ text, links, universe, file, readers = false }: { tex
   const remoteImages = useMemo(() => ({ allowed, reload }), [allowed, reload])
   const { plugin, resolved } = useMemo(() => {
     const resolved: LinkView[] = []
-    return { plugin: wikiLinks(links, resolved, readers), resolved }
+    return { plugin: readers ? readersLinks(links, resolved) : wikiLinks(links, resolved), resolved }
   }, [links, readers])
 
   const components = useMemo<Components>(
@@ -328,7 +333,7 @@ export function Markdown({ text, links, universe, file, readers = false }: { tex
       a: ({ href, children }) => {
         if (href?.startsWith(WIKI_PROTOCOL)) {
           const link = resolved[Number(href.slice(WIKI_PROTOCOL.length))]
-          return link ? <WikiLink link={link} universe={universe} /> : <>{children}</>
+          return link ? <WikiLink link={link} universe={universe}>{readers ? children : undefined}</WikiLink> : <>{children}</>
         }
 
         return href ? <NoteLink href={href}>{children}</NoteLink> : <>{children}</>
@@ -338,7 +343,7 @@ export function Markdown({ text, links, universe, file, readers = false }: { tex
       h1: ({ children }) => <h3>{children}</h3>,
       h2: ({ children }) => <h3>{children}</h3>,
     }),
-    [resolved, universe, file, remoteImages],
+    [resolved, universe, file, remoteImages, readers],
   )
 
   return (

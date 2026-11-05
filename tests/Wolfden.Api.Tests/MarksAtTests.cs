@@ -818,10 +818,15 @@ public sealed class MarksAtTests : IDisposable
     {
         await using var server = await Start();
 
-        var full = await server.GetJsonAsync("/api/search?universe=starfall&query=salt", HttpStatusCode.OK);
-        var marked = await server.GetJsonAsync("/api/search?query=salt&marksAt=ember:3", HttpStatusCode.OK);
+        static IEnumerable<string> Places(JsonElement answer) => answer.GetProperty("hits").EnumerateArray()
+            .Select(h => $"{h.GetProperty("entity").GetProperty("path").GetString()}|{h.GetProperty("line")}|{h.GetProperty("field")}|{h.GetProperty("snippet").GetString()}")
+            .Order(StringComparer.Ordinal);
 
-        SameAsMcp.Assert(full, marked);
+        var full = await server.GetJsonAsync("/api/search?universe=starfall&query=salt&limit=200", HttpStatusCode.OK);
+        var marked = await server.GetJsonAsync("/api/search?query=salt&marksAt=ember:3&limit=200", HttpStatusCode.OK);
+
+        // In its own order, what a reader can find first (#300).
+        Assert.Equal(Places(full), Places(marked));
     }
 
     [Fact]

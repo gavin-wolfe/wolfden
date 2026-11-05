@@ -322,7 +322,21 @@ public sealed record SearchPageHit(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReaderMark? ReaderMark = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? AheadValues = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? UnplacedValues = null,
-    [property: JsonIgnore] int? EntryIndex = null);
+    [property: JsonIgnore] int? EntryIndex = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReaderMark? NoteMark = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] LaterLink? LaterLink = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? Met = null,
+    [property: JsonIgnore] IReadOnlyList<string>? LinkedNotes = null);
+
+/// <summary>
+/// For a field hit whose snippet shows the name or alias of a linked note readers
+/// at the position don't know: a reader's search couldn't match that name (#300).
+/// </summary>
+/// <param name="Status">That note's status, since one out of canon has no mark.</param>
+/// <param name="ReaderMark">That note's mark, if it's in canon.</param>
+public sealed record LaterLink(
+    string Status,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReaderMark? ReaderMark);
 
 /// <summary>A search's result as the search page gets it: the MCP tool's, with <see cref="SearchPageHit"/>s.</summary>
 /// <param name="Version">The shape version.</param>

@@ -224,7 +224,7 @@ public sealed partial class DenReader
         string? status = null, string? series = null, string? book = null, string? asOf = null, string? field = null)
     {
         var filter = CheckSearch(query, limit, status, series, book);
-        return WithIndex(index => RunSearch(index, query, universe, type, canonOnly, limit, status, filter, asOf, field));
+        return WithIndex(index => RunSearch(index, query, universe, type, canonOnly, limit, status, filter, asOf, field, null));
     }
 
     /// <summary>
@@ -238,7 +238,25 @@ public sealed partial class DenReader
     {
         ArgumentNullException.ThrowIfNull(index);
         var filter = CheckSearch(query, limit, status, series, book);
-        return RunSearch(index, query, universe, type, canonOnly, limit, status, filter, asOf, field);
+        return RunSearch(index, query, universe, type, canonOnly, limit, status, filter, asOf, field, null);
+    }
+
+    /// <summary>The most hits <see cref="SearchWide"/> reads, so what's after the cut is what's sorted last.</summary>
+    private const int WideSearch = 1000;
+
+    /// <summary>
+    /// <see cref="Search(DenIndex, string, string?, string?, bool, int, string?, string?, string?, string?, string?)"/>
+    /// with no position, and with room for up to 1,000 hits whatever
+    /// <paramref name="limit"/> is, for a caller that sorts them before it cuts them to the limit.
+    /// Hits in notes in canon by <paramref name="metFirstAt"/> are read first, so a word
+    /// in thousands of notes can't leave those out of the 1,000.
+    /// </summary>
+    public SearchResult SearchWide(
+        DenIndex index, string query, string? universe, string? type, bool canonOnly, int limit, string? status, string? series, string? book, string? field, long metFirstAt)
+    {
+        ArgumentNullException.ThrowIfNull(index);
+        var filter = CheckSearch(query, limit, status, series, book);
+        return RunSearch(index, query, universe, type, canonOnly, Math.Max(limit, WideSearch), status, filter, null, field, metFirstAt);
     }
 
     /// <summary>Refuses a search's arguments that are wrong whatever the den holds, and gives its series or book filter.</summary>
@@ -255,7 +273,7 @@ public sealed partial class DenReader
     }
 
     private SearchResult RunSearch(
-        DenIndex index, string query, string? universe, string? type, bool canonOnly, int limit, string? status, CanonFilter? filter, string? asOf, string? field)
+        DenIndex index, string query, string? universe, string? type, bool canonOnly, int limit, string? status, CanonFilter? filter, string? asOf, string? field, long? metFirstAt)
     {
         var fieldName = string.IsNullOrWhiteSpace(field) ? null : field.Trim();
         var db = index.Context;
@@ -297,7 +315,7 @@ public sealed partial class DenReader
 
         if (fieldName is not null)
         {
-            CheckField(db, universeId, fieldName, metView, asOf);
+            CheckField(db, universeId, fieldName, metView is null ? null : FieldsIn(metView), asOf);
         }
 
         var scopes = Scopes(db);
@@ -311,7 +329,7 @@ public sealed partial class DenReader
         var cutOff = false;
         if (fieldName is null)
         {
-            var hits = index.Search(query, cap + 1);
+            var hits = index.Search(query, cap + 1, metFirstAt);
             cutOff = hits.Count > cap;
             var paths = hits.Select(h => h.EntityPath).Distinct().ToList();
             var entities = db.Entities.Where(e => paths.Contains(e.Path)).ToList().ToDictionary(e => e.Path, StringComparer.Ordinal);
@@ -355,6 +373,7 @@ public sealed partial class DenReader
                     Text = h.Snippet.Text,
                     Matches = h.Snippet.Matches,
                     EntryIndex = h.EntryIndex,
+                    LinkedNotes = h.LinkedNotes,
                 }));
         }
 
@@ -370,12 +389,14 @@ public sealed partial class DenReader
     /// <paramref name="asOf"/> only the fields of values in the canon view
     /// there, so a field only later notes use isn't named.
     /// </summary>
-    public FieldNamesResult FieldNames(string? universe = null, string? asOf = null) => WithIndex(index =>
+    /// <remarks>With <paramref name="readers"/>, only the fields a reader at <paramref name="asOf"/> can see a value of (<see cref="SearchAsReaders"/>).</remarks>
+    public FieldNamesResult FieldNames(string? universe = null, string? asOf = null, bool readers = false) => WithIndex(index =>
     {
         var db = index.Context;
         var u = ChooseUniverse(db, universe, asOf, allowAll: false)!;
         var names = asOf is null
             ? db.FieldValues.Where(v => v.UniverseId == u.Id).Select(v => v.Field).Distinct().ToList()
+            : readers ? FieldsKnownIn(CanonView(index, u.Key, asOf, null), u.Key, Horizon(index, u.Key, asOf)).ToList()
             : FieldsIn(CanonView(index, u.Key, asOf, null)).ToList();
         names.Sort(StringComparer.Ordinal);
         return new FieldNamesResult(ResultVersion, asOf, names.Count, names);
@@ -392,11 +413,11 @@ public sealed partial class DenReader
     /// field only later notes have is refused just as a made-up one is. It
     /// doesn't list the fields that are.
     /// </summary>
-    private static void CheckField(IndexDbContext db, int? universeId, string field, CanonView? metView, string? asOf)
+    private static void CheckField(IndexDbContext db, int? universeId, string field, IEnumerable<string>? metFields, string? asOf)
     {
-        if (metView is not null)
+        if (metFields is not null)
         {
-            if (!FieldsIn(metView).Contains(field, StringComparer.Ordinal))
+            if (!metFields.Contains(field, StringComparer.Ordinal))
             {
                 throw new DenToolException(
                     ToolErrorCodes.BadArgument,

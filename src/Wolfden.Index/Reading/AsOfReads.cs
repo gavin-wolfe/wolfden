@@ -50,6 +50,14 @@ public static class AsOfReads
         };
     }
 
+    /// <summary><paramref name="entity"/>, read at the position of <paramref name="at"/>, with only what a reader there knows.</summary>
+    public static EntityView ForReaders(EntityView entity, StoryHorizon at)
+    {
+        ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(at);
+        return AsKnown(entity, at);
+    }
+
     private static StoryHorizon Required(StoryHorizon? horizon) =>
         horizon ?? throw new InvalidOperationException("A read at a position comes with its horizon.");
 

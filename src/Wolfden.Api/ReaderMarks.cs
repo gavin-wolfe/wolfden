@@ -38,6 +38,7 @@ internal sealed class ReaderMarks
     private readonly Dictionary<long, string> _names;
     private readonly long _point;
     private readonly int _universeId;
+    private ReadersLinks? _links;
 
     private ReaderMarks(DenIndex index, ContainerRecord universe, string position, long point)
     {
@@ -62,6 +63,12 @@ internal sealed class ReaderMarks
 
     /// <summary>The key of the universe the position is in.</summary>
     public string Universe { get; }
+
+    /// <summary>The story point of the position.</summary>
+    public long Point => _point;
+
+    /// <summary>The links of the universe's notes as a Reader's page at the position shows them. A note a reader has met has no mark and is in canon.</summary>
+    private ReadersLinks Links => _links ??= new ReadersLinks(_db, _universeId, e => IsInCanon(e.Status) && OfNote(e) is null);
 
     /// <summary>
     /// The marks at <paramref name="position"/>. Its universe is chosen as an
@@ -141,21 +148,65 @@ internal sealed class ReaderMarks
         return link.PositionOrdinal is { } at && at > _point ? new ReaderMark(ReaderMark.Ahead, _names.GetValueOrDefault(at)) : null;
     }
 
-    /// <summary><paramref name="page"/> with each hit's marks.</summary>
-    public SearchPageResult Mark(SearchPageResult page)
+    /// <summary>
+    /// <paramref name="page"/> with each hit's marks, what readers can find first and
+    /// then the rest, each part in the order it came in, cut to <paramref name="limit"/>.
+    /// It reads the facts of every note with a hit at once, however many that is.
+    /// </summary>
+    public SearchPageResult Mark(SearchPageResult page, int limit)
     {
-        var paths = page.Hits.Select(h => h.Entity.Path).Distinct().ToList();
-        var notes = _db.Entities.Where(e => paths.Contains(e.Path)).ToList().ToDictionary(e => e.Path, Of, StringComparer.Ordinal);
+        var paths = page.Hits.SelectMany(h => (h.LinkedNotes ?? []).Prepend(h.Entity.Path)).Distinct().ToList();
+        var records = _db.Entities.Where(e => paths.Contains(e.Path)).ToList().ToDictionary(e => e.Path, StringComparer.Ordinal);
+        var ids = page.Hits.Select(h => records.GetValueOrDefault(h.Entity.Path)?.Id).OfType<int>().Distinct().ToList();
+        var sections = _db.Sections.Where(s => ids.Contains(s.EntityId)).ToList().ToLookup(s => s.EntityId);
+        var values = _db.FieldValues.Where(v => ids.Contains(v.EntityId)).ToList().ToLookup(v => v.EntityId);
+        var notes = new Dictionary<string, NoteMarks>(StringComparer.Ordinal);
+        NoteMarks NoteOf(EntityRecord record)
+        {
+            if (!notes.TryGetValue(record.Path, out var note))
+            {
+                note = new NoteMarks(this, record, sections[record.Id], values[record.Id]);
+                notes[record.Path] = note;
+            }
+
+            return note;
+        }
+
+        var marked = page.Hits
+            .Select(h => records.TryGetValue(h.Entity.Path, out var record) ? NoteOf(record).Mark(h, page.Query, records) : h with { Met = false })
+            .ToList();
+        var shown = marked.OrderByDescending(h => h.Met == true).Take(limit).ToList();
         return page with
         {
             MarksAt = Position,
-            Hits = page.Hits.Select(h => notes.TryGetValue(h.Entity.Path, out var note) ? note.Mark(h) : h).ToList(),
+            Count = shown.Count,
+            Truncated = page.Truncated || marked.Count > limit,
+            Hits = shown,
         };
+    }
+
+    /// <summary>What a reader doesn't know of the first linked note a snippet names that they haven't met, if there is one.</summary>
+    private LaterLink? LaterOf(IReadOnlyList<string>? linked, Dictionary<string, EntityRecord> records)
+    {
+        foreach (var path in linked ?? [])
+        {
+            if (records.TryGetValue(path, out var note) && (!IsInCanon(note.Status) || OfNote(note) is not null))
+            {
+                return new LaterLink(note.Status, OfNote(note));
+            }
+        }
+
+        return null;
     }
 
     /// <summary>The marks of the facts of one note.</summary>
     internal sealed class NoteMarks
     {
+        private const string InAComment = "comment";
+        private const string InAnAlias = "alias";
+        private const string InALinkTarget = "linkTarget";
+        private const string InALaterNote = "laterNote";
+
         private readonly ReaderMarks _marks;
         private readonly EntityRecord _note;
         private readonly bool _inCanon;
@@ -164,12 +215,17 @@ internal sealed class ReaderMarks
         private readonly Dictionary<long, string> _written = [];
 
         public NoteMarks(ReaderMarks marks, EntityRecord note)
+            : this(marks, note, marks._db.Sections.Where(s => s.EntityId == note.Id).ToList(), marks._db.FieldValues.Where(v => v.EntityId == note.Id).ToList())
+        {
+        }
+
+        public NoteMarks(ReaderMarks marks, EntityRecord note, IEnumerable<SectionRecord> sections, IEnumerable<FieldValueRecord> values)
         {
             _marks = marks;
             _note = note;
             _inCanon = IsInCanon(note.Status);
-            _sections = marks._db.Sections.Where(s => s.EntityId == note.Id).ToList().ToDictionary(s => s.Line);
-            _values = marks._db.FieldValues.Where(v => v.EntityId == note.Id).ToList();
+            _sections = sections.ToDictionary(s => s.Line);
+            _values = values.ToList();
 
             Note = marks.OfNote(note);
 
@@ -216,8 +272,29 @@ internal sealed class ReaderMarks
         public ReaderMark? OfFieldLink(string field, int? entryIndex) =>
             Row(field, entryIndex) is { } row ? (Takes(row) ? Fact(row) ?? Note : null) : Note;
 
-        /// <summary><paramref name="hit"/> with what readers at the position know of the text it found.</summary>
-        public SearchPageHit Mark(SearchPageHit hit)
+        /// <summary>
+        /// <paramref name="hit"/> with what readers at the position know of the text it
+        /// found. It's <c>met</c> if a reader's search there finds it: it has no mark and no
+        /// later value, it's in canon, and its words are in what the reader's page shows, so
+        /// not only in a comment, an alias, a labelled link's target, or a later note's name.
+        /// </summary>
+        public SearchPageHit Mark(SearchPageHit hit, string query, Dictionary<string, EntityRecord> records)
+        {
+            var hiddenIn = hit.Field is not null ? HiddenInValue(hit, query, records) : HiddenInText(hit, query);
+            var marked = Marks(hit) with
+            {
+                NoteMark = Note,
+                LaterLink = _marks.LaterOf(hit.LinkedNotes, records),
+                InComment = hit.InComment || hiddenIn == InAComment,
+                HiddenIn = hiddenIn is InAnAlias or InALinkTarget ? hiddenIn : null,
+            };
+            return marked with
+            {
+                Met = hiddenIn is null && hit.InCanon && marked.ReaderMark is null && marked.AheadValues is null && marked.UnplacedValues is null,
+            };
+        }
+
+        private SearchPageHit Marks(SearchPageHit hit)
         {
             if (hit.Field is not null)
             {
@@ -238,6 +315,67 @@ internal sealed class ReaderMarks
             // The name, an alias, or the lead: they hold wherever the note does.
             return hit with { ReaderMark = Note };
         }
+
+        /// <summary>
+        /// Where a hit in text has words a reader's search can't find, by that search's own
+        /// rule, or null if it can find them. Text with no comment or link has nothing to check.
+        /// </summary>
+        private string? HiddenInText(SearchPageHit hit, string query)
+        {
+            if (hit.Section is not null && hit.Line is { } line)
+            {
+                if (_sections.GetValueOrDefault(line) is not { } section
+                    || !MayHide(section.Name, section.Body)
+                    || DenReader.ReadersCanFind(query, section.Name, section.Body, _marks.Links, _note.Id))
+                {
+                    return null;
+                }
+
+                return DenReader.FoundWithoutComments(query, section.Name, section.Body) ? InALinkTarget : InAComment;
+            }
+
+            if (DenReader.ReadersCanFind(query, _note.Name, _note.Lead, _marks.Links, _note.Id))
+            {
+                return null;
+            }
+
+            var noteId = _note.Id;
+            var aliases = _marks._db.Aliases.Where(a => a.EntityId == noteId).Select(a => a.Alias).ToList();
+            var names = string.Join("\n", aliases.Prepend(_note.Name));
+            return DenReader.ReadersCanFind(query, names, _note.Lead, _marks.Links, _note.Id) ? InAnAlias
+                : DenReader.FoundWithoutComments(query, names, _note.Lead) ? InALinkTarget
+                : InAComment;
+        }
+
+        /// <summary>
+        /// Where a field hit has words a reader's search can't find. A later value or note
+        /// has its own tag, so this only says how, if the value isn't marked for it.
+        /// </summary>
+        private string? HiddenInValue(SearchPageHit hit, string query, Dictionary<string, EntityRecord> records)
+        {
+            if (Row(hit.Field!, hit.EntryIndex) is not { } row)
+            {
+                return null;
+            }
+
+            var names = (hit.LinkedNotes ?? [])
+                .Select(records.GetValueOrDefault)
+                .OfType<EntityRecord>()
+                .Where(n => IsInCanon(n.Status) && _marks.OfNote(n) is null)
+                .Select(n => n.Name)
+                .ToList();
+            if (DenReader.ReadersCanFindValue(query, row.ValueJson, _marks.Links, _note.Id))
+            {
+                return null;
+            }
+
+            return _marks.LaterOf(hit.LinkedNotes, records) is not null ? InALaterNote
+                : DenReader.FoundInValueAsWritten(query, row.ValueJson, names) ? InALinkTarget
+                : InAnAlias;
+        }
+
+        private static bool MayHide(string name, string body) =>
+            name.Contains("<!--", StringComparison.Ordinal) || body.Contains("<!--", StringComparison.Ordinal) || body.Contains("[[", StringComparison.Ordinal);
 
         private FieldValueRecord? Row(string field, int? entryIndex) => _values.FirstOrDefault(v => v.Field == field && v.EntryIndex == entryIndex);
 

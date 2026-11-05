@@ -335,6 +335,10 @@ public sealed record SearchHitView(
     /// <summary>For a match in a field's entry, the entry's place in its field, since entries can share a line. It's for the web API, which marks the entry.</summary>
     [JsonIgnore]
     public int? EntryIndex { get; init; }
+
+    /// <summary>For a match in a field, the paths of the notes whose name or alias <see cref="Snippet"/> shows after its arrow. It's for the web API.</summary>
+    [JsonIgnore]
+    public IReadOnlyList<string> LinkedNotes { get; init; } = [];
 }
 
 /// <summary>The result of <c>search</c>.</summary>

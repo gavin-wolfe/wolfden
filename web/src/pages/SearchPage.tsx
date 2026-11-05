@@ -16,13 +16,26 @@ import {
   type SearchKey,
   type SearchResult,
   type EntitySummary,
+  type PositionView,
 } from '../api'
+import { MarkList } from '../components/AheadOfReaders'
 import { EntityLink, sectionAnchor } from '../components/Links'
 import { ErrorState, Loading, StatusBadge } from '../components/States'
 import { useDocumentTitle } from '../hooks'
 import { typesQuery, type TypeView } from '../createApi'
 import { snippetParts, type TextMatch } from '../snippet'
-import { describePosition } from '../story'
+import {
+  AHEAD_OF_READERS,
+  MARKS_LEGEND,
+  NOT_PLACED,
+  ONLY_IN_ALIAS,
+  ONLY_IN_ALIAS_WHY,
+  ONLY_IN_LINK_TARGET,
+  ONLY_IN_LINK_TARGET_WHY,
+  aheadValuesWhy,
+  notPlacedWhy,
+} from '../readerWords'
+import { describePosition, readersTree } from '../story'
 import type { SearchPageSearch } from '../router'
 
 const route = getRouteApi('/u/$universe/search')
@@ -30,8 +43,9 @@ const route = getRouteApi('/u/$universe/search')
 /**
  * The search page (#25): full-text search of a universe's notes and their
  * field values, filtered by type, scope, and status, or to canon text only,
- * or narrowed to one field's values (#179). As of a position, it finds only
- * what the reader has met by then (the API's asOf), and says so.
+ * or narrowed to one field's values (#179). At a position, the Author's view
+ * finds everything, what readers can find first and the rest tagged, and the
+ * Reader's view finds only what readers can (#300). The page says which.
  */
 export function SearchPage() {
   const { universe } = route.useParams()
@@ -39,12 +53,12 @@ export function SearchPage() {
   const navigate = route.useNavigate()
   // A blank `at` is '' (it fails closed, as on every page), never everything.
   const at = search.at
-  // Scopes are books and series, shown whatever the position; types only as
-  // the reader has met them or a kind of them, so a type met later isn't named.
+  const readers = at !== undefined && search.readers === '1'
   const hierarchy = useQuery(hierarchyQuery(universe, undefined))
-  const metHierarchy = useQuery({ ...hierarchyQuery(universe, at), enabled: at !== '' })
-  // Fields as types are: only those of values the reader has met.
-  const fields = useQuery({ ...fieldsQuery(universe, at), enabled: at !== '' })
+  // In the Reader's view, types, fields, and scopes are only what readers there have
+  // reached, so a filter doesn't name what's later. Otherwise, every one.
+  const metHierarchy = useQuery({ ...hierarchyQuery(universe, readers ? at : undefined), enabled: at !== '' })
+  const fields = useQuery({ ...fieldsQuery(universe, readers ? at : undefined), enabled: at !== '' })
   const positions = useQuery(positionsQuery(universe))
   const q = search.q
   const filters: SearchFilters = {
@@ -68,23 +82,53 @@ export function SearchPage() {
     <div className="page-body search-page">
       <p className="eyebrow">Search</p>
       <h1>{q ? <>Matches for “{q}”</> : 'Search'}</h1>
-      <Filters hierarchy={hierarchy.data} metHierarchy={metHierarchy.data} fields={fields.data?.fields} search={search} onChange={setFilters} />
+      <Filters
+        hierarchy={readers ? readersScopes(metHierarchy.data, at, positions.data?.positions) : hierarchy.data}
+        metHierarchy={metHierarchy.data}
+        fields={fields.data?.fields}
+        search={search}
+        onChange={setFilters}
+      />
       {at === '' && !q && <ErrorState error={new ApiRequestError('bad_argument', "The story position in the address is empty, so there's nothing to search as of.")} />}
-      {where !== undefined && (
-        <p className="search-position">
-          Searching as of <strong>{where}</strong>: only what the reader has met by then.{' '}
-          <Link to="." search={(prev: SearchPageSearch) => ({ ...prev, at: undefined })}>
-            Search everything
-          </Link>
-        </p>
-      )}
+      {where !== undefined &&
+        (readers ? (
+          <p className="search-position">
+            Searching as of <strong>{where}</strong>: only what a reader can find by then.{' '}
+            <Link to="." search={(prev: SearchPageSearch) => ({ ...prev, readers: undefined })}>
+              Author's view
+            </Link>
+          </p>
+        ) : (
+          <p className="search-position">
+            Searching everything, at <strong>{where}</strong>: what a reader can find by then comes first.
+          </p>
+        ))}
       {q ? (
-        <Results universe={universe} q={q} filters={filters} filtered={filtered} at={at} where={where} hierarchy={hierarchy.data} />
+        <Results
+          universe={universe}
+          q={q}
+          filters={filters}
+          filtered={filtered}
+          at={at}
+          readers={readers}
+          where={where}
+          hierarchy={hierarchy.data}
+          positions={positions.data?.positions ?? []}
+        />
       ) : (
         <p className="muted">Type in the search box at the top to search this universe's notes. Press / to go to it from anywhere.</p>
       )}
     </div>
   )
+}
+
+/** The hierarchy with only the books and series readers at `at` have reached, for the Scope filter. Nothing until it can be worked out. */
+function readersScopes(
+  hierarchy: HierarchyResult | undefined,
+  at: string | undefined,
+  positions: readonly PositionView[] | undefined,
+): HierarchyResult | undefined {
+  return hierarchy && at && positions ? { ...hierarchy, universe: readersTree(hierarchy.universe, at, positions) } : undefined
 }
 
 function Filters({
@@ -157,7 +201,9 @@ function Filters({
                 {b.name}
               </option>
             ))}
-            {scope && !u && <option value={scope}>{search.book ?? search.series}</option>}
+            {scope && !books.some((b) => `book:${b.key}` === scope) && !u?.series.some((s) => `series:${s.key}` === scope) && (
+              <option value={scope}>{search.book ?? search.series}</option>
+            )}
           </optgroup>
         </select>
       </label>
@@ -203,13 +249,14 @@ function typesIn(hierarchy: HierarchyResult | undefined): string[] {
 }
 
 /**
- * Keeps the last answer while the next one loads, but only at the same
- * position: one from a later position could show what the reader hasn't met.
+ * Keeps the last answer while the next one loads, but only at the same position
+ * and in the same view: one from a later position, or the Author's view, could
+ * show what the reader hasn't met.
  */
-export function keepAtSamePosition(at: string | undefined) {
+export function keepAtSamePosition(at: string | undefined, readers = false) {
   return (previous: SearchResult | undefined, previousQuery: { queryKey: readonly unknown[] } | undefined): SearchResult | undefined => {
     const key = previousQuery?.queryKey[1] as SearchKey | undefined
-    return key && key.at === (at ?? null) ? previous : undefined
+    return key && key.at === (at ?? null) && key.readers === readers ? previous : undefined
   }
 }
 
@@ -219,24 +266,28 @@ function Results({
   filters,
   filtered,
   at,
+  readers,
   where,
   hierarchy,
+  positions,
 }: {
   universe: string
   q: string
   filters: SearchFilters
   filtered: boolean
   at: string | undefined
+  readers: boolean
   where: string | undefined
   hierarchy: HierarchyResult | undefined
+  positions: readonly PositionView[]
 }) {
   // "Show more" asks again for more hits; a new search starts from the first step.
-  const searchKey = JSON.stringify([q, filters, at])
+  const searchKey = JSON.stringify([q, filters, at, readers])
   const [more, setMore] = useState({ key: searchKey, step: 0 })
   const step = more.key === searchKey ? more.step : 0
   const result = useQuery({
-    ...searchQuery(universe, q, filters, at, SEARCH_LIMITS[step]),
-    placeholderData: keepAtSamePosition(at),
+    ...searchQuery(universe, q, filters, at, SEARCH_LIMITS[step], readers),
+    placeholderData: keepAtSamePosition(at, readers),
   })
   // After "Show more", when the button goes (every match is shown, or the
   // API's limit is reached), focus moves to the line that says so.
@@ -264,7 +315,7 @@ function Results({
   if (hits.length === 0) {
     return (
       <p className="muted" role="status">
-        {where !== undefined ? `No matches as of ${where}.` : `No matches for “${q}”.`}
+        {where !== undefined && readers ? `No matches as of ${where}.` : `No matches for “${q}”.`}
         {filtered && ' Try without some of the filters.'}
       </p>
     )
@@ -272,24 +323,29 @@ function Results({
 
   const groups = groupByEntity(hits)
   const last = step === SEARCH_LIMITS.length - 1
+  // In the Author's view, what no hit lets a reader find follows a line, as a list's later notes do.
+  const firstLater = at !== undefined && !readers ? groups.findIndex((g) => !g.hits.some((h) => h.met)) : -1
+  const tagged = hits.some(hasTag)
   return (
     <div aria-busy={result.isPlaceholderData} className={result.isPlaceholderData ? 'search-results stale' : 'search-results'}>
       <p className="muted" role="status">
         {truncated ? `The first ${count(hits.length, 'match', 'matches')}` : count(hits.length, 'match', 'matches')}, in{' '}
         {count(groups.length, 'note', 'notes')}.
       </p>
+      {tagged && <p className="muted list-legend">{MARKS_LEGEND}</p>}
       <ol className="hit-groups">
-        {groups.map(({ entity, hits: own }) => (
-          <li key={entity.key}>
+        {groups.map(({ entity, hits: own }, i) => (
+          <li key={entity.key} className={i === firstLater && i > 0 ? 'later-first' : undefined}>
             <p className="hit-entity">
               <EntityLink universe={universe} entityKey={entity.key}>
                 {entity.name}
               </EntityLink>{' '}
               <StatusBadge status={entity.status} /> <span className="muted">{entity.type}, in {scopeName(entity, hierarchy)}</span>
+              {own[0].noteMark && <MarkList mark={own[0].noteMark} positions={positions} note />}
             </p>
             <ul className="hits">
-              {own.map((hit, i) => (
-                <Hit key={i} universe={universe} hit={hit} />
+              {own.map((hit, j) => (
+                <Hit key={j} universe={universe} hit={hit} positions={positions} />
               ))}
             </ul>
           </li>
@@ -321,7 +377,58 @@ function Results({
   )
 }
 
-function Hit({ universe, hit }: { universe: string; hit: SearchHit }) {
+/** A hit's own tag or note's tag, so the list needs its one line to explain them. */
+function hasTag(hit: SearchHit): boolean {
+  return !!(hit.noteMark || hit.readerMark || hit.aheadValues || hit.unplacedValues || hit.laterLink?.readerMark || hit.hiddenIn)
+}
+
+/** True if two marks say the same, so a hit whose mark is its note's doesn't repeat it. */
+function sameMark(a: SearchHit['readerMark'], b: SearchHit['readerMark']): boolean {
+  return a?.kind === b?.kind && a?.at === b?.at
+}
+
+/**
+ * What readers at the position don't know of a hit, in one plain tag, as nothing has
+ * two (#300): what it's in, then a value it names, then a linked note it names.
+ * A linked note out of canon has its own badge instead.
+ */
+function HitTag({ hit, positions }: { hit: SearchHit; positions: readonly PositionView[] }) {
+  if (hit.readerMark) {
+    return sameMark(hit.readerMark, hit.noteMark) ? null : <MarkList mark={hit.readerMark} positions={positions} />
+  }
+
+  if (hit.aheadValues) {
+    return (
+      <span className="ahead-of-readers" title={aheadValuesWhy(hit.aheadValues)}>
+        {AHEAD_OF_READERS}
+      </span>
+    )
+  }
+
+  if (hit.unplacedValues) {
+    return (
+      <span className="ahead-of-readers" title={notPlacedWhy(hit.unplacedValues[0])}>
+        {NOT_PLACED}
+      </span>
+    )
+  }
+
+  if (hit.laterLink) {
+    return hit.laterLink.readerMark ? <MarkList mark={hit.laterLink.readerMark} positions={positions} note /> : <StatusBadge status={hit.laterLink.status} />
+  }
+
+  if (hit.hiddenIn) {
+    return (
+      <span className="ahead-of-readers" title={hit.hiddenIn === 'alias' ? ONLY_IN_ALIAS_WHY : ONLY_IN_LINK_TARGET_WHY}>
+        {hit.hiddenIn === 'alias' ? ONLY_IN_ALIAS : ONLY_IN_LINK_TARGET}
+      </span>
+    )
+  }
+
+  return null
+}
+
+function Hit({ universe, hit, positions }: { universe: string; hit: SearchHit; positions: readonly PositionView[] }) {
   const bookkeeping = !hit.inCanon && !hit.inComment && !hit.field && !hit.leftOut && (hit.status === 'canon' || hit.status === 'draft')
   return (
     <li>
@@ -331,12 +438,13 @@ function Hit({ universe, hit }: { universe: string; hit: SearchHit }) {
           params={{ universe, _splat: hit.entity.key }}
           hash={hit.section ? sectionAnchor(hit.section) : undefined}
         >
-          {hit.field ? `Field: ${hit.field}` : (hit.section ?? 'Name or opening')}
+          {hit.field ? `Field: ${hit.field}` : hit.section === null ? 'Name or opening' : hit.section || 'A section with no heading'}
         </Link>
         {hit.status !== hit.entity.status && <StatusBadge status={hit.status} />}
         {bookkeeping && <span className="badge">bookkeeping</span>}
         {hit.leftOut && <span className="badge problem">left out</span>}
         {hit.inComment && <span className="badge">in a comment</span>}
+        <HitTag hit={hit} positions={positions} />
       </p>
       <p className="snippet">
         <Snippet text={hit.text ?? hit.snippet} matches={hit.matches ?? []} />

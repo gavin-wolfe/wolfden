@@ -240,13 +240,19 @@ public sealed class DenIndex : IDisposable
     /// characters are treated as spaces, so no input throws. It finds every
     /// status, bookkeeping, and HTML comments; see <see cref="SearchHit.IsInCanon"/>.
     /// </summary>
-    public IReadOnlyList<SearchHit> Search(string text, int limit = 20)
+    /// <param name="text">The words.</param>
+    /// <param name="limit">The most hits to read.</param>
+    /// <param name="metFirstAt">
+    /// A story point: hits in notes in canon that enter by then come first, each part
+    /// best first, so a limit cuts the others first. Null for best first.
+    /// </param>
+    public IReadOnlyList<SearchHit> Search(string text, int limit = 20, long? metFirstAt = null)
     {
         ArgumentNullException.ThrowIfNull(text);
 
         // Control characters become spaces: FTS5 reads a query as a C string, so a NUL would end it early.
         var query = SearchQuery.ToFts5(text);
-        return query.Length == 0 ? [] : SearchMatch(query, limit);
+        return query.Length == 0 ? [] : SearchMatch(query, limit, metFirstAt);
     }
 
     /// <summary>
@@ -257,11 +263,14 @@ public sealed class DenIndex : IDisposable
     /// higher, and matches in comments lower.
     /// </summary>
     /// <exception cref="SqliteException">The expression isn't valid FTS5 syntax.</exception>
-    public IReadOnlyList<SearchHit> SearchMatch(string fts5Query, int limit = 20)
+    public IReadOnlyList<SearchHit> SearchMatch(string fts5Query, int limit = 20) => SearchMatch(fts5Query, limit, null);
+
+    private List<SearchHit> SearchMatch(string fts5Query, int limit, long? metFirstAt)
     {
         ArgumentNullException.ThrowIfNull(fts5Query);
         using var command = _connection.CreateCommand();
-        command.CommandText = """
+        var first = metFirstAt is null ? "" : "(e.status IN ('draft', 'canon') AND e.from_ordinal <= $met) DESC, ";
+        command.CommandText = $"""
             SELECT e.key, e.name, e.path, s.name, s.line,
                    snippet(search, -1, char(1), char(2), '…', 12), bm25(search, 10.0, 1.0, 0.5) AS rank,
                    coalesce(s.status, e.status), coalesce(s.is_bookkeeping, 0),
@@ -271,9 +280,14 @@ public sealed class DenIndex : IDisposable
             JOIN entities e ON e.id = search.entity_id
             LEFT JOIN sections s ON s.id = search.section_id
             WHERE search MATCH $query
-            ORDER BY rank, e.path, coalesce(s."index", -1)
+            ORDER BY {first}rank, e.path, coalesce(s."index", -1)
             LIMIT $limit
             """;
+        if (metFirstAt is { } met)
+        {
+            command.Parameters.AddWithValue("$met", met);
+        }
+
         command.Parameters.AddWithValue("$query", fts5Query);
         command.Parameters.AddWithValue("$limit", limit);
         var hits = new List<SearchHit>();
@@ -309,6 +323,47 @@ public sealed class DenIndex : IDisposable
         }
 
         return hits;
+    }
+
+    /// <summary>
+    /// How well each note's name and lead, or each section, matches <paramref name="text"/> in
+    /// names, aliases, leads, and sections, leaving out what's in HTML comments, by the
+    /// entity's path and the section's line (null for the name and lead); lower is better.
+    /// Every row that matches is there, with no snippets, so it's cheap whatever matches.
+    /// </summary>
+    internal Dictionary<(string Path, int? Line), double> SearchRanks(string text)
+    {
+        var ranks = new Dictionary<(string Path, int? Line), double>();
+        var query = SearchQuery.ToFts5(text);
+        if (query.Length == 0)
+        {
+            return ranks;
+        }
+
+        using var command = _connection.CreateCommand();
+        command.CommandText = """
+            SELECT e.path, s.line, bm25(search, 10.0, 1.0, 0.5)
+            FROM search
+            JOIN entities e ON e.id = search.entity_id
+            LEFT JOIN sections s ON s.id = search.section_id
+            WHERE search MATCH $query
+            """;
+        command.Parameters.AddWithValue("$query", $"{{title body}} : ({query})");
+        _connection.Open();
+        try
+        {
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                ranks[(reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetInt32(1))] = reader.GetDouble(2);
+            }
+        }
+        finally
+        {
+            _connection.Close();
+        }
+
+        return ranks;
     }
 
     /// <inheritdoc />

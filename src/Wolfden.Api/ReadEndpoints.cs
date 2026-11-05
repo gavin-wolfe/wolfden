@@ -35,10 +35,11 @@ namespace Wolfden.Api;
 /// <c>asOf</c>, and no MCP tool has it.
 /// </para>
 /// <para>
-/// <c>readers=true</c>, on <c>/api/entity</c> beside <c>asOf</c>, is the web UI's
-/// Reader's view: the page as an AI assistant's read at that position has it
-/// (<see cref="AsOfReads"/>), with no later <c>until</c>, position value, or HTML
-/// comment. Without <c>asOf</c>, or with <c>marksAt</c>, it's <c>bad_argument</c>.
+/// <c>readers=true</c>, on <c>/api/entity</c>, <c>/api/search</c>, and <c>/api/fields</c>
+/// beside <c>asOf</c>, is the web UI's Reader's view: the page as an AI assistant's read at
+/// that position has it (<see cref="AsOfReads"/>), with no later <c>until</c>, position
+/// value, or HTML comment, and a search of only that. Without <c>asOf</c>, or with
+/// <c>marksAt</c>, it's <c>bad_argument</c>.
 /// </para>
 /// </remarks>
 public static class ReadEndpoints
@@ -93,15 +94,29 @@ public static class ReadEndpoints
             q => reader.CanonAsOf(q.Text("universe"), q.Position("asOf"), q.Text("series"), q.Text("book"), q.Text("type"), q.Bool("brief"))));
         api.MapGet("/search", (HttpContext c) => Answer(
             c,
-            ["query", "universe", "type", "status", "series", "book", "canonOnly", "asOf", "limit", "field", "marksAt"],
-            q => q.Position("marksAt") is { } marksAt
-                ? MarkedSearch(
-                    reader, marksAt, q.Position("asOf"), q.Text("query") ?? "", q.Text("universe"), q.Text("type"), q.Bool("canonOnly"), q.Int("limit", 20),
-                    q.Text("status"), q.Text("series"), q.Text("book"), q.Text("field"))
-                : SearchPage(reader.Search(
-                    q.Text("query") ?? "", q.Text("universe"), q.Text("type"), q.Bool("canonOnly"), q.Int("limit", 20),
-                    q.Text("status"), q.Text("series"), q.Text("book"), q.Position("asOf"), q.Text("field")))));
-        api.MapGet("/fields", (HttpContext c) => Answer(c, ["universe", "asOf"], q => reader.FieldNames(q.Text("universe"), q.Position("asOf"))));
+            ["query", "universe", "type", "status", "series", "book", "canonOnly", "asOf", "limit", "field", "marksAt", "readers"],
+            q =>
+            {
+                CheckReaders(q.Position("asOf"), q.Position("marksAt"), q.Bool("readers"));
+                return q.Position("marksAt") is { } marksAt
+                    ? MarkedSearch(
+                        reader, marksAt, q.Position("asOf"), q.Text("query") ?? "", q.Text("universe"), q.Text("type"), q.Bool("canonOnly"), q.Int("limit", 20),
+                        q.Text("status"), q.Text("series"), q.Text("book"), q.Text("field"))
+                    : q.Bool("readers")
+                    ? SearchPage(reader.SearchAsReaders(
+                        q.Text("query") ?? "", q.Text("universe"), q.Text("type"), q.Bool("canonOnly"), q.Int("limit", 20),
+                        q.Text("status"), q.Text("series"), q.Text("book"), q.Position("asOf")!, q.Text("field")))
+                    : SearchPage(reader.Search(
+                        q.Text("query") ?? "", q.Text("universe"), q.Text("type"), q.Bool("canonOnly"), q.Int("limit", 20),
+                        q.Text("status"), q.Text("series"), q.Text("book"), q.Position("asOf"), q.Text("field")));
+            }));
+        api.MapGet("/fields", (HttpContext c) => Answer(
+            c, ["universe", "asOf", "readers"],
+            q =>
+            {
+                CheckReaders(q.Position("asOf"), null, q.Bool("readers"));
+                return reader.FieldNames(q.Text("universe"), q.Position("asOf"), q.Bool("readers"));
+            }));
         api.MapGet("/history", (HttpContext c) => Answer(
             c, ["entity", "universe", "limit", "before"], q => History(reader, q.Text("entity"), q.Text("universe"), q.Int("limit", 20), q.Text("before"))));
         api.MapGet("/history/diff", (HttpContext c) => Answer(
@@ -125,7 +140,7 @@ public static class ReadEndpoints
     /// </summary>
     internal static SearchPageResult SearchPage(SearchResult result) => new(
         result.Version, result.Query, result.Count, result.Truncated,
-        result.Hits.Select(h => new SearchPageHit(h.Entity, h.Section, h.Line, h.Snippet, h.Status, h.InCanon, h.InComment, h.Field, h.Text, h.Matches, h.LeftOut, EntryIndex: h.EntryIndex))
+        result.Hits.Select(h => new SearchPageHit(h.Entity, h.Section, h.Line, h.Snippet, h.Status, h.InCanon, h.InComment, h.Field, h.Text, h.Matches, h.LeftOut, EntryIndex: h.EntryIndex, LinkedNotes: h.LinkedNotes))
             .ToList());
 
     /// <summary>Refuses a read given both a position to read as of and a position to mark at.</summary>
@@ -139,10 +154,23 @@ public static class ReadEndpoints
         }
     }
 
+    /// <summary>Refuses <c>readers</c> without a position to read as of, or with a position to mark at.</summary>
+    internal static void CheckReaders(string? asOf, string? marksAt, bool readers)
+    {
+        CheckOnePosition(asOf, marksAt);
+        if (readers && asOf is null)
+        {
+            throw new DenToolException(
+                ToolErrorCodes.BadArgument,
+                "'readers' goes only with 'asOf': give the position whose readers to read as, and no 'marksAt'.");
+        }
+    }
+
     /// <summary>
     /// A search of the universe <paramref name="marksAt"/> is in, finding what
     /// it finds with no position, later material included, with what readers
-    /// there don't know marked.
+    /// there can find first and what they don't know marked. It reads more than
+    /// the limit, so a limit cuts what readers haven't met before anything they have.
     /// </summary>
     private static SearchPageResult MarkedSearch(
         DenReader reader, string marksAt, string? asOf, string query, string? universe, string? type, bool canonOnly, int limit,
@@ -152,7 +180,7 @@ public static class ReadEndpoints
         return reader.WithIndex(index =>
         {
             var marks = ReaderMarks.For(reader, index, universe, marksAt);
-            return marks.Mark(SearchPage(reader.Search(index, query, marks.Universe, type, canonOnly, limit, status, series, book, null, field)));
+            return marks.Mark(SearchPage(reader.SearchWide(index, query, marks.Universe, type, canonOnly, limit, status, series, book, field, marks.Point)), limit);
         });
     }
 

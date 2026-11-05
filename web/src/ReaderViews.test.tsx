@@ -83,11 +83,11 @@ describe('SC-WEB-103: the Author’s view and the Reader’s view', () => {
   it('says what it doesn’t cover yet, beside read-only, on both tabs', async () => {
     stubApi()
     const note = renderApp('/u/dracula/e/E-MINA?at=dracula:3&readers=1')
-    expect(await screen.findByText(/Search, book and chapter pages, and the Book and Chapter menus aren't part of the Reader's view yet/)).toBeTruthy()
+    expect(await screen.findByText(/Book and chapter pages, and the Book and Chapter menus, aren't part of the Reader's view yet/)).toBeTruthy()
     note.unmount()
 
     renderApp('/u/dracula/e/E-MINA?view=history&at=dracula:3&readers=1')
-    expect(await screen.findByText(/Search, book and chapter pages, and the Book and Chapter menus aren't part of the Reader's view yet/)).toBeTruthy()
+    expect(await screen.findByText(/Book and chapter pages, and the Book and Chapter menus, aren't part of the Reader's view yet/)).toBeTruthy()
   })
 
   it('doesn’t say so in the Author’s view', async () => {

@@ -465,6 +465,19 @@ export interface SearchHit {
   status: string
   inCanon: boolean
   inComment: boolean
+  /** With `marksAt`: what readers there don't know of the text it found, the note's own mark if that's why. */
+  readerMark?: ReaderMark
+  /** With `marksAt`: the note's own mark, if readers meet it after the position or no position places it. */
+  noteMark?: ReaderMark
+  /** With `marksAt`: which of a position field's values are later, or can't be compared. */
+  aheadValues?: string[]
+  unplacedValues?: string[]
+  /** With `marksAt`: the snippet names a linked note readers there don't know, so they couldn't have found it by that name. */
+  laterLink?: { status: string; readerMark?: ReaderMark }
+  /** With `marksAt`: the words are only where a reader's page doesn't show them: a note's aliases, or a labelled link's target. */
+  hiddenIn?: 'alias' | 'linkTarget'
+  /** With `marksAt`: true if a search in the Reader's view there finds this. They come first. */
+  met?: boolean
 }
 
 /** The field names a search can be narrowed to (/api/fields): as of a position, only those of values the reader has met. */
@@ -481,6 +494,7 @@ export interface SearchResult {
   count: number
   truncated: boolean
   hits: SearchHit[]
+  marksAt?: string
 }
 
 /** What a search asks for besides its words: the filters /api/search takes. */
@@ -511,10 +525,17 @@ export interface SearchKey {
   book: string | null
   canonOnly: boolean
   at: string | null
+  /** True for the Reader's view at `at`. */
+  readers: boolean
   limit: number
 }
 
-export function searchQuery(universe: string, query: string, filters: SearchFilters, at: string | undefined, limit: number) {
+/**
+ * A search (#25, #300). With no position, everything. In the Author's view, everything,
+ * with what readers at `at` can find first and marks on the rest. In the Reader's view,
+ * only what they can find. A blank `at` is sent as it is, and fails closed.
+ */
+export function searchQuery(universe: string, query: string, filters: SearchFilters, at: string | undefined, limit: number, readers = false) {
   const { field, type, status, series, book, canonOnly } = filters
   const key: SearchKey = {
     universe,
@@ -526,21 +547,23 @@ export function searchQuery(universe: string, query: string, filters: SearchFilt
     book: book ?? null,
     canonOnly: canonOnly ?? false,
     at: at ?? null,
+    readers: readers && at !== undefined,
     limit,
   }
+  const position = at === undefined ? {} : readers ? { asOf: at, readers: 'true' } : { marksAt: at }
   return queryOptions({
     queryKey: ['search', key] as const,
     queryFn: () =>
       getJson<SearchResult>(
-        apiPath('/api/search', { query, universe, field, type, status, series, book, canonOnly: canonOnly ? 'true' : undefined, asOf: at, limit }),
+        apiPath('/api/search', { query, universe, field, type, status, series, book, canonOnly: canonOnly ? 'true' : undefined, ...position, limit }),
       ),
   })
 }
 
-/** The fields a search can be narrowed to: as of a position, only those the reader has met values of. */
-export function fieldsQuery(universe: string, at: string | undefined) {
+/** The fields a search can be narrowed to: every one, or in the Reader's view at `at`, only those with a value readers there can see. */
+export function fieldsQuery(universe: string, at?: string) {
   return queryOptions({
     queryKey: ['fields', universe, at ?? null],
-    queryFn: () => getJson<FieldNamesResult>(apiPath('/api/fields', { universe, asOf: at })),
+    queryFn: () => getJson<FieldNamesResult>(apiPath('/api/fields', at === undefined ? { universe } : { universe, asOf: at, readers: 'true' })),
   })
 }

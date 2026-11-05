@@ -7,7 +7,14 @@ namespace Wolfden.Index.Reading;
 internal sealed record FieldCandidate(EntityRecord Entity, string Field, int Line, string ValueJson, string Status, int? EntryIndex);
 
 /// <summary>A field value a search matched, with its snippet.</summary>
-internal sealed record FieldHit(EntityRecord Entity, string Field, int Line, string Status, MarkedText Snippet, int? EntryIndex);
+/// <param name="Entity">The entity.</param>
+/// <param name="Field">The field.</param>
+/// <param name="Line">The value's line.</param>
+/// <param name="Status">Its effective status.</param>
+/// <param name="Snippet">The value as written, and the linked names that matched.</param>
+/// <param name="EntryIndex">The entry's place in its field, for an entry.</param>
+/// <param name="LinkedNotes">The paths of the notes whose name or alias the snippet shows.</param>
+internal sealed record FieldHit(EntityRecord Entity, string Field, int Line, string Status, MarkedText Snippet, int? EntryIndex, IReadOnlyList<string> LinkedNotes);
 
 /// <summary>
 /// Search in field values (#179, maintainer decision 2026-10-26). A value's
@@ -34,8 +41,9 @@ internal sealed class FieldSearch
     private readonly int? _universeId;
     private readonly string? _field;
     private readonly IReadOnlySet<string>? _met;
+    private readonly ReadersLinks? _asReaders;
     private ILookup<(int EntityId, string Field), int>? _lines;
-    private ILookup<(int EntityId, string Field, int Line), string[]>? _links;
+    private ILookup<(int EntityId, string Field, int Line), (string Path, string[] Names)>? _links;
 
     /// <summary>A search for <paramref name="words"/>.</summary>
     /// <param name="index">The index.</param>
@@ -43,8 +51,13 @@ internal sealed class FieldSearch
     /// <param name="universeId">The universe, or null for every universe.</param>
     /// <param name="field">The one field to search, or null for every field.</param>
     /// <param name="met">As of a position, the paths of the notes the reader has met, whatever a filter shows; null without a position.</param>
-    public FieldSearch(DenIndex index, SearchWords words, int? universeId, string? field, IReadOnlySet<string>? met)
+    /// <param name="asReaders">
+    /// To search what a reader's page shows (<see cref="DenReader.SearchAsReaders"/>): each
+    /// link is what it shows there, and nothing else about the note it reaches matches.
+    /// </param>
+    public FieldSearch(DenIndex index, SearchWords words, int? universeId, string? field, IReadOnlySet<string>? met, ReadersLinks? asReaders = null)
     {
+        _asReaders = asReaders;
         _db = index.Context;
         _words = words;
         _universeId = universeId;
@@ -87,8 +100,13 @@ internal sealed class FieldSearch
         }
 
         var written = ValueText(value.ValueJson);
+        if (_asReaders is not null)
+        {
+            written = _asReaders.Value(value.Entity.Id, written);
+        }
+
         var own = _words.Find(written);
-        var names = LinkedNames(value).Select(n => (Name: n, Found: _words.Find(n.Text))).ToList();
+        var names = (_asReaders is null ? LinkedNames(value) : []).Select(n => (Name: n, Found: _words.Find(n.Text))).ToList();
         for (var i = 0; i < _words.Count; i++)
         {
             if (own[i].Count == 0 && names.All(n => n.Found[i].Count == 0))
@@ -103,6 +121,7 @@ internal sealed class FieldSearch
         var text = new StringBuilder(snippet.Text);
         var matches = snippet.Matches.ToList();
         var shown = new HashSet<string>(StringComparer.Ordinal);
+        var linked = new List<string>();
         foreach (var group in names.Where(n => n.Found.Any(f => f.Count > 0)).GroupBy(n => n.Name.Group))
         {
             // The name or alias that holds the most of the query's words, the name first on a tie.
@@ -112,13 +131,14 @@ internal sealed class FieldSearch
                 continue;
             }
 
+            linked.Add(name.Path);
             text.Append(" → ");
             var at = text.Length;
             text.Append(name.Text);
             matches.AddRange(found.SelectMany(f => f).Select(m => m with { Start = m.Start + at }));
         }
 
-        return new FieldHit(value.Entity, value.Field, value.Line, value.Status, new MarkedText(text.ToString(), MarkedText.Merge(matches)), value.EntryIndex);
+        return new FieldHit(value.Entity, value.Field, value.Line, value.Status, new MarkedText(text.ToString(), MarkedText.Merge(matches)), value.EntryIndex, linked);
     }
 
     /// <summary>A field value as one line of text: a list's items and a mapping's keys and values joined with commas.</summary>
@@ -142,10 +162,10 @@ internal sealed class FieldSearch
     /// each tagged with its link's place, so a snippet shows one per link.
     /// As of a position, only notes the reader has met.
     /// </summary>
-    private IEnumerable<(string Text, int Group)> LinkedNames(FieldCandidate value)
+    private IEnumerable<(string Text, int Group, string Path)> LinkedNames(FieldCandidate value)
     {
         LoadLinks();
-        return _links![(value.Entity.Id, value.Field, value.Line)].SelectMany((names, i) => names.Select(n => (n, i)));
+        return _links![(value.Entity.Id, value.Field, value.Line)].SelectMany((note, i) => note.Names.Select(n => (n, i, note.Path)));
     }
 
     /// <summary>
@@ -179,11 +199,11 @@ internal sealed class FieldSearch
             .OrderBy(x => x.Link.Line).ThenBy(x => x.Link.Column)
             .Select(x => (
                 Key: (x.Link.EntityId, x.Link.Field, x.Owner),
-                Names: targets[(x.Link.UniverseId, x.Link.Target)]
-                    .SelectMany(e => aliases[e.Id].OrderBy(a => a.Order).Select(a => a.Alias).Prepend(e.Name))
-                    .ToArray()))
-            .Where(x => x.Names.Length > 0)
-            .ToLookup(x => x.Key, x => x.Names);
+                Note: targets[(x.Link.UniverseId, x.Link.Target)]
+                    .Select(e => (e.Path, Names: aliases[e.Id].OrderBy(a => a.Order).Select(a => a.Alias).Prepend(e.Name).ToArray()))
+                    .FirstOrDefault()))
+            .Where(x => x.Note.Names is not null)
+            .ToLookup(x => x.Key, x => x.Note);
     }
 
     private List<FieldValueRecord> Values() =>

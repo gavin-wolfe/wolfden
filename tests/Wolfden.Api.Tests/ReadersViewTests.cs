@@ -233,9 +233,8 @@ public sealed class ReadersViewTests : IDisposable
     [Theory]
     [Trait("Scenario", "SC-WEB-101")]
     [InlineData("/api/canon?universe=starfall&asOf=ember:1&readers=true")]
-    [InlineData("/api/search?universe=starfall&query=toll&asOf=ember:1&readers=true")]
     [InlineData("/api/entities?universe=starfall&asOf=ember:1&readers=true")]
-    public async Task OnlyANotesPageTakesReaders(string path)
+    public async Task CanonAndListsDontTakeReaders(string path)
     {
         await using var server = await Start();
 

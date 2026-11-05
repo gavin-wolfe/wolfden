@@ -27,13 +27,7 @@ internal static class EntityPages
     public static EntityPageResult Get(DenReader reader, string? entity, string? universe, string? asOf, string? marksAt = null, bool readers = false)
     {
         DenReader.CheckEntityName(entity);
-        ReadEndpoints.CheckOnePosition(asOf, marksAt);
-        if (readers && asOf is null)
-        {
-            throw new DenToolException(
-                ToolErrorCodes.BadArgument,
-                "'readers' goes only with 'asOf': give the position whose readers to read as, and no 'marksAt'.");
-        }
+        ReadEndpoints.CheckReaders(asOf, marksAt, readers);
 
         return reader.WithIndex(index =>
         {

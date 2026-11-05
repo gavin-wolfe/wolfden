@@ -847,6 +847,12 @@ you're in is always highlighted.
   for the sentence, or open the note. A chapter's page lists what enters there the same way.
   With more than 1,000 notes, the sidebar lists 1,000, what readers have met first, says
   how many of how many, and a group's count covers only what's listed.
+
+  **Search** finds everything. Notes with something a reader could find come first, then
+  a dashed line, then the rest, with tags saying why. Hits in a comment say `in a
+  comment`, and `only in an alias` or `only in a link's target` means a reader's search
+  wouldn't find it there. If you find a note by the name or alias of a note it links to,
+  and readers haven't met that one, the hit says where they do.
 - **The Reader's view** shows what a reader at that chapter knows, and nothing else:
   no tags, no later dates, no comments, and no sections with an error. A note they
   haven't met says where they first meet it. It's read-only, and it has no history,
@@ -860,15 +866,25 @@ you're in is always highlighted.
   list only the books they've got to. There's nowhere to make a new note from here, so
   switch to the Author's view for that.
 
+  **Search** finds only what a reader could: a word in a comment, a later section or
+  value, or a note they haven't met finds nothing, and no snippet shows it. It goes by
+  what the Reader's page shows, so each link is found by what it shows there.
+  `[[halden-pike|the stranger]]` is found by "stranger" and never by "pike", even once
+  they've met him, which is why the tip above works. With no label, a link to a note
+  they've met is found by that note's name, however you wrote it, and one to a note
+  they haven't met is found as you wrote it. Aliases aren't searched here, since the
+  page doesn't list them, and nor are a type's default values. A comment inside a field's value isn't hidden, here or on the page: comments
+  are hidden in a note's text. The Type, Field, and Scope filters list only what
+  they've reached.
+
 The Reader's view stays while you follow links and change chapters, and its link
 keeps it (`?readers=1`), but Wolfden doesn't remember it: opening Wolfden fresh starts
 in the Author's view.
 
-**What the Reader's view doesn't cover yet.** It's about note pages and lists of notes,
-and says so on the page. The rest of the screen isn't filtered the same way,
-so don't take it as what a reader would see: search finds comments and later values,
-and the book and chapter pages and the position bar's Book and Chapter menus show later
-books' and chapters' names. "Read-only" also doesn't reach everything: checkpoints, the ⚠ list's **Edit file**, and the book and
+**What the Reader's view doesn't cover yet.** It's about note pages, lists of notes, and
+search, and says so on the page. The rest of the screen isn't filtered the same way,
+so don't take it as what a reader would see: the book and chapter pages and the position
+bar's Book and Chapter menus show later books' and chapters' names. "Read-only" also doesn't reach everything: checkpoints, the ⚠ list's **Edit file**, and the book and
 chapter pages' controls still work. Edit file shows the whole source, so it's the
 Author's view whichever you came from, and it keeps your position.
 

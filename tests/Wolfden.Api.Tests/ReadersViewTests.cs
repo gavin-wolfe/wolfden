@@ -339,7 +339,10 @@ public sealed class ReadersViewTests : IDisposable
         var noPosition = LinksWithNoPosition();
 
         // The kinds F-LINK-13 gives no position, so the exemption below is about all of them.
-        Assert.Subset(noPosition.Select(l => l.Site).ToHashSet(), new HashSet<string> { "container_body", "outline_notes", "chapter_field", "chapter_default" });
+        Assert.Equal(["chapter_default", "chapter_field", "container_body", "outline_notes"], noPosition.Select(l => l.Site).Distinct().Order(StringComparer.Ordinal));
+
+        // A chapter value that's held has its chapter as its position, so it isn't one of them.
+        Assert.True(new DenReader(_den.Root).WithIndex(index => index.Context.Links.Any(l => l.Site == "chapter_field" && l.Text == "[[The salt tithe]]" && l.PositionOrdinal != null)));
 
         foreach (var at in positions.GetProperty("positions").EnumerateArray().Select(p => p.GetProperty("position").GetString()!))
         {
@@ -376,7 +379,8 @@ public sealed class ReadersViewTests : IDisposable
         var book = File.ReadAllText(Path.Combine(_den.Root, Book, "book.md")).Replace("\r\n", "\n", StringComparison.Ordinal);
         book = book
             .Replace("status: draft\n", "status: draft\nchapter_defaults:\n  narration: \"[[The salt tithe]]\"\n", StringComparison.Ordinal)
-            .Replace("title: Kessan Reach }", "title: Kessan Reach, fields: { narration: \"[[The salt tithe]]\" } }", StringComparison.Ordinal);
+            .Replace("title: Kessan Reach }", "title: Kessan Reach, fields: { narration: \"[[The salt tithe]]\" } }", StringComparison.Ordinal)
+            .Replace("{ key: \"2\", number: 2 }", "{ key: \"2\", number: 2, fields: { pov: [\"[[The salt tithe]]\"] } }", StringComparison.Ordinal);
         _den.Write($"{Book}/book.md", $"{book}\nA word on [[The salt tithe]] in the book's own text.\n");
         _den.Write($"{Book}/outline.md", $"{File.ReadAllText(Path.Combine(_den.Root, Book, "outline.md"))}\n\nA working note on [[The salt tithe]].\n");
     }

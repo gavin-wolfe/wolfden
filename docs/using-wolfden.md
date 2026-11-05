@@ -845,6 +845,8 @@ you're in is always highlighted.
   note you're looking for is where you'd expect in its part of the list. The tags here
   are plain words, so they don't add a stop for every row when you tab through. Hover
   for the sentence, or open the note. A chapter's page lists what enters there the same way.
+  With more than 1,000 notes, the sidebar lists 1,000, what readers have met first, says
+  how many of how many, and a group's count covers only what's listed.
 - **The Reader's view** shows what a reader at that chapter knows, and nothing else:
   no tags, no later dates, no comments, and no sections with an error. A note they
   haven't met says where they first meet it. It's read-only, and it has no history,
@@ -865,8 +867,8 @@ in the Author's view.
 **What the Reader's view doesn't cover yet.** It's about note pages and lists of notes,
 and says so on the page. The rest of the screen isn't filtered the same way,
 so don't take it as what a reader would see: search finds comments and later values,
-and the book and chapter pages and the position bar's chapter menu show later chapters'
-titles. "Read-only" also doesn't reach everything: checkpoints, the ⚠ list's **Edit file**, and the book and
+and the book and chapter pages and the position bar's Book and Chapter menus show later
+books' and chapters' names. "Read-only" also doesn't reach everything: checkpoints, the ⚠ list's **Edit file**, and the book and
 chapter pages' controls still work. Edit file shows the whole source, so it's the
 Author's view whichever you came from, and it keeps your position.
 

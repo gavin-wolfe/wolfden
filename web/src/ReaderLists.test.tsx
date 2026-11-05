@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import type { BookNode, ChapterNode, MarkedEntity, PositionView, UniverseNode } from './api'
-import { entities, renderApp, stubApi } from './test/harness'
+import { entities, hierarchy, renderApp, stubApi } from './test/harness'
 import { MARKS_LEGEND, READERS_VIEW_REACH } from './readerWords'
 import { readersTree } from './story'
 
@@ -114,16 +114,35 @@ describe('SC-WEB-104: in the Author’s view, a list has everything, what reader
     expect(within(contents).getByRole('link', { name: 'The empty series note' }).closest('li')!.textContent).toContain('not placed in the story yet')
   })
 
-  it('says when a long list is cut off', async () => {
-    stubApi({
-      override: (path, params): unknown =>
-        path === '/api/entities' && params.get('marksAt')
-          ? { version: 1, count: 1, total: 5000, truncated: true, entities: [{ ...entities[0], met: true }], marksAt: 'dracula:3' }
-          : undefined,
-    })
+  it('says plainly what a long list leaves out, in each view and with no position', async () => {
+    const cut = (marked: boolean) => ({ version: 1, count: 1, total: 5000, truncated: true, entities: [{ ...entities[0], ...(marked ? { met: true } : {}) }], ...(marked ? { marksAt: 'dracula:3' } : {}) })
+    stubApi({ override: (path, params): unknown => (path === '/api/entities' ? cut(params.get('marksAt') !== null) : undefined) })
     renderApp('/u/dracula?at=dracula:3')
+    expect(await within(await tree()).findByText("1 of 5,000 notes are listed; groups count only what's listed. What readers have met is listed first.")).toBeTruthy()
+    cleanup()
 
-    expect(await within(await tree()).findByText('Only the first 1 notes are listed.')).toBeTruthy()
+    renderApp('/u/dracula?at=dracula:3&readers=1')
+    expect(await within(await tree()).findByText("1 of 5,000 notes are listed; groups count only what's listed.")).toBeTruthy()
+    cleanup()
+
+    renderApp('/u/dracula')
+    expect(await within(await tree()).findByText("1 of 5,000 notes are listed; groups count only what's listed.")).toBeTruthy()
+  })
+
+  it.each([
+    ['/u/dracula/b/dracula/c/5', false],
+    ['/u/dracula/b/dracula/c/5?at=dracula:3', true],
+    ['/u/dracula/b/dracula/c/5?at=dracula:5&readers=1', false],
+  ])('doesn’t say no note enters at a chapter when the list was cut: %s', async (url, marked) => {
+    const only = { ...entities[0], ...(marked ? { met: true } : {}) }
+    stubApi({ override: (path): unknown => (path === '/api/entities' ? { version: 1, count: 1, total: 1200, truncated: true, entities: [only], ...(marked ? { marksAt: 'dracula:3' } : {}) } : undefined) })
+    renderApp(url)
+    const main = await screen.findByRole('main')
+
+    expect(await within(main).findByText('Only 1 of 1,200 notes could be checked, so more may enter the story here.')).toBeTruthy()
+    expect(within(main).getByText('None of those enter the story here.')).toBeTruthy()
+    expect(within(main).queryByText('No notes enter the story in this chapter.')).toBeNull()
+    expect(within(main).queryByText('Readers have met no notes that enter the story here.')).toBeNull()
   })
 
   it('tags the notes that enter at a later chapter on its page', async () => {
@@ -232,6 +251,24 @@ describe('SC-WEB-105: in the Reader’s view, a list has only what readers know'
 
     expect(await within(main).findByRole('link', { name: 'Lucy Westenra' })).toBeTruthy()
     expect(within(main).queryByText(MARKS_LEGEND)).toBeNull()
+  })
+
+  it('doesn’t say a later series has no books, or name what it’s kept for', async () => {
+    const later = { key: 'later', name: 'The Later Saga', id: null, path: 'later', entities: { total: 1, byType: { note: 1 } }, books: [{ ...hierarchy.universe.books[0], key: 'farbook', name: 'Far Book', position: 'farbook', entities: { total: 0, byType: {} } }] }
+    const answer = { ...hierarchy, universe: { ...hierarchy.universe, series: [later] } }
+    stubApi({ override: (path): unknown => (path === '/api/hierarchy' ? answer : undefined) })
+    renderApp('/u/dracula?at=dracula:3&readers=1')
+    const main = await screen.findByRole('main')
+
+    expect(await within(main).findByText("Readers haven't got to a book in this series.")).toBeTruthy()
+    expect(document.body.textContent).not.toContain('Far Book')
+    expect(within(main).queryByText('No books yet.')).toBeNull()
+    cleanup()
+
+    renderApp('/u/dracula/s/later?at=dracula:3&readers=1')
+    const page = await screen.findByRole('main')
+    expect(await within(page).findByText("Readers haven't got to a book in this series.")).toBeTruthy()
+    expect(within(page).queryByText('This series has no books yet.')).toBeNull()
   })
 
   it('says what it doesn’t reach on every page, once', async () => {

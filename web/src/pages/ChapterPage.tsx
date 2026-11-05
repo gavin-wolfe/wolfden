@@ -6,7 +6,7 @@ import { EntityList } from '../components/EntityList'
 import { ErrorState, Loading } from '../components/States'
 import { useShownError } from '../formHold'
 import { useDocumentTitle, useEntitiesInView, usePosition } from '../hooks'
-import { MARKS_LEGEND } from '../readerWords'
+import { MARKS_LEGEND, chapterListCutWords } from '../readerWords'
 import { chapterLabel, entryOf } from '../story'
 import { findBook } from './BookPage'
 
@@ -103,13 +103,14 @@ export function ChapterPage() {
         <ErrorState error={view.error} />
       ) : (
         <>
+          {view.truncated && <p className="muted list-legend">{chapterListCutWords(view.entities?.length ?? 0, view.total)}</p>}
           {entering.some((e) => e.readerMark) && <p className="muted list-legend">{MARKS_LEGEND}</p>}
           <EntityList
             universe={universe}
             entities={entering}
             positions={view.positions ?? []}
             // It says nothing of a chapter readers haven't reached, whose notes they haven't met either.
-            empty={view.readers ? 'Readers have met no notes that enter the story here.' : 'No notes enter the story in this chapter.'}
+            empty={view.truncated ? 'None of those enter the story here.' : view.readers ? 'Readers have met no notes that enter the story here.' : 'No notes enter the story in this chapter.'}
           />
         </>
       )}

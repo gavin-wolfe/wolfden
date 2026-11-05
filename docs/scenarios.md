@@ -6660,13 +6660,17 @@ Spec: F-VIEW-4, F-VIEW-5, design.md §9 (#300). Covered by: `web/src/ReaderViews
 - **Show everything** ends it, and `?readers=1` with no position means nothing.
 - The Reader's view of a note's page shows only what readers know (SC-WEB-101), with
   no tags, and has no way to edit: no Edit buttons, and it says so. It also says
-  search, book and chapter pages, and the chapter menu aren't part of it yet, as every
+  search, book and chapter pages, and the Book and Chapter menus aren't part of it yet, as every
   other page in that view does.
 - The ⚠ list's **Edit file** leaves the Reader's view behind and keeps the position,
   since it's the whole source, for the writer.
 - A note readers haven't met there has only the banner (SC-WEB-13), and the History
   tab fetches no saved version, since one can hold anything. It says so.
-- With an unsaved edit open, switching asks first, as moving the position does.
+- With an unsaved edit open, switching asks first, as moving the position does. That's
+  a note's edit, and a chapter default's on a universe's or series' page, which also
+  asks before moving the position. A book's page keeps its form through a switch for
+  now, and asks before moving the position. A chapter's own fields on its page stay
+  open through both, so only going to another page asks.
 
 Spec: design.md §9 (#300). Covered by: `web/src/ReaderViews.test.tsx`,
 `web/src/History.test.tsx`, `web/src/Browse.test.tsx`, `web/src/Editing.test.tsx`.
@@ -6686,7 +6690,9 @@ I'm at Dracula chapter 3 in the Author's view, looking at the sidebar.
 - A group's count says what readers have met, `2 of 5`, and has a tooltip that says so.
 - A chapter's "Enters the story here" works the same way.
 - When there are more notes than a list can hold, what readers have met stays, and it
-  says only the first ones are listed.
+  says `1,000 of 5,000 notes are listed; groups count only what's listed. What readers
+  have met is listed first.` A chapter's list says only so many could be checked, and
+  "None of those enter the story here" rather than that none do.
 - `/api/entities` with `marksAt` gives this in one answer, and its filters by type,
   status, series, and book work as they do without it. What's met is what `asOf` and
   `canon_as_of` hold, at every position.
@@ -6700,11 +6706,14 @@ Spec: design.md §9 (#300, #302). Covered by: `web/src/ReaderLists.test.tsx`,
 I'm at Dracula chapter 3 with `?readers=1`.
 
 - The sidebar lists only what's in `canon_as_of` there. No later note's name is on
-  the page, and the page doesn't ask for it. A group's count is what's listed, and
+  the page, and no list asks for it. The one exception is the banner on a note they
+  haven't met, which asks for the whole list and shows only that note's own name and
+  where it enters (SC-WEB-13). A group's count is what's listed, and
   a type with nothing met isn't there.
 - Later books and chapters aren't listed in the tree or on the universe's and series'
   pages, and a series with nothing yet isn't. A later book or series stays only if a met
-  note is filed in it, with no later chapters. A series readers haven't got to says so,
+  note is filed in it, with no later chapters, and such a series says "Readers haven't
+  got to a book in this series". A series readers haven't got to otherwise says so,
   without its name.
 - A chapter's "Enters the story here" lists what they've met, and otherwise says
   "Readers have met no notes that enter the story here", at a later chapter too.

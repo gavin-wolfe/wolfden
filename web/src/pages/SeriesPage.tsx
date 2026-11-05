@@ -67,7 +67,7 @@ export function SeriesPage() {
         </div>
       )}
       <h2>Books</h2>
-      <BookList universe={universe} books={s.books} empty="This series has no books yet." />
+      <BookList universe={universe} books={s.books} empty={hierarchy.readers ? "Readers haven't got to a book in this series." : 'This series has no books yet.'} />
       {!hierarchy.readers && <ChapterDefaultsSection key={s.key} scope={{ universe, series: s.key }} name={s.name} />}
       <Counts counts={s.entities} title="Filed in the series" />
     </div>

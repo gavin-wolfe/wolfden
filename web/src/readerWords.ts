@@ -17,9 +17,23 @@ export const MARKS_LEGEND = "Tags say what readers at this point in the story do
 /**
  * What the Reader's view doesn't cover yet. Remove this, and where it's shown,
  * when steps 5 and 6 of #300 give search, the book and chapter pages, and the
- * chapter menu the two views.
+ * position bar's Book and Chapter menus the two views.
  */
-export const READERS_VIEW_REACH = "This covers note pages and lists of notes. Search, book and chapter pages, and the chapter menu aren't part of the Reader's view yet."
+export const READERS_VIEW_REACH = "This covers note pages and lists of notes. Search, book and chapter pages, and the Book and Chapter menus aren't part of the Reader's view yet."
+
+/** The words for a list longer than the API's limit, with what it does list. `metFirst` is for the Author's view, which puts them first. */
+export function listCutWords(listed: number, total: number, metFirst: boolean): string {
+  return `${number(listed)} of ${number(total)} notes are listed; groups count only what's listed.${metFirst ? ' What readers have met is listed first.' : ''}`
+}
+
+/** The same, for a list of what enters at one chapter, which can't say none does. */
+export function chapterListCutWords(listed: number, total: number): string {
+  return `Only ${number(listed)} of ${number(total)} notes could be checked, so more may enter the story here.`
+}
+
+function number(n: number): string {
+  return n.toLocaleString('en-US')
+}
 
 /** Why a position isn't placed, naming it if there's one to name. */
 export function notPlacedWhy(position: string | null): string {

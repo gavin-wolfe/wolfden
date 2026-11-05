@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { denQuery, hierarchyQuery, type BookNode, type PositionView, type ScopeKind } from '../api'
 import { useShownError } from '../formHold'
 import { useEntitiesInView, type ListedEntity } from '../hooks'
-import { MARKS_LEGEND } from '../readerWords'
+import { MARKS_LEGEND, listCutWords } from '../readerWords'
 import { chapterLabel, readersTree } from '../story'
 import { EntityList } from './EntityList'
 import { NewTypeButton } from './NewEntity'
@@ -114,7 +114,7 @@ function UniverseTree({ universe }: { universe: string }) {
           {u.name}
         </Link>
       </p>
-      {view.truncated && <p className="muted">Only the first {all.length} notes are listed.</p>}
+      {view.truncated && <p className="muted list-legend">{listCutWords(all.length, view.total, view.at !== undefined && !view.readers)}</p>}
       {all.some((e) => e.readerMark) && <p className="muted list-legend">{MARKS_LEGEND}</p>}
       {scopeGroups('universe', u.key, u.name)}
       {u.series.map((s) => (

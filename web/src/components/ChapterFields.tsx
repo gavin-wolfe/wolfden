@@ -29,7 +29,7 @@ import {
   type Problem,
 } from '../fieldModel'
 import { FieldValue } from '../pages/EntityPageView'
-import { Conflict, useAfterSave } from './Editing'
+import { Conflict, useAfterSave, useLeavePrompt, type LeaveLocation } from './Editing'
 import { ValueEditor, typeWords } from './FieldEditing'
 import { ErrorMark, ErrorState, Loading, fileProblemsHeading } from './States'
 
@@ -478,6 +478,19 @@ function Refused({ error }: { error: Error }) {
  * inherited, so a change to it becomes the value set here. Save (or
  * Ctrl/⌘+Enter) sends only what changed; Cancel (or Escape) leaves it.
  */
+/**
+ * Which moves leave a field's form on its page. A chapter's page doesn't reload for
+ * a new position or view. A book's reloads for a new position, and has one form for
+ * both views for now. A universe's or series' reloads, and has no defaults in the
+ * Reader's view, so any move drops it.
+ */
+const FORM_STAYS: Record<ValueFrom, (current: LeaveLocation, next: LeaveLocation) => boolean> = {
+  chapter: (current, next) => current.pathname === next.pathname,
+  book: (current, next) => current.pathname === next.pathname && current.search.at === next.search.at,
+  series: () => false,
+  universe: () => false,
+}
+
 function FieldForm({
   target,
   type,
@@ -516,6 +529,7 @@ function FieldForm({
   const inheriting = inherit && emptyList && inheritable !== null
   // Choosing the default is a change too, even where the list was already empty (own []).
   const dirty = JSON.stringify(draft) !== initial || inheriting
+  const leavePrompt = useLeavePrompt(dirty, FORM_STAYS[target.own])
 
   // Focus goes to the first control when the form opens.
   useEffect(() => {
@@ -589,22 +603,25 @@ function FieldForm({
   if (conflict) {
     const after = inheriting ? undefined : jsonOfField(type, draft).value
     return (
-      <Conflict
-        title={`The file changed while you were editing ${view.name}`}
-        what={view.name}
-        mine={valueLines(after)}
-        theirs={valueLines(conflict.theirs?.set ? (conflict.theirs.own ?? null) : undefined)}
-        saving={saving}
-        onKeepMine={() => {
-          const on = conflict.hash
-          setConflict(null)
-          void send(on, after === undefined ? [{ op: 'clear' }] : [{ op: 'set', value: after }], conflict.theirs?.text ?? '')
-        }}
-        onTakeTheirs={() => {
-          void client.invalidateQueries()
-          onDone(null)
-        }}
-      />
+      <>
+        {leavePrompt}
+        <Conflict
+          title={`The file changed while you were editing ${view.name}`}
+          what={view.name}
+          mine={valueLines(after)}
+          theirs={valueLines(conflict.theirs?.set ? (conflict.theirs.own ?? null) : undefined)}
+          saving={saving}
+          onKeepMine={() => {
+            const on = conflict.hash
+            setConflict(null)
+            void send(on, after === undefined ? [{ op: 'clear' }] : [{ op: 'set', value: after }], conflict.theirs?.text ?? '')
+          }}
+          onTakeTheirs={() => {
+            void client.invalidateQueries()
+            onDone(null)
+          }}
+        />
+      </>
     )
   }
 
@@ -637,6 +654,8 @@ function FieldForm({
   }
 
   return (
+    <>
+    {leavePrompt}
     <form
       className="editor-panel inline-form field-editor"
       aria-label={`Edit ${view.name}`}
@@ -697,6 +716,7 @@ function FieldForm({
         <span className="muted">Ctrl+Enter (⌘+Enter) saves, Escape cancels.</span>
       </p>
     </form>
+    </>
   )
 }
 

@@ -76,7 +76,7 @@ export function UniversePage() {
               {s.name}
             </Link>
           </h2>
-          <BookList universe={universe} books={s.books} empty="No books yet." />
+          <BookList universe={universe} books={s.books} empty={hierarchy.readers ? "Readers haven't got to a book in this series." : 'No books yet.'} />
         </section>
       ))}
       {u.books.length > 0 && (

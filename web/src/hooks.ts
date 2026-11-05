@@ -62,8 +62,8 @@ export interface ListedEntity extends EntitySummary {
  * The universe's notes as this view lists them (#300). With no position, every
  * one. In the Author's view, every one, with what the reader has met first and
  * the rest marked. In the Reader's view, only what the reader has met, from the
- * same list MCP's `canon_as_of` holds: the rest are never asked for, so nothing
- * on the page can name them or count them.
+ * same list MCP's `canon_as_of` holds: this doesn't ask for the rest, so no list
+ * can name them or count them.
  */
 export function useEntitiesInView(universe: string) {
   const { at, readers } = usePosition()
@@ -83,6 +83,8 @@ export function useEntitiesInView(universe: string) {
     readers,
     entities,
     truncated: list?.truncated ?? false,
+    /** How many notes the list holds in all, before the limit. */
+    total: list?.total ?? 0,
     positions: positions.data?.positions,
     isPending: (marked ? all.isPending : plain.isPending) || positions.isPending,
     error: (marked ? failedAll : failedPlain) ?? failedPositions,
@@ -90,8 +92,10 @@ export function useEntitiesInView(universe: string) {
 }
 
 /**
- * What's known of a note a read at a position didn't give: only the banner for a
- * note the reader hasn't met asks, so the list isn't fetched otherwise.
+ * What's known of a note a read at a position didn't give, for the banner on a note
+ * the reader hasn't met. It's the one thing in the Reader's view that asks for the
+ * whole list, later names included, and it shows only that note's own name
+ * (SC-WEB-13). Nothing asks for it otherwise.
  */
 export function useNoteSummary(universe: string, key: string, enabled: boolean): EntitySummary | undefined {
   const all = useQuery({ ...entitiesQuery(universe, undefined), enabled })

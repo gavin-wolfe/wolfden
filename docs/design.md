@@ -1832,13 +1832,15 @@ docs/
     - **The Reader's view** asks `asOf` with `readers=true`, so it holds what an
       AI assistant reads there, a type's defaults included, badged. The note's page
       is read-only. A list asks `/api/entities` with `asOf`, what `canon_as_of`
-      holds, and never asks for the rest, so it can't name or count them. The sidebar
+      holds, and doesn't ask for the rest, so it can't name or count them. (The banner
+      for a note the reader hasn't met does ask for the whole list, for that note's own
+      name and where it enters, and shows nothing else of it.) The sidebar
       and the universe's and series' pages leave out books and chapters readers haven't
       got to, and a series with nothing yet, keeping a later book or series only where a
       met note is filed. They have no New buttons or chapter defaults, and nor does the
       top bar. The rest of the screen isn't part of it yet, and the page says so
       until later steps of #300 land: search, the book and chapter pages, and the
-      chapter menu aren't filtered as it is, and checkpoints, the ⚠ list, and the
+      position bar's Book and Chapter menus aren't filtered as it is, and checkpoints, the ⚠ list, and the
       book and chapter pages' controls still work. Edit file by path drops `readers`,
       so it's plainly the writer's. The API's writes know nothing of views.
       A note the reader hasn't met shows the banner, for example "Readers first
@@ -1881,7 +1883,9 @@ docs/
   - **Notes out of view.** In a list's Author's view, a note out of view for its
     status rather than its entry point comes after what the reader has met, with its
     status badge and no tag. One no position places says `not placed in the story yet`.
-    Each group's count says how many the reader has met of them, `2 of 5`. The banner for a
+    Each group's count says how many the reader has met of them, `2 of 5`. A list longer
+    than the API's limit says how many of how many it has, and that groups count only what's
+    listed, and a chapter's list says more may enter there instead of saying none do. The banner for a
     note not met yet also offers to go to where it enters, or to show
     everything. In the Reader's view, the tab's title names only what's in view.
   - **Entity pages.** An entity page shows the name, type, status, scope

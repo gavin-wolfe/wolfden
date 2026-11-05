@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Wolfden.Core.Structure;
+using Wolfden.Index.Reading;
 
 namespace Wolfden.Index;
 
@@ -39,8 +40,10 @@ public static class ChapterHeadingRows
     /// <param name="chapters">The chapter rows.</param>
     /// <param name="showFields">Whether a chapter's heading may show its fields; null for all.</param>
     /// <param name="met">The paths of the entities the reader has met, or null for everything.</param>
+    /// <param name="readers">For the web UI's Reader's view, the rules a chapter's fields follow there; null otherwise.</param>
     public static IReadOnlyDictionary<int, string?> Headings(
-        IndexDbContext db, int universeId, IReadOnlyCollection<ChapterRecord> chapters, Func<ChapterRecord, bool>? showFields = null, IReadOnlySet<string>? met = null)
+        IndexDbContext db, int universeId, IReadOnlyCollection<ChapterRecord> chapters, Func<ChapterRecord, bool>? showFields = null, IReadOnlySet<string>? met = null,
+        ReadersHeadingRules? readers = null)
     {
         ArgumentNullException.ThrowIfNull(db);
         ArgumentNullException.ThrowIfNull(chapters);
@@ -77,6 +80,19 @@ public static class ChapterHeadingRows
                 ? entity.Name
                 : null;
 
+        if (readers is not null)
+        {
+            return chapters.ToDictionary(
+                c => c.Id,
+                c => ChapterHeadings.Compose(
+                    ReadersLinks.Title(c.Title),
+                    parts.TryGetValue(c.Id, out var stored)
+                        ? stored.Select(p => p.Items
+                            .Where(i => !readers.IsPositionField(p.Field) || readers.HasReached(i.Text))
+                            .Select(i => ReadersLinks.Title(ChapterHeadings.ItemText(i, l => ChapterHeadings.LinkText(l with { Heading = null }, NameOf(p.Path, l))))!))
+                        : []));
+        }
+
         return chapters.ToDictionary(
             c => c.Id,
             c => ChapterHeadings.Compose(
@@ -85,6 +101,14 @@ public static class ChapterHeadingRows
                     ? stored.Select(p => p.Items.Select(i => ChapterHeadings.ItemText(i, l => ChapterHeadings.LinkText(l, NameOf(p.Path, l)))))
                     : []));
     }
+
+    /// <summary>
+    /// What a heading leaves out in the Reader's view, as that chapter's fields do (#300):
+    /// a position field's value readers haven't reached. A link in one never names a section.
+    /// </summary>
+    /// <param name="IsPositionField">Whether the den defines a chapter field as <c>position</c>.</param>
+    /// <param name="HasReached">Whether readers have reached a position.</param>
+    public sealed record ReadersHeadingRules(Func<string, bool> IsPositionField, Func<string, bool> HasReached);
 
     /// <summary>A heading part as a chapter row keeps it: the field, the file that holds the value, and its items.</summary>
     private sealed record StoredPart(string Field, string Path, IReadOnlyList<ChapterHeadingItem> Items);

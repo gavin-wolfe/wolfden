@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Wolfden.Core.History;
+using Wolfden.Core.Structure;
+using Wolfden.Core.Types;
 using Wolfden.Index;
 
 namespace Wolfden.Api;
@@ -40,7 +42,9 @@ namespace Wolfden.Api;
 /// that position has it (<see cref="AsOfReads"/>), with no later <c>until</c>, position
 /// value, or HTML comment, and a search of only that. On <c>/api/hierarchy</c>,
 /// <c>/api/positions</c>, and <c>/api/book/chapter-fields</c>, it's only the books and
-/// chapters readers there have reached, so no answer names a later one. Without
+/// chapters readers there have reached, so no answer names a later one. On
+/// <c>/api/entities</c>, the list is <c>asOf</c>'s. On all of them, a position that can't be
+/// read is refused without listing the books. Without
 /// <c>asOf</c>, or with <c>marksAt</c>, it's <c>bad_argument</c>.
 /// </para>
 /// <para>
@@ -77,27 +81,31 @@ public static class ReadEndpoints
         api.MapGet("/hierarchy", (HttpContext c) => Answer(c, ["universe", "asOf", "readers"], q =>
         {
             CheckReaders(q.Position("asOf"), null, q.Bool("readers"));
-            return Hierarchy(reader, q.Text("universe"), q.Position("asOf"), q.Bool("readers"));
+            return AsReaders(q, () => Hierarchy(reader, q.Text("universe"), q.Position("asOf"), q.Bool("readers")));
         }));
         api.MapGet("/positions", (HttpContext c) => Answer(c, ["universe", "asOf", "readers"], q =>
         {
             CheckReadersOnly(q.Position("asOf"), q.Bool("readers"));
-            return Positions(reader, q.Text("universe"), q.Bool("readers") ? q.Position("asOf") : null);
+            return AsReaders(q, () => Positions(reader, q.Text("universe"), q.Bool("readers") ? q.Position("asOf") : null));
         }));
         api.MapGet("/positions/next", (HttpContext c) => Answer(c, ["universe", "after", "step"], q => NextPosition(reader, q.Text("universe"), q.Position("after"), q.Text("step"))));
         api.MapGet("/entities", (HttpContext c) => Answer<object>(
             c,
-            ["universe", "type", "status", "series", "book", "asOf", "limit", "marksAt"],
-            q => q.Position("marksAt") is { } marksAt
-                ? (object)MarkedList(reader, marksAt, q.Position("asOf"), q.Text("universe"), q.Text("type"), q.Text("status"), q.Text("series"), q.Text("book"), q.Int("limit", 200))
-                : reader.ListEntities(
-                    q.Text("universe"), q.Text("type"), q.Text("status"), q.Text("series"), q.Text("book"), q.Int("limit", 200), q.Position("asOf"))));
+            ["universe", "type", "status", "series", "book", "asOf", "limit", "marksAt", "readers"],
+            q =>
+            {
+                CheckReaders(q.Position("asOf"), q.Position("marksAt"), q.Bool("readers"));
+                return q.Position("marksAt") is { } marksAt
+                    ? (object)MarkedList(reader, marksAt, q.Position("asOf"), q.Text("universe"), q.Text("type"), q.Text("status"), q.Text("series"), q.Text("book"), q.Int("limit", 200))
+                    : AsReaders(q, () => reader.ListEntities(
+                        q.Text("universe"), q.Text("type"), q.Text("status"), q.Text("series"), q.Text("book"), q.Int("limit", 200), q.Position("asOf")));
+            }));
         api.MapGet("/entities/lookup", (HttpContext c) => Answer(
             c,
             ["query", "universe", "type", "asOf", "limit"],
             q => reader.LookupEntities(q.Text("query") ?? "", q.Text("universe"), Types(q.Text("type")), q.Position("asOf"), q.Int("limit", 20))));
         api.MapGet("/entity", (HttpContext c) => Answer(
-            c, ["entity", "universe", "asOf", "marksAt", "readers"], q => EntityPages.Get(reader, q.Text("entity"), q.Text("universe"), q.Position("asOf"), q.Position("marksAt"), q.Bool("readers"))));
+            c, ["entity", "universe", "asOf", "marksAt", "readers"], q => AsReaders(q, () => EntityPages.Get(reader, q.Text("entity"), q.Text("universe"), q.Position("asOf"), q.Position("marksAt"), q.Bool("readers")))));
         api.MapGet("/canon", (HttpContext c) => Answer(
             c,
             ["universe", "asOf", "series", "book", "type", "brief"],
@@ -113,9 +121,9 @@ public static class ReadEndpoints
                         reader, marksAt, q.Position("asOf"), q.Text("query") ?? "", q.Text("universe"), q.Text("type"), q.Bool("canonOnly"), q.Int("limit", 20),
                         q.Text("status"), q.Text("series"), q.Text("book"), q.Text("field"))
                     : q.Bool("readers")
-                    ? SearchPage(reader.SearchAsReaders(
+                    ? AsReaders(q, () => SearchPage(reader.SearchAsReaders(
                         q.Text("query") ?? "", q.Text("universe"), q.Text("type"), q.Bool("canonOnly"), q.Int("limit", 20),
-                        q.Text("status"), q.Text("series"), q.Text("book"), q.Position("asOf")!, q.Text("field")))
+                        q.Text("status"), q.Text("series"), q.Text("book"), q.Position("asOf")!, q.Text("field"))))
                     : SearchPage(reader.Search(
                         q.Text("query") ?? "", q.Text("universe"), q.Text("type"), q.Bool("canonOnly"), q.Int("limit", 20),
                         q.Text("status"), q.Text("series"), q.Text("book"), q.Position("asOf"), q.Text("field")));
@@ -125,7 +133,7 @@ public static class ReadEndpoints
             q =>
             {
                 CheckReaders(q.Position("asOf"), null, q.Bool("readers"));
-                return reader.FieldNames(q.Text("universe"), q.Position("asOf"), q.Bool("readers"));
+                return AsReaders(q, () => reader.FieldNames(q.Text("universe"), q.Position("asOf"), q.Bool("readers")));
             }));
         api.MapGet("/history", (HttpContext c) => Answer(
             c, ["entity", "universe", "limit", "before"], q => History(reader, q.Text("entity"), q.Text("universe"), q.Int("limit", 20), q.Text("before"))));
@@ -172,6 +180,35 @@ public static class ReadEndpoints
         History = options.History,
         Words = Words,
     };
+
+    /// <summary>
+    /// <paramref name="read"/>, and with <c>readers=true</c>, a position it can't read is refused in
+    /// words that name nothing else: an <c>asOf</c> read's own message lists the universe's books,
+    /// later ones included, and it's what the page shows at a stale bookmark. Without it, as it was.
+    /// </summary>
+    internal static T AsReaders<T>(ApiQuery query, Func<T> read)
+    {
+        if (!query.Bool("readers"))
+        {
+            return read();
+        }
+
+        try
+        {
+            return read();
+        }
+        catch (DenToolException e) when (e.Code == ToolErrorCodes.BadPosition)
+        {
+            throw NotAPosition(query.Position("asOf"));
+        }
+        catch (CanonViewException)
+        {
+            throw NotAPosition(query.Position("asOf"));
+        }
+    }
+
+    private static DenToolException NotAPosition(string? position) =>
+        new(ToolErrorCodes.BadPosition, $"'{position}' isn't a position in this story.");
 
     /// <summary>Refuses <c>asOf</c> or <c>readers</c> without the other, where a position means only the Reader's view.</summary>
     internal static void CheckReadersOnly(string? asOf, bool readers)
@@ -317,8 +354,12 @@ public static class ReadEndpoints
 
         // Headings (#227): as of a position, a chapter after it shows its title
         // alone, and no heading names a note the reader hasn't met (#26).
+        var horizon = readers ? DenReader.Horizon(index, u.Key, asOf!) : null;
+        var positionFields = new Lazy<HashSet<string>>(() =>
+            DenStructure.Load(reader.Root).Types.ChapterFields.Where(f => f.Kind == FieldKind.Position).Select(f => f.Name).ToHashSet(StringComparer.Ordinal));
         var headings = ChapterHeadingRows.Headings(
-            db, u.Id, chapters.SelectMany(g => g).ToList(), point is { } at ? c => c.Ordinal <= at : null, met);
+            db, u.Id, chapters.SelectMany(g => g).ToList(), point is { } at ? c => c.Ordinal <= at : null, met,
+            horizon is null ? null : new ChapterHeadingRows.ReadersHeadingRules(f => positionFields.Value.Contains(f), horizon.HasReached));
 
         var byScope = entities.ToLookup(e => e.ScopeId);
         EntityCounts Counts(ContainerRecord c) => new(
@@ -326,7 +367,7 @@ public static class ReadEndpoints
             new SortedDictionary<string, int>(byScope[c.Id].GroupBy(e => e.Type).ToDictionary(g => g.Key, g => g.Count()), StringComparer.Ordinal));
         BookNode Book(ContainerRecord b) => new(
             b.Key, b.Name, b.Ulid, b.Path, b.BookStatus ?? "draft", b.Key, Counts(b),
-            chapters[b.Id].OrderBy(c => c.Index).Select(c => new ChapterNode(c.Key, c.Number, c.Title, $"{b.Key}:{c.Key}", headings[c.Id])).ToList());
+            chapters[b.Id].OrderBy(c => c.Index).Select(c => new ChapterNode(c.Key, c.Number, readers ? ReadersLinks.Title(c.Title) : c.Title, $"{b.Key}:{c.Key}", headings[c.Id])).ToList());
         List<BookNode> BooksIn(ContainerRecord parent) =>
             containers.Where(c => c.Kind == "book" && c.ParentId == parent.Id).OrderBy(c => c.StoryOrder).ThenBy(c => c.Key, StringComparer.Ordinal).Select(Book).ToList();
 
@@ -339,10 +380,9 @@ public static class ReadEndpoints
         {
             // The Reader's view (#300): a book or chapter readers have got to, and a book or series a note they've
             // met is filed in, so no met note is left without a place. A series with no books isn't at any position.
-            var horizon = DenReader.Horizon(index, u.Key, asOf!);
             List<BookNode> Known(IEnumerable<BookNode> list) => list
-                .Where(b => horizon.HasReached(b.Position) || b.Entities.Total > 0)
-                .Select(b => b with { Chapters = b.Chapters.Where(c => horizon.HasReached(c.Position)).ToList() })
+                .Where(b => horizon!.HasReached(b.Position) || b.Entities.Total > 0)
+                .Select(b => b with { Chapters = b.Chapters.Where(c => horizon!.HasReached(c.Position)).ToList() })
                 .ToList();
             series = series.Select(s => s with { Books = Known(s.Books) }).Where(s => s.Books.Count > 0 || s.Entities.Total > 0).ToList();
             books = Known(books);
@@ -406,7 +446,7 @@ public static class ReadEndpoints
         if (readersAt is not null)
         {
             var horizon = DenReader.Horizon(index, u.Key, readersAt);
-            positions = positions.Where(p => horizon.HasReached(p.Position)).ToList();
+            positions = positions.Where(p => horizon.HasReached(p.Position)).Select(p => p with { Title = ReadersLinks.Title(p.Title) }).ToList();
         }
 
         return new PositionsResult(ResultVersion, u.Key, positions.Count, positions);

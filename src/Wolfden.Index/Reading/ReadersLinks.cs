@@ -48,6 +48,11 @@ public sealed class ReadersLinks
         return !string.IsNullOrEmpty(heading) && label is null ? $"{name}: {heading}" : name;
     }
 
+    /// <summary>A chapter's title or field as a Reader's page has it, where nothing resolves a link: a labelled link is only its label, and any other stays as written.</summary>
+    [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(text))]
+    public static string? Title(string? text) =>
+        text is null ? null : LinkSyntax.WithLinksShown(text, markdown: false, _ => null);
+
     /// <summary>A lead or a section's text as the note's Reader's page has it: no HTML comments, and each link as it shows.</summary>
     public string Text(int note, string text) =>
         Apply(note, MarkdownComments.Strip(text), markdown: true);

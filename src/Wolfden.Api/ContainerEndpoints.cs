@@ -108,7 +108,7 @@ public static class ContainerEndpoints
             {
                 ReadEndpoints.CheckReadersOnly(q.Position("asOf"), q.Bool("readers"));
                 return q.Bool("readers")
-                    ? ReadersChapters.Get(reader, tools, q.Text("book") ?? "", q.Text("universe"), q.Position("asOf")!)
+                    ? ReadEndpoints.AsReaders(q, () => ReadersChapters.Get(reader, tools, q.Text("book") ?? "", q.Text("universe"), q.Position("asOf")!))
                     : tools.GetBookChapterFields(q.Text("book") ?? "", q.Text("universe"));
             }));
         api.MapPost("/chapter/edit", (Func<HttpContext, Task<IResult>>)(c => Create(

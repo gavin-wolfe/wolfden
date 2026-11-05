@@ -32,6 +32,9 @@ public sealed class ReadersBookPagesTests : IDisposable
         ("the-keeper", "tarnwick:1"),         // A target behind a label, until its note is met, and then its path.
         ("Oldkeeper", null),                  // That note's alias.
         ("Reedlantern", null),                // An alias behind a label, to a note met.
+        ("tarnwick:1", "tarnwick:1"),         // A later position value, in a field and a heading.
+        ("Secondwatch", null),                // A later section's name, in a field's link and a heading.
+        ("Titlelabel", "brightharbor:3"),     // A label in a chapter's title.
     ];
 
     /// <summary>The story in order.</summary>
@@ -42,7 +45,7 @@ public sealed class ReadersBookPagesTests : IDisposable
     public ReadersBookPagesTests()
     {
         _den.Write("packs/starfall/chapter.yaml", "fields:\n  turns_at: { type: position }\n");
-        _den.Write($"universes/{Universe}/universe.md", "---\nid: 01JB0000000000000000000000\nname: Saltmarch\norder: [brightharbor, nightsedge]\n---\n\nThe universe's own text.\n");
+        _den.Write($"universes/{Universe}/universe.md", "---\nid: 01JB0000000000000000000000\nname: Saltmarch\norder: [brightharbor, nightsedge]\nchapter_heading: [pov, when, turns_at]\n---\n\nThe universe's own text.\n");
         _den.Write(
             $"universes/{Universe}/books/brightharbor/book.md",
             """
@@ -51,9 +54,9 @@ public sealed class ReadersBookPagesTests : IDisposable
             name: Brightharbor
             status: draft
             chapters:
-              - { key: "1", number: 1, title: Gullmere, fields: { when: "Sandpiper", pov: ["[[First Mate]]", "[[Heronfell]]", "[[the-keeper|Marrowcove]]", "[[Reedlantern|the mate]]"], turns_at: "tarnwick:1" } }
+              - { key: "1", number: 1, title: Gullmere, fields: { when: "Sandpiper", pov: ["[[First Mate]]", "[[Heronfell]]", "[[the-keeper|Marrowcove]]", "[[Reedlantern|the mate]]", "[[First Mate#Secondwatch]]"], turns_at: "tarnwick:1" } }
               - { key: "2", number: 2, title: Oystergate, fields: { when: "Curlewdown" } }
-              - { key: "3", number: 3, title: Saltbarrow }
+              - { key: "3", number: 3, title: "Saltbarrow [[the-keeper|Titlelabel]]" }
             ---
             """);
         _den.Write($"universes/{Universe}/series/nightsedge/series.md", "---\nid: 01JB0000000000000000000002\nname: Nightsedge\nbooks: [tarnwick]\n---\n");
@@ -73,7 +76,7 @@ public sealed class ReadersBookPagesTests : IDisposable
             """);
         _den.Write(
             $"universes/{Universe}/entities/notes/first-mate.md",
-            "---\ntype: character\nname: First Mate\naliases: [Reedlantern]\nstatus: canon\n---\n\nOn deck.\n");
+            "---\ntype: character\nname: First Mate\naliases: [Reedlantern]\nstatus: canon\n---\n\nOn deck.\n\n## Knownpart\nKnown.\n\n## Secondwatch\n<!-- wolfden: from=tarnwick:1 -->\nLater.\n");
         _den.Write(
             $"universes/{Universe}/entities/notes/the-keeper.md",
             "---\ntype: character\nname: The keeper\naliases: [Oldkeeper]\nstatus: canon\nfrom: \"tarnwick\"\n---\n\nOf the light.\n");
@@ -93,7 +96,7 @@ public sealed class ReadersBookPagesTests : IDisposable
         var hierarchy = await server.GetJsonAsync($"/api/hierarchy?universe={Universe}&asOf={at}&readers=true", HttpStatusCode.OK);
         answers.Add(hierarchy.GetRawText());
         answers.Add((await server.GetJsonAsync($"/api/positions?universe={Universe}&asOf={at}&readers=true", HttpStatusCode.OK)).GetRawText());
-        answers.Add((await server.GetJsonAsync($"/api/entities?universe={Universe}&asOf={at}&limit=1000", HttpStatusCode.OK)).GetRawText());
+        answers.Add((await server.GetJsonAsync($"/api/entities?universe={Universe}&asOf={at}&readers=true&limit=1000", HttpStatusCode.OK)).GetRawText());
         var u = hierarchy.GetProperty("universe");
         var books = u.GetProperty("books").EnumerateArray().Concat(u.GetProperty("series").EnumerateArray().SelectMany(s => s.GetProperty("books").EnumerateArray()));
         foreach (var book in books)
@@ -150,7 +153,9 @@ public sealed class ReadersBookPagesTests : IDisposable
         var pov = fields["pov"];
         var items = pov.GetProperty("value").EnumerateArray().Select(v => v.GetString()!).ToList();
         var mate = pov.GetProperty("links").EnumerateArray().Select(l => (Text: l.GetProperty("text").GetString()!, Label: l.GetProperty("label").GetString()!)).ToList();
-        Assert.Equal(2, mate.Count);
+        Assert.Equal(3, mate.Count);
+        Assert.Equal(mate[2].Text, items[4]);
+        Assert.Equal("First Mate", mate[2].Label);
         Assert.Equal(mate[0].Text, items[0]);
         Assert.Equal("First Mate", mate[0].Label);
         Assert.Equal("Heronfell", items[1]);
@@ -279,9 +284,6 @@ public sealed class ReadersBookPagesTests : IDisposable
     private void WriteLinkyNote()
     {
         _den.Write(
-            $"universes/{Universe}/entities/notes/first-mate.md",
-            "---\ntype: character\nname: First Mate\naliases: [Reedlantern]\nstatus: canon\n---\n\nOn deck.\n\n## Knownpart\nKnown.\n\n## Secondwatch\n<!-- wolfden: from=tarnwick:1 -->\nLater.\n");
-        _den.Write(
             $"universes/{Universe}/entities/notes/linky.md",
             """
             ---
@@ -310,7 +312,120 @@ public sealed class ReadersBookPagesTests : IDisposable
             ## Aimed
             Aim [[First Mate#Secondwatch]] and [[First Mate#Knownpart]] and [[Heronfell#Noheadhere]].
 
+            ## Formed
+            One [[the-keeper|*Emlabel*]] and [[the-keeper|a *b* Multilabel]].
+
+            Two [[the-keeper|**Boldlabel**]] and [[the-keeper|<b>Htmllabel</b>]] and [[the-keeper|`Ticklabel`]].
+
+            Three [[the-keeper
+            |Hardsplit]] and [[the-keeper\
+            |Bsplit]] and [[the-keeper
+            |*Emsplit*]].
+
             """);
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-WEB-106")]
+    [InlineData("Emlabel")]
+    [InlineData("Multilabel")]
+    [InlineData("Boldlabel")]
+    [InlineData("Htmllabel")]
+    [InlineData("Ticklabel")]
+    [InlineData("Hardsplit")]
+    [InlineData("Bsplit")]
+    [InlineData("Emsplit")]
+    public async Task AReadersSearchReadsAFormattedOrSplitLabelAsThePageDoes(string word)
+    {
+        WriteLinkyNote();
+        await using var server = await Start();
+
+        var answer = await server.GetJsonAsync($"/api/search?universe={Universe}&query={word}&asOf=brightharbor:1&readers=true&limit=200", HttpStatusCode.OK);
+
+        var hit = Assert.Single(answer.GetProperty("hits").EnumerateArray());
+        Assert.Equal("Formed", hit.GetProperty("section").GetString());
+        Assert.DoesNotContain("[[", hit.GetProperty("text").GetString()!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-110")]
+    public async Task AReachedChaptersHeadingFollowsItsFieldsRules()
+    {
+        await using var server = await Start();
+        var book = (await server.GetJsonAsync($"/api/hierarchy?universe={Universe}&asOf=brightharbor:3&readers=true", HttpStatusCode.OK))
+            .GetProperty("universe").GetProperty("books")[0];
+
+        var heading = book.GetProperty("chapters")[0].GetProperty("heading").GetString()!;
+        Assert.Equal("Gullmere · First Mate & Heronfell & Marrowcove & the mate & First Mate — Sandpiper", heading);
+
+        // Once it's reached, the position value shows, as in the fields.
+        var later = (await server.GetJsonAsync($"/api/hierarchy?universe={Universe}&asOf=tarnwick:1&readers=true", HttpStatusCode.OK))
+            .GetProperty("universe").GetProperty("books")[0].GetProperty("chapters")[0].GetProperty("heading").GetString()!;
+        Assert.EndsWith("Sandpiper, tarnwick:1", later, StringComparison.Ordinal);
+
+        Assert.Equal("Saltbarrow Titlelabel", book.GetProperty("chapters")[2].GetProperty("title").GetString());
+        Assert.Equal("Saltbarrow Titlelabel", book.GetProperty("chapters")[2].GetProperty("heading").GetString());
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-77")]
+    public async Task AHeadingWithoutReadersIsAsItWas()
+    {
+        await using var server = await Start();
+        var whole = await server.GetJsonAsync($"/api/hierarchy?universe={Universe}", HttpStatusCode.OK);
+        var plain = await server.GetJsonAsync($"/api/hierarchy?universe={Universe}&asOf=brightharbor:3", HttpStatusCode.OK);
+
+        Assert.Contains("First Mate: Secondwatch", whole.GetRawText(), StringComparison.Ordinal);
+        Assert.Contains("First Mate: Secondwatch", plain.GetRawText(), StringComparison.Ordinal);
+        Assert.Contains("[[the-keeper|Titlelabel]]", whole.GetRawText(), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-WEB-111")]
+    [InlineData("brightharbor:9")]
+    [InlineData("nowhere")]
+    [InlineData("nowhere:1")]
+    [InlineData("a:b:c")]
+    public async Task APositionThatCantBeReadNamesNoBookInAnyReadersAnswer(string at)
+    {
+        await using var server = await Start();
+        var asked = $"universe={Universe}&asOf={at}&readers=true";
+        foreach (var path in new[]
+        {
+            $"/api/hierarchy?{asked}",
+            $"/api/positions?{asked}",
+            $"/api/entities?{asked}&limit=1000",
+            $"/api/entity?{asked}&entity=Linky",
+            $"/api/search?{asked}&query=the",
+            $"/api/fields?{asked}",
+            $"/api/book/chapter-fields?{asked}&book=brightharbor",
+        })
+        {
+            var answer = await server.GetJsonAsync(path, HttpStatusCode.BadRequest);
+            Assert.Equal("bad_position", answer.GetProperty("code").GetString());
+            Assert.Equal($"'{at}' isn't a position in this story.", answer.GetProperty("message").GetString());
+        }
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-111")]
+    public async Task WithoutReadersABadPositionStillListsTheBooks()
+    {
+        await using var server = await Start();
+        var answer = await server.GetJsonAsync($"/api/hierarchy?universe={Universe}&asOf=brightharbor:9", HttpStatusCode.BadRequest);
+        Assert.Contains("tarnwick", answer.GetProperty("message").GetString()!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-110")]
+    public async Task ALaterBookAndOneThatDoesntExistAnswerAlike()
+    {
+        await using var server = await Start();
+        var later = await server.GetJsonAsync($"/api/book/chapter-fields?universe={Universe}&book=tarnwick&asOf=brightharbor:1&readers=true", HttpStatusCode.NotFound);
+        var none = await server.GetJsonAsync($"/api/book/chapter-fields?universe={Universe}&book=nothing&asOf=brightharbor:1&readers=true", HttpStatusCode.NotFound);
+
+        Assert.Equal(none.GetProperty("code").GetString(), later.GetProperty("code").GetString());
+        Assert.Equal(none.GetProperty("message").GetString()!.Replace("nothing", "tarnwick", StringComparison.Ordinal), later.GetProperty("message").GetString());
     }
 
     [Theory]

@@ -65,7 +65,8 @@ public static partial class LinkSyntax
     /// labelled link is still only its label, and any other stays as written. For
     /// markdown, a <c>[[</c> in code isn't a link, so it stays; otherwise, as for a
     /// frontmatter string, every one counts. A labelled link split over two lines
-    /// isn't a link (F-LINK-1), but it reads as one, so it's only its label too.
+    /// isn't a link (F-LINK-1), but it reads as one, so it's only its label too, and so
+    /// is one with code in its label: it's in code only if its <c>[[</c> is.
     /// </summary>
     public static string WithLinksShown(string text, bool markdown, Func<string, string?> shown)
     {
@@ -73,9 +74,9 @@ public static partial class LinkSyntax
         ArgumentNullException.ThrowIfNull(shown);
         var excluded = markdown ? BodyLinkScanner.CodeAndComments(text) : null;
         var replaced = new List<(int Offset, int Length, string Text)>();
-        foreach (var link in Scan(text, 0, text.Length, excluded))
+        foreach (var link in Scan(text, 0, text.Length, null))
         {
-            if (!link.IsEmpty && (shown(text.Substring(link.Offset, link.Length)) ?? link.Label) is { } replacement)
+            if (!link.IsEmpty && excluded?.Overlaps(link.Offset, link.Offset + 2) != true && (shown(text.Substring(link.Offset, link.Length)) ?? link.Label) is { } replacement)
             {
                 replaced.Add((link.Offset, link.Length, replacement));
             }
@@ -83,7 +84,7 @@ public static partial class LinkSyntax
 
         foreach (Match split in SplitLinkPattern().Matches(text))
         {
-            if (excluded?.Overlaps(split.Index, split.Index + split.Length) != true)
+            if (excluded?.Overlaps(split.Index, split.Index + 2) != true)
             {
                 replaced.Add((split.Index, split.Length, split.Groups["l"].Value.Trim()));
             }

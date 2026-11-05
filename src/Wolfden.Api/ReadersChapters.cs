@@ -43,17 +43,14 @@ internal static class ReadersChapters
 {
     public static ReadersChapterFieldsResult Get(DenReader reader, DenTools tools, string book, string? universe, string asOf)
     {
-        BookChapterFieldsResult whole;
-        try
+        // Only a book the tree readers know has, so a later book and one that doesn't exist answer the same, and a book's own error, which can list the others, isn't given.
+        var tree = ReadEndpoints.Hierarchy(reader, universe, asOf, readers: true).Universe;
+        if (!tree.Books.Concat(tree.Series.SelectMany(s => s.Books)).Any(b => b.Key == book))
         {
-            whole = tools.GetBookChapterFields(book, universe);
-        }
-        catch (DenToolException e) when (e.Code == ToolErrorCodes.UnknownScope)
-        {
-            // A book's own error can list the others, and it isn't known here which are later.
             throw new DenToolException(ToolErrorCodes.UnknownScope, $"There's no book '{book}' to read here.");
         }
 
+        var whole = tools.GetBookChapterFields(book, tree.Key);
         return reader.WithIndex(index =>
         {
             var horizon = DenReader.Horizon(index, whole.Universe, asOf);
@@ -66,7 +63,7 @@ internal static class ReadersChapters
                 whole.Chapters
                     .Where(c => horizon.HasReached(c.Position))
                     .Select(c => new ReadersChapterFields(
-                        c.Key, c.Position, c.Number, c.Title, c.Fields.Select(f => Known(f, met, positionFields, horizon)).OfType<ReadersChapterValue>().ToList()))
+                        c.Key, c.Position, c.Number, ReadersLinks.Title(c.Title), c.Fields.Select(f => Known(f, met, positionFields, horizon)).OfType<ReadersChapterValue>().ToList()))
                     .ToList());
         });
     }

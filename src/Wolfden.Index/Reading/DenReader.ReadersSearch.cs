@@ -138,17 +138,21 @@ public sealed partial class DenReader
         Found(SearchWords.Parse(query), string.Join("\n", names), FieldSearch.ValueText(valueJson)) is not null;
 
     /// <summary>Refuses a series or book the universe doesn't have, naming neither the others nor which are later.</summary>
-    private static void CheckFilterNamingNothing(IndexDbContext db, ContainerRecord universe, CanonFilter? filter)
+    /// <remarks>A key more than one of them has (F-KEY-5) gets <see cref="CheckFilter"/>'s own message, which names only that key.</remarks>
+    private void CheckFilterNamingNothing(IndexDbContext db, ContainerRecord universe, CanonFilter? filter)
     {
-        try
+        if (filter is null)
         {
-            CheckFilter(db, universe, filter);
+            return;
         }
-        catch (DenToolException e) when (e.Code == ToolErrorCodes.UnknownScope)
+
+        var kind = filter.Kind == CanonFilterKind.Series ? "series" : "book";
+        if (!db.Containers.Any(c => c.UniverseId == universe.Id && c.Kind == kind && c.Key == filter.Key))
         {
-            var kind = filter!.Kind == CanonFilterKind.Series ? "series" : "book";
             throw new DenToolException(ToolErrorCodes.UnknownScope, $"There's no {kind} '{filter.Key}' here.");
         }
+
+        CheckFilter(db, universe, filter, Words);
     }
 
     /// <summary>The names of the fields with a value a reader at <paramref name="at"/> can see, not the types' defaults.</summary>

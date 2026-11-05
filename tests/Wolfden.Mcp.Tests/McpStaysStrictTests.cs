@@ -1116,6 +1116,25 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
 
     [Fact]
     [Trait("Scenario", "SC-MCP-50")]
+    public async Task AKeyTwoBooksShareIsSaidToBeSharedAtAPosition()
+    {
+        // F-KEY-5. The book is there, so "there's no book" would send the writer the wrong way, and the true message names only the key given.
+        _den.Write("universes/starfall/series/drift-war/series.md", "---\nid: 01JA3E28JT97KB6CQ643DZVMXY\nname: The Drift War\nbooks: [ember]\n---\n");
+        _den.Write("universes/starfall/series/drift-war/books/ember/book.md", "---\nid: 01JB0000000000000000000A02\nname: Ember of the Drift\nchapters: [1, 2]\n---\n");
+
+        var reply = await Call("list_entities", new() { ["as_of"] = "ash:2", ["book"] = "ember" }, error: true);
+
+        var error = reply.Json.GetProperty("error");
+        Assert.Equal("unknown_scope", error.GetProperty("code").GetString());
+        Assert.StartsWith("More than one book of universe 'starfall' has the key 'ember' (F-KEY-5)", error.GetProperty("message").GetString(), StringComparison.Ordinal);
+        foreach (var other in new[] { "ash", "a-quiet-moon", "drift-war" })
+        {
+            Assert.DoesNotContain(other, error.GetProperty("message").GetString(), StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-50")]
     public async Task AScopeThatIsntThereNamesNoOtherAtAPosition()
     {
         var book = await Call("list_entities", new() { ["as_of"] = "ember:3", ["book"] = "nope" }, error: true);

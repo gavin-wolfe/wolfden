@@ -97,8 +97,9 @@ public static class AsOfReads
     /// written empty stays, since it points nowhere. Anything else, which
     /// F-FT-10 warns about, can't be compared, so it goes.
     /// </summary>
-    private static JsonElement? Reached(JsonElement value, StoryHorizon at)
+    public static JsonElement? Reached(JsonElement value, StoryHorizon at)
     {
+        ArgumentNullException.ThrowIfNull(at);
         switch (value.ValueKind)
         {
             case JsonValueKind.String:

@@ -38,10 +38,12 @@ internal sealed class ReaderMarks
     private readonly Dictionary<long, string> _names;
     private readonly long _point;
     private readonly int _universeId;
+    private readonly Lazy<Func<EntityRecord, string, bool>> _view;
     private ReadersLinks? _links;
 
-    private ReaderMarks(DenIndex index, ContainerRecord universe, string position, long point)
+    private ReaderMarks(DenReader reader, DenIndex index, ContainerRecord universe, string position, long point)
     {
+        _view = new Lazy<Func<EntityRecord, string, bool>>(() => ReadersLinks.SectionsIn(reader.CanonView(index, universe.Key, position, null)));
         _db = index.Context;
         _containers = _db.Containers.Where(c => c.UniverseId == universe.Id).ToList().ToDictionary(c => c.Id);
         _positionFields = _db.PositionFields.Select(p => new { p.TypeKey, p.Field }).AsEnumerable().Select(p => (p.TypeKey, p.Field)).ToHashSet();
@@ -68,7 +70,7 @@ internal sealed class ReaderMarks
     public long Point => _point;
 
     /// <summary>The links of the universe's notes as a Reader's page at the position shows them. A note a reader has met has no mark and is in canon.</summary>
-    private ReadersLinks Links => _links ??= new ReadersLinks(_db, _universeId, e => IsInCanon(e.Status) && OfNote(e) is null);
+    private ReadersLinks Links => _links ??= new ReadersLinks(_db, _universeId, e => IsInCanon(e.Status) && OfNote(e) is null, (e, section) => _view.Value(e, section));
 
     /// <summary>
     /// The marks at <paramref name="position"/>. Its universe is chosen as an
@@ -91,7 +93,7 @@ internal sealed class ReaderMarks
             throw;
         }
 
-        return new ReaderMarks(index, chosen, position, point);
+        return new ReaderMarks(reader, index, chosen, position, point);
     }
 
     /// <summary>The marks of one note.</summary>

@@ -93,6 +93,11 @@ public sealed record PositionView(string Position, string Book, string BookName,
 /// <param name="Positions">Every position in story order (format.md F-ORD-1, F-ORD-2).</param>
 public sealed record PositionsResult(int Version, string Universe, int Count, IReadOnlyList<PositionView> Positions);
 
+/// <summary>The result of <c>GET /api/positions/next</c>.</summary>
+/// <param name="Version">The shape version.</param>
+/// <param name="Position">The one position it was asked for, or null if there's none after.</param>
+public sealed record NextPositionResult(int Version, string? Position);
+
 /// <summary>An entity a link reaches, or one a backlink comes from.</summary>
 /// <param name="Key">What links store and <c>/api/entity</c> takes: its id, or its path while it has none.</param>
 /// <param name="Id">Its id, or null.</param>

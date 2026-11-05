@@ -52,7 +52,7 @@ internal static class FileEndpoints
     /// <summary>Maps the endpoints onto <paramref name="api"/>, through <paramref name="tools"/>, so a save takes its turn with the other writes.</summary>
     public static void Map(RouteGroupBuilder api, DenTools tools)
     {
-        api.MapGet("/den/errors", (HttpContext c) => ReadEndpoints.Answer(c, [], _ => Errors(tools)));
+        api.MapGet("/den/errors", (HttpContext c) => ReadEndpoints.Answer(c, ["countOnly"], q => q.Bool("countOnly") ? Errors(tools) with { Errors = [], Truncated = false } : Errors(tools)));
         api.MapGet("/file/source", (HttpContext c) => ReadEndpoints.Answer(c, ["path"], q => tools.GetFileSource(q.Text("path") ?? "")));
         api.MapPost("/file/edit", (Func<HttpContext, Task<IResult>>)(c => Edit(c, tools)));
     }

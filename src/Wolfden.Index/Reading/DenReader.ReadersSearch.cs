@@ -14,11 +14,12 @@ public sealed partial class DenReader
     /// </summary>
     /// <remarks>
     /// <para>
-    /// A note's text is its name and its lead, and a section's is its heading and its own
-    /// text. In text and field values, every link is what it shows on the page
-    /// (<see cref="ReadersLinks"/>), so a target behind a label, an alias or key a link is
-    /// written by, and a note's aliases, which that page doesn't list and which can hold a
-    /// secret, don't match, and a met note's name does. Types' defaults aren't searched, as
+    /// A note's text is its name, the other names readers know there (format.md F-VIEW-7, D3
+    /// on #67), and its lead, and a section's is its heading and its own text. A
+    /// <c>known_as</c> name readers learn later doesn't match. In text and field values, every
+    /// link is what it shows on the page (<see cref="ReadersLinks"/>), so a target behind a
+    /// label, or an alias or key a link is written by, doesn't match, and a met note's name
+    /// does. Types' defaults aren't searched, as
     /// with no position: they aren't the note's writing. The search table only gives the
     /// order, by how well a note's text matches there, with no comments counted.
     /// </para>
@@ -66,7 +67,7 @@ public sealed partial class DenReader
             var scopes = Scopes(db);
             var hits = new List<SearchHitView>();
             var metPaths = whole.Entities.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
-            var links = new ReadersLinks(db, u.Id, e => metPaths.Contains(e.Path), ReadersLinks.SectionsIn(whole));
+            var links = new ReadersLinks(db, u.Id, e => metPaths.Contains(e.Path), ReadersLinks.SectionsIn(whole), horizon);
             if (fieldName is null)
             {
                 var ranks = index.SearchRanks(query);
@@ -165,7 +166,8 @@ public sealed partial class DenReader
 
     private static IEnumerable<ReadersTextHit> TextHits(EntityView note, EntityRecord record, SearchWords words, ReadersLinks links)
     {
-        if (Found(words, note.Name, links.Text(record.Id, note.Lead ?? "")) is { } own)
+        var names = string.Join("\n", (note.Aliases ?? []).Prepend(note.Name));
+        if (Found(words, names, links.Text(record.Id, note.Lead ?? "")) is { } own)
         {
             yield return new ReadersTextHit(record, null, null, own, note.Status);
         }

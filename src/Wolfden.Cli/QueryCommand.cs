@@ -216,9 +216,11 @@ internal static partial class QueryCommand
             // can tie, and then both are shown. Only if none matches is the
             // whole universe asked, to tell "not met yet" (an empty view) from
             // "no such entity" (an error).
+            // A name readers learn after the view's point is no name in either step (format.md F-VIEW-7).
             var among = met.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
-            var paths = index.MatchEntities(universeId, name, among).Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
-            if (paths.Count == 0 && index.MatchEntities(universeId, name).Count == 0)
+            var at = index.PointOf(universe, line.Value("--at"));
+            var paths = index.MatchEntities(universeId, name, among, at).Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
+            if (paths.Count == 0 && index.MatchEntities(universeId, name, null, at).Count == 0)
             {
                 problem = $"universe '{universe}' has no entity '{name}' (matched as a link is: by id, file name, name, or alias).";
                 return null;

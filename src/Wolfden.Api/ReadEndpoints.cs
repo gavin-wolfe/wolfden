@@ -179,6 +179,9 @@ public static class ReadEndpoints
         PinnedUniverse = options.PinnedUniverse,
         History = options.History,
         Words = Words,
+
+        // The writer's own pages list the books as typing help; the Reader's view says nothing of them (AsReaders).
+        ListBooksAtABadPosition = true,
     };
 
     /// <summary>

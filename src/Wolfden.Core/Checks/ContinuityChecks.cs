@@ -492,7 +492,12 @@ internal static class ContinuityChecks
         {
             if (reference.Position is { } position && universe.Resolve(position).ToDiagnostic(reference.Line) is { } diagnostic)
             {
-                var what = reference.Site == PositionSite.FieldValue ? "is kept, but not placed in story order" : "is left out of canon views";
+                var what = reference.Site switch
+                {
+                    PositionSite.FieldValue => "is kept, but not placed in story order",
+                    PositionSite.KnownAsFrom => "is a name no read at a story position knows",
+                    _ => "is left out of canon views",
+                };
                 found.Add(diagnostic with { Message = $"{reference.Text}: {diagnostic.Message} Until it resolves, the fact that uses it {what}." });
             }
         }

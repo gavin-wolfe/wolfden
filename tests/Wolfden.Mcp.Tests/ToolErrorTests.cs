@@ -12,16 +12,17 @@ public sealed class ToolErrorTests : IClassFixture<DraculaToolTests.Den>
 
     [Theory]
     [Trait("Scenario", "SC-MCP-6")]
-    [InlineData("dracula:99", "has no chapter '99'")]
-    [InlineData("ember:1", "has no book 'ember'")]
+    [InlineData("dracula:99", "Book 'dracula' has no chapter '99'. dracula has chapters 1\u2013note.")]
+    [InlineData("ember:1", "There's no book 'ember' here.")]
     [InlineData("dracula:14.2", "scenes are not supported yet")]
     [InlineData("Dracula 5", "invalid story position")]
     public void ABadPositionIsBadPosition(string position, string message)
     {
+        // A position names no other book (#67, option C): a book's chapters, for a chapter it doesn't have.
         var canon = Assert.Throws<DenToolException>(() => _tools.CanonAsOf(position: position));
         Assert.Equal(ToolErrorCodes.BadPosition, canon.Code);
         Assert.Contains(message, canon.Message, StringComparison.Ordinal);
-        Assert.Contains("Books of universe 'dracula' in story order: dracula.", canon.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("in story order", canon.Message, StringComparison.Ordinal);
 
         var entity = Assert.Throws<DenToolException>(() => _tools.GetEntity("Mina", asOf: position));
         Assert.Equal(ToolErrorCodes.BadPosition, entity.Code);

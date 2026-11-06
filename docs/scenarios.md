@@ -3646,8 +3646,9 @@ My assistant is drafting `ember:3`, and passes `as_of: ember:3` to `search` and
   whatever the position, as before (SC-MCP-47).
 - The hits at any position are the Reader's view's, word by word and in the same order
   (SC-WEB-106). A hit has no `left_out`, and no mark.
-- A note's aliases don't match at a position. A link in a field matches by the label
-  it shows, not by its later note's name or alias.
+- A note's name and the other names the reader knows it by there match (D3 on #67,
+  SC-MCP-49). A link in a field matches by the label it shows, not by its later note's
+  name or alias.
 - A `field` that only later or out-of-canon values give is refused as a made-up one is.
 - `list_entities` lists what `canon_as_of` lists at that position, with the same line for
   each note, whatever `type`, `status`, `series`, or `book` it's given. `total` counts only
@@ -3655,13 +3656,82 @@ My assistant is drafting `ember:3`, and passes `as_of: ember:3` to `search` and
   doesn't exist is refused without naming the others. A key two books share (F-KEY-5) is
   said to be shared, naming only that key.
 - A position that can't be read is `bad_position`, and doesn't fall back to a full
-  search or list. `universe: "*"` with `as_of` is `bad_argument`.
-
-(SC-MCP-49 is reserved for the names that arrive during the story, #67.)
+  search or list. `universe: "*"` with `as_of` is `bad_argument`. Its message names no
+  book but the one given: "There's no book 'embr' here." for a book the universe doesn't
+  have, and that book's chapters for a chapter it doesn't have ("ember has chapters
+  1–24."), so a typo doesn't list the later books (#67). The web's own reads still list
+  them, for the writer.
 
 Spec: F-VIEW-1, design.md §8, §9 (#67). Covered by: `McpStaysStrictTests`,
 `ReadersSearchTests.AnAssistantAtAPositionFindsWhatTheReadersViewFinds`,
-`UniverseChoiceTests`.
+`UniverseChoiceTests`, `ToolErrorTests`.
+
+### SC-MCP-49. A name I haven't reached doesn't exist
+
+The Courier is met at `ember:1`, with `aliases: [the Messenger]` and
+`known_as: [{ value: Mara Voss, from: "ash:2" }]`.
+
+- At `ember:3`, `get_entity("Mara Voss")` gets `unknown_entity`, word for word what a
+  made-up name gets, except for the name: not `in_view: false`, which would confirm
+  the note has it. `The Courier` opens, its `aliases` is `["the Messenger"]`, and the
+  answer doesn't hold the name anywhere. `search` for it has no hits, and `canon_as_of`
+  and `list_entities` don't say it.
+- At `ash:2`, both names open the note, and `aliases` is `["the Messenger", "Mara Voss"]`,
+  plain strings with no `from`. `search` finds it.
+- With no position, both open, and `known_as` lists it with its `from`.
+- A plain alias is listed and found at any position the note is in (D3).
+
+Spec: F-ENT-10, F-VIEW-7 (#67). Covered by: `McpStaysStrictTests`, `KnownAsTests`.
+
+### SC-MCP-51. My earlier text linked by the later name
+
+A note met at `ember:1` says `[[Mara Voss]] signed it. [[Mara Voss|The stranger]]
+paid. [[Mara Voss#Overview|she]] left.`, and its `signer` field is `[[Mara Voss]]`.
+
+- With `as_of: ember:3`, the text reads `[[The Courier]] signed it. [[The Courier|The
+  stranger]] paid.`, a label kept, and a heading only if the reader knows that section.
+  The field reads `[[The Courier]]`. `line` is unchanged, and nothing holds the name. A
+  search at `ember:3` finds the text by "Courier" and not by "Voss".
+- The Reader's view's page has the same text, and its `links`, `target`, and
+  backlinks' `text` read the same, so the page can match them.
+- At `ash:2`, and with no position, it reads as written. The link resolves to the note
+  at every position.
+- With `spoiler_checks`, `check` warns that the link runs ahead, naming the name's
+  `from` and the link's position, even in a note with no `from` of its own. A link
+  with a label isn't flagged.
+
+Spec: F-VIEW-7, F-LINK-13 (#67). Covered by: `McpStaysStrictTests`,
+`ReadersViewTests.AReadersPageShowsALinkByALaterNameAsTheNotesName`, `KnownAsTests`.
+
+### SC-MCP-52. An alias the reader knows beside one they don't
+
+The Harbourmaster has `aliases: [Old Tam]`, and The Lamplighter has
+`known_as: [{ value: Old Tam, from: "ash:2" }]`. Both are met in `ember`.
+
+- At `ember:3`, `get_entity("Old Tam")` opens The Harbourmaster, and the answer doesn't
+  name The Lamplighter. A search finds only The Harbourmaster.
+- At `ash:2`, and with no position, it's `ambiguous_entity`, with both in `candidates`
+  by their filed names, and a search finds both.
+- A link `[[Old Tam]]` in text is ambiguous at every position (F-LINK-7), since links
+  don't depend on where they're read.
+
+Spec: F-VIEW-7, F-LINK-6 (#67). Covered by: `McpStaysStrictTests`.
+
+### SC-MCP-54. Names that arrive at different times
+
+The man in the grey coat, met at `ember:1`, has `known_as` entries `Corin` from
+`ember:2`, `Corin Hask` from `ash:1`, `Søren Hask` and `Soren Hask` from `ash:3`,
+`Brother Hask` with no `from`, and `The Abbot` from `ash:9`, a chapter the book
+doesn't have.
+
+- `aliases` grows as the story goes: none at `ember:1`, `Corin` at `ember:3`, both
+  Corins at `ash:2`, and the two spellings of Søren too at the end of the story, in the
+  order they're written.
+- A spelling not reached is unknown, accented or not, to a lookup and a search.
+- `Brother Hask` and `The Abbot` are never known at a position, and `check` warns about
+  each (F-ENT-10, F-POS-4). With no position, all six are listed.
+
+Spec: F-ENT-10, F-VIEW-7 (#67). Covered by: `McpStaysStrictTests`, `KnownAsTests`.
 
 ## STORE: Wolfden saves, moves, and deletes notes
 

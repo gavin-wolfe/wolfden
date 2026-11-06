@@ -870,6 +870,7 @@ public sealed partial class DenTools
                 PositionSite.EntryUntil => $"'until' of a fields.{reference.Field} entry",
                 PositionSite.FieldValue => $"fields.{reference.Field}",
                 PositionSite.SectionFrom => $"'from' of section '{reference.Section!.Name}'",
+                PositionSite.KnownAsFrom => "'from' of a known_as entry",
                 _ => $"'until' of section '{reference.Section!.Name}'",
             };
             if (shape)

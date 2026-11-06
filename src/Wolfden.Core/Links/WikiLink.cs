@@ -101,6 +101,62 @@ public static partial class LinkSyntax
         return result.Append(text, at, text.Length - at).ToString();
     }
 
+    /// <summary>
+    /// <paramref name="text"/> with each link that <paramref name="rewrite"/> gives a
+    /// replacement for, given the link as written, replaced by it; every other link,
+    /// and everything else, stays as written. For markdown, a <c>[[</c> in code or an
+    /// HTML comment isn't a link, so it stays. Nothing else changes, so line numbers hold.
+    /// </summary>
+    public static string WithLinksRewritten(string text, bool markdown, Func<string, string?> rewrite)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        ArgumentNullException.ThrowIfNull(rewrite);
+        if (!text.Contains("[[", StringComparison.Ordinal))
+        {
+            return text;
+        }
+
+        var excluded = markdown ? BodyLinkScanner.CodeAndComments(text) : null;
+        var result = new System.Text.StringBuilder(text.Length);
+        var at = 0;
+        foreach (var link in Scan(text, 0, text.Length, excluded))
+        {
+            if (!link.IsEmpty && rewrite(text.Substring(link.Offset, link.Length)) is { } replacement)
+            {
+                result.Append(text, at, link.Offset - at).Append(replacement);
+                at = link.Offset + link.Length;
+            }
+        }
+
+        return result.Append(text, at, text.Length - at).ToString();
+    }
+
+    /// <summary>
+    /// <paramref name="linkText"/>, a whole link such as <c>[[Mara Voss#Past|her]]</c>,
+    /// with its target replaced by <paramref name="target"/>, and its heading taken out
+    /// unless <paramref name="keepHeading"/>. The label, and the <c>\|</c> or <c>|</c>
+    /// before it, stay as written. Null if it isn't one link with a target.
+    /// </summary>
+    public static string? Retargeted(string linkText, string target, bool keepHeading)
+    {
+        ArgumentNullException.ThrowIfNull(linkText);
+        ArgumentNullException.ThrowIfNull(target);
+        var m = LinkPattern().Match(linkText);
+        if (!m.Success || m.Index != 0 || m.Length != linkText.Length || m.Groups["t"].Value.Trim().Length == 0)
+        {
+            return null;
+        }
+
+        var heading = m.Groups["h"];
+        var rest = heading.Success ? linkText[(heading.Index - 1)..] : linkText[(m.Groups["t"].Index + m.Groups["t"].Length)..];
+        if (heading.Success && !keepHeading)
+        {
+            rest = linkText[(heading.Index + heading.Length)..];
+        }
+
+        return string.Concat("[[", target, rest);
+    }
+
     /// <summary>A link found by <see cref="Scan"/>, before it has a line and column.</summary>
     internal readonly record struct RawLink(int Offset, int Length, string Target, string? Heading, string? Label)
     {

@@ -881,8 +881,10 @@ you're in is always highlighted.
   `[[halden-pike|the stranger]]` is found by "stranger" and never by "pike", even once
   they've met him, which is why the tip above works. With no label, a link to a note
   they've met is found by that note's name, however you wrote it, and one to a note
-  they haven't met is found as you wrote it. Aliases aren't searched here, since the
-  page doesn't list them, and nor are a type's default values. A comment inside a field's value isn't hidden, here or on the page: comments
+  they haven't met is found as you wrote it. A note is found by its name and the other
+  names readers know it by at that point, which its page lists: its aliases, and each
+  `known_as` name they've reached ([Other names](#other-names-aliases-and-known_as)).
+  A type's default values aren't searched. A comment inside a field's value isn't hidden, here or on the page: comments
   are hidden in a note's text. The Type, Field, and Scope filters list only what
   they've reached.
 
@@ -976,6 +978,101 @@ fields and chapter defaults.
 
 A field your note's type doesn't define, or one written in a way the
 form can't show, has **Edit in file** instead, which says why.
+
+### Other names: aliases and known_as
+
+A note can have other names besides its `name`, and there are two places to put
+them. The question that decides which: **does readers' knowing this name start
+partway through the story?**
+
+- **No: `aliases`.** A nickname, a title, a short form, a spelling everyone uses.
+  Readers know it wherever they know the note, so it shows at every position.
+
+  ```yaml
+  name: Ilse Tarrow
+  aliases: [Tarrow, the Commander]
+  ```
+
+- **Yes: `known_as`.** A secret identity, a real name behind a code name, a name
+  a character takes later. Each name gets the `from` where readers learn it.
+
+  ```yaml
+  name: The Courier
+  aliases: [the Messenger]
+  known_as:
+    - { value: Mara Voss, from: "ember:38" }
+  ```
+
+Both work as links, at every position: `[[Mara Voss]]` reaches The Courier
+wherever you write it, so renames and **Linked from** don't depend on the
+chapter. What changes is what a reader at a position, and an AI assistant
+drafting there, is told:
+
+- **Before `ember:38`**, `Mara Voss` isn't a name at all. Looking it up finds
+  nothing, exactly as for a name no note has, so it doesn't even confirm the
+  note exists. A search doesn't find it, and the note's page doesn't list it.
+  Your own link `[[Mara Voss]] signed it`, in a section readers reach at
+  chapter 12, reads `[[The Courier]] signed it` there, so the link doesn't hand
+  over the name. The file isn't changed.
+- **From `ember:38`**, it's listed with the note's other names, like an alias,
+  with no date beside it, and found by search.
+- **In the Author's view and with no position**, you see everything:
+  `known_as` with each `from`.
+
+**A secret written as a plain alias shows at every position.** If a name is a
+reveal, it goes in `known_as`, never `aliases`: an alias is listed on the note's
+page in the Reader's view, searched there, and given to an AI assistant at any
+point in the story. When you bring in notes written before `known_as` existed,
+look through their `aliases` for names like that and move them.
+
+**Each spelling is its own entry.** A link matches a name ignoring case, but
+not accents, so `[[Zoe Ark]]` doesn't reach a note that lists only `Zoë Ark`.
+If you write a name more than one way, list each way, each with its own `from`:
+
+```yaml
+known_as:
+  - { value: Zoë Ark, from: "ash:4" }        # ë (Dutch, French, Albanian) folds in search, not in links
+  - { value: Zoe Ark, from: "ash:4" }
+  - { value: Søren Holt, from: "ash:9" }     # ø (Danish, Norwegian) has no plain form
+  - { value: Soren Holt, from: "ash:9" }
+  - { value: Łucja Wren, from: "ash:12" }    # ł (Polish) doesn't fold to l
+  - { value: Lucja Wren, from: "ash:12" }
+  - { value: Đorđe Vale, from: "ash:15" }    # đ (Serbian, Croatian) doesn't fold to d
+  - { value: Djordje Vale, from: "ash:15" }
+  - { value: Иван Грей, from: "ash:20" }     # Cyrillic and Latin are different names
+  - { value: Ivan Grey, from: "ash:20" }
+```
+
+Search ignores most accents (`Zoe` finds `Zoë`), but not `ø`, `ł`, or `đ`,
+which have no plain form: `Soren` doesn't find `Søren`. Links ignore none.
+A name you don't list as its own entry is a broken link where you write it,
+which `wolfden check` reports.
+
+**When a note's name is the secret,** file it under what readers first know it
+by, `name: The man in the grey coat`, with the real name in `known_as`, and give
+the file the same name (`the-man-in-the-grey-coat.md`): a file name shows in
+every read, so `corin-hask.md` would give it away. Nothing warns about a note
+that never gets a real name.
+
+**What to watch for.**
+
+- A `known_as` entry with no `from`, or one that names a chapter your universe
+  doesn't have, is never known at any position, so the name stays hidden.
+  `wolfden check` warns about both. A name written as a plain item
+  (`known_as: [Mara Voss]`) is the same, and the warning says to move it to
+  `aliases` if readers always know it.
+- A name in both `aliases` and `known_as` is hidden until its `from`, and
+  `check` warns. A name that's the note's own `name` can't be hidden.
+- With `spoiler_checks: true` in `den.yaml`, `check` warns about a link written
+  by a `known_as` name in text readers reach before its `from`, even in a note
+  with no `from` of its own, such as a universe-level note. A labelled link
+  (`[[Mara Voss|the stranger]]`) shows only its label, so it isn't flagged.
+- It hides names, not prose. `Mara Voss` typed as plain words in an early
+  section shows there, so read summary sections for it as for any reveal.
+- There's no `until`: readers who have learned a name don't forget it.
+- For now, the web editor doesn't edit `known_as`: use **Edit file**, or ask an
+  AI assistant. In Obsidian, `known_as` is a property it doesn't know, so edit
+  it in Source mode, as with `fields`.
 
 ## Images
 

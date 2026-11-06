@@ -1070,7 +1070,9 @@ same code (§9):
   it, or show up in an `ambiguous_entity` error. Only when nothing there
   matches does it ask all the entities, to tell one the reader hasn't met
   (`in_view: false`, and nothing about it) from one that doesn't exist
-  (`unknown_entity`). Aliases aren't positional (format.md §9.5).
+  (`unknown_entity`). A name readers learn later (`known_as`, format.md
+  F-VIEW-7, #67) matches in neither step, so it's `unknown_entity`, word for
+  word as a made-up name, and never `in_view: false`, which would confirm it.
 - **`search` and `list_entities` take `as_of` too** (#67, maintainer decision
   2026-11-05), so an assistant drafting a chapter can't search or list its way to
   later notes. `search` with `as_of` calls `DenReader.SearchAsReaders`, the Reader's
@@ -1081,6 +1083,22 @@ same code (§9):
   unreadable position is `bad_position`, as in `canon_as_of`, and `universe: "*"`
   is refused. `as_of` is per call, so an assistant can still forget it; a session
   default (`wolfden mcp --at`) is left for dogfooding.
+- **Names at a position** (#67, maintainer decisions D1 to D4, 2026-11-05). A name
+  readers learn partway through the story goes in `known_as` with its `from`
+  (format.md F-ENT-10), beside `aliases`, which hold for the whole story. At a
+  position, a name is known if its note is in the view and it's the name, a plain
+  alias, or a `known_as` value whose `from` it has reached (F-VIEW-7). So
+  `get_entity`, `canon_as_of`, and `search` with `as_of` list the known names in
+  `aliases`, as plain strings (D3, reversing the #300 call that a Reader's search
+  doesn't match aliases), and a name not known is no name at all: `unknown_entity`,
+  no hit, not listed. A link written by such a name reads as written by the note's
+  name (D4), in text, headings, and field values, so an assistant drafting an early
+  chapter isn't handed the name by the writer's own link. It's in `AsOfReads`, from
+  link rows that keep the point of the `known_as` value they matched, so the web's
+  Reader's view does the same. Link resolution doesn't change: a link reaches its
+  note at every position, so renames and backlinks need no position. With
+  `spoiler_checks`, F-LINK-13 warns about such a link. Writes take no position;
+  `bad_position` names no book but the one asked for (#67, option C).
 - **A future `until` is left out** (maintainer decision on #288). With a
   position, `canon_as_of` and `get_entity` leave out each fact's `until`
   (format.md F-VIEW-4), since it tells an assistant drafting that chapter
@@ -1848,7 +1866,10 @@ docs/
   `/api/entity` keeps text as `get_entity` has it, since `ReadersViewTests` holds the two
   equal and the page has to match links to their text. So `body`, `links`, and
   `backlinks[].text` can hold a target behind a label, an alias a link is written by, or a
-  later section's name. None of it is on the page, but it's in that answer.
+  later section's name. None of it is on the page, but it's in that answer. A link written
+  by a name readers learn later (`known_as`) is the one case this no longer holds for:
+  it reads by the note's name there too, `links[].text` and `target` and
+  `backlinks[].text` included (format.md F-VIEW-7, #67).
 
   `readers=true` on `/api/search` (`DenReader.SearchAsReaders`) looks for the words in
   that same text, each note read through `AsOfReads`, rather than in the search table,
@@ -1872,9 +1893,13 @@ docs/
   search with the Reader's page data word by word.
 
   **Where search and the page still differ.**
-  - A note's aliases don't match, since the page doesn't list them and a secret identity
-    is a natural alias (the maintainer can revisit this while dogfooding, and #67 looks
-    at aliases at a position).
+  - Nothing for names any more: a note's name and the other names readers know at the
+    position match, and the page lists them in `aliases` (D3 on #67, maintainer decision
+    2026-11-05, which reverses the earlier call that aliases don't match). A `known_as`
+    name readers learn later neither matches nor shows. A secret written as a plain
+    alias shows at every position, so it belongs in `known_as`. The search table keeps
+    `known_as` names in a column of their own, which the ranking leaves out, so a name
+    readers haven't reached can't order hits either.
   - A type's defaults don't match, though the page shows them, since they aren't the
     note's writing, as with no position.
   - What isn't a note's text isn't searched: field names, the note's type and scope, and
@@ -1903,7 +1928,8 @@ docs/
   pays off, and a `field` with none is refused as a made-up one is. MCP's `search`
   with `as_of` calls this same search (#67), without the page's `text` and `matches`, and
   with no marks; with no `as_of` it's the full search, as it was. `asOf` alone on `/api/search` is as it
-  was, for the writer: the web no longer asks it.
+  was, for the writer: the web no longer asks it. It doesn't match `known_as` names at all,
+  since it can't tell which ones readers know (#67).
 
   An `/api/entity` for a note left out is still 404 `unknown_entity`, with
   `leftOut` (`path`, `line`, `rule`, `message`), found by its path, a path under a
@@ -2582,8 +2608,8 @@ docs/
     editors never send `asOf`: an editing surface shows everything
     (#28), so a field or section can link a note the reader meets later.
     With `asOf`, only the notes met by then are looked at (#26), for a
-    reading view; aliases aren't positional (format.md §9.5), so a met
-    note matches by any of them. The MCP tools have no lookup of their
+    reading view, by the names readers know there (format.md F-VIEW-7):
+    every plain alias, and a `known_as` name from its `from`. The MCP tools have no lookup of their
     own: `search` matches names and aliases (`madam*`), and `get_entity`
     takes a name or alias as a link does.
   - **Checked in the page.** Numbers, links, sort keys, one-line

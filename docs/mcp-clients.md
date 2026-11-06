@@ -199,7 +199,7 @@ prompts. This list is for knowing what the assistant can do.
 | Tool | What it does |
 |---|---|
 | `search` | Full-text search over names, aliases, leads, section text, and field values (a link in a field matches its note's name and aliases too); `field` searches one field's values. A hit in a field has `field` (its name) and `line` (the entry's line), with no `section`, such as `{"field": "occupation", "line": 10, "snippet": "[physician], professor", …}`. A query's words match anywhere in any order; words in double quotes (`"silver key"`) match as a phrase, side by side and in order. A hit in a section a bad comment leaves out has `left_out: true` and `in_canon: false`, so `canon_only` drops it. With `as_of`, it searches only what the reader knows at that position, as the Reader's view does: see [Read by position](#7-gotchas-for-ai-assistants). |
-| `get_entity` | One entity, by name, alias, file name, id, key, or path; with `as_of`, only what the reader knows at that position. Without `as_of`, a section a bad comment leaves out comes in its place with `left_out` (each error's `line`, `rule`, and `message`). With `as_of` it isn't there at all, and nothing says so, since a heading can give away a reveal. With `as_of`, a fact's `until` is left out too, and so are a position field's values later than `as_of` and the writer's HTML comments. |
+| `get_entity` | One entity, by name, alias, file name, id, key, or path; with `as_of`, only what the reader knows at that position, with the names the reader knows it by in `aliases`. Without `as_of`, a section a bad comment leaves out comes in its place with `left_out` (each error's `line`, `rule`, and `message`). With `as_of` it isn't there at all, and nothing says so, since a heading can give away a reveal. With `as_of`, a fact's `until` is left out too, and so are a position field's values later than `as_of` and the writer's HTML comments. |
 | `list_entities` | Entities by type, status, series, or book. A type includes its kinds here and in `search` and `canon_as_of`: `location` also finds a den's worlds ([types.md F-TYPE-13](types.md#3-type-definitions)), and each result says its own type. With `as_of`, only the entities in canon at that position: met by then, and draft or canon. `total` counts only those. |
 | `canon_as_of` | Canon at a story position (or the end of the story), pinned canon first. Sections a bad comment leaves out aren't in it, at any position. At a position, a fact's `until` is left out, and so are a position field's values later than the position and the writer's HTML comments. |
 | `get_chapter` | A book's chapters and their fields, with each value's source (the chapter, or `chapter_defaults` above it), and each chapter's `heading`: its title, then the fields a `chapter_heading` lists, such as `"Ardent — Vesta Yards, 2350-04-12"`. A field the chapter writes with a value that's ignored is listed in the chapter's `ignored`, as written and why, such as `{"field": "setting", "as_written": "Whitby harbour", "reason": "setting is a link to one entity, …"}`; a list item that's left out has its number in `item`. A field written with no value (null) isn't a fault, so it isn't listed. |
@@ -387,7 +387,9 @@ docs. The writer's own list is in
   Ask the writer before either.
 - **Positions must resolve.** A position is `book:chapter`, by key
   (`dracula:5`), and must be a chapter the book lists; `get_chapter`
-  lists them. A read at one that doesn't is `bad_position`, and so is a
+  lists them. A read at one that doesn't is `bad_position`: for a book the
+  universe doesn't have it names no other book, and for a chapter a book
+  doesn't have it gives that book's chapters. So is a
   write that sets one as a `from` or `until`, or as the value of a
   position field such as a thread's `planted` (where a value that isn't
   a position is refused too): `create_entity`,
@@ -403,8 +405,8 @@ docs. The writer's own list is in
   looks only in the notes the reader has met, as `get_entity` with `as_of` reads
   them: a later note, later or undecided text, a later value, and a comment
   neither match nor show, so a word that's only there gets the same empty answer as
-  a word no note has. A note's aliases don't match there, and a link matches by
-  the text it shows, not by its target. A type's default value isn't searched, with
+  a word no note has. A note's name and the other names the reader knows there
+  match, and a link matches by the text it shows, not by its target. A type's default value isn't searched, with
   or without `as_of`, though `get_entity` shows it, so no hit doesn't mean a note has
   no such value. `as_of` is per call, so a search without it
   sees everything again. `universe: "*"` doesn't go with `as_of`, and a position
@@ -468,9 +470,26 @@ docs. The writer's own list is in
   are. If you can also edit the file another way, read it with no position first.
   Rewriting a section from a read at a position deletes comments you never saw, and
   the hash is the same from both reads, so nothing refuses the write.
+- **A name the reader hasn't learned isn't a name.** A note's `known_as` holds
+  the names readers learn partway through the story, each with its `from`
+  ([format.md F-ENT-10](format.md#71-frontmatter)). At a position before that
+  `from`, `get_entity` by that name is `unknown_entity`, just as for a name no
+  note has, `search` doesn't find it, and the note's `aliases` don't list it.
+  From its `from` on, it's in `aliases` like any other name, with no date.
+  Without `as_of`, `get_entity` lists `known_as` with each `from`. So when
+  drafting, refer to a note by the names in `aliases` at that position, and
+  never by a name you saw only in a read with no position.
+- **A link by a name the reader hasn't learned reads by the note's name.** At a
+  position before the name's `from`, `[[Mara Voss]] signed it` reads
+  `[[The Courier]] signed it`, with a label kept (`[[The Courier|the stranger]]`).
+  The file still says `[[Mara Voss]]`, and `line` numbers don't change. Another
+  reason to read with no position before replacing text. You can still write a
+  link by a later name: it resolves, and `check` warns that it's ahead of its
+  position, which you should tell the writer.
 - **A read at a position only goes by positions.** Text the writer put in a
   section or lead, a field the note's type doesn't define, or a `ref` field's
-  value can still mention later events.
+  value can still mention later events, and so can a later name written as plain
+  text rather than as a link.
 - **Writes land at once; only `checkpoint` records them.** An open page
   in the web UI shows each write within about 5 seconds, or once the
   writer closes an editor or form they have open there. If they save a

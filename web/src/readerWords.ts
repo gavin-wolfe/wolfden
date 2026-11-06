@@ -28,7 +28,7 @@ export function notReachedWords(what: 'book' | 'chapter' | 'series'): string {
 
 /** Tags for a search hit whose words are where a reader's page doesn't show them. */
 export const ONLY_IN_ALIAS = 'only in an alias'
-export const ONLY_IN_ALIAS_WHY = "A note's page doesn't list its aliases in the Reader's view, so a search there doesn't look at them."
+export const ONLY_IN_ALIAS_WHY = "Readers don't know this name here: it's one they learn later, or a link stands for it, and the Reader's view shows the note's name for the link."
 export const ONLY_IN_LINK_TARGET = "only in a link's target"
 export const ONLY_IN_LINK_TARGET_WHY = 'Readers see only the label of a labelled link, so a search in the Reader\'s view looks only at that.'
 

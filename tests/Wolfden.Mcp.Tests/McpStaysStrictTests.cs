@@ -86,6 +86,7 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
         type: thread
         name: The salt tithe
         aliases: [The toll]
+        known_as: [{ value: Wraithmoor, from: "ash:2" }]
         status: canon
         from: "ember:1"
         fields:
@@ -172,8 +173,12 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
         "The old pact", "Thornmarch", // A retconned note.
         "The brine oath", "the-brine-oath", "Corvantis", // A note an error leaves out.
         "Halden Pike", "Tarnhollow", // Notes filed in the later book, so they enter there.
+        "Wraithmoor", // A name readers learn later, of a note they've met (known_as, #67).
         "ash:", "a-quiet-moon:", // Every position later than the first book.
     ];
+
+    /// <summary>The keys of the books later than the first, which a message can name bare as well as in a position.</summary>
+    private static readonly string[] LaterBooks = ["ash", "a-quiet-moon"];
 
     /// <summary>What a marked view might be called, in the spellings a member or a tag would use. None of these is ordinary prose, so they're searched for anywhere.</summary>
     private static readonly string[] MarkPhrases =
@@ -300,6 +305,8 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
         Assert.Contains("entity.sections.left_out", full.Keys);
         Assert.Contains("entity.sections.bookkeeping", full.Keys);
         Assert.Contains("entity.aliases", full.Keys);
+        Assert.Contains("entity.known_as", full.Keys);
+        Assert.Contains("Wraithmoor", full.Whole, StringComparison.Ordinal);
         Assert.Contains(full.Json.GetProperty("entity").GetProperty("fields").EnumerateArray(), f => f.GetProperty("name").GetString() == "echoes");
 
         // The heir is in view once the reader reaches it.
@@ -335,23 +342,24 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
                 "scope_key": "starfall",
                 "path": "{{TithePath}}",
                 "from": "ember:1",
+                "aliases": ["The toll"],
                 "lead": "# The salt tithe\n\nEvery ship pays it at the Reach.",
                 "pinned": {
                   "fields": [
-                    { "name": "planted", "value": ["ember:1"], "kind": "entry", "status": "canon", "pinned": true, "line": 9 },
-                    { "name": "keeper", "value": "Orrin Vale", "kind": "temporal", "status": "canon", "pinned": true, "from": "ember:1", "line": 13 }
+                    { "name": "planted", "value": ["ember:1"], "kind": "entry", "status": "canon", "pinned": true, "line": 10 },
+                    { "name": "keeper", "value": "Orrin Vale", "kind": "temporal", "status": "canon", "pinned": true, "from": "ember:1", "line": 14 }
                   ],
                   "sections": [
-                    { "name": "Terms", "level": 2, "heading_path": ["Terms"], "status": "canon", "pinned": true, "from": "ember:1", "line": 33, "body": "Paid each season." }
+                    { "name": "Terms", "level": 2, "heading_path": ["Terms"], "status": "canon", "pinned": true, "from": "ember:1", "line": 34, "body": "Paid each season." }
                   ]
                 },
                 "fields": [
-                  { "name": "planted", "value": ["ember:1"], "kind": "entry", "status": "canon", "pinned": true, "line": 9 },
-                  { "name": "keeper", "value": "Orrin Vale", "kind": "temporal", "status": "canon", "pinned": true, "from": "ember:1", "line": 13 }
+                  { "name": "planted", "value": ["ember:1"], "kind": "entry", "status": "canon", "pinned": true, "line": 10 },
+                  { "name": "keeper", "value": "Orrin Vale", "kind": "temporal", "status": "canon", "pinned": true, "from": "ember:1", "line": 14 }
                 ],
                 "sections": [
-                  { "name": "Overview", "level": 2, "heading_path": ["Overview"], "status": "canon", "pinned": false, "line": 26, "body": "A toll in salt, until the ambush. The fleet enters at dawn, and what she says is no longer true." },
-                  { "name": "Terms", "level": 2, "heading_path": ["Terms"], "status": "canon", "pinned": true, "from": "ember:1", "line": 33, "body": "Paid each season." }
+                  { "name": "Overview", "level": 2, "heading_path": ["Overview"], "status": "canon", "pinned": false, "line": 27, "body": "A toll in salt, until the ambush. The fleet enters at dawn, and what she says is no longer true." },
+                  { "name": "Terms", "level": 2, "heading_path": ["Terms"], "status": "canon", "pinned": true, "from": "ember:1", "line": 34, "body": "Paid each season." }
                 ],
                 "hash": "{{reply.Json.GetProperty("entity").GetProperty("hash").GetString()}}"
               },
@@ -384,11 +392,11 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
                   "name": "The salt tithe",
                   "type": "thread",
                   "fields": [
-                    { "name": "planted", "value": ["ember:1"], "kind": "entry", "status": "canon", "pinned": true, "line": 9 },
-                    { "name": "keeper", "value": "Orrin Vale", "kind": "temporal", "status": "canon", "pinned": true, "from": "ember:1", "line": 13 }
+                    { "name": "planted", "value": ["ember:1"], "kind": "entry", "status": "canon", "pinned": true, "line": 10 },
+                    { "name": "keeper", "value": "Orrin Vale", "kind": "temporal", "status": "canon", "pinned": true, "from": "ember:1", "line": 14 }
                   ],
                   "sections": [
-                    { "name": "Terms", "level": 2, "heading_path": ["Terms"], "status": "canon", "pinned": true, "from": "ember:1", "line": 33, "body": "Paid each season." }
+                    { "name": "Terms", "level": 2, "heading_path": ["Terms"], "status": "canon", "pinned": true, "from": "ember:1", "line": 34, "body": "Paid each season." }
                   ]
                 }
               ],
@@ -404,14 +412,15 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
                   "scope_key": "starfall",
                   "path": "{{TithePath}}",
                   "from": "ember:1",
+                  "aliases": ["The toll"],
                   "lead": "# The salt tithe\n\nEvery ship pays it at the Reach.",
                   "fields": [
-                    { "name": "planted", "value": ["ember:1"], "kind": "entry", "status": "canon", "pinned": true, "line": 9 },
-                    { "name": "keeper", "value": "Orrin Vale", "kind": "temporal", "status": "canon", "pinned": true, "from": "ember:1", "line": 13 }
+                    { "name": "planted", "value": ["ember:1"], "kind": "entry", "status": "canon", "pinned": true, "line": 10 },
+                    { "name": "keeper", "value": "Orrin Vale", "kind": "temporal", "status": "canon", "pinned": true, "from": "ember:1", "line": 14 }
                   ],
                   "sections": [
-                    { "name": "Overview", "level": 2, "heading_path": ["Overview"], "status": "canon", "pinned": false, "line": 26, "body": "A toll in salt, until the ambush. The fleet enters at dawn, and what she says is no longer true." },
-                    { "name": "Terms", "level": 2, "heading_path": ["Terms"], "status": "canon", "pinned": true, "from": "ember:1", "line": 33, "body": "Paid each season." }
+                    { "name": "Overview", "level": 2, "heading_path": ["Overview"], "status": "canon", "pinned": false, "line": 27, "body": "A toll in salt, until the ambush. The fleet enters at dawn, and what she says is no longer true." },
+                    { "name": "Terms", "level": 2, "heading_path": ["Terms"], "status": "canon", "pinned": true, "from": "ember:1", "line": 34, "body": "Paid each season." }
                   ]
                 }
               ],
@@ -464,7 +473,7 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
     {
         var reply = await Call("canon_as_of", new() { ["position"] = "ember:3", [filter] = value });
 
-        AssertNothingLater(reply);
+        AssertNothingLater(reply, asked: value);
         AssertNoMarks(reply);
         AssertOnlyKeys(CanonResultKeys, reply);
     }
@@ -855,7 +864,8 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
     [Trait("Scenario", "SC-MCP-50")]
     public async Task SearchAtAPositionIsExactlyThis()
     {
-        // A word in text of every kind, later and out of canon too, is found only in the one section a reader there has. The aliases that hold it don't match.
+        // A word in text of every kind, later and out of canon too, is found only in the one section a reader there has, and in
+        // the plain alias of the note they've met, which readers know wherever the note is (D3 on #67). The later note's alias doesn't match.
         var reply = await Call("search", new() { ["query"] = "toll", ["as_of"] = "ember:3" });
 
         var expected = JsonNode.Parse(
@@ -863,7 +873,7 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
             {
               "version": 1,
               "query": "toll",
-              "count": 1,
+              "count": 2,
               "truncated": false,
               "hits": [
                 {
@@ -879,8 +889,26 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
                     "path": "{{TithePath}}",
                     "from": "ember:1"
                   },
+                  "snippet": "The salt tithe\nThe [toll]",
+                  "status": "canon",
+                  "in_canon": true,
+                  "in_comment": false
+                },
+                {
+                  "entity": {
+                    "key": "{{TitheId}}",
+                    "id": "{{TitheId}}",
+                    "name": "The salt tithe",
+                    "type": "thread",
+                    "status": "canon",
+                    "universe": "starfall",
+                    "scope_kind": "universe",
+                    "scope_key": "starfall",
+                    "path": "{{TithePath}}",
+                    "from": "ember:1"
+                  },
                   "section": "Overview",
-                  "line": 26,
+                  "line": 27,
                   "snippet": "A [toll] in salt, until the ambush. The fleet enters at dawn, and what she says is no longer true.",
                   "status": "canon",
                   "in_canon": true,
@@ -1168,6 +1196,235 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
         AssertOnlyKeys(ErrorResultKeys, reply);
     }
 
+    // --- Names readers learn partway through the story (known_as, #67). ---
+
+    private const string CourierPath = "universes/starfall/entities/notes/the-courier.md";
+    private const string LedgerPath = "universes/starfall/entities/notes/the-ledger.md";
+
+    /// <summary>A note met at ember:1 whose real name readers learn at ash:2, and a note met at ember:1 whose text links by that name.</summary>
+    private void WriteCourier()
+    {
+        _den.Write(
+            CourierPath,
+            """
+            ---
+            type: note
+            name: The Courier
+            aliases: [the Messenger]
+            known_as:
+              - { value: Mara Voss, from: "ash:2" }
+            status: canon
+            from: "ember:1"
+            ---
+
+            Carries the post.
+            """);
+        _den.Write(
+            LedgerPath,
+            """
+            ---
+            type: note
+            name: The ledger
+            status: canon
+            from: "ember:1"
+            fields:
+              signer: "[[Mara Voss]]"
+            ---
+
+            Kept at the Reach.
+
+            ## Entries
+            [[Mara Voss]] signed it. [[Mara Voss|The stranger]] paid. [[Mara Voss#Overview|she]] left.
+            """);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-49")]
+    public async Task ANameIHaventReachedDoesntExist()
+    {
+        WriteCourier();
+
+        // At ember:3, the later name is no name: word for word what a made-up name gets.
+        var hidden = await Call("get_entity", new() { ["entity"] = "Mara Voss", ["as_of"] = "ember:3" }, error: true);
+        var madeUp = await Call("get_entity", new() { ["entity"] = "Mara Vass", ["as_of"] = "ember:3" }, error: true);
+        Assert.Equal("unknown_entity", hidden.Json.GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal(
+            madeUp.Json.GetProperty("error").GetProperty("message").GetString()!.Replace("Mara Vass", "Mara Voss", StringComparison.Ordinal),
+            hidden.Json.GetProperty("error").GetProperty("message").GetString());
+        AssertOnlyKeys(ErrorResultKeys, hidden);
+
+        // The note opens, lists only the plain alias, and has the name nowhere.
+        var courier = await Call("get_entity", new() { ["entity"] = "The Courier", ["as_of"] = "ember:3" });
+        Assert.Equal(["the Messenger"], courier.Json.GetProperty("entity").GetProperty("aliases").EnumerateArray().Select(a => a.GetString()));
+        Assert.DoesNotContain("Mara", courier.Whole, StringComparison.Ordinal);
+        Assert.DoesNotContain("known_as", courier.Whole, StringComparison.Ordinal);
+        AssertOnlyKeys(EntityResultKeys, courier);
+        AssertNothingLater(courier);
+
+        // From ash:2, both open, and aliases has the name as a plain string, with no from.
+        foreach (var name in new[] { "Mara Voss", "The Courier" })
+        {
+            var known = await Call("get_entity", new() { ["entity"] = name, ["as_of"] = "ash:2" });
+            Assert.Equal("The Courier", known.Json.GetProperty("entity").GetProperty("name").GetString());
+            Assert.Equal(["the Messenger", "Mara Voss"], known.Json.GetProperty("entity").GetProperty("aliases").EnumerateArray().Select(a => a.GetString()));
+            Assert.DoesNotContain("known_as", known.Whole, StringComparison.Ordinal);
+            AssertOnlyKeys(EntityResultKeys, known);
+        }
+
+        // With no position, both open, with known_as and its from.
+        var full = await Call("get_entity", new() { ["entity"] = "Mara Voss" });
+        var entity = full.Json.GetProperty("entity");
+        Assert.Equal(["the Messenger"], entity.GetProperty("aliases").EnumerateArray().Select(a => a.GetString()));
+        var knownAs = Assert.Single(entity.GetProperty("known_as").EnumerateArray());
+        Assert.Equal(("Mara Voss", "ash:2"), (knownAs.GetProperty("value").GetString(), knownAs.GetProperty("from").GetString()));
+
+        // A canon view and a list say nothing of it either; canon_as_of lists the plain alias with the note's content.
+        var canon = await Call("canon_as_of", new() { ["position"] = "ember:3", ["type"] = "note" });
+        var brief = await Call("canon_as_of", new() { ["position"] = "ember:3", ["brief"] = true });
+        var list = await Call("list_entities", new() { ["as_of"] = "ember:3" });
+        foreach (var reply in new[] { canon, brief, list })
+        {
+            Assert.DoesNotContain("Mara", reply.Whole, StringComparison.Ordinal);
+            AssertNothingLater(reply);
+        }
+
+        Assert.Equal(["the Messenger"], canon.Json.GetProperty("entities").EnumerateArray().Single(e => e.GetProperty("name").GetString() == "The Courier").GetProperty("aliases").EnumerateArray().Select(a => a.GetString()));
+        Assert.DoesNotContain("aliases", brief.Keys.Select(k => k.Split('.')[^1]));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-49")]
+    public async Task SearchingByANameIHaventReachedFindsNothing()
+    {
+        WriteCourier();
+
+        AssertIsExactly(NoHits("Mara Voss"), await Call("search", new() { ["query"] = "Mara Voss", ["as_of"] = "ember:3" }));
+        AssertIsExactly(NoHits("Voss"), await Call("search", new() { ["query"] = "Voss", ["as_of"] = "ember:3", ["limit"] = 200 }));
+
+        // A plain alias is found at any position the note is in (D3), and the later name once it's reached.
+        var messenger = await Call("search", new() { ["query"] = "Messenger", ["as_of"] = "ember:3" });
+        Assert.Equal("The Courier", Assert.Single(messenger.Json.GetProperty("hits").EnumerateArray()).GetProperty("entity").GetProperty("name").GetString());
+        var reached = await Call("search", new() { ["query"] = "Mara Voss", ["as_of"] = "ash:2" });
+        Assert.Contains(reached.Json.GetProperty("hits").EnumerateArray(), h => h.GetProperty("entity").GetProperty("name").GetString() == "The Courier");
+
+        // With no position, it's found.
+        var full = await Call("search", new() { ["query"] = "Voss" });
+        Assert.Contains(full.Json.GetProperty("hits").EnumerateArray(), h => h.GetProperty("entity").GetProperty("name").GetString() == "The Courier");
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-51")]
+    public async Task MyEarlierTextLinkedByTheLaterNameReadsByTheNotesName()
+    {
+        WriteCourier();
+
+        var at = await Call("get_entity", new() { ["entity"] = "The ledger", ["as_of"] = "ember:3" });
+        var full = await Call("get_entity", new() { ["entity"] = "The ledger" });
+
+        // The link is shown as written by the note's name, keeping its label; a heading readers don't know goes.
+        var section = at.Json.GetProperty("entity").GetProperty("sections")[0];
+        Assert.Equal("[[The Courier]] signed it. [[The Courier|The stranger]] paid. [[The Courier|she]] left.", section.GetProperty("body").GetString());
+        Assert.Equal(full.Json.GetProperty("entity").GetProperty("sections")[0].GetProperty("line").GetInt32(), section.GetProperty("line").GetInt32());
+        Assert.Equal("[[The Courier]]", at.Json.GetProperty("entity").GetProperty("fields").EnumerateArray().Single(f => f.GetProperty("name").GetString() == "signer").GetProperty("value").GetString());
+        Assert.DoesNotContain("Mara", at.Whole, StringComparison.Ordinal);
+
+        // A search there finds what the text shows, not what it's written by.
+        AssertIsExactly(NoHits("Voss"), await Call("search", new() { ["query"] = "Voss", ["as_of"] = "ember:3", ["limit"] = 200 }));
+        var shown = await Call("search", new() { ["query"] = "Courier signed", ["as_of"] = "ember:3" });
+        Assert.Equal("The ledger", Assert.Single(shown.Json.GetProperty("hits").EnumerateArray()).GetProperty("entity").GetProperty("name").GetString());
+
+        // With no position, and once readers know the name, as written.
+        Assert.Contains("[[Mara Voss]] signed it.", full.Json.GetProperty("entity").GetProperty("sections")[0].GetProperty("body").GetString(), StringComparison.Ordinal);
+        var later = await Call("get_entity", new() { ["entity"] = "The ledger", ["as_of"] = "ash:2" });
+        Assert.Equal("[[Mara Voss]] signed it. [[Mara Voss|The stranger]] paid. [[Mara Voss#Overview|she]] left.", later.Json.GetProperty("entity").GetProperty("sections")[0].GetProperty("body").GetString());
+
+        // check warns, naming both positions.
+        var check = await Call("check", new() { ["path"] = LedgerPath });
+        Assert.Contains("'Mara Voss' is a name of 'The Courier' that readers learn at ash:2, after this link's position, ember:1", check.Whole, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-52")]
+    public async Task AnAliasTheReaderKnowsBesideOneTheyDont()
+    {
+        // Two notes share Old Tam: one plain, one learned at ash:2. Both are met in ember.
+        _den.Write("universes/starfall/entities/notes/the-harbourmaster.md", "---\ntype: note\nname: The Harbourmaster\naliases: [Old Tam]\nstatus: canon\nfrom: \"ember:1\"\n---\n\nKeeps the harbour.\n");
+        _den.Write("universes/starfall/entities/notes/the-lamplighter.md", "---\ntype: note\nname: The Lamplighter\nknown_as: [{ value: Old Tam, from: \"ash:2\" }]\nstatus: canon\nfrom: \"ember:1\"\n---\n\nLights the lamps.\n");
+
+        var early = await Call("get_entity", new() { ["entity"] = "Old Tam", ["as_of"] = "ember:3" });
+        Assert.Equal("The Harbourmaster", early.Json.GetProperty("entity").GetProperty("name").GetString());
+        Assert.DoesNotContain("Lamplighter", early.Whole, StringComparison.Ordinal);
+
+        foreach (var reply in new[]
+        {
+            await Call("get_entity", new() { ["entity"] = "Old Tam", ["as_of"] = "ash:2" }, error: true),
+            await Call("get_entity", new() { ["entity"] = "Old Tam" }, error: true),
+        })
+        {
+            var error = reply.Json.GetProperty("error");
+            Assert.Equal("ambiguous_entity", error.GetProperty("code").GetString());
+            Assert.Equal(["The Harbourmaster", "The Lamplighter"], error.GetProperty("candidates").EnumerateArray().Select(c => c.GetProperty("name").GetString()!).Order(StringComparer.Ordinal));
+        }
+
+        var searchEarly = await Call("search", new() { ["query"] = "Old Tam", ["as_of"] = "ember:3" });
+        Assert.Equal(["The Harbourmaster"], searchEarly.Json.GetProperty("hits").EnumerateArray().Select(h => h.GetProperty("entity").GetProperty("name").GetString()));
+        var searchLate = await Call("search", new() { ["query"] = "Old Tam", ["as_of"] = "ash:2" });
+        Assert.Equal(["The Harbourmaster", "The Lamplighter"], searchLate.Json.GetProperty("hits").EnumerateArray().Select(h => h.GetProperty("entity").GetProperty("name").GetString()!).Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-54")]
+    public async Task NamesThatArriveAtDifferentTimes()
+    {
+        // Each spelling is its own entry, with its own from; one with no from, or a from that doesn't resolve, is never known at a position.
+        _den.Write(
+            "universes/starfall/entities/notes/the-man-in-the-grey-coat.md",
+            """
+            ---
+            type: note
+            name: The man in the grey coat
+            known_as:
+              - { value: Corin, from: "ember:2" }
+              - { value: Corin Hask, from: "ash:1" }
+              - { value: Søren Hask, from: "ash:3" }
+              - { value: Soren Hask, from: "ash:3" }
+              - { value: Brother Hask }
+              - { value: The Abbot, from: "ash:9" }
+            status: canon
+            from: "ember:1"
+            ---
+
+            Watches the docks.
+            """);
+
+        async Task<string[]> Names(string position) =>
+            [.. (await Call("get_entity", new() { ["entity"] = "The man in the grey coat", ["as_of"] = position })).Json.GetProperty("entity").GetProperty("aliases").EnumerateArray().Select(a => a.GetString()!)];
+
+        foreach (var (position, expected) in new (string, string[])[]
+        {
+            ("ember:1", []),
+            ("ember:3", ["Corin"]),
+            ("ash:2", ["Corin", "Corin Hask"]),
+            ("ash:epilogue", ["Corin", "Corin Hask", "Søren Hask", "Soren Hask"]),
+        })
+        {
+            var names = await Names(position);
+            Assert.Equal(expected, names);
+        }
+
+        // A spelling not reached is unknown, accented or not, by lookup and by search.
+        foreach (var name in new[] { "Soren Hask", "Søren Hask", "Brother Hask", "The Abbot" })
+        {
+            var reply = await Call("get_entity", new() { ["entity"] = name, ["as_of"] = "ash:2" }, error: true);
+            Assert.Equal("unknown_entity", reply.Json.GetProperty("error").GetProperty("code").GetString());
+            AssertIsExactly(NoHits(name), await Call("search", new() { ["query"] = name, ["as_of"] = "ash:2" }));
+        }
+
+        // Each is a name with no position.
+        var full = await Call("get_entity", new() { ["entity"] = "Brother Hask" });
+        Assert.Equal(6, full.Json.GetProperty("entity").GetProperty("known_as").GetArrayLength());
+    }
+
     // --- Reads with no position stay as they are: see the remarks on this class. ---
 
     [Fact]
@@ -1395,7 +1652,7 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
     [
         "CanonAsOfResult: At, Count, Entities, Filter, Pinned, Position, Universe, Version",
         "EntitySummary: From, Id, Key, Name, Path, ScopeKey, ScopeKind, Status, Type, Universe",
-        "EntityView: Aliases, Fields, From, Hash, Id, Key, Lead, Name, Path, Pinned, ScopeKey, ScopeKind, Sections, Status, Type, Universe",
+        "EntityView: Aliases, Fields, From, Hash, Id, Key, KnownAs, Lead, Name, Path, Pinned, ScopeKey, ScopeKind, Sections, Status, Type, Universe",
         "FieldView: EntryIndex, From, Kind, Line, Live, Name, Pinned, Status, Until, Value",
         "GetEntityResult: Entity, InView, Note, Position, Version, View",
         "GetHistoryResult: Available, Backend, Count, Diff, Entity, Entries, NextBefore, Note, Reason, Truncated, Version",
@@ -1403,6 +1660,7 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
         "HistoryDiffView: Files, From, To",
         "HistoryEntryView: Author, Changes, Id, Message, When",
         "HistoryFileDiffView: Change, Patch",
+        "KnownNameView: From, Value",
         "ListEntitiesResult: Count, Entities, Total, Truncated, Version",
         "PinnedEntity: Fields, Key, Name, Sections, Type",
         "PinnedFacts: Fields, Sections",
@@ -1428,12 +1686,13 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
     /// <summary>
     /// The content of an entity at a position. A field's <c>value</c> is the
     /// writer's, whatever keys a mapping of theirs has. There's no <c>until</c>
-    /// (F-VIEW-4), and none of the full view's <c>aliases</c>, <c>entry_index</c>,
-    /// <c>live</c>, <c>bookkeeping</c>, or <c>left_out</c> (F-GEN-2).
+    /// (F-VIEW-4), and none of the full view's <c>known_as</c>, <c>entry_index</c>,
+    /// <c>live</c>, <c>bookkeeping</c>, or <c>left_out</c> (F-GEN-2). <c>aliases</c>
+    /// holds the names readers know there, as plain strings (D3 on #67).
     /// </summary>
     private static string[] Content(string entity) =>
     [
-        .. Under(entity, ["lead", "fields", "sections"]),
+        .. Under(entity, ["aliases", "lead", "fields", "sections"]),
         .. Under($"{entity}.fields", FieldKeys),
         .. Under($"{entity}.sections", SectionKeys),
     ];
@@ -1509,11 +1768,19 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
             $"This answer changed. If what's new can hold anything later than the position, or a mark, showing it to an assistant is a decision for the maintainer (#300). The answer was:\n{actual}");
     }
 
-    private static void AssertNothingLater(Reply reply)
+    /// <param name="reply">The answer.</param>
+    /// <param name="asked">A later book the call itself named, which the answer may say back.</param>
+    private static void AssertNothingLater(Reply reply, string? asked = null)
     {
         foreach (var word in LaterWords)
         {
             Assert.DoesNotContain(word, reply.Whole, StringComparison.Ordinal);
+        }
+
+        // A bare key too, as an error might list the books (#67): not inside a longer key or word.
+        foreach (var book in LaterBooks.Where(b => b != asked))
+        {
+            Assert.DoesNotMatch($@"(?<![\w-]){System.Text.RegularExpressions.Regex.Escape(book)}(?![\w-])", reply.Whole);
         }
     }
 

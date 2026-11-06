@@ -378,6 +378,7 @@ internal sealed class IndexRows
             _insert.Parameters.Add("$title", SqliteType.Text);
             _insert.Parameters.Add("$body", SqliteType.Text);
             _insert.Parameters.Add("$comments", SqliteType.Text);
+            _insert.Parameters.Add("$names", SqliteType.Text);
             _insert.Parameters.Add("$kind", SqliteType.Text);
             _insert.Parameters.Add("$entity", SqliteType.Integer);
             _insert.Parameters.Add("$section", SqliteType.Integer);
@@ -396,6 +397,7 @@ internal sealed class IndexRows
             p["$title"].Value = row.Title;
             p["$body"].Value = row.Body;
             p["$comments"].Value = row.Comments;
+            p["$names"].Value = row.Names;
             p["$kind"].Value = row.Kind;
             p["$entity"].Value = row.EntityId;
             p["$section"].Value = (object?)row.SectionId ?? DBNull.Value;

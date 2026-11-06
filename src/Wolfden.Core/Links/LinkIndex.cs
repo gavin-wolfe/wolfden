@@ -239,7 +239,29 @@ public sealed class LinkIndex
                     $"{link.Text}: this canon text links to '{target.Name}', whose status is {target.Status.ToKey()}.");
             }
 
-            if (spoilerChecks && target.EntersCanon is { } enters)
+            // A link by a name readers learn later than they meet the note runs ahead until that name's
+            // from, even at the start of the story. With a label, nothing shows the name (format.md F-LINK-13).
+            var known = spoilerChecks && link.Label is null && resolution.MatchedBy == LinkMatchKind.Alias ? target.KnownNameMatching(link.Target) : null;
+            if (known?.Point is { } learned && (target.EntersCanon is not { } met || learned > met))
+            {
+                var early = occurrence.Positions.Where(p => learned > p.Point).ToList();
+                foreach (var position in early.Where(p => p.Chapter is null))
+                {
+                    Warn(occurrence, "F-LINK-13",
+                        $"{link.Text}: '{known.Value}' is a name of '{target.Name}' that readers learn at {known.From}, after this link's position, {position.Description}. It may be a spoiler.");
+                }
+
+                var inheriting = early.Where(p => p.Chapter is not null).OrderBy(p => p.Point).Select(p => p.Chapter!.ToString()).ToList();
+                if (inheriting.Count > 0)
+                {
+                    var where = inheriting.Count == 1
+                        ? $"chapter {inheriting[0]}, which inherits this default"
+                        : $"chapters {ListChapters(inheriting)}, which inherit this default";
+                    Warn(occurrence, "F-LINK-13",
+                        $"{link.Text}: '{known.Value}' is a name of '{target.Name}' that readers learn at {known.From}, after {where}. It may be a spoiler.");
+                }
+            }
+            else if (spoilerChecks && target.EntersCanon is { } enters)
             {
                 var ahead = occurrence.Positions.Where(p => !p.Point.IsStartOfStory && enters > p.Point).ToList();
                 foreach (var position in ahead.Where(p => p.Chapter is null))

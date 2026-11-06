@@ -55,7 +55,8 @@ public sealed class WolfdenTools
         "When drafting a chapter, pass as_of here as you do to get_entity: then only what a reader knows at that position is searched, each " +
         "note the reader has met, as get_entity with as_of reads it, with its name, lead, section headings and text, and field values. A value that only comes from its type's " +
         "default isn't searched, with or without as_of, though get_entity shows it, so no hit doesn't mean a note has no such value. Later notes, later or undecided " +
-        "material, and HTML comments neither match nor show. A note's aliases don't match there, and a link matches by the text it shows, not its target. " +
+        "material, and HTML comments neither match nor show. A note's name and the other names the reader knows it by there match; a name the reader " +
+        "learns later (known_as) doesn't. A link matches by the text it shows, not its target. " +
         "As with get_entity, that's as far as positions go: text the writer put in a section or lead, or a field the note's type doesn't define, or a ref " +
         "field's value, can still mention later events. " + PositionHelp)]
     public CallToolResult Search(
@@ -77,7 +78,9 @@ public sealed class WolfdenTools
         "every field entry and section, whatever its status (idea, undecided, candidate, draft, canon, retconned), with the " +
         "positions where each one starts and ends. With as_of you get only what's canon at that point in the story, as a reader " +
         "would know it then: the name is matched only among the entities the reader has met by then, " +
-        "and if the reader hasn't met the entity yet, in_view is false and nothing about it is returned. A fact's 'until' is left out " +
+        "and if the reader hasn't met the entity yet, in_view is false and nothing about it is returned. A name the reader learns later " +
+        "(one of its known_as) isn't a name there at all: it gets unknown_entity, as a made-up name does. 'aliases' lists the names the reader " +
+        "knows it by there, and a link written by a name the reader learns later reads as if written by the entity's name. A fact's 'until' is left out " +
         "with as_of, and so are a position field's values later than as_of (such as a thread's paid_off), since when a fact stops holding " +
         "or a thread pays off is something the reader doesn't know yet: to plan ahead, read without as_of. The writer's HTML comments are left out " +
         "of the lead and sections with as_of too, and nothing says so: read without as_of to see them, and any guidance the writer left in them. " +

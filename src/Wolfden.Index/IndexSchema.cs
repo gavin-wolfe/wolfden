@@ -25,8 +25,10 @@ public static class IndexSchema
     /// Version 10 (#305) keeps which fields of each type are <c>position</c> fields.
     /// Version 11 (#308) folds apostrophes in the normalized names, aliases,
     /// and section names (F-LINK-4), so an older index would miss a link's match.
+    /// Version 12 (#67) keeps the names readers learn partway through the story
+    /// (<c>known_as</c>, F-ENT-10) with their <c>from</c>, in their own search column.
     /// </summary>
-    public const int Version = 11;
+    public const int Version = 12;
 
     /// <summary>The <c>meta</c> key for <see cref="Version"/>.</summary>
     public const string SchemaVersionKey = "schema_version";
@@ -71,8 +73,10 @@ public static class IndexSchema
 
     /// <summary>
     /// The FTS5 table: one row per entity (its name and aliases in
-    /// <c>title</c>, its lead in <c>body</c>) and one per section (its name,
-    /// and its own text). HTML comments in the lead or section (F-SEC-11)
+    /// <c>title</c>, its lead in <c>body</c>, and its <c>known_as</c> names in
+    /// <c>names</c>) and one per section (its name, and its own text). A
+    /// <c>known_as</c> name is apart so a ranking for a read at a position
+    /// (<see cref="DenIndex.SearchRanks"/>) can leave it out, as it leaves out comments. HTML comments in the lead or section (F-SEC-11)
     /// go in <c>comments</c> rather than <c>body</c>, so a hit can say it
     /// came from one. Bookkeeping and out-of-canon material is searchable
     /// too (F-SEC-12, F-STAT-4); <see cref="DenIndex.SearchMatch"/> reports
@@ -81,9 +85,9 @@ public static class IndexSchema
     /// </summary>
     internal const string CreateSearchTable =
         "CREATE VIRTUAL TABLE search USING fts5(" +
-        "title, body, comments, kind UNINDEXED, entity_id UNINDEXED, section_id UNINDEXED, " +
+        "title, body, comments, names, kind UNINDEXED, entity_id UNINDEXED, section_id UNINDEXED, " +
         "tokenize = 'unicode61 remove_diacritics 2')";
 
     internal const string InsertSearchRow =
-        "INSERT INTO search (rowid, title, body, comments, kind, entity_id, section_id) VALUES ($rowid, $title, $body, $comments, $kind, $entity, $section)";
+        "INSERT INTO search (rowid, title, body, comments, names, kind, entity_id, section_id) VALUES ($rowid, $title, $body, $comments, $names, $kind, $entity, $section)";
 }

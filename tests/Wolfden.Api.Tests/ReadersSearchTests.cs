@@ -167,6 +167,8 @@ public sealed class ReadersSearchTests : IDisposable
     /// <summary>
     /// What the Reader's page of a note shows of its text and fields: each link is replaced
     /// as <c>Links.tsx</c> replaces it, by its label, else the note it reaches, else its target.
+    /// Its name goes with the other names readers know there, which the page has in
+    /// <c>aliases</c> (D3 on #67).
     /// </summary>
     private static async Task<List<string>> PageShows(Server server, string path, string at)
     {
@@ -192,7 +194,8 @@ public sealed class ReadersSearchTests : IDisposable
         }
 
         var entity = page.GetProperty("entity");
-        var shown = new List<string> { entity.GetProperty("name").GetString()!, Shown(entity.GetProperty("lead").GetString() ?? "", entity.GetProperty("leadLinks")) };
+        var names = entity.GetProperty("aliases").EnumerateArray().Select(a => a.GetString()!).Prepend(entity.GetProperty("name").GetString()!);
+        var shown = new List<string> { string.Join("\n", names), Shown(entity.GetProperty("lead").GetString() ?? "", entity.GetProperty("leadLinks")) };
         foreach (var field in entity.GetProperty("fields").EnumerateArray().Where(f => f.GetProperty("kind").GetString() != "default"))
         {
             var value = field.GetProperty("value");
@@ -363,20 +366,11 @@ public sealed class ReadersSearchTests : IDisposable
     [Trait("Scenario", "SC-WEB-106")]
     [InlineData("Thornveil")] // A later note's alias, through a link in a value readers can see.
     [InlineData("Zephyrlode")] // An idea's alias.
-    [InlineData("Alderquill")] // A met note's own alias.
     public async Task ANameFromANoteReadersHaventMetMatchesOnlyInTheAuthorsViewWhichTagsIt(string alias)
     {
         await using var server = await Start();
 
         Assert.Empty(Hits(await server.GetJsonAsync(Readers(alias, "ember:1"), HttpStatusCode.OK)));
-
-        if (alias == "Alderquill")
-        {
-            var own = Hits(await server.GetJsonAsync(Marked(alias, "ember:1"), HttpStatusCode.OK)).Single();
-            Assert.False(own.GetProperty("met").GetBoolean());
-            Assert.Equal("alias", own.GetProperty("hiddenIn").GetString());
-            return;
-        }
 
         var hit = Hits(await server.GetJsonAsync(Marked(alias, "ember:1", "&field=" + (alias == "Thornveil" ? "crown" : "dream")), HttpStatusCode.OK)).Single();
         Assert.Contains(alias, hit.GetProperty("text").GetString()!, StringComparison.Ordinal);
@@ -393,12 +387,28 @@ public sealed class ReadersSearchTests : IDisposable
             Assert.False(later.TryGetProperty("readerMark", out _));
         }
 
-        // Once readers have met it, its alias still doesn't match, and neither view says it does.
+        // Once readers have met it, its alias finds the note itself (D3 on #67), but not through the link in the value,
+        // which shows the note's name, and the Author's view says so of the value.
         var met = Hits(await server.GetJsonAsync(Marked("Thornveil", "ash:3", "&field=crown"), HttpStatusCode.OK)).Single();
         Assert.False(met.TryGetProperty("laterLink", out _));
         Assert.False(met.GetProperty("met").GetBoolean());
         Assert.Equal("alias", met.GetProperty("hiddenIn").GetString());
-        Assert.Empty(Hits(await server.GetJsonAsync(Readers("Thornveil", "ash:3"), HttpStatusCode.OK)));
+        var own = Assert.Single(Hits(await server.GetJsonAsync(Readers("Thornveil", "ash:3"), HttpStatusCode.OK)));
+        Assert.Equal(("The word crown", JsonValueKind.Null, JsonValueKind.Null), (own.GetProperty("entity").GetProperty("name").GetString(), own.GetProperty("section").ValueKind, own.GetProperty("field").ValueKind));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-WEB-106")]
+    public async Task AMetNotesOwnAliasIsFoundAsItsNameIs()
+    {
+        // D3 on #67, reversing #300: readers know a plain alias wherever the note is, so their search finds it, and the Author's view counts it as met.
+        await using var server = await Start();
+
+        var own = Assert.Single(Hits(await server.GetJsonAsync(Readers("Alderquill", "ember:1"), HttpStatusCode.OK)));
+        Assert.Equal("The word ledger\nWordkeep [Alderquill]", own.GetProperty("snippet").GetString());
+        var marked = Hits(await server.GetJsonAsync(Marked("Alderquill", "ember:1"), HttpStatusCode.OK)).Single();
+        Assert.True(marked.GetProperty("met").GetBoolean());
+        Assert.False(marked.TryGetProperty("hiddenIn", out var hidden) && hidden.ValueKind != JsonValueKind.Null);
     }
 
     /// <summary>A note with labelled links to a note met later and one met already, in text, a field, and code.</summary>
@@ -495,9 +505,10 @@ public sealed class ReadersSearchTests : IDisposable
             Assert.True(Holds(word, shown) == hits.Count > 0, $"'{word}' at {at}: the page {(Holds(word, shown) ? "shows it" : "doesn't")}, and the search has {hits.Count} hits.");
         }
 
-        // An alias of a met note is never written out, in text or a value, nor paired with its name.
-        Assert.Empty(Hits(await server.GetJsonAsync(Readers("Secretaliasone", at), HttpStatusCode.OK)));
-        foreach (var hit in Hits(await server.GetJsonAsync(Readers("Metnamed", at), HttpStatusCode.OK)))
+        // A link by a met note's alias shows its name, in text or a value: only the note itself is found by the alias (D3 on #67).
+        var byAlias = Assert.Single(Hits(await server.GetJsonAsync(Readers("Secretaliasone", at), HttpStatusCode.OK)));
+        Assert.Equal(("Metnamed Friend", JsonValueKind.Null), (byAlias.GetProperty("entity").GetProperty("name").GetString(), byAlias.GetProperty("section").ValueKind));
+        foreach (var hit in Hits(await server.GetJsonAsync(Readers("Metnamed", at), HttpStatusCode.OK)).Where(h => h.GetProperty("entity").GetProperty("name").GetString() != "Metnamed Friend"))
         {
             Assert.DoesNotContain("Secretaliasone", hit.GetRawText(), StringComparison.Ordinal);
             Assert.DoesNotContain("[[", hit.GetProperty("text").GetString()!, StringComparison.Ordinal);
@@ -527,7 +538,7 @@ public sealed class ReadersSearchTests : IDisposable
 
         // Once met, the unlabelled links show it, and a labelled one still doesn't.
         Assert.Equal("Laternamed Friend", Assert.Single(Hits(await server.GetJsonAsync(Readers("Laternamed", "ash:3", "&field=f3"), HttpStatusCode.OK))).GetProperty("text").GetString());
-        Assert.Empty(Hits(await server.GetJsonAsync(Readers("Lateraliasword", "ash:3"), HttpStatusCode.OK)));
+        Assert.Equal(["Laternamed Friend"], Hits(await server.GetJsonAsync(Readers("Lateraliasword", "ash:3"), HttpStatusCode.OK)).Select(h => h.GetProperty("entity").GetProperty("name").GetString()));
         Assert.Empty(Hits(await server.GetJsonAsync(Readers("Laternamed", "ash:3", "&field=f4"), HttpStatusCode.OK)));
 
         // And the Author's view finds the name, tagged, and says a reader wouldn't.

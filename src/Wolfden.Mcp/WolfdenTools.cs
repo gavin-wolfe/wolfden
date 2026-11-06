@@ -197,7 +197,7 @@ public sealed class WolfdenTools
         "Creates a new entity (a character, location, event, item, faction, thread, note, idea, or other type an enabled pack defines) " +
         "from its type's template, with a new id. It's filed in the universe, or in the series or book given, under " +
         "entities/<type folder>/<slug>.md; the slug is made from the name unless given, and gets -2, -3 if that file is taken. " +
-        "Values you give (aliases, status, from, fields) replace the template's; the status defaults to the template's, or draft. " +
+        "Values you give (aliases, known_as, status, from, fields) replace the template's; the status defaults to the template's, or draft. " +
         "The template's sections come with it, empty: fill them with append_section. If the new name or file name would change which " +
         "entity an existing link reaches (another one, or none because it becomes ambiguous; a nearer scope wins, F-LINK-7), nothing is " +
         "created unless allow_relinks is true; a broken link the new entity now mends is listed in effects. A 'from' must be a position the " +
@@ -215,20 +215,22 @@ public sealed class WolfdenTools
         [Description("Field values, as an object from field name to value, such as {\"born\": \"1873\", \"occupation\": [\"solicitor\"]}. A value that changes over time is a list of entries: [{\"value\": \"x\", \"from\": \"dracula:3\"}].")] JsonElement? fields = null,
         [Description("Text for the lead, before the first section.")] string? text = null,
         [Description(RelinksHelp)] bool allow_relinks = false,
+        [Description("Names readers learn partway through the story, each with where: [{\"value\": \"Mara Voss\", \"from\": \"dracula:20\"}]. A read at an earlier position doesn't know them. Names readers always know go in aliases.")] JsonElement? known_as = null,
         CancellationToken cancellationToken = default) =>
-        Write(() => _tools.CreateEntity(type, name, universe, series, book, slug, aliases, status, from, fields, text, allow_relinks), cancellationToken);
+        Write(() => _tools.CreateEntity(type, name, universe, series, book, slug, aliases, status, from, fields, text, allow_relinks, known_as), cancellationToken);
 
     /// <summary>The <c>update_fields</c> tool.</summary>
     [McpServerTool(Name = "update_fields", Title = "Change an entity's fields", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]
     [Description(
         "Changes an entity's frontmatter, keeping everything else as written. 'changes' is a list, made in order and saved together " +
         "or not at all. Each change is {\"op\": \"set\", \"path\": ..., \"value\": ...}, {\"op\": \"add\", \"path\": ..., \"value\": ..., \"index\": n} " +
-        "(add an item to a list: an alias, or an entry of a field that changes over time; at the end without index), or " +
+        "(add an item to a list: an alias, a known_as entry {\"value\": name, \"from\": position} for a name readers learn later, or an entry of a field that changes over time; at the end without index), or " +
         "{\"op\": \"remove\", \"path\": ...} (a key or list item), or {\"op\": \"move\", \"path\": \"fields.pov.2\", \"index\": 0} (move a list item so it " +
         "becomes item 'index', keeping its comments; taking an item out and adding it again drops them; dated entries are never moved, F-TMP-7). Setting a path that ends in an item number " +
         "('fields.pov.1') changes that item in place, keeping a comment on it. A path is dotted: 'status', 'from', 'aliases', 'fields.born', " +
         "'fields.rank.1.from' (item numbers from 0). An entry is {\"value\": x, \"from\": \"book:chapter\", \"until\": ..., \"status\": ..., \"pin\": true}. " +
-        "The id never changes. Aliases can be added and moved here; to rename the entity, or change or remove an alias, use rename_entity or " +
+        "The id never changes. Aliases can be added and moved here, known_as entries added, and a known_as entry's from set ('known_as.0.from'), " +
+        "which changes no link; to rename the entity, or change or remove an alias or a known_as name, use rename_entity or " +
         "change_alias, which rewrite the links that used the old text. A 'from', 'until', or position field value you set must be a position the " +
         "universe has (bad_position otherwise); null leaves it out. Read without as_of before changing a field: a read with as_of leaves out a position " +
         "field's later values, so a field missing from it may be set in the note, and its list item numbers may not match the note's, " +
@@ -335,7 +337,10 @@ public sealed class WolfdenTools
         "every link that reached the entity by the old alias, in any file of the den: to the new alias, or to the entity's name for a " +
         "removed one. With keep_old_alias true, the new alias is added beside the old one instead and no link changes. If a link to " +
         "rewrite is in a final (frozen) book, nothing changes. If a link that reaches another entity would change target, nothing " +
-        "changes unless allow_relinks is true. To add an alias, update_fields is enough." + WriteHelp)]
+        "changes unless allow_relinks is true. To add an alias, update_fields is enough. The alias can be a plain one (aliases) or a name " +
+        "readers learn later (known_as): a changed or new one stays in the same list with the same from, unless 'from' says otherwise. " +
+        "With 'from' or 'plain' and no new_alias, only where readers learn the name changes, and no link: a position in 'from' makes it a known_as " +
+        "name from there, and plain: true makes it a plain alias, known wherever the entity is. That gives a secret away, so check with the writer first." + WriteHelp)]
     public CallToolResult ChangeAlias(
         [Description("The entity: its name, an alias, its file name, its id, its key, or its path.")] string entity,
         [Description("The alias to change or remove, as it's written.")] string alias,
@@ -344,8 +349,10 @@ public sealed class WolfdenTools
         [Description("If true, add new_alias beside the old one and leave links as they are.")] bool keep_old_alias = false,
         [Description(UniverseHelp)] string? universe = null,
         [Description(RelinksHelp)] bool allow_relinks = false,
+        [Description("Where readers learn the alias (the new one, if any), as a position such as 'dracula:5': a known_as name from there. Leave it out to keep it as it is.")] string? from = null,
+        [Description("If true, make the alias (the new one, if any) a plain alias, known wherever the entity is, at every position. Not with 'from'. A secret becomes public, so check with the writer first.")] bool plain = false,
         CancellationToken cancellationToken = default) =>
-        Write(() => _tools.ChangeAlias(entity, alias, expected_hash, new_alias, keep_old_alias, universe, allow_relinks), cancellationToken);
+        Write(() => _tools.ChangeAlias(entity, alias, expected_hash, new_alias, keep_old_alias, universe, allow_relinks, from, plain), cancellationToken);
 
     /// <summary>The <c>move_entity</c> tool.</summary>
     [McpServerTool(Name = "move_entity", Title = "Move an entity to another scope", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]

@@ -160,7 +160,7 @@ public sealed partial class DenTools
     public WriteResult CreateEntity(
         string type, string name, string? universe = null, string? series = null, string? book = null, string? slug = null,
         IReadOnlyList<string>? aliases = null, string? status = null, string? from = null, JsonElement? fields = null, string? text = null,
-        bool allowRelinks = false)
+        bool allowRelinks = false, JsonElement? knownAs = null)
     {
         if (string.IsNullOrWhiteSpace(type))
         {
@@ -169,7 +169,25 @@ public sealed partial class DenTools
 
         CheckName(name);
         var fieldValues = fields is { } f ? FieldValues(f) : [];
-        return Create(type.Trim(), name, universe, series, book, slug, aliases, status, from, fieldValues, text, allowRelinks);
+        return Create(type.Trim(), name, universe, series, book, slug, aliases, status, from, fieldValues, text, allowRelinks, KnownAsValues(knownAs));
+    }
+
+    /// <summary>A new entity's <c>known_as</c> (F-ENT-10), as a list of <c>{"value": ..., "from": ...}</c>, or null if none was given.</summary>
+    private static List<KeyValuePair<string, string>>? KnownAsValues(JsonElement? knownAs)
+    {
+        if (knownAs is not { } given || given.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            return null;
+        }
+
+        if (given.ValueKind != JsonValueKind.Array)
+        {
+            throw new DenToolException(
+                ToolErrorCodes.BadArgument,
+                "'known_as' is a list of names readers learn later, each with where, such as [{\"value\": \"Mara Voss\", \"from\": \"ember:38\"}] (F-ENT-10).");
+        }
+
+        return given.EnumerateArray().Select(e => new KeyValuePair<string, string>(KnownAsAdded(e), e.GetProperty("from").GetString()!.Trim())).ToList();
     }
 
     /// <summary>
@@ -279,6 +297,19 @@ public sealed partial class DenTools
                     }
 
                     added.Add(alias.GetString()!.Trim());
+                }
+
+                if (path[0] == "known_as" && op.Op == "add")
+                {
+                    added.Add(KnownAsAdded(op.RawValue));
+                }
+
+                if (path[0] == "known_as" && op.Op == "set" && op.RawValue is not { ValueKind: JsonValueKind.String })
+                {
+                    throw new DenToolException(
+                        ToolErrorCodes.BadArgument,
+                        "A known_as entry's 'from' is a story position, such as \"ember:38\" (F-ENT-10). Without one, no read at a position knows the name: " +
+                        $"to make it a plain alias, known wherever the note is, use change_alias with plain: true.");
                 }
 
                 if (op.Op == "set" && op.Value is YamlSequenceValue && path.Count > 1 && file.GetFrontmatterValue(path.Take(path.Count - 1).ToList()) is YamlSequence)
@@ -681,7 +712,7 @@ public sealed partial class DenTools
 
     private WriteResult Create(
         string typeKey, string name, string? universe, string? series, string? book, string? slug, IReadOnlyList<string>? aliases, string? status,
-        string? from, IReadOnlyList<KeyValuePair<string, YamlValue>> fields, string? text, bool allowRelinks)
+        string? from, IReadOnlyList<KeyValuePair<string, YamlValue>> fields, string? text, bool allowRelinks, IReadOnlyList<KeyValuePair<string, string>>? knownAs = null)
     {
         var filter = Filter(series, book);
         var (universeKey, ids) = WithIndex(index =>
@@ -712,6 +743,11 @@ public sealed partial class DenTools
             }
 
             CheckFrom(u, from);
+            foreach (var (known, learned) in knownAs ?? [])
+            {
+                CheckKnownFrom(u, known, learned);
+            }
+
             var type = structure.Types.Find(typeKey) ?? throw new DenToolException(
                 ToolErrorCodes.UnknownType,
                 $"No enabled pack defines the type '{typeKey}', so there's no template to make it from. Enabled types: " +
@@ -722,7 +758,7 @@ public sealed partial class DenTools
             {
                 made = NewEntity.Create(den, scope, type, id, new NewEntityRequest(name.Trim())
                 {
-                    Slug = slug?.Trim(), Aliases = aliases, Status = status?.Trim(), From = string.IsNullOrWhiteSpace(from) ? null : from.Trim(), Fields = fields,
+                    Slug = slug?.Trim(), Aliases = aliases, KnownAs = knownAs, Status = status?.Trim(), From = string.IsNullOrWhiteSpace(from) ? null : from.Trim(), Fields = fields,
                 });
             }
             catch (ArgumentException e) when (e.Message.Contains("is taken", StringComparison.Ordinal))
@@ -1940,11 +1976,50 @@ public sealed partial class DenTools
                 throw new DenToolException(
                     ToolErrorCodes.UnsupportedEdit,
                     $"Aliases can be added and moved here, but not changed or removed: links that matched the old alias must follow (F-RT-5). {Words.AliasLinks}");
+            case "known_as" when op == "move":
+                throw new DenToolException(
+                    ToolErrorCodes.UnsupportedEdit,
+                    "known_as entries aren't moved here. Their order doesn't decide anything: of a name listed twice, the entry with the earliest 'from' counts (F-ENT-10). " +
+                    "To change when readers learn a name, set its 'from'. If the order matters to you, edit the file by hand.");
+            case "known_as" when op == "add" && path.Count == 1:
+                // A new name: no link that matched a name before is lost (F-ENT-10).
+                break;
+            case "known_as" when op == "set" && path[^1] == "from" && path.Count == (IsIndex(path[1]) ? 3 : 2):
+                // Where readers learn a name is an ordinary edit: links don't depend on it (#67, §9).
+                break;
+            case "known_as":
+                throw new DenToolException(
+                    ToolErrorCodes.UnsupportedEdit,
+                    "Names in known_as can be added here, and an entry's 'from' set, but a name can't be changed or removed: links that matched the old name " +
+                    $"must follow (F-RT-5). {Words.AliasLinks} It takes 'from' too, to move a name between aliases and known_as without changing any link.");
             case "fields" when path.Count == 1 && op != "set":
                 throw new DenToolException(ToolErrorCodes.BadArgument, "Name a field: 'fields.<name>'.");
             case "fields" when path.Count == 1:
                 throw new DenToolException(ToolErrorCodes.BadArgument, "Set one field at a time: 'fields.<name>'.");
         }
+    }
+
+    private static bool IsIndex(string segment) =>
+        int.TryParse(segment, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out _);
+
+    /// <summary>
+    /// Refuses a new <c>known_as</c> entry that isn't a name and a <c>from</c> (F-ENT-10), and gives the name.
+    /// Whether the <c>from</c> resolves is checked with every other position the write sets.
+    /// </summary>
+    private static string KnownAsAdded(JsonElement? raw)
+    {
+        if (raw is not { ValueKind: JsonValueKind.Object } entry
+            || !entry.TryGetProperty("value", out var value) || value.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(value.GetString()) || value.GetString()!.Any(char.IsControl)
+            || !entry.TryGetProperty("from", out var from) || from.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(from.GetString()))
+        {
+            throw new DenToolException(
+                ToolErrorCodes.BadArgument,
+                "A known_as entry is a name, one line of text, and the from where readers learn it, such as {\"value\": \"Mara Voss\", \"from\": \"ember:38\"} (F-ENT-10). " +
+                "A name readers know wherever the note is goes in aliases.");
+        }
+
+        return value.GetString()!.Trim();
     }
 
     private static MarkdownFile Remove(MarkdownFile file, IReadOnlyList<string> path, List<string> notes)

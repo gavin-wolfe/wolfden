@@ -372,7 +372,7 @@ public sealed partial class DenTools
                         $"unless it's kept as an alias. {Words.NameLinks}");
                 }
 
-                var gone = before.Aliases.Where(a => !after.Aliases.Any(b => LinkText.Matches(a, b)) && !LinkText.Matches(a, after.Name)).ToList();
+                var gone = before.AllAliases.Where(a => !after.AllAliases.Any(b => LinkText.Matches(a, b)) && !LinkText.Matches(a, after.Name)).ToList();
                 if (gone.Count > 0)
                 {
                     effects.Add(

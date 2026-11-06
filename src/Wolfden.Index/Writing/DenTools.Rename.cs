@@ -74,6 +74,9 @@ public sealed partial class DenTools
             var aliasItems = (target.File.GetFrontmatterValue("aliases") as YamlSequence)?.Items ?? [];
             var ownAlias = sameForLinks ? -1 : aliasItems.ToList().FindIndex(i => i is YamlScalar { IsNull: false } s && LinkText.Matches(s.Text, newName));
             var dropped = ownAlias >= 0 ? ((YamlScalar)aliasItems[ownAlias]).Text : null;
+
+            // Renamed to one of its own known_as names: the entry goes, since a name can't be hidden (F-ENT-10).
+            var ownKnown = sameForLinks || target.KnownNameMatching(newName) is null ? null : NameSlot.Find(target, newName);
             const string Hint = "pass keep_old_name: true to keep the old name as an alias instead, which leaves those links as they are";
             var notes = new List<string>();
             return new TextChange(
@@ -85,6 +88,11 @@ public sealed partial class DenTools
                     {
                         file = Apply(() => NoteEmptied(
                             notes, file.WithoutFrontmatterValue(["aliases", ownAlias.ToString(System.Globalization.CultureInfo.InvariantCulture)], EmptiedList.Null, out var comments), comments, "aliases"));
+                    }
+
+                    if (ownKnown is not null)
+                    {
+                        file = Apply(() => ownKnown.Remove(file, notes));
                     }
 
                     if (keep && !alreadyAlias)
@@ -100,7 +108,10 @@ public sealed partial class DenTools
                 KeepHint: $"To make the change, {Hint}.",
                 LostHint: "choose another name, or " + Hint,
                 DroppedAlias: dropped,
-                Notes: notes);
+                Notes: notes)
+            {
+                DroppedKnown = ownKnown is null ? null : (ownKnown.Text, ownKnown.From),
+            };
         });
     }
 
@@ -110,9 +121,27 @@ public sealed partial class DenTools
     /// link that reached the entity by the old alias, in any file of the den
     /// (format.md F-RT-5): to the new alias, or, for a removed alias, to the
     /// entity's name. With <paramref name="keepOldAlias"/>, the new alias is
-    /// added beside the old one instead, and no link changes.
+    /// added beside the old one instead, and no link changes. The alias can be
+    /// a plain one (<c>aliases</c>) or a name readers learn later (<c>known_as</c>,
+    /// F-ENT-10): a new or changed one stays in the same key, with the same
+    /// <c>from</c>.
     /// </summary>
-    public WriteResult ChangeAlias(string entity, string alias, string expectedHash, string? newAlias = null, bool keepOldAlias = false, string? universe = null, bool allowRelinks = false)
+    /// <param name="entity">The entity.</param>
+    /// <param name="alias">The alias as written.</param>
+    /// <param name="expectedHash">The hash of the file the change is based on.</param>
+    /// <param name="newAlias">The new alias, or null to remove it, or to keep it and only change its <paramref name="from"/>.</param>
+    /// <param name="keepOldAlias">True to add the new alias beside the old.</param>
+    /// <param name="universe">The universe, or null.</param>
+    /// <param name="allowRelinks">True to go ahead when a link to another entity would change target.</param>
+    /// <param name="from">
+    /// Where readers learn the alias, the new one if there is one: a position makes it a <c>known_as</c>
+    /// name from there. Null, empty, or blank leaves it as it is. Moving a name between the two keys, or changing its <c>from</c>, rewrites no
+    /// link, since links don't depend on positions (#67, §9).
+    /// </param>
+    /// <param name="plain">True to make the alias (the new one, if any) a plain alias, known wherever the entity is. Not with <paramref name="from"/>.</param>
+    public WriteResult ChangeAlias(
+        string entity, string alias, string expectedHash, string? newAlias = null, bool keepOldAlias = false, string? universe = null, bool allowRelinks = false,
+        string? from = null, bool plain = false)
     {
         var hash = RequireHash(expectedHash);
         if (string.IsNullOrWhiteSpace(alias))
@@ -131,29 +160,46 @@ public sealed partial class DenTools
                 ToolErrorCodes.BadArgument, "'keep_old_alias' keeps the old alias beside a new one: give the new one in 'new_alias'. Without it, the alias is removed.");
         }
 
+        // An empty or blank from counts as left out: a client that fills optional strings with "" mustn't make a secret public.
+        if (plain && !string.IsNullOrWhiteSpace(from))
+        {
+            throw new DenToolException(
+                ToolErrorCodes.BadArgument,
+                "Give 'plain' (known wherever the entity is) or 'from' (a name readers learn there), not both.");
+        }
+
         newAlias = newAlias?.Trim();
+
+        // Internally, an empty 'learned' means plain, and null means as it is.
+        var learned = plain ? "" : string.IsNullOrWhiteSpace(from) ? null : from.Trim();
         return ChangeText(entity, universe, hash, allowRelinks, target =>
         {
-            var file = target.File;
-            var list = file.GetFrontmatterValue("aliases") as YamlSequence;
-            var index = list?.Items.ToList().FindIndex(i => i is YamlScalar { IsNull: false } s && LinkText.Matches(s.Text, alias.Trim())) ?? -1;
-            if (index < 0)
+            if (learned is { Length: > 0 })
             {
-                throw new DenToolException(
-                    ToolErrorCodes.BadArgument,
-                    $"'{target.Name}' has no alias '{alias.Trim()}'. Its aliases: " +
-                    (target.Aliases.Count == 0 ? "none." : string.Join(", ", target.Aliases.Select(a => $"'{a}'")) + "."));
+                CheckKnownFrom(target.Universe, newAlias ?? alias.Trim(), learned);
             }
 
-            var oldAlias = ((YamlScalar)list!.Items[index]).Text;
-            if (newAlias == oldAlias)
+            var slot = NameSlot.Find(target, alias.Trim()) ?? throw new DenToolException(
+                ToolErrorCodes.BadArgument,
+                $"'{target.Name}' has no alias '{alias.Trim()}'. Its aliases: " +
+                (target.Aliases.Count == 0 ? "none" : string.Join(", ", target.Aliases.Select(a => $"'{a}'"))) +
+                (target.KnownAs.Count == 0 ? "." : $"; names readers learn later (known_as): {string.Join(", ", target.KnownAs.Select(k => $"'{k.Value}'"))}."));
+            var oldAlias = slot.Text;
+
+            // Only where readers learn it changes: the name moves between the keys, or its from, and no link changes.
+            if (newAlias is null && learned is not null)
+            {
+                return Relearned(target, slot, learned);
+            }
+
+            if (newAlias == oldAlias && learned is null)
             {
                 return null;
             }
 
             var sameForLinks = newAlias is not null && LinkText.Matches(oldAlias, newAlias);
             if (newAlias is not null && !sameForLinks
-                && (LinkText.Matches(target.Name, newAlias) || target.Aliases.Any(a => LinkText.Matches(a, newAlias))))
+                && (LinkText.Matches(target.Name, newAlias) || target.AllAliases.Any(a => LinkText.Matches(a, newAlias))))
             {
                 throw new DenToolException(
                     ToolErrorCodes.BadArgument,
@@ -161,14 +207,36 @@ public sealed partial class DenTools
                     $"To drop '{oldAlias}', call change_alias without 'new_alias', which points its links at the name.");
             }
 
-            var itemPath = new[] { "aliases", index.ToString(System.Globalization.CultureInfo.InvariantCulture) };
             var keep = keepOldAlias && !sameForLinks;
+
+            // The new alias goes in the key 'from' says, or the old one's, with the old one's from.
+            var toKnown = learned is null ? slot.IsKnownAs : learned.Length > 0;
+            var newFrom = learned is { Length: > 0 } ? learned : slot.From;
             var notes = new List<string>();
+            MarkdownFile Edit(MarkdownFile f)
+            {
+                if (newAlias is null)
+                {
+                    return slot.Remove(f, notes);
+                }
+
+                if (!keep && toKnown == slot.IsKnownAs && (newFrom == slot.From || !toKnown))
+                {
+                    return slot.Rename(f, newAlias);
+                }
+
+                if (!keep && toKnown == slot.IsKnownAs)
+                {
+                    return slot.Retime(slot.Rename(f, newAlias), newFrom);
+                }
+
+                var added = keep ? f : slot.Remove(f, notes);
+                return NameSlot.Add(added, newAlias, toKnown, toKnown ? newFrom : null);
+            }
+
             return new TextChange(
                 LinkMatchKind.Alias, oldAlias, newAlias, keep || sameForLinks ? null : newAlias ?? target.Name,
-                f => keep ? Apply(() => f.WithNewListItem(["aliases"], YamlScalarValue.String(newAlias!), null, inTemplateOrder: true))
-                    : newAlias is null ? Apply(() => NoteEmptied(notes, f.WithoutFrontmatterValue(itemPath, EmptiedList.Null, out var comments), comments, "aliases"))
-                    : Apply(() => f.WithFrontmatterValue(itemPath, YamlScalarValue.String(newAlias))),
+                f => Apply(() => Edit(f)),
                 Kept: keep ? oldAlias : null,
                 NewAlias: newAlias,
                 SameForLinks: sameForLinks,
@@ -178,8 +246,167 @@ public sealed partial class DenTools
                 LostHint: newAlias is null
                     ? "keep the alias, or change those links to the entity's id or file name first"
                     : "choose another alias, or pass keep_old_alias: true to add the new alias beside the old one instead, which leaves those links as they are",
-                Notes: notes);
+                Notes: notes)
+            {
+                Learned = learned is null ? null : Learning(newAlias ?? oldAlias, toKnown ? newFrom : null, slot),
+            };
         });
+    }
+
+    /// <summary>A change to where readers learn a name, with no other change and no link rewritten.</summary>
+    private TextChange? Relearned(CatalogEntity target, NameSlot slot, string learned)
+    {
+        if (learned.Length == 0 ? !slot.IsKnownAs : slot.IsKnownAs && slot.From == learned)
+        {
+            return null;
+        }
+
+        var notes = new List<string>();
+
+        // The same name may be in aliases too (an F-ENT-10 warning): then it only leaves known_as.
+        var alsoPlain = NameSlot.FindPlain(target.File, slot.Text) is not null;
+        MarkdownFile Edit(MarkdownFile f) =>
+            learned.Length == 0 ? (alsoPlain ? slot.Remove(f, notes) : NameSlot.Add(slot.Remove(f, notes), slot.Text, false, null))
+            : slot.IsKnownAs ? slot.Retime(f, learned)
+            : NameSlot.Add(slot.Remove(f, notes), slot.Text, true, learned);
+        return new TextChange(
+            LinkMatchKind.Alias, slot.Text, slot.Text, null, f => Apply(() => Edit(f)), Kept: null, NewAlias: null, SameForLinks: true,
+            KeepHint: "Leave the alias as it is.", LostHint: "leave the alias as it is", Notes: notes)
+        {
+            Learned = Learning(slot.Text, learned.Length == 0 ? null : learned, slot),
+        };
+    }
+
+    /// <summary>What a change to where readers learn a name means, as an effect.</summary>
+    private static string Learning(string name, string? from, NameSlot slot) => from is null
+        ? $"'{name}' is a plain alias now, known wherever the note is: a read at any story position lists it and finds the note by it." +
+          (slot.IsKnownAs ? " If it's a secret, that gives it away; put it back in known_as with a from." : "")
+        : $"'{name}' is a name readers learn at {from} now (known_as): a read at an earlier position doesn't know it, and shows a link written by it as the note's name.";
+
+    /// <summary>Refuses a <c>known_as</c> <c>from</c> that isn't a position the universe has (F-ENT-10, F-POS-4).</summary>
+    private void CheckKnownFrom(Universe universe, string name, string from)
+    {
+        if (!Wolfden.Core.Positions.StoryPosition.TryParse(from, out var position, out var error))
+        {
+            throw new DenToolException(
+                ToolErrorCodes.BadPosition,
+                $"'from' for '{name}' isn't a story position: {error.Message} Give one such as {PositionExample(universe)}, or plain: true for a plain alias.");
+        }
+
+        if (universe.Resolve(position).Problem is { } problem)
+        {
+            throw Unresolvable(
+                $"'from' for '{name}'", from, universe, problem,
+                "A name whose from doesn't resolve is known at no position, so nothing was changed.");
+        }
+    }
+
+    /// <summary>
+    /// Where one of an entity's other names is written: an item of <c>aliases</c>, or an entry of
+    /// <c>known_as</c> (F-ENT-10), in a list or on its own.
+    /// </summary>
+    /// <param name="Path">The item's path: <c>aliases.2</c>, <c>known_as.0</c>, or <c>known_as</c> for a single entry.</param>
+    /// <param name="Text">The name as written.</param>
+    /// <param name="IsKnownAs">True for a <c>known_as</c> entry.</param>
+    /// <param name="From">A <c>known_as</c> entry's <c>from</c> as written, or null.</param>
+    /// <param name="Bare">True for a <c>known_as</c> item written as a plain string, with no <c>from</c> (a warning, F-ENT-10).</param>
+    private sealed record NameSlot(IReadOnlyList<string> Path, string Text, bool IsKnownAs, string? From, bool Bare = false)
+    {
+        /// <summary>The slot of the name matching <paramref name="text"/> (F-LINK-4): the <c>known_as</c> entry that counts, else an alias.</summary>
+        public static NameSlot? Find(CatalogEntity entity, string text)
+        {
+            var file = entity.File;
+            if (entity.KnownNameMatching(text) is { } known)
+            {
+                switch (file.GetFrontmatterValue("known_as"))
+                {
+                    case YamlMapping single:
+                        return new NameSlot(["known_as"], known.Value, true, known.From?.ToString());
+                    case YamlSequence list:
+                        // By value, as links match it (F-LINK-4): a flow list has every item on one line. Of a name
+                        // listed twice, the entry that counts, with the from readers learn it at.
+                        var matching = list.Items
+                            .Select((item, i) => (Item: item, Index: i, Value: ValueOf(item)))
+                            .Where(x => x.Value is not null && LinkText.Matches(x.Value, known.Value))
+                            .ToList();
+                        if (matching.Count > 0)
+                        {
+                            var counted = matching.FirstOrDefault(x => FromOf(x.Item) == known.From?.ToString() && x.Item.Line == known.Line);
+                            var at = counted.Item is not null ? counted : matching.FirstOrDefault(x => FromOf(x.Item) == known.From?.ToString());
+                            at = at.Item is not null ? at : matching[0];
+                            return new NameSlot(["known_as", Index(at.Index)], at.Value!, true, FromOf(at.Item), at.Item is YamlScalar);
+                        }
+
+                        break;
+                }
+            }
+
+            return FindPlain(file, text);
+        }
+
+        /// <summary>The slot of a plain alias matching <paramref name="text"/> (F-LINK-4), or null.</summary>
+        public static NameSlot? FindPlain(MarkdownFile file, string text)
+        {
+            var aliases = file.GetFrontmatterValue("aliases") as YamlSequence;
+            var index = aliases?.Items.ToList().FindIndex(i => i is YamlScalar { IsNull: false } s && LinkText.Matches(s.Text, text)) ?? -1;
+            return index < 0 ? null : new NameSlot(["aliases", Index(index)], ((YamlScalar)aliases!.Items[index]).Text, false, null);
+        }
+
+        private static string? ValueOf(YamlNode item) => item switch
+        {
+            YamlScalar { IsNull: false } s => s.Text,
+            YamlMapping m when m["value"] is YamlScalar { IsNull: false } v => v.Text,
+            _ => null,
+        };
+
+        private static string? FromOf(YamlNode item) => item is YamlMapping m && m["from"] is YamlScalar { IsNull: false } f ? f.Text : null;
+
+        /// <summary>The name written as <paramref name="name"/>, in place.</summary>
+        public MarkdownFile Rename(MarkdownFile file, string name) =>
+            file.WithFrontmatterValue(IsKnownAs && !Bare ? [.. Path, "value"] : Path, YamlScalarValue.String(name));
+
+        /// <summary>The <c>known_as</c> entry with <paramref name="from"/> as its from, in place; a bare name becomes an entry.</summary>
+        public MarkdownFile Retime(MarkdownFile file, string? from)
+        {
+            if (from is null)
+            {
+                return file;
+            }
+
+            if (Bare)
+            {
+                var name = file.GetFrontmatterValue(Path) is YamlScalar s ? s.Text : Text;
+                return file.WithFrontmatterValue(Path, NewEntity.KnownAsList([new(name, from)]).Single());
+            }
+
+            return file.WithFrontmatterValue([.. Path, "from"], YamlScalarValue.String(from));
+        }
+
+        /// <summary>The name taken out of its key.</summary>
+        public MarkdownFile Remove(MarkdownFile file, List<string> notes) =>
+            NoteEmptied(notes, file.WithoutFrontmatterValue(Path, EmptiedList.Null, out var comments), comments, Path[0]);
+
+        /// <summary>
+        /// <paramref name="name"/> added as a plain alias, or with <paramref name="known"/> as a <c>known_as</c> entry with
+        /// <paramref name="from"/>; with no from, it's known at no position, as the entry it's kept beside (F-ENT-10 fails closed).
+        /// </summary>
+        public static MarkdownFile Add(MarkdownFile file, string name, bool known, string? from)
+        {
+            if (!known)
+            {
+                return file.WithNewListItem(["aliases"], YamlScalarValue.String(name), null, inTemplateOrder: true);
+            }
+
+            if (file.GetFrontmatterValue("known_as") is YamlMapping)
+            {
+                throw new NotSupportedException("known_as is a single entry, not a list, so another can't be added in place. Write it as a list first.");
+            }
+
+            var entry = from is null ? new YamlMappingValue { { "value", YamlScalarValue.String(name) } } : NewEntity.KnownAsList([new(name, from)]).Single();
+            return file.WithNewListItem(["known_as"], entry, null, inTemplateOrder: true);
+        }
+
+        private static string Index(int i) => i.ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
     /// <summary>
@@ -199,7 +426,14 @@ public sealed partial class DenTools
     /// <param name="Notes">Effects the edit of the entity's own file adds as it's made, such as comment lines that went with an emptied list.</param>
     private sealed record TextChange(
         LinkMatchKind Kind, string OldText, string? NewText, string? LinkText, Func<MarkdownFile, MarkdownFile> Edit, string? Kept, string? NewAlias, bool SameForLinks,
-        string KeepHint, string LostHint, string? DroppedAlias = null, List<string>? Notes = null);
+        string KeepHint, string LostHint, string? DroppedAlias = null, List<string>? Notes = null)
+    {
+        /// <summary>What a change to where readers learn the name means (F-ENT-10), or null if it doesn't change.</summary>
+        public string? Learned { get; init; }
+
+        /// <summary>For a rename to one of the entity's own <c>known_as</c> names: that name and its from, taken out of <c>known_as</c>.</summary>
+        public (string Name, string? From)? DroppedKnown { get; init; }
+    }
 
     private WriteResult ChangeText(string entity, string? universe, string hash, bool allowRelinks, Func<CatalogEntity, TextChange?> change)
     {
@@ -303,6 +537,11 @@ public sealed partial class DenTools
             var after = EntityCatalog.ReadEntityFile(check.Structure, path, files[path]).Entity!;
             var ownMoved = moved.Any(l => l.Before.Target?.Path == path);
             var effects = new List<string> { Said(c, plan, target, files.Count, ownMoved) };
+            if (c.Learned is { } learned)
+            {
+                effects.Add(learned);
+            }
+
             effects.AddRange(c.Notes ?? []);
             if (c.Kind == LinkMatchKind.Name)
             {
@@ -315,6 +554,13 @@ public sealed partial class DenTools
                 if (c.DroppedAlias is { } dropped)
                 {
                     effects.Add($"'{dropped}' was one of its aliases; it's the name now, so it was taken out of aliases. Links that use it still reach it, by name now.");
+                }
+
+                if (c.DroppedKnown is { } known)
+                {
+                    effects.Add(
+                        $"'{known.Name}' was a name readers learn {(known.From is { } at ? $"at {at}" : "at no position")} (known_as); it's the name now, so it was taken out of known_as, " +
+                        "and readers know it wherever they know the note, at every position. Links that use it still reach it, by name now.");
                 }
             }
 
@@ -363,6 +609,11 @@ public sealed partial class DenTools
     {
         var unlessSaid = ownMoved ? ", except those listed below" : "";
         var what = c.Kind == LinkMatchKind.Name ? "name" : "alias";
+        if (c.Learned is not null && c.NewText == c.OldText)
+        {
+            return $"Changed where readers learn '{c.OldText}'. No link was changed: a link reaches the note by it at every position.";
+        }
+
         var change = c.Kind == LinkMatchKind.Name ? $"Renamed '{c.OldText}' to '{c.NewText}'"
             : c.Kept is not null ? $"Added the alias '{c.NewText}' beside '{c.OldText}'"
             : c.NewText is null ? $"Removed the alias '{c.OldText}'"
@@ -397,7 +648,7 @@ public sealed partial class DenTools
         {
             var tier = other.Slug is { } slug && LinkText.Matches(slug, text) ? "slug"
                 : LinkText.Matches(other.Name, text) ? "name"
-                : other.Aliases.Any(a => LinkText.Matches(a, text)) ? "alias" : null;
+                : other.AllAliases.Any(a => LinkText.Matches(a, text)) ? "alias" : null;
             if (tier is null)
             {
                 continue;

@@ -108,6 +108,14 @@ public sealed partial class DenTools
                 droppedComments = comments - CommentLines(file);
             }
 
+            // The names readers learn later are the original's too (F-ENT-10).
+            if (source.KnownAs.Count > 0)
+            {
+                var comments = CommentLines(file);
+                file = Apply(() => file.WithoutFrontmatterValue(["known_as"]));
+                droppedComments += comments - CommentLines(file);
+            }
+
             var retitled = file.Title is { } title && title.Trim() == source.Name && source.Name != newName;
             if (retitled)
             {
@@ -258,10 +266,17 @@ public sealed partial class DenTools
         {
             effects.Add(
                 $"The original's aliases ({string.Join(", ", source.Aliases.Select(a => $"'{a}'"))}) weren't copied, so links by them still reach the original.");
-            if (droppedComments > 0)
-            {
-                effects.Add($"Removed {droppedComments} comment line{(droppedComments == 1 ? "" : "s")} inside aliases, which went with them.");
-            }
+        }
+
+        if (source.KnownAs.Count > 0)
+        {
+            effects.Add(
+                $"The original's names readers learn later (known_as: {string.Join(", ", source.KnownAs.Select(k => $"'{k.Value}'"))}) weren't copied, so links by them still reach the original.");
+        }
+
+        if (droppedComments > 0)
+        {
+            effects.Add($"Removed {droppedComments} comment line{(droppedComments == 1 ? "" : "s")} inside {(source.Aliases.Count > 0 ? "aliases" : "known_as")}, which went with them.");
         }
 
         if (retitled)

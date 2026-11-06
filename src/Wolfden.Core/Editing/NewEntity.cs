@@ -17,6 +17,12 @@ public sealed record NewEntityRequest(string Name)
     /// <summary>Aliases, or null for the template's.</summary>
     public IReadOnlyList<string>? Aliases { get; init; }
 
+    /// <summary>
+    /// The names readers learn partway through the story (format.md F-ENT-10), each
+    /// with the <c>from</c> where they learn it, or null for the template's.
+    /// </summary>
+    public IReadOnlyList<KeyValuePair<string, string>>? KnownAs { get; init; }
+
     /// <summary>The status, or null for the template's, or <c>draft</c>.</summary>
     public string? Status { get; init; }
 
@@ -43,7 +49,7 @@ public sealed record NewEntityFile(string Path, string Slug, MarkdownFile File);
 /// </summary>
 public static class NewEntity
 {
-    private static readonly string[] OwnKeys = ["id", "type", "name", "aliases", "status", "from", "fields"];
+    private static readonly string[] OwnKeys = ["id", "type", "name", "aliases", "known_as", "status", "from", "fields"];
 
     /// <summary>
     /// The longest name a writer gives a new, copied, or renamed entity, in
@@ -205,6 +211,11 @@ public static class NewEntity
             throw new ArgumentException("Each alias is one line of text, not empty (F-ENT-4).", nameof(request));
         }
 
+        if (request.KnownAs?.Any(k => string.IsNullOrWhiteSpace(k.Key) || k.Key.Any(char.IsControl) || string.IsNullOrWhiteSpace(k.Value)) == true)
+        {
+            throw new ArgumentException("Each known_as name is one line of text, not empty, with the from where readers learn it (F-ENT-10).", nameof(request));
+        }
+
         if (!Keys.IsId(id))
         {
             throw new ArgumentException($"'{id}' isn't a valid id.", nameof(id));
@@ -282,6 +293,21 @@ public static class NewEntity
             sb.Append(raw.Text);
         }
 
+        if (request.KnownAs is { } knownAs)
+        {
+            sb.Append("known_as:");
+            foreach (var entry in KnownAsList(knownAs))
+            {
+                sb.Append("\n  - ").Append(entry.RenderFlow(null, null));
+            }
+
+            sb.Append(knownAs.Count == 0 ? " []\n" : "\n");
+        }
+        else if (entries.TryGetValue("known_as", out var raw))
+        {
+            sb.Append(raw.Text);
+        }
+
         if (request.Status is { } status)
         {
             sb.Append("status: ").Append(YamlScalarValue.String(status).Render(null)).Append('\n');
@@ -319,6 +345,13 @@ public static class NewEntity
         }
 
         return sb.Append("---\n").ToString();
+    }
+
+    /// <summary>Each <c>known_as</c> name and its <c>from</c> as an entry to write, <c>{ value: Mara Voss, from: "ember:38" }</c>.</summary>
+    public static IEnumerable<YamlMappingValue> KnownAsList(IEnumerable<KeyValuePair<string, string>> knownAs)
+    {
+        ArgumentNullException.ThrowIfNull(knownAs);
+        return knownAs.Select(k => new YamlMappingValue { { "value", YamlScalarValue.String(k.Key.Trim()) }, { "from", YamlScalarValue.String(k.Value.Trim()) } });
     }
 
     /// <summary>A top-level template entry: its lines as written (LF line ends), its order, and the parsed entry.</summary>
@@ -483,6 +516,8 @@ public static class NewEntity
             && (request.From is null || YamlScalarValue.String(request.From).MatchesAsWritten(fm["from"]))
             && (request.Aliases is null || (fm["aliases"] is YamlSequence a && a.Items.Count == request.Aliases.Count
                 && request.Aliases.Zip(a.Items).All(p => YamlScalarValue.String(p.First).MatchesAsWritten(p.Second))))
+            && (request.KnownAs is null || (fm["known_as"] is YamlSequence k && k.Items.Count == request.KnownAs.Count
+                && KnownAsList(request.KnownAs).Zip(k.Items).All(p => p.First.MatchesAsWritten(p.Second))))
             && fields.All(f => f.Value.MatchesAsWritten((fm["fields"] as YamlMapping)?[f.Key]));
         if (ok && tfm is not null)
         {
@@ -495,7 +530,7 @@ public static class NewEntity
                     ok &= templateFields.Entries.Where(e => e.KeyText is { } f && fields.All(g => g.Key != f))
                         .All(e => YamlTreeCheck.Same(e.Value, (fm!["fields"] as YamlMapping)?[e.KeyText!]));
                 }
-                else if (!(key == "aliases" && request.Aliases is not null) && !(key == "status" && request.Status is not null)
+                else if (!(key == "aliases" && request.Aliases is not null) && !(key == "known_as" && request.KnownAs is not null) && !(key == "status" && request.Status is not null)
                     && !(key == "from" && request.From is not null) && !(key == "status" && entry.Value is YamlScalar { IsNull: true }))
                 {
                     ok &= YamlTreeCheck.Same(entry.Value, fm![key]);

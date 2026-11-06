@@ -1593,6 +1593,30 @@ Spec: format.md F-RT-7, F-TMP-7, F-RT-1, F-RT-2 (#197). Covered by:
 `ChapterFieldEndpointTests.MovingOrReplacingAnItemKeepsItsComments` (API),
 `ListItemToolTests` (MCP).
 
+### SC-RT-19. Renaming a later name
+
+The Courier's `known_as` has `Mara Voss` from `ash:2`, and a note links `[[Mara Voss]]`
+in a field, a section readers reach early, and one they reach later.
+
+- `change_alias` from `Mara Voss` to `Mara Holt` rewrites all three links, at every
+  position, and the entry keeps its `from`. With `keep_old_alias`, the new name goes
+  beside the old, with the same `from`. Removed, its links get the note's name.
+- Given `plain: true`, the name becomes a plain alias, and no link changes; the effects
+  say a secret is given away. A name that's in `aliases` too only leaves `known_as`.
+  `from: ""` or a blank `from` counts as left out, so it changes nothing. Given a
+  position, a plain alias becomes a `known_as` name from there, or a `known_as`
+  name's `from` changes, and no link changes. A `from` that isn't a position the
+  universe has is `bad_position`, and `plain` with a `from` is `bad_argument`.
+- A name kept beside a `known_as` entry with no `from` goes in `known_as` with no
+  `from` too, so it stays hidden. In a flow list (`known_as: [{ ... }, { ... }]`)
+  each tool finds the entry by its name.
+- `update_fields` doesn't move a `known_as` entry, and says why: the earliest `from`
+  counts, not the order.
+- `rename_entity` to one of the note's own `known_as` names takes the entry out, and
+  says the name is known everywhere now. `create_entity` takes `known_as`.
+
+Spec: F-ENT-10, F-RT-5 (#67, §9). Covered by: `KnownAsWriteTests`.
+
 ### SC-RT-18. A note with a bad section comment keeps every byte
 
 - A file with a bad section comment writes back exactly as it was read,
@@ -3716,6 +3740,19 @@ The Harbourmaster has `aliases: [Old Tam]`, and The Lamplighter has
   don't depend on where they're read.
 
 Spec: F-VIEW-7, F-LINK-6 (#67). Covered by: `McpStaysStrictTests`.
+
+### SC-MCP-53. Moving the reveal
+
+The Courier's `known_as` has `{ value: Mara Voss, from: "ash:2" }`, and a note met
+earlier links `[[Mara Voss]]`.
+
+- `update_fields` sets `known_as.0.from` to `ember:3`. Only the Courier's file
+  changes, and a read at `ember:3` now finds the name.
+- `update_fields` can add a `known_as` entry, a `value` and a `from`, but refuses to
+  change or remove a name (`unsupported_edit`, pointing to `change_alias`), a `from`
+  of null, and a `from` the universe doesn't have (`bad_position`).
+
+Spec: F-ENT-10 (#67, §9). Covered by: `KnownAsWriteTests`.
 
 ### SC-MCP-54. Names that arrive at different times
 

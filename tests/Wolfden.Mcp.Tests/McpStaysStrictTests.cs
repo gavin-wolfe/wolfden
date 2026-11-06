@@ -1628,7 +1628,7 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
         "add_idea(text, entity, section, expected_hash, name, type, universe, series, book, fields, allow_relinks)",
         "append_section(entity, section, text, expected_hash, universe, under, section_line, new_section, from, until, status, pin)",
         "canon_as_of(position, universe, series, book, type, brief)",
-        "change_alias(entity, alias, expected_hash, new_alias, keep_old_alias, universe, allow_relinks, from)",
+        "change_alias(entity, alias, expected_hash, new_alias, keep_old_alias, universe, allow_relinks, from, plain)",
         "check(severity, path, limit, universe)",
         "checkpoint(message, co_author, paths)",
         "copy_entity(entity, new_name, universe, to_universe, to_series, to_book, slug, allow_relinks, expected_hash)",

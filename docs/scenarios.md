@@ -1601,10 +1601,17 @@ in a field, a section readers reach early, and one they reach later.
 - `change_alias` from `Mara Voss` to `Mara Holt` rewrites all three links, at every
   position, and the entry keeps its `from`. With `keep_old_alias`, the new name goes
   beside the old, with the same `from`. Removed, its links get the note's name.
-- Given `from: ""`, the name becomes a plain alias, and no link changes; the effects
-  say a secret is given away. Given a position, a plain alias becomes a `known_as`
-  name from there, or a `known_as` name's `from` changes, and no link changes. A
-  `from` that isn't a position the universe has is `bad_position`.
+- Given `plain: true`, the name becomes a plain alias, and no link changes; the effects
+  say a secret is given away. A name that's in `aliases` too only leaves `known_as`.
+  `from: ""` or a blank `from` counts as left out, so it changes nothing. Given a
+  position, a plain alias becomes a `known_as` name from there, or a `known_as`
+  name's `from` changes, and no link changes. A `from` that isn't a position the
+  universe has is `bad_position`, and `plain` with a `from` is `bad_argument`.
+- A name kept beside a `known_as` entry with no `from` goes in `known_as` with no
+  `from` too, so it stays hidden. In a flow list (`known_as: [{ ... }, { ... }]`)
+  each tool finds the entry by its name.
+- `update_fields` doesn't move a `known_as` entry, and says why: the earliest `from`
+  counts, not the order.
 - `rename_entity` to one of the note's own `known_as` names takes the entry out, and
   says the name is known everywhere now. `create_entity` takes `known_as`.
 

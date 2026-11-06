@@ -229,7 +229,7 @@ public sealed class WolfdenTools
         "becomes item 'index', keeping its comments; taking an item out and adding it again drops them; dated entries are never moved, F-TMP-7). Setting a path that ends in an item number " +
         "('fields.pov.1') changes that item in place, keeping a comment on it. A path is dotted: 'status', 'from', 'aliases', 'fields.born', " +
         "'fields.rank.1.from' (item numbers from 0). An entry is {\"value\": x, \"from\": \"book:chapter\", \"until\": ..., \"status\": ..., \"pin\": true}. " +
-        "The id never changes. Aliases and known_as entries can be added and moved here, and a known_as entry's from set ('known_as.0.from'), " +
+        "The id never changes. Aliases can be added and moved here, known_as entries added, and a known_as entry's from set ('known_as.0.from'), " +
         "which changes no link; to rename the entity, or change or remove an alias or a known_as name, use rename_entity or " +
         "change_alias, which rewrite the links that used the old text. A 'from', 'until', or position field value you set must be a position the " +
         "universe has (bad_position otherwise); null leaves it out. Read without as_of before changing a field: a read with as_of leaves out a position " +
@@ -339,8 +339,8 @@ public sealed class WolfdenTools
         "rewrite is in a final (frozen) book, nothing changes. If a link that reaches another entity would change target, nothing " +
         "changes unless allow_relinks is true. To add an alias, update_fields is enough. The alias can be a plain one (aliases) or a name " +
         "readers learn later (known_as): a changed or new one stays in the same list with the same from, unless 'from' says otherwise. " +
-        "With 'from' and no new_alias, only where readers learn the name changes, and no link: a position makes it a known_as name from there, " +
-        "and an empty string makes it a plain alias, known wherever the entity is. That gives a secret away, so check with the writer." + WriteHelp)]
+        "With 'from' or 'plain' and no new_alias, only where readers learn the name changes, and no link: a position in 'from' makes it a known_as " +
+        "name from there, and plain: true makes it a plain alias, known wherever the entity is. That gives a secret away, so check with the writer first." + WriteHelp)]
     public CallToolResult ChangeAlias(
         [Description("The entity: its name, an alias, its file name, its id, its key, or its path.")] string entity,
         [Description("The alias to change or remove, as it's written.")] string alias,
@@ -349,9 +349,10 @@ public sealed class WolfdenTools
         [Description("If true, add new_alias beside the old one and leave links as they are.")] bool keep_old_alias = false,
         [Description(UniverseHelp)] string? universe = null,
         [Description(RelinksHelp)] bool allow_relinks = false,
-        [Description("Where readers learn the alias (the new one, if any): a position such as 'dracula:5' for a known_as name, or an empty string for a plain alias, known everywhere. Leave it out to keep it as it is.")] string? from = null,
+        [Description("Where readers learn the alias (the new one, if any), as a position such as 'dracula:5': a known_as name from there. Leave it out to keep it as it is.")] string? from = null,
+        [Description("If true, make the alias (the new one, if any) a plain alias, known wherever the entity is, at every position. Not with 'from'. A secret becomes public, so check with the writer first.")] bool plain = false,
         CancellationToken cancellationToken = default) =>
-        Write(() => _tools.ChangeAlias(entity, alias, expected_hash, new_alias, keep_old_alias, universe, allow_relinks, from), cancellationToken);
+        Write(() => _tools.ChangeAlias(entity, alias, expected_hash, new_alias, keep_old_alias, universe, allow_relinks, from, plain), cancellationToken);
 
     /// <summary>The <c>move_entity</c> tool.</summary>
     [McpServerTool(Name = "move_entity", Title = "Move an entity to another scope", ReadOnly = false, Idempotent = false, Destructive = true, OpenWorld = false)]

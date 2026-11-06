@@ -212,12 +212,12 @@ prompts. This list is for knowing what the assistant can do.
 | Tool | What it does |
 |---|---|
 | `create_entity` | A new entity from its type's template. If its name would take links from another entity, it's refused unless `allow_relinks`. |
-| `update_fields` | Set, add to, or remove anything in an entity's frontmatter (its fields, `status`, `from`), add aliases and `known_as` entries, set a `known_as` entry's `from` (`known_as.0.from`), and move a list item (`move`), keeping its comments. |
+| `update_fields` | Set, add to, or remove anything in an entity's frontmatter (its fields, `status`, `from`), add aliases and `known_as` entries, set a `known_as` entry's `from` (`known_as.0.from`), and move a list item (`move`, though not a `known_as` entry), keeping its comments. |
 | `append_section` | Add text to a section, or add a new section. |
 | `add_idea` | Record undecided material with `status: idea`, as its own entity or as a section of one. A new idea entity whose name would take links from another entity is refused unless `allow_relinks`. An idea added to an existing `entity` creates nothing, so it refuses `allow_relinks`, as it does the new entity's `name`, `type`, `series`, `book`, and `fields`. |
 | `rename_section` | Rename a section and rewrite the links to it, den-wide. |
 | `rename_entity` | Rename an entity and rewrite the links that used the old name, or keep the old name as an alias. |
-| `change_alias` | Change or remove an alias, or a `known_as` name, rewriting its links the same way. With `from` and no `new_alias`, it only moves a name between `aliases` and `known_as`, or changes its `from`, and rewrites no link. |
+| `change_alias` | Change or remove an alias, or a `known_as` name, rewriting its links the same way. With `from` (a position) or `plain: true` and no `new_alias`, it only moves a name between `aliases` and `known_as`, or changes its `from`, and rewrites no link. |
 | `copy_entity` | Copy an entity under a new name and id, beside it or into another scope or universe. |
 | `move_entity` | Move an entity's file to another scope of its universe (a series, a book, or the universe itself), keeping canon views as they were. Links to it that would stop reaching it, and its own links that would change target, are rewritten to ids. |
 | `update_chapter_fields` | Change one chapter's own fields: set, add, remove, or clear, and move or replace one list item in place (`move`, `replace`), keeping its comments. |

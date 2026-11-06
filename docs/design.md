@@ -1462,12 +1462,15 @@ store, so an edit changes only what it means to (format.md §12):
 - **Names readers learn later** (#67, §9 of its design). Writes take no
   position. `change_alias` finds a name in `aliases` or `known_as`
   (format.md F-ENT-10), and a changed or kept name stays in the same key
-  with the same `from`. Its `from` argument moves a name between the keys,
-  or changes its `from`, with **no link rewritten**, since links don't
-  depend on positions: a position makes it a `known_as` name from there,
-  and an empty string makes it a plain alias (remove-then-add would
-  rewrite every link to the filed name). `update_fields` adds and moves
-  `known_as` entries, each a `value` and a `from` that must resolve, and
+  with the same `from`, or none, if it has none, so a kept name stays
+  hidden. Its `from` and `plain` arguments move a name between the keys,
+  or change its `from`, with **no link rewritten**, since links don't
+  depend on positions: a position in `from` makes it a `known_as` name
+  from there, and `plain: true` makes it a plain alias (remove-then-add
+  would rewrite every link to the filed name). An empty or blank `from`
+  counts as left out, so a client that fills optional strings with `""`
+  can't make a secret public by accident. `update_fields` adds
+  `known_as` entries (it doesn't move them, since their order decides nothing), each a `value` and a `from` that must resolve, and
   sets an entry's `from` as an ordinary edit; changing or removing a name
   there is `unsupported_edit`, pointing to `change_alias`. `rename_entity`
   to one of the note's own `known_as` names takes the entry out, and says

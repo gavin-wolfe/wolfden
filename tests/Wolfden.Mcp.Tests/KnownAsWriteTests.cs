@@ -151,7 +151,7 @@ public sealed class KnownAsWriteTests : IDisposable
         var ledger = _den.Read(Ledger);
 
         // Plain: known wherever the note is.
-        var plain = Tools.ChangeAlias("The Courier", "Mara Voss", Hash("The Courier"), from: "", universe: "starfall");
+        var plain = Tools.ChangeAlias("The Courier", "Mara Voss", Hash("The Courier"), plain: true, universe: "starfall");
         var courier = _den.Read(Courier);
         Assert.Contains("aliases: [the Messenger, Mara Voss]\n", courier, StringComparison.Ordinal);
         Assert.DoesNotContain("value: Mara Voss", courier, StringComparison.Ordinal);
@@ -208,6 +208,112 @@ public sealed class KnownAsWriteTests : IDisposable
         Assert.DoesNotContain("value: Mara Voss", courier, StringComparison.Ordinal);
         Assert.Contains(result.Effects, e => e.Contains("'Mara Voss' was a name readers learn at ash:2 (known_as); it's the name now", StringComparison.Ordinal));
         Assert.Equal("Mara Voss", Tools.GetEntity("Mara Voss", "starfall", "ember:1").Entity!.Name);
+    }
+
+    /// <summary>The Courier with two later names in a one-line flow list, as writers type aliases.</summary>
+    private void WriteFlowList(string knownAs = """[{ value: Mara Voss, from: "ash:2" }, { value: Voss, from: "ash:3" }]""")
+    {
+        _den.Write(Courier, _den.Read(Courier).Replace("known_as:\n  - { value: Mara Voss, from: \"ash:2\" }\n", $"known_as: {knownAs}\n", StringComparison.Ordinal));
+        _den.Write(Ledger, _den.Read(Ledger).Replace("[[Mara Voss]] signed it.", "[[Mara Voss]] signed it. [[Voss]] paid.", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-RT-19")]
+    public void InAFlowListEachToolFindsTheEntryByItsName()
+    {
+        WriteFlowList();
+
+        // change_alias renames the second entry, not the first on the same line.
+        var renamed = Tools.ChangeAlias("The Courier", "Voss", Hash("The Courier"), newAlias: "Holt", universe: "starfall");
+        Assert.Contains("""known_as: [{ value: Mara Voss, from: "ash:2" }, { value: Holt, from: "ash:3" }]""", _den.Read(Courier), StringComparison.Ordinal);
+        Assert.Contains("[[Mara Voss]] signed it. [[Holt]] paid.", _den.Read(Ledger), StringComparison.Ordinal);
+        Assert.DoesNotContain(Tools.Check().Diagnostics, d => d.Rule == "F-LINK-8");
+
+        // plain takes out that entry only.
+        Tools.ChangeAlias("The Courier", "Holt", renamed.Hash, plain: true, universe: "starfall");
+        var courier = _den.Read(Courier);
+        Assert.Contains("""known_as: [{ value: Mara Voss, from: "ash:2" }]""", courier, StringComparison.Ordinal);
+        Assert.Contains("aliases: [the Messenger, Holt]", courier, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RenamingTheNoteInAFlowListTakesOutTheRightEntry()
+    {
+        WriteFlowList();
+
+        Tools.RenameEntity("The Courier", "Voss", Hash("The Courier"), universe: "starfall");
+
+        var courier = _den.Read(Courier);
+        Assert.Contains("\nname: Voss\n", courier, StringComparison.Ordinal);
+        Assert.Contains("""known_as: [{ value: Mara Voss, from: "ash:2" }]""", courier, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("""[{ value: Mara Voss }]""")]
+    [InlineData("""[Mara Voss]""")]
+    public void ANameKeptBesideOneWithNoFromStaysHidden(string knownAs)
+    {
+        // Fails closed: the new name goes in known_as with no from, as the old one has, never into plain aliases.
+        WriteFlowList(knownAs);
+
+        Tools.ChangeAlias("The Courier", "Mara Voss", Hash("The Courier"), newAlias: "Mara Holt", keepOldAlias: true, universe: "starfall");
+
+        var courier = _den.Read(Courier);
+        Assert.Contains("aliases: [the Messenger]\n", courier, StringComparison.Ordinal);
+        Assert.Contains("{ value: Mara Holt }", courier, StringComparison.Ordinal);
+        Assert.Equal(ToolErrorCodes.UnknownEntity, Assert.Throws<DenToolException>(() => Tools.GetEntity("Mara Holt", "starfall", "ash:epilogue")).Code);
+    }
+
+    [Fact]
+    public void ANameInBothKeysMadePlainIsntListedTwice()
+    {
+        _den.Write(Courier, _den.Read(Courier).Replace("aliases: [the Messenger]", "aliases: [the Messenger, Mara Voss]", StringComparison.Ordinal));
+
+        Tools.ChangeAlias("The Courier", "Mara Voss", Hash("The Courier"), plain: true, universe: "starfall");
+
+        var courier = _den.Read(Courier);
+        Assert.Contains("aliases: [the Messenger, Mara Voss]\n", courier, StringComparison.Ordinal);
+        Assert.DoesNotContain("value: Mara Voss", courier, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void ABlankFromIsLeftOutSoItCantMakeASecretPublic(string from)
+    {
+        var before = _den.Read(Courier);
+
+        var result = Tools.ChangeAlias("The Courier", "Mara Voss", Hash("The Courier"), from: from, universe: "starfall");
+
+        // No new_alias and no from: it's a removal, as with from left out, and the name stays out of aliases.
+        Assert.DoesNotContain("aliases: [the Messenger, Mara Voss]", _den.Read(Courier), StringComparison.Ordinal);
+        Assert.Contains("[[The Courier]] signed it.", _den.Read(Ledger), StringComparison.Ordinal);
+        Assert.NotEqual(before, _den.Read(Courier));
+        Assert.True(result.Changed);
+    }
+
+    [Fact]
+    public void PlainAndFromTogetherAreRefused()
+    {
+        var before = _den.Read(Courier);
+
+        Refused(ToolErrorCodes.BadArgument, () => Tools.ChangeAlias("The Courier", "Mara Voss", Hash("The Courier"), from: "ash:1", plain: true, universe: "starfall"));
+
+        Assert.Equal(before, _den.Read(Courier));
+    }
+
+    [Fact]
+    public void AKnownAsEntryIsntMovedAndTheRefusalSaysWhy()
+    {
+        var added = Tools.UpdateFields(
+            "The Courier", Hash("The Courier"), Json("""[{"op": "add", "path": "known_as", "value": {"value": "Mara Holt", "from": "ash:3"}}]"""), "starfall");
+        var before = _den.Read(Courier);
+
+        var e = Refused(ToolErrorCodes.UnsupportedEdit, () => Tools.UpdateFields("The Courier", added.Hash, Json("""[{"op": "move", "path": "known_as.1", "index": 0}]"""), "starfall"));
+
+        Assert.Contains("the entry with the earliest 'from' counts", e.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("F-TMP", e.Message, StringComparison.Ordinal);
+        Assert.Equal(before, _den.Read(Courier));
     }
 
     [Fact]

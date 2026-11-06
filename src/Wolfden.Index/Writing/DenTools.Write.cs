@@ -309,7 +309,7 @@ public sealed partial class DenTools
                     throw new DenToolException(
                         ToolErrorCodes.BadArgument,
                         "A known_as entry's 'from' is a story position, such as \"ember:38\" (F-ENT-10). Without one, no read at a position knows the name: " +
-                        $"to make it a plain alias, known wherever the note is, use change_alias with from set to an empty string.");
+                        $"to make it a plain alias, known wherever the note is, use change_alias with plain: true.");
                 }
 
                 if (op.Op == "set" && op.Value is YamlSequenceValue && path.Count > 1 && file.GetFrontmatterValue(path.Take(path.Count - 1).ToList()) is YamlSequence)
@@ -1976,8 +1976,13 @@ public sealed partial class DenTools
                 throw new DenToolException(
                     ToolErrorCodes.UnsupportedEdit,
                     $"Aliases can be added and moved here, but not changed or removed: links that matched the old alias must follow (F-RT-5). {Words.AliasLinks}");
-            case "known_as" when op == "move" || (op == "add" && path.Count == 1):
-                // A new name, or a new place in the list: no link that matched a name before is lost (F-ENT-10).
+            case "known_as" when op == "move":
+                throw new DenToolException(
+                    ToolErrorCodes.UnsupportedEdit,
+                    "known_as entries aren't moved here. Their order doesn't decide anything: of a name listed twice, the entry with the earliest 'from' counts (F-ENT-10). " +
+                    "To change when readers learn a name, set its 'from'. If the order matters to you, edit the file by hand.");
+            case "known_as" when op == "add" && path.Count == 1:
+                // A new name: no link that matched a name before is lost (F-ENT-10).
                 break;
             case "known_as" when op == "set" && path[^1] == "from" && path.Count == (IsIndex(path[1]) ? 3 : 2):
                 // Where readers learn a name is an ordinary edit: links don't depend on it (#67, §9).
@@ -1985,7 +1990,7 @@ public sealed partial class DenTools
             case "known_as":
                 throw new DenToolException(
                     ToolErrorCodes.UnsupportedEdit,
-                    "Names in known_as can be added and moved here, and an entry's 'from' set, but a name can't be changed or removed: links that matched the old name " +
+                    "Names in known_as can be added here, and an entry's 'from' set, but a name can't be changed or removed: links that matched the old name " +
                     $"must follow (F-RT-5). {Words.AliasLinks} It takes 'from' too, to move a name between aliases and known_as without changing any link.");
             case "fields" when path.Count == 1 && op != "set":
                 throw new DenToolException(ToolErrorCodes.BadArgument, "Name a field: 'fields.<name>'.");

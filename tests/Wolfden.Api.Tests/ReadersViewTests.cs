@@ -31,6 +31,15 @@ public sealed class ReadersViewTests : IDisposable
             "---\ntype: note\nname: The salt ledger\nstatus: canon\nfrom: \"ember:1\"\n---\n\nKept at the Reach. <!-- Thistlewick burns it in Ash. -->\n\n" +
             "## Entries\nEach toll is written down. <!-- [[The salt tithe]] is why, says Thistlewick.\n\n" +
             "## Audits\n<!-- wolfden: from=ember:1 until=ash:2 -->\nRead every year. See [[The salt tithe]].\n");
+
+        // A note whose real name readers learn at ash:2, and a note met earlier whose text links by it (#67).
+        _den.Write(
+            "universes/starfall/entities/notes/the-courier.md",
+            "---\ntype: note\nname: The Courier\naliases: [the Messenger]\nknown_as: [{ value: Mara Voss, from: \"ash:2\" }]\nstatus: canon\nfrom: \"ember:1\"\n---\n\nCarries the post.\n\n## Overview\nQuiet.\n");
+        _den.Write(
+            "universes/starfall/entities/notes/the-post-book.md",
+            "---\ntype: note\nname: The post book\nstatus: canon\nfrom: \"ember:1\"\nfields:\n  signer: \"[[Mara Voss]]\"\n---\n\nSigned by [[Mara Voss]].\n\n" +
+            "## Entries\n[[Mara Voss|The stranger]] paid. [[Mara Voss#Overview]] left.\n");
     }
 
     public void Dispose() => _den.Dispose();
@@ -83,6 +92,8 @@ public sealed class ReadersViewTests : IDisposable
     [InlineData("The salt ledger")]
     [InlineData("Ilse Tarrow")]
     [InlineData("The missing manifest")]
+    [InlineData("The Courier")]
+    [InlineData("The post book")]
     public async Task AtEveryPositionTheReadersPageIsWhatAnAssistantReads(string name)
     {
         await using var server = await Start();
@@ -102,12 +113,49 @@ public sealed class ReadersViewTests : IDisposable
                 continue;
             }
 
-            string[] members = ["lead", "fields", "sections", "pinned"];
+            string[] members = ["aliases", "lead", "fields", "sections", "pinned"];
             Assert.Equal(Facts(mcp.RootElement.GetProperty("entity"), members), Facts(page.GetProperty("entity"), members));
             compared++;
         }
 
         Assert.True(compared > 0, $"{name} was never in view, so nothing was compared.");
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-51")]
+    public async Task AReadersPageShowsALinkByALaterNameAsTheNotesName()
+    {
+        await using var server = await Start();
+
+        var book = await server.GetJsonAsync(Readers("The%20post%20book", "ember:3"), HttpStatusCode.OK);
+        var courier = await server.GetJsonAsync(Readers("The%20Courier", "ember:3"), HttpStatusCode.OK);
+
+        // The text, each link the page matches to it, and each backlink read by the note's name, so nothing on either page holds the later name.
+        var entity = book.GetProperty("entity");
+        Assert.Equal("Signed by [[The Courier]].", entity.GetProperty("lead").GetString());
+        Assert.Equal(["[[The Courier]]"], entity.GetProperty("leadLinks").EnumerateArray().Select(l => l.GetProperty("text").GetString()));
+        Assert.Equal(["The Courier"], entity.GetProperty("leadLinks").EnumerateArray().Select(l => l.GetProperty("target").GetString()));
+        var section = entity.GetProperty("sections")[0];
+        Assert.Equal("[[The Courier|The stranger]] paid. [[The Courier#Overview]] left.", section.GetProperty("body").GetString());
+        Assert.Equal(["[[The Courier|The stranger]]", "[[The Courier#Overview]]"], section.GetProperty("links").EnumerateArray().Select(l => l.GetProperty("text").GetString()));
+        Assert.Equal("[[The Courier]]", entity.GetProperty("fields").EnumerateArray().Single(f => f.GetProperty("name").GetString() == "signer").GetProperty("value").GetString());
+        Assert.Contains(courier.GetProperty("entity").GetProperty("backlinks").EnumerateArray(), b => b.GetProperty("text").GetString() == "[[The Courier]]");
+        Assert.Equal(["the Messenger"], courier.GetProperty("entity").GetProperty("aliases").EnumerateArray().Select(a => a.GetString()));
+        foreach (var page in new[] { book, courier })
+        {
+            Assert.DoesNotContain("Mara", page.GetRawText(), StringComparison.Ordinal);
+            Assert.DoesNotContain("Voss", page.GetRawText(), StringComparison.Ordinal);
+        }
+
+        // And the Reader's search finds the link by what it shows there.
+        var hits = await server.GetJsonAsync("/api/search?universe=starfall&query=Courier%20paid&asOf=ember:3&readers=true", HttpStatusCode.OK);
+        Assert.Equal("The post book", Assert.Single(hits.GetProperty("hits").EnumerateArray()).GetProperty("entity").GetProperty("name").GetString());
+        var none = await server.GetJsonAsync("/api/search?universe=starfall&query=Voss&asOf=ember:3&readers=true", HttpStatusCode.OK);
+        Assert.Equal(0, none.GetProperty("count").GetInt32());
+
+        // Once readers know the name, as written.
+        var later = await server.GetJsonAsync(Readers("The%20post%20book", "ash:2"), HttpStatusCode.OK);
+        Assert.Equal("Signed by [[Mara Voss]].", later.GetProperty("entity").GetProperty("lead").GetString());
     }
 
     [Fact]

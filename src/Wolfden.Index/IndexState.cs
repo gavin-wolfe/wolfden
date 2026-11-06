@@ -81,4 +81,4 @@ internal sealed class EntityRows
 }
 
 /// <summary>A row of the FTS5 <c>search</c> table, with its rowid.</summary>
-internal sealed record SearchRow(long RowId, string Title, string Body, string Comments, string Kind, int EntityId, int? SectionId);
+internal sealed record SearchRow(long RowId, string Title, string Body, string Comments, string Kind, int EntityId, int? SectionId, string Names = "");

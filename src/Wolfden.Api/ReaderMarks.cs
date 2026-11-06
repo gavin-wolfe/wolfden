@@ -336,14 +336,16 @@ internal sealed class ReaderMarks
                 return DenReader.FoundWithoutComments(query, section.Name, section.Body) ? InALinkTarget : InAComment;
             }
 
-            if (DenReader.ReadersCanFind(query, _note.Name, _note.Lead, _marks.Links, _note.Id))
+            // Readers find a note by its name and the other names they know at the position (F-VIEW-7).
+            var noteId = _note.Id;
+            var rows = _marks._db.Aliases.Where(a => a.EntityId == noteId).OrderBy(a => a.Order).ToList();
+            var known = string.Join("\n", rows.Where(a => a.IsKnownAt(_marks._point)).Select(a => a.Alias).Prepend(_note.Name));
+            if (DenReader.ReadersCanFind(query, known, _note.Lead, _marks.Links, _note.Id))
             {
                 return null;
             }
 
-            var noteId = _note.Id;
-            var aliases = _marks._db.Aliases.Where(a => a.EntityId == noteId).Select(a => a.Alias).ToList();
-            var names = string.Join("\n", aliases.Prepend(_note.Name));
+            var names = string.Join("\n", rows.Select(a => a.Alias).Prepend(_note.Name));
             return DenReader.ReadersCanFind(query, names, _note.Lead, _marks.Links, _note.Id) ? InAnAlias
                 : DenReader.FoundWithoutComments(query, names, _note.Lead) ? InALinkTarget
                 : InAComment;

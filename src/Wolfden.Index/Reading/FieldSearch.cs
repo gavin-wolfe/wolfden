@@ -42,6 +42,7 @@ internal sealed class FieldSearch
     private readonly string? _field;
     private readonly IReadOnlySet<string>? _met;
     private readonly ReadersLinks? _asReaders;
+    private readonly long? _knownAt;
     private ILookup<(int EntityId, string Field), int>? _lines;
     private ILookup<(int EntityId, string Field, int Line), (string Path, string[] Names)>? _links;
 
@@ -55,8 +56,10 @@ internal sealed class FieldSearch
     /// To search what a reader's page shows (<see cref="DenReader.SearchAsReaders"/>): each
     /// link is what it shows there, and nothing else about the note it reaches matches.
     /// </param>
-    public FieldSearch(DenIndex index, SearchWords words, int? universeId, string? field, IReadOnlySet<string>? met, ReadersLinks? asReaders = null)
+    /// <param name="knownAt">As of a position, its point, so a linked note matches only by the names readers know there (format.md F-VIEW-7).</param>
+    public FieldSearch(DenIndex index, SearchWords words, int? universeId, string? field, IReadOnlySet<string>? met, ReadersLinks? asReaders = null, long? knownAt = null)
     {
+        _knownAt = knownAt;
         _asReaders = asReaders;
         _db = index.Context;
         _words = words;
@@ -192,7 +195,9 @@ internal sealed class FieldSearch
             .Where(e => _met is null || _met.Contains(e.Path))
             .ToLookup(e => (e.UniverseId, e.Key));
         var targetIds = targets.SelectMany(t => t).Select(e => e.Id).ToList();
-        var aliases = _db.Aliases.Where(a => targetIds.Contains(a.EntityId)).ToList().ToLookup(a => a.EntityId);
+        var aliases = _db.Aliases.Where(a => targetIds.Contains(a.EntityId)).ToList()
+            .Where(a => _knownAt is not { } at || a.IsKnownAt(at))
+            .ToLookup(a => a.EntityId);
         _links = links
             .Select(l => (Link: l, Owner: _lines[(l.EntityId, l.Field)].Where(line => line <= l.Line).DefaultIfEmpty(-1).Max()))
             .Where(x => x.Owner >= 0)

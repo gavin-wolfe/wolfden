@@ -68,6 +68,13 @@ public sealed partial class DenReader
     /// </summary>
     public Func<IHistoryProvider> History { get; init; } = () => NoHistory.Instance;
 
+    /// <summary>
+    /// True to list every book of the universe, in story order, when a read at a position
+    /// can't read it, as typing help for the writer's own views (the web API). False, as MCP
+    /// has it, names nothing past the book asked for, since a book key can be a spoiler (#67).
+    /// </summary>
+    public bool ListBooksAtABadPosition { get; init; }
+
     /// <summary>The words errors use to advise what to do next (<see cref="ToolWords"/>).</summary>
     public ToolWords Words { get; init; } = ToolWords.Mcp;
 
@@ -330,7 +337,9 @@ public sealed partial class DenReader
         var cutOff = false;
         if (fieldName is null)
         {
-            var hits = index.Search(query, cap + 1, metFirstAt);
+            // As of a position, a known_as name isn't searched (format.md F-VIEW-7): this path
+            // can't tell which of them readers know, so the Reader's search is the one that does.
+            var hits = index.Search(query, cap + 1, metFirstAt, withKnownAs: asOf is null);
             cutOff = hits.Count > cap;
             var paths = hits.Select(h => h.EntityPath).Distinct().ToList();
             var entities = db.Entities.Where(e => paths.Contains(e.Path)).ToList().ToDictionary(e => e.Path, StringComparer.Ordinal);
@@ -361,7 +370,7 @@ public sealed partial class DenReader
         if (metFirstAt is not null || (views.Count <= limit && !cutOff))
         {
             var met = metView?.Entities.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
-            var search = new FieldSearch(index, SearchWords.Parse(query), universeId, fieldName, met);
+            var search = new FieldSearch(index, SearchWords.Parse(query), universeId, fieldName, met, knownAt: asOf is null ? null : index.PointOf(one!.Key, asOf));
             var candidates = view is null
                 ? search.AllValues(e => (types is null || types.Contains(e.Type)) && (status is null || e.Status == status) && (kept is null || kept.Contains(e.Path)))
                 : search.ValuesIn(view, e => (types is null || types.Contains(e.Type)) && (status is null || e.Status == status));
@@ -476,11 +485,79 @@ public sealed partial class DenReader
     /// <summary>What a reader at <paramref name="position"/> has reached, in universe <paramref name="universeKey"/>.</summary>
     public static StoryHorizon Horizon(DenIndex index, string universeKey, string position)
     {
+        ArgumentNullException.ThrowIfNull(index);
         var db = index.Context;
+        var at = index.PointOf(universeKey, position);
+        var universeId = db.Containers.Single(c => c.Kind == "universe" && c.Key == universeKey).Id;
         return new StoryHorizon(
             db.PositionFields.Select(p => new { p.TypeKey, p.Field }).AsEnumerable().Select(p => (p.TypeKey, p.Field)).ToHashSet(),
             CanonQuery.PointsOf(db, universeKey),
-            index.PointOf(universeKey, position));
+            at)
+        {
+            Names = KnownNames(db, universeId, at),
+            LaterNameLinks = LaterNameLinks(db, universeId, at),
+        };
+    }
+
+    /// <summary>For each note of the universe with other names readers know at <paramref name="at"/>, those names in order (format.md F-VIEW-7).</summary>
+    private static Dictionary<string, IReadOnlyList<string>> KnownNames(IndexDbContext db, int universeId, long at)
+    {
+        var rows = (
+            from a in db.Aliases.KnownAt(at)
+            join e in db.Entities on a.EntityId equals e.Id
+            where e.UniverseId == universeId
+            select new { e.Path, a.Order, a.Alias }).ToList();
+        return rows.GroupBy(r => r.Path, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => (IReadOnlyList<string>)g.OrderBy(r => r.Order).Select(r => r.Alias).ToList(), StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    /// Each link in a note of the universe that's written by a name readers learn after
+    /// <paramref name="at"/> (format.md F-VIEW-7), as it reads there: the note's name for
+    /// its target, or its file name or id if the name can't be a link's target, the label
+    /// kept, and the heading only if readers know that section. In a den with no
+    /// <c>known_as</c>, the one query finds nothing.
+    /// </summary>
+    private static Dictionary<(string Path, string Text), string> LaterNameLinks(IndexDbContext db, int universeId, long at)
+    {
+        var links = db.Links
+            .Where(l => l.UniverseId == universeId && l.SourceEntityId != null && l.NameFromOrdinal != null && l.NameFromOrdinal > at)
+            .Select(l => new { l.Path, l.Text, l.TargetKey, l.TargetSection })
+            .ToList();
+        var rewritten = new Dictionary<(string, string), string>();
+        if (links.Count == 0)
+        {
+            return rewritten;
+        }
+
+        var keys = links.Select(l => l.TargetKey).OfType<string>().Distinct().ToList();
+        var targets = db.Entities.Where(e => e.UniverseId == universeId && keys.Contains(e.Key)).ToList()
+            .GroupBy(e => e.Key).ToDictionary(g => g.Key, g => g.OrderBy(e => e.Path, StringComparer.Ordinal).First());
+        var targetIds = targets.Values.Select(e => e.Id).ToList();
+        var sections = db.Sections.Where(s => targetIds.Contains(s.EntityId)).InEffectAt(at)
+            .Where(s => (s.Status == "draft" || s.Status == "canon") && !s.IsBookkeeping && s.LeftOutJson == null)
+            .Select(s => new { s.EntityId, s.Name }).ToList()
+            .Select(s => (s.EntityId, s.Name)).ToHashSet();
+        foreach (var link in links)
+        {
+            if (link.TargetKey is not { } key || !targets.TryGetValue(key, out var target))
+            {
+                continue;
+            }
+
+            var name = UsableTarget(target.Name) ?? target.Slug ?? target.Ulid;
+            var met = target.Status is "draft" or "canon" && target.FromOrdinal <= at;
+            var keepHeading = met && link.TargetSection is { } section && sections.Contains((target.Id, section));
+            if (name is not null && Wolfden.Core.Links.LinkSyntax.Retargeted(link.Text, name, keepHeading) is { } text)
+            {
+                rewritten.TryAdd((link.Path, link.Text), text);
+            }
+        }
+
+        return rewritten;
+
+        static string? UsableTarget(string name) =>
+            name.Trim().Length > 0 && name.IndexOfAny(['[', ']', '|', '#', '\r', '\n']) < 0 && !name.Contains('\\', StringComparison.Ordinal) ? name.Trim() : null;
     }
 
     /// <summary>Refuses an entity name that's missing or blank.</summary>
@@ -531,9 +608,12 @@ public sealed partial class DenReader
         // With a position, the name is matched, tier by tier, among the
         // entities the reader has met by then: an entity met later can't
         // shadow one met already, tie with it, or show in an error.
+        // A name readers learn later doesn't match in either step, so it isn't told
+        // from a made-up name: in_view false would confirm the note has it (F-VIEW-7).
         var found = CanonView(index, u.Key, asOf, null);
         view = found;
-        var met = Match(index, u.Id, name, found.Entities.Select(x => x.Path).ToHashSet(StringComparer.Ordinal));
+        var at = index.PointOf(u.Key, asOf);
+        var met = Match(index, u.Id, name, found.Entities.Select(x => x.Path).ToHashSet(StringComparer.Ordinal), at);
         if (met.Count > 1)
         {
             throw Ambiguous(entity, met, universes, scopes, Words);
@@ -542,7 +622,7 @@ public sealed partial class DenReader
         if (met.Count == 0)
         {
             // Matching every entity only tells "not met yet" from "no such entity".
-            if (Match(index, u.Id, name, null).Count == 0)
+            if (Match(index, u.Id, name, null, at).Count == 0)
             {
                 throw UnknownOrLeftOut(db, u, entity, asOf);
             }
@@ -660,8 +740,8 @@ public sealed partial class DenReader
     /// <remarks>
     /// The editors don't give <paramref name="asOf"/>: an editing surface
     /// shows everything (#28). With it, only the notes the reader has met by
-    /// then are looked at (#26). Aliases aren't positional (format.md §9.5),
-    /// so a met note matches by any of them.
+    /// then are looked at (#26), by the names readers know there (format.md
+    /// F-VIEW-7): every plain alias, and a <c>known_as</c> name from its <c>from</c>.
     /// </remarks>
     public LookupResult LookupEntities(
         string query, string? universe = null, IReadOnlyList<string>? types = null, string? asOf = null, int limit = 20)
@@ -692,13 +772,15 @@ public sealed partial class DenReader
             }
 
             var met = asOf is null ? null : CanonView(index, u.Key, asOf, null).Entities.Select(e => e.Path).ToHashSet(StringComparer.Ordinal);
+            long? at = asOf is null ? null : index.PointOf(u.Key, asOf);
             var all = db.Entities.Where(e => e.UniverseId == u.Id).ToList();
             var entities = all
                 .Where(e => matching is null || matching.Contains(e.Type))
                 .Where(e => met is null || met.Contains(e.Path))
                 .ToList();
             var allIds = all.Select(e => e.Id).ToList();
-            var aliasRows = db.Aliases.Where(a => allIds.Contains(a.EntityId)).ToList();
+            // As of a position, a name readers learn later isn't one (F-VIEW-7): it doesn't match, rank, or reach.
+            var aliasRows = db.Aliases.Where(a => allIds.Contains(a.EntityId)).ToList().Where(a => at is not { } p || a.IsKnownAt(p)).ToList();
             var aliases = aliasRows.OrderBy(a => a.Order).ToLookup(a => a.EntityId, a => a.Alias);
             var resolvable = aliasRows.Select(a => (a.EntityId, a.AliasNormalized)).ToList();
 
@@ -918,12 +1000,28 @@ public sealed partial class DenReader
     }
 
     /// <summary>The canon view, with a bad filter or position as a <see cref="DenToolException"/>.</summary>
+    /// <remarks>
+    /// A position that can't be read names nothing past what was asked for (#67, option C):
+    /// a book key can be a spoiler in itself. A book the universe doesn't have names no
+    /// other, and a real book with a chapter it doesn't have gives that book's chapters.
+    /// With <see cref="ListBooksAtABadPosition"/>, for the writer's own views, the message lists every
+    /// book in story order instead, as typing help.
+    /// </remarks>
     public CanonView CanonView(DenIndex index, string universeKey, string? position, CanonFilter? filter)
     {
+        var listBooks = ListBooksAtABadPosition;
         ArgumentNullException.ThrowIfNull(index);
         var db = index.Context;
         var universe = db.Containers.Single(c => c.Kind == "universe" && c.Key == universeKey);
-        CheckFilter(db, universe, filter, Words);
+        if (position is not null && !listBooks)
+        {
+            CheckFilterNamingNothing(db, universe, filter);
+        }
+        else
+        {
+            CheckFilter(db, universe, filter, Words);
+        }
+
         try
         {
             return index.CanonAsOf(universeKey, position, filter);
@@ -931,11 +1029,37 @@ public sealed partial class DenReader
         catch (CanonViewException e)
         {
             var books = db.Containers.Where(c => c.UniverseId == universe.Id && c.Kind == "book").ToList()
-                .OrderBy(c => c.StartOrdinal).Select(c => c.Key).ToList();
+                .OrderBy(c => c.StartOrdinal).ToList();
+            var syntax = $" A position is 'book:chapter', such as '{books.FirstOrDefault()?.Key ?? "book"}:1', or a bare book key for the start of that book.";
+            if (listBooks)
+            {
+                throw new DenToolException(
+                    ToolErrorCodes.BadPosition,
+                    $"{e.Message}{syntax}" + (books.Count == 0 ? "" : $" Books of universe '{universeKey}' in story order: {string.Join(", ", books.Select(b => b.Key))}."));
+            }
+
+            if (position is null || !Wolfden.Core.Positions.StoryPosition.TryParse(position, out var parsed, out _))
+            {
+                throw new DenToolException(ToolErrorCodes.BadPosition, $"{e.Message}{syntax}");
+            }
+
+            var named = books.Where(b => b.Key == parsed.BookKey).ToList();
+            if (named.Count != 1)
+            {
+                // A key two books share (F-KEY-5) names only that key.
+                throw new DenToolException(ToolErrorCodes.BadPosition, named.Count == 0 ? $"There's no book '{parsed.BookKey}' here." : e.Message);
+            }
+
+            var book = named[0];
+            var chapters = db.Chapters.Where(c => c.BookId == book.Id).OrderBy(c => c.Index).Select(c => c.Key).ToList();
             throw new DenToolException(
                 ToolErrorCodes.BadPosition,
-                $"{e.Message} A position is 'book:chapter', such as '{books.FirstOrDefault() ?? "book"}:1', or a bare book key for the start of that book." +
-                (books.Count == 0 ? "" : $" Books of universe '{universeKey}' in story order: {string.Join(", ", books)}."));
+                $"{e.Message} " + chapters.Count switch
+                {
+                    0 => $"It has no chapters yet, so give the bare book key '{book.Key}' for its start.",
+                    1 => $"Its only chapter is '{chapters[0]}'.",
+                    _ => $"{book.Key} has chapters {chapters[0]}\u2013{chapters[^1]}.",
+                });
         }
     }
 
@@ -1023,9 +1147,10 @@ public sealed partial class DenReader
     /// The entities <paramref name="name"/> names in the given universes: an
     /// exact key or path first, then as a link would (<see cref="DenIndex.MatchEntities"/>).
     /// With <paramref name="amongPaths"/>, only those entities take part in
-    /// either step.
+    /// either step. With <paramref name="knownAt"/>, only the names readers know
+    /// there (format.md F-VIEW-7): a <c>known_as</c> name they learn later matches nothing.
     /// </summary>
-    public static List<EntityRecord> Match(DenIndex index, int universeId, string name, IReadOnlySet<string>? amongPaths)
+    public static List<EntityRecord> Match(DenIndex index, int universeId, string name, IReadOnlySet<string>? amongPaths, long? knownAt = null)
     {
         ArgumentNullException.ThrowIfNull(index);
         ArgumentNullException.ThrowIfNull(name);
@@ -1040,7 +1165,7 @@ public sealed partial class DenReader
             return exact.OrderBy(e => e.Path, StringComparer.Ordinal).ToList();
         }
 
-        return index.MatchEntities(universeId, name, amongPaths).ToList();
+        return index.MatchEntities(universeId, name, amongPaths, knownAt).ToList();
     }
 
     /// <summary>An <c>unknown_entity</c> error for <paramref name="name"/> in <paramref name="universe"/>.</summary>
@@ -1160,7 +1285,9 @@ public sealed partial class DenReader
     private static EntityView FullView(
         IndexDbContext db, EntityRecord e, Dictionary<int, string> universes, Dictionary<int, ContainerRecord> scopes)
     {
-        var aliases = db.Aliases.Where(a => a.EntityId == e.Id).OrderBy(a => a.Order).Select(a => a.Alias).ToList();
+        var names = db.Aliases.Where(a => a.EntityId == e.Id).OrderBy(a => a.Order).ToList();
+        var aliases = names.Where(a => !a.IsKnownAs).Select(a => a.Alias).ToList();
+        var knownAs = names.Where(a => a.IsKnownAs).Select(a => new KnownNameView(a.Alias, a.FromText)).ToList();
         var fields = db.FieldValues.Where(v => v.EntityId == e.Id).ToList()
             .OrderBy(v => v.FieldOrder).ThenBy(v => v.EntryIndex ?? -1)
             .Select(v => new FieldView(
@@ -1181,7 +1308,7 @@ public sealed partial class DenReader
         var summary = Summary(e, universes, scopes);
         return new EntityView(
             summary.Key, summary.Id, summary.Name, summary.Type, summary.Status, summary.Universe, summary.ScopeKind, summary.ScopeKey, summary.Path,
-            summary.From, aliases, Text(e.Lead), pinned, fields, sections);
+            summary.From, aliases, Text(e.Lead), pinned, fields, sections, KnownAs: knownAs.Count == 0 ? null : knownAs);
     }
 
     private static EntityView CanonEntityView(CanonEntity e, string universe, bool includeContent) => new(

@@ -754,7 +754,9 @@ need a type (F-LAY-6, F-FLD-2, F-FLD-3, F-SEC-5) are skipped for it.
 entity has no aliases, the same as leaving the key out, with no
 diagnostic. That's what a writer leaves behind after removing the last
 alias from a block list (F-RT-6). Any other shape, including a single
-string, is an [error].
+string, is an [error]. An alias isn't positional: readers know it wherever
+they know the entity (F-VIEW-7). A name readers learn partway through the
+story goes in `known_as` (F-ENT-10).
 
 **F-ENT-5.** `status` is optional and defaults to `draft`, so nothing
 counts as settled until the writer says so: an unmarked note still shows in
@@ -796,6 +798,45 @@ use `status` for material that leaves canon.
 **F-ENT-9.** Other top-level keys are kept and ignored, with no diagnostic.
 Keys a writer invents SHOULD start with `x-`. Future format versions won't
 define top-level keys with that prefix.
+
+**F-ENT-10.** `known_as` is an optional list of the names readers learn
+partway through the story, each with where they learn it:
+
+```yaml
+name: The Courier
+aliases: [the Messenger]
+known_as:
+  - { value: Mara Voss, from: "ember:38" }
+```
+
+- It's a list of entries, or a single entry. A null `known_as` or an empty
+  list means none, with no diagnostic.
+- An entry is a mapping with `value`, the name, one line of non-empty text,
+  and `from`, a position (§8) where readers learn it. A `value` that's
+  missing, empty, more than one line, or not a string is an [error], and so
+  is an item that's a list or a null. Any other key is a [warning], and is
+  kept and ignored.
+- **It fails closed.** An entry with no `from`, or a `from` that doesn't
+  resolve (F-POS-4), is a [warning], and the name isn't known at any
+  position. A malformed `from` is an [error] (F-POS-3). A plain string item
+  is a [warning] and reads as an entry with no `from`: a name readers know
+  wherever the entity is goes in `aliases`.
+- The same text, under F-LINK-4, in `known_as` and in `aliases` is a
+  [warning], and the `known_as` entry counts, since hiding is the safe
+  reading. The same text as the entity's own `name` is a [warning], and the
+  entry has no effect, since a name can't be hidden. The same text twice in
+  `known_as` is a [warning], and the entry with the earliest `from` counts.
+- A `from` earlier than the entity's own entry (F-ENT-6) has no further
+  effect, with no diagnostic: readers don't know the entity before they meet it.
+- Each value is a name links reach the entity by, in the alias tier
+  (F-LINK-6), at every position. Which names a view at a position knows is
+  F-VIEW-7.
+- Any type takes it, an untyped entity too. There's no `until`: readers who
+  have learned a name don't unlearn it.
+
+Each spelling a writer uses is its own entry, with its own `from`, since
+links don't fold accents (F-LINK-4): `[[Zoe Ark]]` doesn't reach a note
+that lists only `Zoë Ark`.
 
 ### 7.2 Field values
 
@@ -1336,7 +1377,8 @@ entity it shows the lead, each field's value at `p` from its live entries
 except bookkeeping sections (F-SEC-12). Facts whose positions don't
 resolve are left out (F-POS-4), and so are sections an error leaves out
 (F-GEN-2), which the view doesn't mention. `p` MAY be omitted, which means the end of
-the story: all canon so far.
+the story: all canon so far. Which of an entity's names a view knows is
+F-VIEW-7.
 
 A view MAY be **filtered** to a series or book `S` of `U`. It then covers
 only the entities filed in `S`'s scope chain (§1.4) and in the scopes
@@ -1423,6 +1465,31 @@ A field's value isn't markdown, so a `<!--` in one is text. YAML comments aren't
 in any view. A write based on such a read isn't refused, since the file's hash is
 the same, so an assistant MUST read without a position before replacing text.
 
+**F-VIEW-7.** A name is **known** at `p` if its entity is in the canon view at
+`p` (F-VIEW-1) and the name is the entity's `name`, one of its `aliases`
+(F-ENT-4), or a `known_as` value (F-ENT-10) whose `from` resolves and isn't
+after `p`. An AI assistant's read at a position and the web UI's Reader's view
+MUST treat a name that isn't known as no name at all, and don't say they did:
+
+- Looking an entity up by it fails as for a name no entity has, not as for an
+  entity the reader hasn't met, since that would confirm the entity has the
+  name. It can't tie with another entity's name, or be listed as a candidate.
+- A read lists the names known at `p` other than the `name`, as plain strings
+  with no `from`, so a name learned partway through reads like one known all
+  along, and a search finds the entity by them. A name not known isn't
+  listed, and a search doesn't find it.
+- A link written by a name that isn't known at `p` (it resolves by it, F-LINK-6)
+  reads as if written by the entity's `name`: `[[Mara Voss]]` reads
+  `[[The Courier]]`, a label is kept, and a `#heading` is kept only if the
+  reader knows that section. If the `name` can't be a link's target (it holds
+  `[`, `]`, `|`, `#`, or a line break), the slug, or else the `id`, is used.
+  This is text changed for the reader, like F-VIEW-6, so the same caution
+  holds: read without a position before replacing text. Link resolution
+  doesn't change: the link still reaches the entity, at every position.
+
+A view without a position, and a view for the writer, keep every name, and the
+writer's full view lists `known_as` with each `from`.
+
 ### 9.5 Keeping reveals in place
 
 This section has no rules. It describes how to write notes whose
@@ -1455,9 +1522,19 @@ text, or a link to something that entered canon earlier but says
 something new about it, gets no warning, so read summary prose for
 reveals as well as links.
 
-Aliases (F-ENT-4) aren't positional: they hold for the whole story, so
-looking up a hidden identity's alias, as a link or a lookup by name does,
-finds the entity at any position and can confirm the reveal.
+A name readers learn partway through the story goes in `known_as` (F-ENT-10),
+not `aliases`. An alias (F-ENT-4) isn't positional: it holds for the whole
+story, so a read at any position lists it, and finds the entity by it. A
+`known_as` name is known only from its `from` (F-VIEW-7): before that, looking
+it up finds nothing, a read doesn't list it, and a link written by it reads as
+the entity's name. A note whose real name is the reveal can be filed under
+the name readers first know it by, such as `name: The man in the grey coat`,
+with the real name in `known_as`, and its file name SHOULD come from that
+`name` too, since a file name shows in every read.
+
+`known_as` hides a name, not prose. The same name written as plain text in a
+section that readers reach first still shows there, so read summary prose for
+it as for any other reveal.
 
 ## 10. Links
 
@@ -1484,7 +1561,7 @@ A `[[` preceded by a backslash isn't a link. In frontmatter, links are
 recognized in every string under an entity's `fields` (including list
 items and temporal `value`s), under a chapter item's `fields` in
 `book.md`, and under a container's `chapter_defaults` (types.md §8), and
-nowhere else (not in `name`, `aliases`, or `x-` keys).
+nowhere else (not in `name`, `aliases`, `known_as`, or `x-` keys).
 
 **F-LINK-2.** `![[...]]` (an Obsidian embed) isn't a link in v0. It's left
 as text, with no diagnostic.
@@ -1494,7 +1571,7 @@ empty target (`[[]]`, `[[ |Tarrow]]`) is a [warning] and isn't a link.
 
 ### 10.2 Resolution
 
-**F-LINK-4.** Targets match slugs, names, and aliases, and headings match
+**F-LINK-4.** Targets match slugs, names, aliases, and `known_as` values, and headings match
 section names, after this normalization of both sides: NFC (F-ENC-5), trim,
 collapse each run of whitespace to one space, Unicode default case folding,
 then each apostrophe made one character. The apostrophes are those a key drops
@@ -1515,7 +1592,8 @@ one with any match:
 1. **id:** the target is a ULID (F-ID-1) equal to an entity's `id`.
 2. **slug:** the target matches an entity's slug.
 3. **name:** the target matches an entity's `name`.
-4. **alias:** the target matches one of an entity's `aliases`.
+4. **alias:** the target matches one of an entity's `aliases`, or a
+   `known_as` value (F-ENT-10), at every position.
 
 **F-LINK-7.** If the winning tier has one match, the link resolves to it.
 If it has several, the match in the nearest scope of the linking file's
@@ -1571,6 +1649,13 @@ error leaves out (F-GEN-2) aren't checked.
 A link whose target enters canon after the link's position is a [warning],
 since it's usually a spoiler or a mistake (design.md §7). Links with no
 position, or whose position is the start of the story, aren't checked.
+
+A link that resolved by a `known_as` value (F-ENT-10) whose `from` is later
+than the target's entry is checked against that `from` instead: it's a
+[warning] if the name's `from` is after the link's position, and this holds
+at the start of the story too, since a link with no `from` of its own shows
+the name at every position. A link with a label isn't checked this way,
+since nothing shows its target.
 A link in `chapter_defaults` that runs ahead of several chapters is one
 warning that names them (types.md F-CHAP-4).
 

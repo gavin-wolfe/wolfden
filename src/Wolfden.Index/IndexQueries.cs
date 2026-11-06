@@ -43,6 +43,24 @@ public static class IndexQueries
             : sections.Where(s => s.FromOrdinal <= point && point < s.UntilOrdinal);
     }
 
+    /// <summary>
+    /// The names a reader at <paramref name="point"/> knows (format.md F-VIEW-7): every
+    /// plain alias, and each <c>known_as</c> entry whose <c>from</c> resolves at or
+    /// before it. Whether the entity itself is in view is the caller's to ask.
+    /// </summary>
+    public static IQueryable<AliasRecord> KnownAt(this IQueryable<AliasRecord> names, long point)
+    {
+        ArgumentNullException.ThrowIfNull(names);
+        return names.Where(a => !a.IsKnownAs || a.FromOrdinal <= point);
+    }
+
+    /// <summary><see cref="KnownAt(IQueryable{AliasRecord}, long)"/> for one row already read.</summary>
+    public static bool IsKnownAt(this AliasRecord name, long point)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        return !name.IsKnownAs || name.FromOrdinal <= point;
+    }
+
     /// <summary>The entities that have entered canon by <paramref name="point"/> (F-ENT-6). It doesn't filter on status.</summary>
     public static IQueryable<EntityRecord> EnteredBy(this IQueryable<EntityRecord> entities, long point)
     {

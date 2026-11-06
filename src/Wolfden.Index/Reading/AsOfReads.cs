@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Wolfden.Core.Documents;
 
 namespace Wolfden.Index.Reading;
@@ -9,7 +10,9 @@ namespace Wolfden.Index.Reading;
 /// values of position fields later than the position (F-VIEW-5, #305), and the
 /// HTML comments in a lead or section (F-VIEW-6, #306). Each can say what the
 /// reader doesn't know yet, such as when a thread pays off, and an assistant
-/// drafting that chapter could write toward it.
+/// drafting that chapter could write toward it. It also lists the names readers
+/// know there in <c>aliases</c>, and reads a link written by a name they learn
+/// later as if written by the note's name (F-VIEW-7, #67).
 /// </summary>
 /// <remarks>
 /// A fact past its <c>until</c> isn't in a view at that position (ranges are
@@ -39,11 +42,16 @@ public static class AsOfReads
         }
 
         var at = Required(horizon);
+        var paths = result.Entities.GroupBy(e => e.Key, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First().Path, StringComparer.Ordinal);
         return result with
         {
             // An entity left with nothing pinned isn't listed: an empty entry would say something was left out.
             Pinned = result.Pinned
-                .Select(p => p with { Fields = AsKnown(p.Fields, p.Type, null, at), Sections = AsKnown(p.Sections) })
+                .Select(p => p with
+                {
+                    Fields = AsKnown(p.Fields, p.Type, null, at, paths.GetValueOrDefault(p.Key)),
+                    Sections = AsKnown(p.Sections, at, paths.GetValueOrDefault(p.Key)),
+                })
                 .Where(p => p.Fields.Count > 0 || p.Sections.Count > 0)
                 .ToList(),
             Entities = result.Entities.Select(e => AsKnown(e, at)).ToList(),
@@ -61,26 +69,35 @@ public static class AsOfReads
     private static StoryHorizon Required(StoryHorizon? horizon) =>
         horizon ?? throw new InvalidOperationException("A read at a position comes with its horizon.");
 
+    /// <remarks>
+    /// The names readers know are listed only with the entity's content: a brief view,
+    /// like a list, has none of it. They're plain strings, with no <c>from</c>, so a name
+    /// learned partway through reads like one known all along (D3 on #67).
+    /// </remarks>
     private static EntityView AsKnown(EntityView entity, StoryHorizon at) => entity with
     {
-        Lead = entity.Lead is { } lead ? MarkdownComments.Strip(lead) : null,
-        Pinned = entity.Pinned is { } pinned ? new PinnedFacts(AsKnown(pinned.Fields, entity.Type, entity.Status, at), AsKnown(pinned.Sections)) : null,
-        Fields = entity.Fields is { } fields ? AsKnown(fields, entity.Type, entity.Status, at) : null,
-        Sections = entity.Sections is { } sections ? AsKnown(sections) : null,
+        Aliases = entity.Fields is null ? null : at.NamesOf(entity.Path),
+        Lead = entity.Lead is { } lead ? at.LinksAsKnown(entity.Path, MarkdownComments.Strip(lead), markdown: true) : null,
+        Pinned = entity.Pinned is { } pinned
+            ? new PinnedFacts(AsKnown(pinned.Fields, entity.Type, entity.Status, at, entity.Path), AsKnown(pinned.Sections, at, entity.Path))
+            : null,
+        Fields = entity.Fields is { } fields ? AsKnown(fields, entity.Type, entity.Status, at, entity.Path) : null,
+        Sections = entity.Sections is { } sections ? AsKnown(sections, at, entity.Path) : null,
     };
 
     /// <param name="fields">The fields.</param>
     /// <param name="type">The entity's type.</param>
     /// <param name="status">The entity's status, or null where every field is pinned (F-VIEW-2).</param>
     /// <param name="at">The position.</param>
-    private static List<FieldView> AsKnown(IReadOnlyList<FieldView> fields, string type, string? status, StoryHorizon at)
+    /// <param name="path">The entity's file, whose links are read as known there; null to leave them as written.</param>
+    private static List<FieldView> AsKnown(IReadOnlyList<FieldView> fields, string type, string? status, StoryHorizon at, string? path)
     {
         var known = new List<FieldView>(fields.Count);
         foreach (var field in fields)
         {
             if (!at.IsPositionField(type, field.Name))
             {
-                known.Add(WithoutUntil(field, status));
+                known.Add(WithLinksAsKnown(WithoutUntil(field, status), at, path));
             }
             else if (Reached(field.Value, at) is { } value)
             {
@@ -89,6 +106,38 @@ public static class AsOfReads
         }
 
         return known;
+    }
+
+    /// <summary>A field whose value's strings have each link written by a later name written by the note's name (F-VIEW-7).</summary>
+    private static FieldView WithLinksAsKnown(FieldView field, StoryHorizon at, string? path)
+    {
+        if (path is null || field.Kind == "default" || !field.Value.GetRawText().Contains("[[", StringComparison.Ordinal))
+        {
+            return field;
+        }
+
+        return field with { Value = JsonSerializer.SerializeToElement(Rewrite(JsonNode.Parse(field.Value.GetRawText()))) };
+
+        JsonNode? Rewrite(JsonNode? node)
+        {
+            switch (node)
+            {
+                case JsonValue value when value.TryGetValue<string>(out var text):
+                    return JsonValue.Create(at.LinksAsKnown(path, text, markdown: false));
+                case JsonArray array:
+                    return new JsonArray(array.Select(item => Rewrite(item?.DeepClone())).ToArray());
+                case JsonObject map:
+                    var copy = new JsonObject();
+                    foreach (var (name, item) in map)
+                    {
+                        copy[name] = Rewrite(item?.DeepClone());
+                    }
+
+                    return copy;
+                default:
+                    return node?.DeepClone();
+            }
+        }
     }
 
     /// <summary>
@@ -129,13 +178,16 @@ public static class AsOfReads
     /// Sections with no <c>until</c> and no HTML comments. A comment in the middle of
     /// a heading is part of the name F-SEC-3 gives it, so it goes from there too.
     /// </summary>
-    private static List<SectionView> AsKnown(IReadOnlyList<SectionView> sections) => sections
+    private static List<SectionView> AsKnown(IReadOnlyList<SectionView> sections, StoryHorizon at, string? path) => sections
         .Select(s => s with
         {
-            Name = MarkdownComments.Strip(s.Name),
-            HeadingPath = s.HeadingPath.Select(MarkdownComments.Strip).ToList(),
+            Name = Known(s.Name, at, path),
+            HeadingPath = s.HeadingPath.Select(h => Known(h, at, path)).ToList(),
             Until = null,
-            Body = MarkdownComments.Strip(s.Body),
+            Body = Known(s.Body, at, path),
         })
         .ToList();
+
+    private static string Known(string text, StoryHorizon at, string? path) =>
+        path is null ? MarkdownComments.Strip(text) : at.LinksAsKnown(path, MarkdownComments.Strip(text), markdown: true);
 }

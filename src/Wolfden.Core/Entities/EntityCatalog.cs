@@ -421,6 +421,8 @@ public sealed partial class EntityCatalog
                 break;
         }
 
+        var knownAs = ReadKnownAs(fm["known_as"], Error, diagnostics);
+
         var status = FactStatus.Draft;
         switch (fm["status"])
         {
@@ -460,6 +462,7 @@ public sealed partial class EntityCatalog
 
             keys.AddRange(new[] { slug, fm["name"] is YamlScalar { IsNull: false } rawName ? rawName.Text : null }
                 .Concat((fm["aliases"] as YamlSequence)?.Items.OfType<YamlScalar>().Where(a => !a.IsNull).Select(a => a.Text) ?? [])
+                .Concat(knownAs.Select(k => k.Value))
                 .Where(k => !string.IsNullOrWhiteSpace(k))
                 .Select(k => Links.LinkText.Normalize(k!)));
             excluded.Add(new ExcludedEntity(path, scope.Universe, keys));
@@ -474,10 +477,124 @@ public sealed partial class EntityCatalog
             fromResolution = scope.Universe.Resolve(from);
         }
 
-        return new CatalogEntity(path, file, scope, id, slug, name!, aliases, type!, status, from, fromResolution)
+        var known = Settle(knownAs, name!, aliases, scope.Universe, diagnostics);
+        return new CatalogEntity(path, file, scope, id, slug, name!, aliases, type!, status, from, fromResolution, known)
         {
             Definition = scope.Universe.Den.Types.Find(type!),
         };
+    }
+
+    /// <summary>A <c>known_as</c> entry as read, before its <c>from</c> is resolved.</summary>
+    private sealed record KnownEntry(string Value, StoryPosition? From, int Line);
+
+    /// <summary>The keys a <c>known_as</c> entry has a meaning for (F-ENT-10).</summary>
+    private static readonly string[] KnownAsKeys = ["value", "from"];
+
+    /// <summary>
+    /// F-ENT-10: <c>known_as</c> is a list of entries, or a single entry, each a
+    /// name and the <c>from</c> where readers learn it. A value that isn't one line
+    /// of text is an error. The rest fails closed, with a warning: an entry with no
+    /// <c>from</c>, or a plain string, is a name no read at a position knows.
+    /// </summary>
+    private static List<KnownEntry> ReadKnownAs(YamlNode? node, Action<string, int, string> error, List<Diagnostic> diagnostics)
+    {
+        var entries = new List<KnownEntry>();
+        void Warn(int line, string message) => diagnostics.Add(new Diagnostic("F-ENT-10", DiagnosticSeverity.Warning, line, message));
+
+        IReadOnlyList<YamlNode> items = node switch
+        {
+            null or YamlScalar { IsNull: true } => [],
+            YamlSequence list => list.Items,
+            _ => [node],
+        };
+        foreach (var item in items)
+        {
+            switch (item)
+            {
+                case YamlScalar { IsNull: false } plain when IsOneLine(plain.Text):
+                    Warn(plain.Line,
+                        $"known_as: '{plain.Text}' has no from, so no read at a story position knows it. Write it as {{ value: {plain.Text}, from: \"book:chapter\" }}, or move it to aliases if readers know it wherever the note is.");
+                    entries.Add(new KnownEntry(plain.Text, null, plain.Line));
+                    break;
+                case YamlMapping entry:
+                    if (entry["value"] is not YamlScalar { IsNull: false } value || !IsOneLine(value.Text))
+                    {
+                        error("F-ENT-10", (entry["value"] ?? entry).Line, "Each known_as entry needs a value: the name, as one line of text, such as { value: Mara Voss, from: \"ember:38\" }.");
+                        break;
+                    }
+
+                    foreach (var other in entry.Entries.Where(e => e.KeyText is not { } key || !KnownAsKeys.Contains(key)))
+                    {
+                        Warn(other.Key.Line, $"known_as: '{other.KeyText}' isn't a key a known_as entry has, so it's kept and ignored. An entry has a value and a from.");
+                    }
+
+                    StoryPosition? from = null;
+                    if (entry["from"] is YamlScalar { IsNull: false } f && StoryPosition.TryParse(f.Text, out var parsed, out _))
+                    {
+                        from = parsed;
+                    }
+                    else if (entry["from"] is null or YamlScalar { IsNull: true })
+                    {
+                        Warn(entry.Line, $"known_as: '{value.Text}' has no from, so no read at a story position knows it. Add where readers learn it, such as from: \"book:chapter\".");
+                    }
+
+                    // A from that doesn't parse is already an error (F-POS-3), from the position scan.
+                    entries.Add(new KnownEntry(value.Text, from, entry.Line));
+                    break;
+                default:
+                    error("F-ENT-10", item.Line, "known_as must be a list of entries, each a name and where readers learn it, such as '- { value: Mara Voss, from: \"ember:38\" }'.");
+                    break;
+            }
+        }
+
+        return entries;
+
+        static bool IsOneLine(string text) => text.Trim().Length > 0 && text.IndexOfAny(['\r', '\n']) < 0;
+    }
+
+    /// <summary>
+    /// The <c>known_as</c> entries that count (F-ENT-10), each with its <c>from</c>
+    /// resolved. A name that's also the entity's own <c>name</c> is a warning, and
+    /// the name wins, since a name can't be hidden. One that's also a plain alias is
+    /// a warning, and the entry wins, since hiding is the safe reading: the alias is
+    /// taken out of <paramref name="aliases"/>. The same name twice is a warning,
+    /// and the entry readers learn first wins.
+    /// </summary>
+    private static List<KnownName> Settle(List<KnownEntry> entries, string name, List<string> aliases, Universe universe, List<Diagnostic> diagnostics)
+    {
+        void Warn(int line, string message) => diagnostics.Add(new Diagnostic("F-ENT-10", DiagnosticSeverity.Warning, line, message));
+        var resolved = entries
+            .Select(e => new KnownName(e.Value, e.From, e.From is { } f ? universe.Resolve(f) : null, e.Line))
+            .ToList();
+        var kept = new List<KnownName>();
+        foreach (var group in resolved.GroupBy(k => Links.LinkText.Normalize(k.Value), StringComparer.Ordinal))
+        {
+            if (group.Key == Links.LinkText.Normalize(name))
+            {
+                foreach (var entry in group)
+                {
+                    Warn(entry.Line, $"known_as: '{entry.Value}' is the note's own name, which readers know wherever the note is, so this entry has no effect.");
+                }
+
+                continue;
+            }
+
+            // Readers learn it at the earliest from; one that doesn't resolve comes last.
+            var first = group.OrderBy(k => k.Point?.Ordinal ?? long.MaxValue).ThenBy(k => k.Line).First();
+            foreach (var entry in group.Where(k => !ReferenceEquals(k, first)))
+            {
+                Warn(entry.Line, $"known_as: '{entry.Value}' is listed more than once, so only the entry on line {first.Line} counts.");
+            }
+
+            if (aliases.RemoveAll(a => Links.LinkText.Normalize(a) == group.Key) > 0)
+            {
+                Warn(first.Line, $"known_as: '{first.Value}' is also in aliases, which would show it wherever the note is. The known_as entry counts, so the name is known only from its from; take it out of aliases.");
+            }
+
+            kept.Add(first);
+        }
+
+        return kept.OrderBy(k => k.Line).ToList();
     }
 
     /// <summary>F-ENT-7, F-FLD-1, F-TMP-1, F-TMP-2, and the status and pin of entries (F-STAT-1, F-PIN-1).</summary>

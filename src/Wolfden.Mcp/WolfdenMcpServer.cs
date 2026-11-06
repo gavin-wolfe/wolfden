@@ -30,6 +30,9 @@ public static class WolfdenMcpServer
         changes as the story goes on. A read at a position leaves out each fact's until, and a position field's values later than it
         (such as a thread's paid_off), which the reader doesn't know yet; a read without one (get_entity without as_of) has them, for
         planning ahead. It leaves out the writer's HTML comments too, since they can say anything; a read without a position has them, and any guidance they hold for you.
+        A note's known_as holds the names readers learn partway through, each with its from. At a position before that, the name isn't one: a lookup by it is
+        unknown_entity, a search doesn't find it, and a link written by it reads as if written by the note's name. Refer to a note by the names a read at the
+        position gives (name and aliases), never by one seen only in a read without a position.
         Read without as_of before changing a fact, so a change doesn't drop an until or a value you weren't shown. No tool here replaces a section's text. If you can edit a note's file
         another way, read it without as_of first, or rewriting text you read at a position deletes comments you never saw. Chapter keys come from get_chapter. A read at a position the universe doesn't
         have, or a write (create_entity, update_fields, append_section) that sets one as a from or until, or as a position field's

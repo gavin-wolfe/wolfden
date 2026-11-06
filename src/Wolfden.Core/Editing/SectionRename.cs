@@ -107,7 +107,7 @@ public static class SectionRename
                 return edited.WithSectionName(renamed, newName);
             });
 
-        var keys = new[] { entity.Slug, entity.Name }.Concat(entity.Aliases).Where(k => k is not null).Select(k => LinkText.Normalize(k!)).ToHashSet(StringComparer.Ordinal);
+        var keys = new[] { entity.Slug, entity.Name }.Concat(entity.AllAliases).Where(k => k is not null).Select(k => LinkText.Normalize(k!)).ToHashSet(StringComparer.Ordinal);
         var skipped = onlyApostrophes ? [] : LinkRewriter.Skipped(
             links, den, entity, (target, heading) => heading is { } h && LinkText.Matches(h, section.Name) && (target == entity.Id || keys.Contains(LinkText.Normalize(target))));
         return new SectionRenamePlan(result.Files, result.Originals, result.Count, result.Frozen, skipped);

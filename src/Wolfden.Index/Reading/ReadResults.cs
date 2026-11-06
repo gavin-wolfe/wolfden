@@ -248,16 +248,26 @@ public sealed record PinnedFacts(IReadOnlyList<FieldView> Fields, IReadOnlyList<
 /// <param name="ScopeKey">See <see cref="EntitySummary"/>.</param>
 /// <param name="Path">See <see cref="EntitySummary"/>.</param>
 /// <param name="From">See <see cref="EntitySummary"/>.</param>
-/// <param name="Aliases">Other names links can use; in the full view only.</param>
+/// <param name="Aliases">
+/// Other names links can use. In the full view, the plain aliases (F-ENT-4). At a position, every
+/// name readers know there (F-VIEW-7): the plain aliases and each <c>known_as</c> name they've
+/// reached, as plain strings. Left out of a brief view.
+/// </param>
 /// <param name="Lead">The text before the first section, title heading included.</param>
 /// <param name="Pinned">Pinned canon, ahead of the rest; also listed in place in <paramref name="Fields"/> and <paramref name="Sections"/>.</param>
 /// <param name="Fields">Field values, in frontmatter order.</param>
 /// <param name="Sections">Sections, in file order.</param>
 /// <param name="Hash">From <c>get_entity</c>, the SHA-256 of the file's bytes, in lowercase hex: the <c>expected_hash</c> a write tool takes.</param>
+/// <param name="KnownAs">In the full view, the names readers learn partway through the story (F-ENT-10), each with its <c>from</c>; null if it has none, and at a position.</param>
 public sealed record EntityView(
     string Key, string? Id, string Name, string Type, string Status, string Universe, string ScopeKind, string ScopeKey, string Path, string? From,
     IReadOnlyList<string>? Aliases, string? Lead, PinnedFacts? Pinned, IReadOnlyList<FieldView>? Fields, IReadOnlyList<SectionView>? Sections,
-    string? Hash = null);
+    string? Hash = null, IReadOnlyList<KnownNameView>? KnownAs = null);
+
+/// <summary>A name readers learn partway through the story (format.md F-ENT-10), in the full view.</summary>
+/// <param name="Value">The name as written.</param>
+/// <param name="From">Where readers learn it, as written, or null if the entry has none, so no read at a position knows it.</param>
+public sealed record KnownNameView(string Value, string? From);
 
 /// <summary>The pinned canon of one entity in a canon view.</summary>
 /// <param name="Key">The entity's key.</param>

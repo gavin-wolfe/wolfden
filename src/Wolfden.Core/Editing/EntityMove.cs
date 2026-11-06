@@ -160,7 +160,7 @@ public static class EntityMove
 
         var after = AfterMove(links, den, from, files);
         var frozen = result.Frozen.ToHashSet(StringComparer.Ordinal);
-        var keys = new[] { entity.Slug, entity.Name }.Concat(entity.Aliases).Where(k => k is not null).Select(k => LinkText.Normalize(k!)).ToHashSet(StringComparer.Ordinal);
+        var keys = new[] { entity.Slug, entity.Name }.Concat(entity.AllAliases).Where(k => k is not null).Select(k => LinkText.Normalize(k!)).ToHashSet(StringComparer.Ordinal);
         var skipped = LinkRewriter.Skipped(links, den, entity, (target, _) => target == entity.Id || keys.Contains(LinkText.Normalize(target)));
         var interim = interimEdit is null ? result.Files[from] : interimEdit(OwnLinks(entity.File)).ToBytes();
         return new EntityMovePlan(

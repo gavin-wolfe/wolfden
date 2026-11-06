@@ -23,6 +23,9 @@ public enum PositionSite
 
     /// <summary>The value of a field of type <c>position</c> (types.md F-FT-10).</summary>
     FieldValue,
+
+    /// <summary>The <c>from</c> of a <c>known_as</c> entry: where readers learn a name (format.md F-ENT-10).</summary>
+    KnownAsFrom,
 }
 
 /// <summary>A position written in a file, parsed but not yet resolved.</summary>
@@ -104,6 +107,14 @@ public static class PositionScanner
                 ReadBound(from, PositionSite.EntityFrom, null, references, diagnostics);
             }
 
+            foreach (var entry in KnownAsEntries(frontmatter["known_as"]))
+            {
+                if (entry["from"] is { } knownFrom)
+                {
+                    ReadBound(knownFrom, PositionSite.KnownAsFrom, null, references, diagnostics);
+                }
+            }
+
             if (frontmatter["fields"] is YamlMapping fields)
             {
                 foreach (var entry in fields.Entries)
@@ -145,6 +156,14 @@ public static class PositionScanner
 
         return new PositionScan(references, diagnostics, notPositions);
     }
+
+    /// <summary>The entries of a <c>known_as</c> (format.md F-ENT-10): a single entry, or the mappings of a list.</summary>
+    internal static IEnumerable<YamlMapping> KnownAsEntries(YamlNode? knownAs) => knownAs switch
+    {
+        YamlMapping single => [single],
+        YamlSequence list => list.Items.OfType<YamlMapping>(),
+        _ => [],
+    };
 
     private static void ScanField(
         string name, YamlNode value, bool isPositionField, List<PositionReference> references, List<Diagnostic> diagnostics, List<PositionReference> notPositions)

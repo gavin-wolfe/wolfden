@@ -217,7 +217,10 @@ public sealed class EntityRecord
     public int LeadLine { get; set; }
 }
 
-/// <summary>One of an entity's aliases (F-ENT-4).</summary>
+/// <summary>
+/// One of an entity's other names: a plain alias (F-ENT-4), or a name readers
+/// learn partway through the story, a <c>known_as</c> entry (F-ENT-10).
+/// </summary>
 public sealed class AliasRecord
 {
     /// <summary>Row id.</summary>
@@ -226,7 +229,7 @@ public sealed class AliasRecord
     /// <summary>The entity.</summary>
     public int EntityId { get; set; }
 
-    /// <summary>The 0-based place in <c>aliases</c>.</summary>
+    /// <summary>The 0-based place among the entity's names: <c>aliases</c> first, then <c>known_as</c>.</summary>
     public int Order { get; set; }
 
     /// <summary>The alias as written.</summary>
@@ -234,6 +237,19 @@ public sealed class AliasRecord
 
     /// <summary>The alias after F-LINK-4 normalization.</summary>
     public string AliasNormalized { get; set; } = "";
+
+    /// <summary>True for a <c>known_as</c> entry (F-ENT-10), false for a plain alias.</summary>
+    public bool IsKnownAs { get; set; }
+
+    /// <summary>For a <c>known_as</c> entry, its <c>from</c> as written, or null.</summary>
+    public string? FromText { get; set; }
+
+    /// <summary>
+    /// For a <c>known_as</c> entry, where readers learn the name, or null if they
+    /// never do (no <c>from</c>, or one that doesn't resolve). Null for a plain alias.
+    /// A read at a position knows the row by <see cref="IndexQueries.KnownAt"/>.
+    /// </summary>
+    public long? FromOrdinal { get; set; }
 }
 
 /// <summary>
@@ -509,6 +525,14 @@ public sealed class LinkRecord
     /// the earliest.
     /// </summary>
     public long? PositionOrdinal { get; set; }
+
+    /// <summary>
+    /// For a link that matched by a <c>known_as</c> value (F-ENT-10), where readers
+    /// learn that name, or <see cref="IndexQueries.EndOfStory"/> if they never do;
+    /// null for any other match. A read at an earlier position shows the link as
+    /// written by the note's name (F-VIEW-7).
+    /// </summary>
+    public long? NameFromOrdinal { get; set; }
 }
 
 /// <summary>A row of an outline table (format.md §11).</summary>

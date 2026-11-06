@@ -16,7 +16,8 @@ public sealed class CatalogEntity
     private readonly IReadOnlyList<string> _normalizedAliases;
 
     internal CatalogEntity(string path, MarkdownFile file, Container scope, string? id, string? slug, string name,
-        IReadOnlyList<string> aliases, string type, FactStatus status, StoryPosition? from, PositionResolution? fromResolution)
+        IReadOnlyList<string> aliases, string type, FactStatus status, StoryPosition? from, PositionResolution? fromResolution,
+        IReadOnlyList<KnownName>? knownAs = null)
     {
         Path = path;
         File = file;
@@ -31,7 +32,8 @@ public sealed class CatalogEntity
         FromResolution = fromResolution;
         NormalizedSlug = slug is null ? null : LinkText.Normalize(slug);
         NormalizedName = LinkText.Normalize(name);
-        _normalizedAliases = aliases.Select(LinkText.Normalize).ToList();
+        KnownAs = knownAs ?? [];
+        _normalizedAliases = aliases.Concat(KnownAs.Select(k => k.Value)).Select(LinkText.Normalize).ToList();
     }
 
     /// <summary>The file's path, relative to the den root, with <c>/</c>.</summary>
@@ -55,8 +57,31 @@ public sealed class CatalogEntity
     /// <summary>The name as written (F-ENT-3, F-YAML-5).</summary>
     public string Name { get; }
 
-    /// <summary>The aliases as written, in order (F-ENT-4).</summary>
+    /// <summary>The aliases as written, in order (F-ENT-4): the names readers know wherever the entity is.</summary>
     public IReadOnlyList<string> Aliases { get; }
+
+    /// <summary>
+    /// The names readers learn partway through the story (F-ENT-10), in order: a
+    /// link or a lookup reaches the entity by them as by an alias, and a read at a
+    /// position knows each one only from its <c>from</c> (F-VIEW-7).
+    /// </summary>
+    public IReadOnlyList<KnownName> KnownAs { get; }
+
+    /// <summary>Every name a link can reach the entity by in the alias tier (F-LINK-6): the aliases, then the <c>known_as</c> values.</summary>
+    public IEnumerable<string> AllAliases => Aliases.Concat(KnownAs.Select(k => k.Value));
+
+    /// <summary>The <c>known_as</c> entry whose value matches <paramref name="text"/> under F-LINK-4, or null.</summary>
+    public KnownName? KnownNameMatching(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        if (KnownAs.Count == 0)
+        {
+            return null;
+        }
+
+        var normalized = LinkText.Normalize(text);
+        return KnownAs.FirstOrDefault(k => LinkText.Normalize(k.Value) == normalized);
+    }
 
     /// <summary>The type key as written (F-ENT-2).</summary>
     public string Type { get; }
@@ -94,8 +119,30 @@ public sealed class CatalogEntity
 
     internal string NormalizedName { get; }
 
+    /// <summary>The aliases and <c>known_as</c> values, normalized (F-LINK-4): the alias tier of F-LINK-6.</summary>
     internal IReadOnlyList<string> NormalizedAliases => _normalizedAliases;
 
     /// <inheritdoc />
     public override string ToString() => $"{Name} ({Path})";
+}
+
+/// <summary>
+/// A name readers learn partway through the story: an entry of <c>known_as</c>
+/// (format.md F-ENT-10), such as <c>{ value: Mara Voss, from: "ember:38" }</c>.
+/// </summary>
+/// <param name="Value">The name as written.</param>
+/// <param name="From">The entry's <c>from</c>, or null if it has none.</param>
+/// <param name="FromResolution">Where <paramref name="From"/> resolves, or null if there's no <c>from</c>.</param>
+/// <param name="Line">The 1-based line of the entry in the file.</param>
+public sealed record KnownName(string Value, StoryPosition? From, PositionResolution? FromResolution, int Line)
+{
+    /// <summary>
+    /// Where readers learn the name, or null if they never do: the entry has no
+    /// <c>from</c>, or it doesn't resolve. Such an entry isn't live, so no read at a
+    /// position knows the name (F-ENT-10 fails closed).
+    /// </summary>
+    public StoryPoint? Point => FromResolution?.Resolved?.Point;
+
+    /// <summary>True if the entry has a <c>from</c> that resolves, so readers learn the name there.</summary>
+    public bool IsLive => Point is not null;
 }

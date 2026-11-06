@@ -427,7 +427,8 @@ internal sealed class IndexWriter
             Lead = lead,
             LeadLine = entity.File.LeadLine,
         });
-        search.Add(Search(path, -1, string.Join("\n", entity.Aliases.Prepend(entity.Name)), lead, "entity", id, null));
+        search.Add(Search(path, -1, string.Join("\n", entity.Aliases.Prepend(entity.Name)), lead, "entity", id, null)
+            with { Names = MarkedText.WithoutMarks(string.Join("\n", entity.KnownAs.Select(k => k.Value))) });
 
         for (var i = 0; i < entity.Aliases.Count; i++)
         {
@@ -438,6 +439,24 @@ internal sealed class IndexWriter
                 Order = i,
                 Alias = entity.Aliases[i],
                 AliasNormalized = LinkText.Normalize(entity.Aliases[i]),
+            });
+        }
+
+        // The names readers learn partway through (F-ENT-10), after the aliases, each with where.
+        for (var i = 0; i < entity.KnownAs.Count; i++)
+        {
+            var known = entity.KnownAs[i];
+            var order = entity.Aliases.Count + i;
+            rows.Add(new AliasRecord
+            {
+                Id = _ids.Aliases.Take(path, order),
+                EntityId = id,
+                Order = order,
+                Alias = known.Value,
+                AliasNormalized = LinkText.Normalize(known.Value),
+                IsKnownAs = true,
+                FromText = known.From?.ToString(),
+                FromOrdinal = known.Point?.Ordinal,
             });
         }
 
@@ -570,11 +589,17 @@ internal sealed class IndexWriter
             var matchedBy = resolution.MatchedBy is { } tier ? Names<LinkMatchKind>.Lower[tier] : null;
             var matches = link.Outcome == LinkOutcome.Ambiguous ? JsonSerializer.Serialize(resolution.Matches.Select(m => m.Key), JsonOptions) : null;
 
+            // A link by a name readers learn partway through (F-ENT-10): where they learn it, or never.
+            long? nameFrom = resolution.MatchedBy == LinkMatchKind.Alias && link.Target?.KnownNameMatching(occurrence.Link.Target) is { } known
+                ? known.Point?.Ordinal ?? IndexQueries.EndOfStory
+                : null;
+
             // A link found in a file that didn't change is the same occurrence
             // object. Its row is the same unless what it resolves to changed.
             if (_previous?.LinkRows.GetValueOrDefault(occurrence) is { } kept
                 && kept.Id == id && kept.Outcome == outcome && kept.MatchedBy == matchedBy && kept.TargetKey == link.Target?.Key
-                && kept.TargetSection == link.TargetSection?.Name && kept.MatchesJson == matches && kept.Problem == resolution.Problem)
+                && kept.TargetSection == link.TargetSection?.Name && kept.MatchesJson == matches && kept.Problem == resolution.Problem
+                && kept.NameFromOrdinal == nameFrom)
             {
                 _linkRows[occurrence] = kept;
                 _rows.Add(kept);
@@ -609,6 +634,7 @@ internal sealed class IndexWriter
                 MatchesJson = matches,
                 Problem = resolution.Problem,
                 PositionOrdinal = occurrence.Positions.Count > 0 ? occurrence.Positions.Min(p => p.Point.Ordinal) : null,
+                NameFromOrdinal = nameFrom,
             };
             _linkRows[occurrence] = row;
             _rows.Add(row);

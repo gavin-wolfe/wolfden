@@ -22,12 +22,17 @@ public sealed class ReadersLinks
     /// <param name="universeId">The universe's container row.</param>
     /// <param name="met">Whether readers have met a note, so a link shows its name.</param>
     /// <param name="knowsSection">Whether readers know a section of a note they've met, by the name the index keeps, so a link can show its heading.</param>
-    public ReadersLinks(IndexDbContext db, int universeId, Func<EntityRecord, bool> met, Func<EntityRecord, string, bool> knowsSection)
+    /// <param name="horizon">
+    /// The position the text was read at (<see cref="AsOfReads"/>), where a link written by a
+    /// name readers learn later reads as written by the note's name (F-VIEW-7): that link
+    /// shows as the rewritten one does. Null for text as written.
+    /// </param>
+    public ReadersLinks(IndexDbContext db, int universeId, Func<EntityRecord, bool> met, Func<EntityRecord, string, bool> knowsSection, StoryHorizon? horizon = null)
     {
         ArgumentNullException.ThrowIfNull(db);
         ArgumentNullException.ThrowIfNull(met);
         ArgumentNullException.ThrowIfNull(knowsSection);
-        _shown = new Lazy<Dictionary<(int, string), string>>(() => Load(db, universeId, met, knowsSection));
+        _shown = new Lazy<Dictionary<(int, string), string>>(() => Load(db, universeId, met, knowsSection, horizon));
     }
 
     /// <summary>The sections a canon view has, for a <c>knowsSection</c>.</summary>
@@ -65,7 +70,8 @@ public sealed class ReadersLinks
             ? LinkSyntax.WithLinksShown(text, markdown, link => _shown.Value.GetValueOrDefault((note, link)))
             : text;
 
-    private static Dictionary<(int, string), string> Load(IndexDbContext db, int universeId, Func<EntityRecord, bool> met, Func<EntityRecord, string, bool> knowsSection)
+    private static Dictionary<(int, string), string> Load(
+        IndexDbContext db, int universeId, Func<EntityRecord, bool> met, Func<EntityRecord, string, bool> knowsSection, StoryHorizon? horizon)
     {
         var targets = db.Entities.Where(e => e.UniverseId == universeId).ToList()
             .GroupBy(e => e.Key)
@@ -73,7 +79,7 @@ public sealed class ReadersLinks
         var shown = new Dictionary<(int, string), string>();
         var links = db.Links
             .Where(l => l.UniverseId == universeId && l.SourceEntityId != null)
-            .Select(l => new { Note = l.SourceEntityId!.Value, l.Text, l.Label, l.Target, l.Heading, l.TargetKey, l.TargetSection })
+            .Select(l => new { Note = l.SourceEntityId!.Value, l.Path, l.Text, l.Label, l.Target, l.Heading, l.TargetKey, l.TargetSection })
             .ToList();
         foreach (var link in links)
         {
@@ -81,6 +87,12 @@ public sealed class ReadersLinks
             var reached = target is not null && met(target) ? target : null;
             var heading = reached is not null && link.TargetSection is { } section && knowsSection(reached, section) ? link.Heading : null;
             shown.TryAdd((link.Note, link.Text), Shown(link.Label, reached?.Name, link.Target, heading));
+
+            // The same link as a read at the position has it, by the note's name (F-VIEW-7).
+            if (horizon?.LinkAsKnown(link.Path, link.Text) is { } known && LinkSyntax.FindLinks(known) is [var rewritten])
+            {
+                shown.TryAdd((link.Note, known), Shown(link.Label, reached?.Name, rewritten.Target, rewritten.Heading is null ? null : heading));
+            }
         }
 
         return shown;

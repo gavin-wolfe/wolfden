@@ -134,14 +134,24 @@ public sealed class DenIndex : IDisposable
     /// run over them alone: for a canon view, the entities the reader has met,
     /// so an entity met later can't shadow or tie with one met already.
     /// </param>
-    public IReadOnlyList<EntityRecord> MatchEntities(int universeId, string name, IReadOnlySet<string>? amongPaths = null)
+    /// <param name="knownAt">
+    /// If given, the story point whose names count: a <c>known_as</c> name readers
+    /// learn later doesn't match at all (format.md F-VIEW-7), so it's no name.
+    /// </param>
+    public IReadOnlyList<EntityRecord> MatchEntities(int universeId, string name, IReadOnlySet<string>? amongPaths = null, long? knownAt = null)
     {
         ArgumentNullException.ThrowIfNull(name);
         var entities = Context.Entities.Where(e => e.UniverseId == universeId).ToList()
             .Where(e => amongPaths is null || amongPaths.Contains(e.Path))
             .ToList();
         var ids = entities.Select(e => e.Id).ToList();
-        var aliases = Context.Aliases.Where(a => ids.Contains(a.EntityId)).Select(a => new { a.EntityId, a.AliasNormalized }).ToList()
+        var rows = Context.Aliases.Where(a => ids.Contains(a.EntityId));
+        if (knownAt is { } point)
+        {
+            rows = rows.KnownAt(point);
+        }
+
+        var aliases = rows.Select(a => new { a.EntityId, a.AliasNormalized }).ToList()
             .Select(a => (a.EntityId, a.AliasNormalized)).ToList();
         return MatchAmong(name, entities, aliases);
     }
@@ -246,13 +256,14 @@ public sealed class DenIndex : IDisposable
     /// A story point: hits in notes in canon that enter by then come first, each part
     /// best first, so a limit cuts the others first. Null for best first.
     /// </param>
-    public IReadOnlyList<SearchHit> Search(string text, int limit = 20, long? metFirstAt = null)
+    /// <param name="withKnownAs">False to leave out the <c>known_as</c> names (format.md F-ENT-10), which only a read with no position may match.</param>
+    public IReadOnlyList<SearchHit> Search(string text, int limit = 20, long? metFirstAt = null, bool withKnownAs = true)
     {
         ArgumentNullException.ThrowIfNull(text);
 
         // Control characters become spaces: FTS5 reads a query as a C string, so a NUL would end it early.
         var query = SearchQuery.ToFts5(text);
-        return query.Length == 0 ? [] : SearchMatch(query, limit, metFirstAt);
+        return query.Length == 0 ? [] : SearchMatch(withKnownAs ? query : $"{{title body comments}} : ({query})", limit, metFirstAt);
     }
 
     /// <summary>
@@ -272,7 +283,7 @@ public sealed class DenIndex : IDisposable
         var first = metFirstAt is null ? "" : "(e.status IN ('draft', 'canon') AND e.from_ordinal <= $met) DESC, ";
         command.CommandText = $"""
             SELECT e.key, e.name, e.path, s.name, s.line,
-                   snippet(search, -1, char(1), char(2), '…', 12), bm25(search, 10.0, 1.0, 0.5) AS rank,
+                   snippet(search, -1, char(1), char(2), '…', 12), bm25(search, 10.0, 1.0, 0.5, 10.0) AS rank,
                    coalesce(s.status, e.status), coalesce(s.is_bookkeeping, 0),
                    instr(highlight(search, 2, char(1), char(2)), char(1)) > 0,
                    s.left_out_json IS NOT NULL
@@ -342,7 +353,7 @@ public sealed class DenIndex : IDisposable
 
         using var command = _connection.CreateCommand();
         command.CommandText = """
-            SELECT e.path, s.line, bm25(search, 10.0, 1.0, 0.5)
+            SELECT e.path, s.line, bm25(search, 10.0, 1.0, 0.5, 10.0)
             FROM search
             JOIN entities e ON e.id = search.entity_id
             LEFT JOIN sections s ON s.id = search.section_id

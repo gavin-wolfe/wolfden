@@ -45,17 +45,16 @@ namespace Wolfden.Mcp.Tests;
 /// <c>in_view: false</c>, unlike <c>unknown_entity</c>, confirms a note exists.
 /// </para>
 /// <para>
-/// <b>Tools with no position aren't filtered, and that's on purpose.</b> They
-/// aren't story views. The descriptions of <c>search</c> and <c>get_history</c>
-/// say so, and <c>list_entities</c>' only implies it:
+/// <b>Reads with no position aren't filtered, and that's on purpose.</b> They
+/// aren't story views, and their descriptions say so:
 /// </para>
 /// <list type="bullet">
-/// <item><c>search</c> finds text of every status at any point in the story,
-/// ideas and later reveals included. A match in a section an error leaves out
-/// says <c>left_out: true</c>, and its snippet has the text.</item>
-/// <item><c>list_entities</c> lists entities of every status with where each one
-/// enters canon, so it names notes the reader meets later. A note an error leaves
-/// out isn't listed.</item>
+/// <item><c>search</c> with no <c>as_of</c> finds text of every status at any point
+/// in the story, ideas and later reveals included. A match in a section an error
+/// leaves out says <c>left_out: true</c>, and its snippet has the text.</item>
+/// <item><c>list_entities</c> with no <c>as_of</c> lists entities of every status
+/// with where each one enters canon, so it names notes the reader meets later. A
+/// note an error leaves out isn't listed.</item>
 /// <item><c>get_history</c> gives checkpoint messages and diffs of the file as
 /// written, so it has later facts, <c>until</c>s, and sections an error leaves
 /// out.</item>
@@ -64,8 +63,10 @@ namespace Wolfden.Mcp.Tests;
 /// return isn't looked at.</item>
 /// </list>
 /// <para>
-/// So they stay as they are, with no marks: only <c>get_entity</c> with
-/// <c>as_of</c> and <c>canon_as_of</c> are reads at a position.
+/// So they stay as they are, with no marks. The reads at a position are
+/// <c>canon_as_of</c>, and <c>get_entity</c>, <c>search</c>, and <c>list_entities</c>
+/// with <c>as_of</c> (#67). <c>search</c>'s is the Reader's view's search, which is in
+/// <c>Wolfden.Index</c>; its marks are in the web's Author's path, which isn't.
 /// </para>
 /// </remarks>
 public sealed class McpStaysStrictTests : IAsyncLifetime
@@ -531,8 +532,10 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
     {
         var entity = await Call("get_entity", new() { ["entity"] = Tithe, ["as_of"] = position }, error: true);
         var canon = await Call("canon_as_of", new() { ["position"] = position }, error: true);
+        var search = await Call("search", new() { ["query"] = "Sablewick", ["as_of"] = position }, error: true);
+        var list = await Call("list_entities", new() { ["as_of"] = position }, error: true);
 
-        foreach (var reply in new[] { entity, canon })
+        foreach (var reply in new[] { entity, canon, search, list })
         {
             Assert.Equal("bad_position", reply.Json.GetProperty("error").GetProperty("code").GetString());
             AssertNothingLater(reply);
@@ -729,7 +732,7 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
 
     [Fact]
     [Trait("Scenario", "SC-MCP-47")]
-    public async Task OnlyTheTwoStoryViewsTakeAPosition()
+    public async Task OnlyTheStoryViewsTakeAPosition()
     {
         var tools = await Client.ListToolsAsync(cancellationToken: TestContext.Current.CancellationToken);
 
@@ -740,8 +743,8 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
         Assert.True(
             ToolsAndArguments.SequenceEqual(actual),
             "The tools or their arguments changed. Before updating the list in McpStaysStrictTests, check: does the new tool or argument let an assistant read as of a " +
-            "story position, however it's named, or read anything later without saying so? Only get_entity (as_of) and canon_as_of (position) do, and they go through " +
-            "AsOfReads. Showing an assistant more is a decision for the maintainer (#300). If it doesn't, add it to the list. The tools now:\n" + string.Join("\n", actual));
+            "story position, however it's named, or read anything later without saying so? Only get_entity, search, and list_entities (as_of) and canon_as_of (position) do, and they " +
+            "go through the canon view and AsOfReads. Showing an assistant more is a decision for the maintainer (#300). If it doesn't, add it to the list. The tools now:\n" + string.Join("\n", actual));
 
         Assert.Equal(
             ["canon_as_of", "check", "get_chapter", "get_chapter_defaults", "get_entity", "get_history", "list_entities", "search"],
@@ -773,8 +776,10 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
 
         var entity = await Call("get_entity", new() { ["entity"] = Tithe, ["as_of"] = "ember:3" });
         var canon = await Call("canon_as_of", new() { ["position"] = "ember:3" });
+        var search = await Call("search", new() { ["query"] = "toll", ["as_of"] = "ember:3" });
+        var list = await Call("list_entities", new() { ["as_of"] = "ember:3" });
 
-        foreach (var reply in new[] { entity, canon })
+        foreach (var reply in new[] { entity, canon, search, list })
         {
             Assert.DoesNotContain("den_notice", reply.Keys);
             AssertNothingLater(reply);
@@ -783,6 +788,8 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
 
         AssertOnlyKeys(EntityResultKeys, entity);
         AssertOnlyKeys(CanonResultKeys, canon);
+        AssertOnlyKeys(SearchAtAPositionKeys, search);
+        AssertOnlyKeys(ListResultKeys, list);
     }
 
     [Fact]
@@ -794,7 +801,374 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
         Assert.Null(Client.ServerCapabilities.Resources);
     }
 
-    // --- Tools with no position stay as they are: see the remarks on this class. ---
+    // --- Search and list at a position: the same rules, end to end. ---
+
+    /// <summary>A search's answer when nothing's found: the query is the one thing it can say.</summary>
+    private static JsonObject NoHits(string query) => new()
+    {
+        ["version"] = 1,
+        ["query"] = query,
+        ["count"] = 0,
+        ["truncated"] = false,
+        ["hits"] = new JsonArray(),
+        ["den_notice"] = DenNotice,
+    };
+
+    /// <summary>The words of <see cref="LaterWords"/> as a search takes them. A position's book alone is a word notes can use for something else, so it's asked for with a chapter.</summary>
+    public static TheoryData<string> LaterSearches()
+    {
+        var data = new TheoryData<string>();
+        foreach (var word in LaterWords.Where(w => !w.EndsWith(':')).Concat(["ash:2", "ash:3", "ash:4", "a-quiet-moon:1"]))
+        {
+            data.Add(word);
+        }
+
+        return data;
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-MCP-50")]
+    [MemberData(nameof(LaterSearches))]
+    public async Task SearchAtAPositionFindsNoLaterWord(string word)
+    {
+        // The query's own words come back in 'query', so this is the whole answer rather than a look for the word.
+        var reply = await Call("search", new() { ["query"] = word, ["as_of"] = "ember:3" });
+
+        AssertIsExactly(NoHits(word), reply);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-50")]
+    public async Task SearchWithNoPositionFindsWhatASearchAtAPositionLeavesOut()
+    {
+        var full = await Call("search", new() { ["query"] = "toll" });
+        var at = await Call("search", new() { ["query"] = "toll", ["as_of"] = "ember:3" });
+
+        foreach (var written in new[] { "Hallowmere", "Vespergale", "Fenwraith", Heir })
+        {
+            Assert.Contains(written, full.Whole, StringComparison.Ordinal);
+            Assert.DoesNotContain(written, at.Whole, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-50")]
+    public async Task SearchAtAPositionIsExactlyThis()
+    {
+        // A word in text of every kind, later and out of canon too, is found only in the one section a reader there has. The aliases that hold it don't match.
+        var reply = await Call("search", new() { ["query"] = "toll", ["as_of"] = "ember:3" });
+
+        var expected = JsonNode.Parse(
+            $$"""
+            {
+              "version": 1,
+              "query": "toll",
+              "count": 1,
+              "truncated": false,
+              "hits": [
+                {
+                  "entity": {
+                    "key": "{{TitheId}}",
+                    "id": "{{TitheId}}",
+                    "name": "The salt tithe",
+                    "type": "thread",
+                    "status": "canon",
+                    "universe": "starfall",
+                    "scope_kind": "universe",
+                    "scope_key": "starfall",
+                    "path": "{{TithePath}}",
+                    "from": "ember:1"
+                  },
+                  "section": "Overview",
+                  "line": 26,
+                  "snippet": "A [toll] in salt, until the ambush. The fleet enters at dawn, and what she says is no longer true.",
+                  "status": "canon",
+                  "in_canon": true,
+                  "in_comment": false
+                }
+              ],
+              "den_notice": "{{DenNotice}}"
+            }
+            """);
+        AssertIsExactly(expected, reply);
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-MCP-50")]
+    [InlineData("ember", "the", null, false)]
+    [InlineData("ember:1", "the", null, false)]
+    [InlineData("ember:2b", "the", null, false)]
+    [InlineData("ember:3", "the", null, false)]
+    [InlineData("ember:3", "the", null, true)]
+    [InlineData("ember:3", "the", "thread", false)]
+    [InlineData("ember:3", "salt", null, false)]
+    [InlineData("ember:3", "toll*", null, false)]
+    [InlineData("ember:3", "ember", null, false)]
+    [InlineData("ember:3", "Orrin", null, false)]
+    public async Task SearchAtAPositionHasNothingLaterInItsHits(string position, string query, string? type, bool canonOnly)
+    {
+        var reply = await Call("search", new() { ["query"] = query, ["as_of"] = position, ["limit"] = 200, ["type"] = type, ["canon_only"] = canonOnly });
+
+        // At the start of a book nothing of it has been met yet; past that, the hits are what's being looked at.
+        Assert.True(position == "ember" || reply.Json.GetProperty("count").GetInt32() > 0);
+        AssertNothingLater(reply);
+        AssertNoMarks(reply);
+        AssertOnlyKeys(SearchAtAPositionKeys, reply);
+        foreach (var hit in reply.Json.GetProperty("hits").EnumerateArray())
+        {
+            Assert.False(hit.GetProperty("in_comment").GetBoolean());
+            Assert.True(hit.GetProperty("in_canon").GetBoolean());
+        }
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-50")]
+    public async Task ASearchOfAFieldAtAPositionHasOnlyTheValuesInView()
+    {
+        var keeper = await Call("search", new() { ["query"] = "Orrin", ["field"] = "keeper", ["as_of"] = "ember:3" });
+        var hit = Assert.Single(keeper.Json.GetProperty("hits").EnumerateArray());
+        Assert.Equal("keeper", hit.GetProperty("field").GetString());
+        Assert.Equal("[Orrin] Vale", hit.GetProperty("snippet").GetString());
+        AssertNothingLater(keeper);
+        AssertOnlyKeys(SearchAtAPositionKeys, keeper);
+
+        // A later entry of a field the reader knows finds nothing, as a word no note has does.
+        AssertIsExactly(NoHits("Morvane"), await Call("search", new() { ["query"] = "Morvane", ["field"] = "keeper", ["as_of"] = "ember:3" }));
+
+        // A field only later or out-of-canon values give is refused as a made-up one is, so the refusal doesn't confirm it.
+        var madeUp = await Call("search", new() { ["query"] = "toll", ["field"] = "madeup", ["as_of"] = "ember:3" }, error: true);
+        foreach (var field in new[] { "seal", "paid_off", "echoes", "rumor", "omen", "old_name", "claim" })
+        {
+            var later = await Call("search", new() { ["query"] = "toll", ["field"] = field, ["as_of"] = "ember:3" }, error: true);
+            Assert.Equal("bad_argument", later.Json.GetProperty("error").GetProperty("code").GetString());
+            Assert.Equal(
+                madeUp.Json.GetProperty("error").GetProperty("message").GetString()!.Replace("madeup", field, StringComparison.Ordinal),
+                later.Json.GetProperty("error").GetProperty("message").GetString());
+            AssertNothingLater(later);
+        }
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-50")]
+    public async Task ALinkToALaterNoteDoesntFindThatNotesNames()
+    {
+        // With no position, a link in a field matches by its note's name and aliases. At one, it finds only by what it shows.
+        _den.Write(
+            "universes/starfall/entities/notes/the-tally.md",
+            """
+            ---
+            type: note
+            name: The tally
+            status: canon
+            fields:
+              rival: "[[the-salt-heir|the claimant]]"
+            ---
+
+            Counted yearly.
+            """);
+
+        var full = await Call("search", new() { ["query"] = "apparent", ["field"] = "rival" });
+        Assert.Equal(1, full.Json.GetProperty("count").GetInt32());
+
+        foreach (var word in new[] { "apparent", "heir", "Ysmerine" })
+        {
+            AssertIsExactly(NoHits(word), await Call("search", new() { ["query"] = word, ["as_of"] = "ember:3", ["limit"] = 200 }));
+        }
+
+        var shown = await Call("search", new() { ["query"] = "claimant", ["as_of"] = "ember:3" });
+        Assert.Equal("the [claimant]", Assert.Single(shown.Json.GetProperty("hits").EnumerateArray()).GetProperty("snippet").GetString());
+        AssertNothingLater(shown);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-50")]
+    public async Task AWordKeptOutOfANoteTheReaderKnowsStopsTheHit()
+    {
+        // Each query's first word is in the note the reader knows, and its second is only in a comment or a later section of that note.
+        AssertIsExactly(NoHits("toll Nightquill"), await Call("search", new() { ["query"] = "toll Nightquill", ["as_of"] = "ember:3" }));
+        AssertIsExactly(NoHits("ship Sablewick"), await Call("search", new() { ["query"] = "ship Sablewick", ["as_of"] = "ember:3" }));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-50")]
+    public async Task PartWayThroughTheStorySearchAndListGoAsFarAsThatPoint()
+    {
+        // Sablewick's section enters at ash:2, and the heir and the payoff at ash:3.
+        var audit = await Call("search", new() { ["query"] = "Sablewick", ["as_of"] = "ash:2" });
+        Assert.Equal("The audit", Assert.Single(audit.Json.GetProperty("hits").EnumerateArray()).GetProperty("section").GetString());
+        AssertIsExactly(NoHits("Ysmerine"), await Call("search", new() { ["query"] = "Ysmerine", ["as_of"] = "ash:2" }));
+        AssertIsExactly(NoHits("Drennick"), await Call("search", new() { ["query"] = "Drennick", ["as_of"] = "ash:2" }));
+        Assert.DoesNotContain(Heir, (await Call("list_entities", new() { ["as_of"] = "ash:2" })).Whole, StringComparison.Ordinal);
+
+        var heir = await Call("search", new() { ["query"] = "Ysmerine", ["as_of"] = "ash:3" });
+        Assert.Equal(Heir, heir.Json.GetProperty("hits")[0].GetProperty("entity").GetProperty("name").GetString());
+        var payoff = await Call("search", new() { ["query"] = "Drennick", ["as_of"] = "ash:3" });
+        Assert.Equal("Payoff", Assert.Single(payoff.Json.GetProperty("hits").EnumerateArray()).GetProperty("section").GetString());
+        Assert.Contains(Heir, (await Call("list_entities", new() { ["as_of"] = "ash:3" })).Whole, StringComparison.Ordinal);
+
+        // Out of canon stays out, at any position.
+        foreach (var word in new[] { "Hallowmere", "Wyrmsedge", "Gallowmere", "Vespergale", "Pellucid", "Glimmerfen", "Thornmarch", "Corvantis" })
+        {
+            AssertIsExactly(NoHits(word), await Call("search", new() { ["query"] = word, ["as_of"] = "ash:epilogue" }));
+        }
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-50")]
+    public async Task ListEntitiesAtAPositionIsExactlyThis()
+    {
+        File.Delete(Path.Combine(_den.Root, "universes/starfall/entities/threads/the-missing-manifest.md"));
+        var reply = await Call("list_entities", new() { ["as_of"] = "ember:3", ["type"] = "thread" });
+
+        var expected = JsonNode.Parse(
+            $$"""
+            {
+              "version": 1,
+              "count": 1,
+              "total": 1,
+              "truncated": false,
+              "entities": [
+                {
+                  "key": "{{TitheId}}",
+                  "id": "{{TitheId}}",
+                  "name": "The salt tithe",
+                  "type": "thread",
+                  "status": "canon",
+                  "universe": "starfall",
+                  "scope_kind": "universe",
+                  "scope_key": "starfall",
+                  "path": "{{TithePath}}",
+                  "from": "ember:1"
+                }
+              ],
+              "den_notice": "{{DenNotice}}"
+            }
+            """);
+        AssertIsExactly(expected, reply);
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-MCP-50")]
+    [InlineData("ember", null, null)]
+    [InlineData("ember:1", null, null)]
+    [InlineData("ember:2b", null, null)]
+    [InlineData("ember:3", null, null)]
+    [InlineData("ember:3", "series", "long-dark")]
+    [InlineData("ember:3", "book", "ember")]
+    [InlineData("ember:3", "book", "ash")] // A filter to a later book doesn't reach ahead of the position.
+    [InlineData("ember:3", "type", "note")]
+    [InlineData("ember:3", "type", "location")]
+    [InlineData("ember:3", "status", "canon")]
+    [InlineData("ember:3", "status", "idea")] // Out of canon is out of the view, whatever the filter asks for.
+    [InlineData("ember:3", "status", "retconned")]
+    public async Task ListEntitiesAtAPositionHasNothingLater(string position, string? filter, string? value)
+    {
+        var args = new Dictionary<string, object?> { ["as_of"] = position };
+        if (filter is not null)
+        {
+            args[filter] = value;
+        }
+
+        var reply = await Call("list_entities", args);
+
+        AssertNothingLater(reply);
+        AssertNoMarks(reply);
+        AssertOnlyKeys(ListResultKeys, reply);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-50")]
+    public async Task ListEntitiesAtAPositionSaysOfEachNoteWhatCanonAsOfSays()
+    {
+        // Filed in the later book but entering earlier, so it's in both views, and where it's filed comes with it (format.md F-VIEW-1).
+        _den.Write("universes/starfall/series/long-dark/books/ash/entities/notes/the-early-omen.md", "---\ntype: note\nname: The early omen\nstatus: canon\nfrom: \"ember:2\"\n---\n\nSeen early.\n");
+
+        foreach (var position in new[] { "ember:1", "ember:3", "ash:2", "ash:3" })
+        {
+            var list = await Call("list_entities", new() { ["as_of"] = position, ["limit"] = 1000 });
+            var canon = await Call("canon_as_of", new() { ["position"] = position, ["brief"] = true });
+
+            var listed = list.Json.GetProperty("entities").EnumerateArray().Select(e => e.GetRawText()).ToList();
+            var viewed = canon.Json.GetProperty("entities").EnumerateArray().Select(e => e.GetRawText()).ToList();
+            Assert.Equal(viewed, listed);
+            Assert.Equal(listed.Count, list.Json.GetProperty("total").GetInt32());
+            Assert.Equal(listed.Count, list.Json.GetProperty("count").GetInt32());
+        }
+
+        var early = await Call("list_entities", new() { ["as_of"] = "ember:3" });
+        Assert.Equal("ash", early.Json.GetProperty("entities").EnumerateArray().Single(e => e.GetProperty("name").GetString() == "The early omen").GetProperty("scope_key").GetString());
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-50")]
+    public async Task AListCutShortAtAPositionCountsOnlyWhatsInView()
+    {
+        var whole = await Call("list_entities", new() { ["as_of"] = "ember:3", ["limit"] = 1000 });
+        var all = await Call("list_entities", new() { ["limit"] = 1000 });
+        var cut = await Call("list_entities", new() { ["as_of"] = "ember:3", ["limit"] = 1 });
+
+        Assert.True(all.Json.GetProperty("total").GetInt32() > whole.Json.GetProperty("total").GetInt32());
+        Assert.Equal(whole.Json.GetProperty("total").GetInt32(), cut.Json.GetProperty("total").GetInt32());
+        Assert.Equal(1, cut.Json.GetProperty("count").GetInt32());
+        Assert.True(cut.Json.GetProperty("truncated").GetBoolean());
+        AssertNothingLater(cut);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-50")]
+    public async Task AKeyTwoBooksShareIsSaidToBeSharedAtAPosition()
+    {
+        // F-KEY-5. The book is there, so "there's no book" would send the writer the wrong way, and the true message names only the key given.
+        _den.Write("universes/starfall/series/drift-war/series.md", "---\nid: 01JA3E28JT97KB6CQ643DZVMXY\nname: The Drift War\nbooks: [ember]\n---\n");
+        _den.Write("universes/starfall/series/drift-war/books/ember/book.md", "---\nid: 01JB0000000000000000000A02\nname: Ember of the Drift\nchapters: [1, 2]\n---\n");
+
+        var reply = await Call("list_entities", new() { ["as_of"] = "ash:2", ["book"] = "ember" }, error: true);
+
+        var error = reply.Json.GetProperty("error");
+        Assert.Equal("unknown_scope", error.GetProperty("code").GetString());
+        Assert.StartsWith("More than one book of universe 'starfall' has the key 'ember' (F-KEY-5)", error.GetProperty("message").GetString(), StringComparison.Ordinal);
+        foreach (var other in new[] { "ash", "a-quiet-moon", "drift-war" })
+        {
+            Assert.DoesNotContain(other, error.GetProperty("message").GetString(), StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-50")]
+    public async Task AScopeThatIsntThereNamesNoOtherAtAPosition()
+    {
+        var book = await Call("list_entities", new() { ["as_of"] = "ember:3", ["book"] = "nope" }, error: true);
+        var series = await Call("list_entities", new() { ["as_of"] = "ember:3", ["series"] = "nope" }, error: true);
+
+        Assert.Equal("unknown_scope", book.Json.GetProperty("error").GetProperty("code").GetString());
+        Assert.Equal("There's no book 'nope' here.", book.Json.GetProperty("error").GetProperty("message").GetString());
+        Assert.Equal("There's no series 'nope' here.", series.Json.GetProperty("error").GetProperty("message").GetString());
+
+        // With no position it's the full view, which can say.
+        var full = await Call("list_entities", new() { ["book"] = "nope" }, error: true);
+        Assert.Contains("ash", full.Json.GetProperty("error").GetProperty("message").GetString(), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-MCP-50")]
+    [InlineData("search")]
+    [InlineData("list_entities")]
+    public async Task EveryUniverseDoesntGoWithAPosition(string tool)
+    {
+        var args = new Dictionary<string, object?> { ["universe"] = "*", ["as_of"] = "ember:3" };
+        if (tool == "search")
+        {
+            args["query"] = "toll";
+        }
+
+        var reply = await Call(tool, args, error: true);
+
+        Assert.Equal("bad_argument", reply.Json.GetProperty("error").GetProperty("code").GetString());
+        Assert.Contains("doesn't go with a position", reply.Json.GetProperty("error").GetProperty("message").GetString(), StringComparison.Ordinal);
+        AssertOnlyKeys(ErrorResultKeys, reply);
+    }
+
+    // --- Reads with no position stay as they are: see the remarks on this class. ---
 
     [Fact]
     [Trait("Scenario", "SC-MCP-47")]
@@ -1006,11 +1380,11 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
         "get_chapter_defaults(universe, series, book)",
         "get_entity(entity, universe, as_of)",
         "get_history(entity, universe, limit, before, diff, diff_from)",
-        "list_entities(universe, type, status, series, book, limit)",
+        "list_entities(universe, type, status, series, book, limit, as_of)",
         "move_entity(entity, expected_hash, to_series, to_book, keep_entry, enter_at_new_scope, universe, allow_relinks)",
         "rename_entity(entity, new_name, expected_hash, keep_old_name, universe, allow_relinks)",
         "rename_section(entity, section, new_name, expected_hash, universe, section_line)",
-        "search(query, universe, type, canon_only, limit, field)",
+        "search(query, universe, type, canon_only, limit, field, as_of)",
         "update_chapter_defaults(expected_hash, changes, universe, series, book)",
         "update_chapter_fields(book, chapter, expected_hash, changes, universe)",
         "update_fields(entity, expected_hash, changes, universe)",
@@ -1089,6 +1463,9 @@ public sealed class McpStaysStrictTests : IAsyncLifetime
         .. Under("hits", ["entity", "section", "line", "snippet", "status", "in_canon", "in_comment", "field", "left_out"]),
         .. Under("hits.entity", SummaryKeys),
     ];
+
+    /// <summary>A search at a position only reads what's in the view, so no hit is in a section an error leaves out.</summary>
+    private static readonly string[] SearchAtAPositionKeys = [.. SearchResultKeys.Where(k => k != "hits.left_out")];
 
     private static readonly string[] ListResultKeys =
     [

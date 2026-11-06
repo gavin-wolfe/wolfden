@@ -52,6 +52,9 @@ public sealed class UniverseChoiceTests : IDisposable
     {
         Assert.Equal("starfall", _tools.CanonAsOf(position: "ember:1").Universe);
         Assert.Equal("drift", _tools.CanonAsOf(position: "tide:1").Universe);
+        Assert.Equal(["starfall"], _tools.ListEntities(asOf: "ash:2").Entities.Select(e => e.Universe).Distinct());
+        Assert.Equal(["starfall"], _tools.Search("Lantern", asOf: "ash:2").Hits.Select(h => h.Entity.Universe).Distinct());
+        Assert.Equal(["drift"], _tools.ListEntities(asOf: "tide:1").Entities.Select(e => e.Universe).Distinct());
 
         // At ash:2 the reader of Starfall has met the Long Dark's lamp only;
         // the Quiet Moon's ship comes later, and the Drift's isn't in this universe.
@@ -97,6 +100,8 @@ public sealed class UniverseChoiceTests : IDisposable
             () => _tools.CanonAsOf(universe: "*"),
             () => _tools.GetEntity("Lantern", universe: "*"),
             () => _tools.GetEntity("Lantern", universe: "*", asOf: "ash:1"),
+            () => _tools.Search("Lantern", universe: "*", asOf: "ash:1"),
+            () => _tools.ListEntities(universe: "*", asOf: "ash:1"),
             () => _tools.ListEntities(universe: "*", book: "ash"),
         })
         {

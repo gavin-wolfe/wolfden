@@ -614,6 +614,52 @@ public sealed class ReadersSearchTests : IDisposable
         Assert.DoesNotContain("ash", refused.GetProperty("message").GetString()!, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// There's no second rule (#67): an assistant's <c>search</c> and <c>list_entities</c> at a
+    /// position find what the Reader's view finds, in the same order, and differ only in that a
+    /// hit leaves out the page's <c>text</c> and <c>matches</c>. It's one word from each kind of
+    /// text, and words many notes share for the order. <see cref="EveryWordOfEveryNoteIsFoundExactlyWhenTheReadersPageShowsIt"/>
+    /// holds the search itself to every word.
+    /// </summary>
+    [Theory]
+    [Trait("Scenario", "SC-MCP-50")]
+    [InlineData("ember:3")]
+    [InlineData("ash:1")]
+    [InlineData("ash:2")]
+    [InlineData("ash:3")]
+    public async Task AnAssistantAtAPositionFindsWhatTheReadersViewFinds(string at)
+    {
+        await using var server = await Start();
+        var tools = new WolfdenTools(new DenTools(_den.Root));
+        var wrong = new List<string>();
+        var mostHits = 0;
+        foreach (var word in Words.Concat(["the", "word", "is", "later", "a", "of"]))
+        {
+            var page = Hits(await server.GetJsonAsync(Readers(word, at), HttpStatusCode.OK))
+                .Select(h => (Note: h.GetProperty("entity").GetProperty("path").GetString(), Section: Member(h, "section"), Line: Member(h, "line"), Field: Member(h, "field"), Snippet: h.GetProperty("snippet").GetString(), Status: h.GetProperty("status").GetString()))
+                .ToList();
+            mostHits = Math.Max(mostHits, page.Count);
+            using var answer = JsonDocument.Parse(Text(tools.Search(word, "starfall", limit: 200, as_of: at)));
+            var mcp = answer.RootElement.GetProperty("hits").EnumerateArray()
+                .Select(h => (Note: h.GetProperty("entity").GetProperty("path").GetString(), Section: Member(h, "section"), Line: Member(h, "line"), Field: Member(h, "field"), Snippet: h.GetProperty("snippet").GetString(), Status: h.GetProperty("status").GetString()));
+            if (!page.SequenceEqual(mcp))
+            {
+                wrong.Add(word);
+            }
+        }
+
+        Assert.Empty(wrong);
+        Assert.True(mostHits > 3, $"The order is only worth comparing with several hits, and the most was {mostHits}.");
+
+        var listed = await server.GetJsonAsync($"/api/entities?universe=starfall&asOf={at}&readers=true&limit=1000", HttpStatusCode.OK);
+        using var list = JsonDocument.Parse(Text(tools.ListEntities("starfall", limit: 1000, as_of: at)));
+        Assert.Equal(
+            listed.GetProperty("entities").EnumerateArray().Select(e => e.GetProperty("path").GetString()),
+            list.RootElement.GetProperty("entities").EnumerateArray().Select(e => e.GetProperty("path").GetString()));
+
+        static string? Member(JsonElement hit, string name) => hit.TryGetProperty(name, out var value) && value.ValueKind != JsonValueKind.Null ? value.ToString() : null;
+    }
+
     [Fact]
     [Trait("Scenario", "SC-WEB-106")]
     public async Task ATypesDefaultIsNotSearchedThoughGetEntityShowsIt()

@@ -1785,6 +1785,9 @@ in it, which Wolfden calls a checkpoint.
   `from: dracula:1` as a web link. In Obsidian 1.14.5 on macOS, the panel
   offered no editor for nested values. Changing a name or adding a text
   property preserved the other YAML values and note body, but rewrote
-  frontmatter formatting. In **Settings → Editor**, set **Properties in
+  the frontmatter's formatting, which shows as a large change in git: a
+  list written on one line as `[a, b]` became one item per line, quotes
+  it didn't need were dropped, and a value folded over several lines
+  became one line. In **Settings → Editor**, set **Properties in
   document** to **Source** to edit the YAML directly. Run `wolfden check`
   after editing (#73).

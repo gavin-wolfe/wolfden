@@ -431,7 +431,7 @@ internal static partial class YamlEditor
     }
 
     /// <summary>The top-level keys of an entity file in template order (types.md F-TPL-7).</summary>
-    private static readonly string[] TemplateOrder = ["id", "type", "name", "aliases", "status", "from", "fields"];
+    private static readonly string[] TemplateOrder = ["id", "type", "name", "aliases", "known_as", "status", "from", "fields"];
 
     private static int? TemplateRank(string key) => Array.IndexOf(TemplateOrder, key) is var i and >= 0 ? i : null;
 

@@ -1073,6 +1073,10 @@ that never gets a real name.
 - For now, the web editor doesn't edit `known_as`: use **Edit file**, or ask an
   AI assistant. In Obsidian, `known_as` is a property it doesn't know, so edit
   it in Source mode, as with `fields`.
+- To move a reveal earlier or later, change its `from`: no link changes, since
+  links don't depend on where you are in the story. An assistant can do it with
+  `update_fields`, and its `change_alias` can move a name between `aliases` and
+  `known_as`, or rename one, rewriting the links that use it.
 
 ## Images
 

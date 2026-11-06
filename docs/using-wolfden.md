@@ -1778,8 +1778,11 @@ in it, which Wolfden calls a checkpoint.
 - **An image Obsidian shows can be "not found" in Wolfden.** When a path
   is wrong, Obsidian finds an image by its file name anywhere in the
   vault. Wolfden follows the path only.
-- **Obsidian's Properties panel can't show `fields`.** It shows a note's
-  nested `fields:` as raw text marked unsupported, and a position such
-  as `from: dracula:1` as a web link. Editing there may rewrite them. In
-  Obsidian's **Settings → Editor**, set **Properties in document** to
-  **Source**, so the frontmatter is plain text you edit yourself (#73).
+- **Obsidian's Properties panel can't edit nested `fields`.** It shows
+  `fields:` as raw text marked unsupported, and a position such as
+  `from: dracula:1` as a web link. In Obsidian 1.14.5 on macOS, the panel
+  offered no editor for nested values. Changing a name or adding a text
+  property preserved the other YAML values and note body, but rewrote
+  frontmatter formatting. In **Settings → Editor**, set **Properties in
+  document** to **Source** to edit the YAML directly. Run `wolfden check`
+  after editing (#73).

@@ -275,4 +275,31 @@ public class MarkdownCommentsTests
         Assert.DoesNotContain("she dies", stripped, StringComparison.Ordinal);
         Assert.Contains("Text", stripped, StringComparison.Ordinal);
     }
+
+    [Theory]
+    [InlineData("Keep.\n\n<!-- unclosed comment\n\nStill going.", "Unclosed HTML comment '<!--'")]
+    [InlineData("Keep.\n\n<!-- outer <!-- nested --> text -->", "Nested-looking HTML comment")]
+    [InlineData("Route: Vesta --> Ardent", "Stray '-->'")]
+    public void CheckWarnsAboutUnclosedNestedAndStrayComments(string markdown, string expectedMessageSubstring)
+    {
+        var source = Wolfden.Core.Text.SourceText.FromText(markdown, false);
+        var diagnostics = MarkdownComments.Check(markdown, source, 0);
+
+        Assert.NotEmpty(diagnostics);
+        Assert.All(diagnostics, d => Assert.Equal("F-SEC-11", d.RuleId));
+        Assert.Contains(diagnostics, d => d.Message.Contains(expectedMessageSubstring, StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("Keep `<!-- unclosed` in code span.")]
+    [InlineData("```\n<!-- unclosed in code block\n```")]
+    [InlineData("Keep `-->` stray in code span.")]
+    [InlineData(@"Escaped \<-- not a comment.")]
+    public void CodeBlocksAndSpansDoNotWarnOnComments(string markdown)
+    {
+        var source = Wolfden.Core.Text.SourceText.FromText(markdown, false);
+        var diagnostics = MarkdownComments.Check(markdown, source, 0);
+
+        Assert.Empty(diagnostics);
+    }
 }

@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
 using Wolfden.Core.Links;
+using Wolfden.Core.Text;
 
 namespace Wolfden.Core.Documents;
 
@@ -102,6 +103,36 @@ public static partial class MarkdownComments
         var comments = scan.Comments();
         steps = scan.Steps;
         return comments.Count == 0 ? markdown : Without(markdown, comments);
+    }
+
+    /// <summary>
+    /// Checks <paramref name="markdown"/> for unclosed HTML comments, nested-looking comments,
+    /// and stray <c>--&gt;</c> markers (format.md F-SEC-11).
+    /// </summary>
+    internal static List<Diagnostic> Check(string markdown, SourceText source, int bodyStart, MarkdownDocument? document = null, HashSet<int>? skipLines = null)
+    {
+        ArgumentNullException.ThrowIfNull(markdown);
+        ArgumentNullException.ThrowIfNull(source);
+        if (!markdown.Contains("<!--", StringComparison.Ordinal) && !markdown.Contains("-->", StringComparison.Ordinal))
+        {
+            return [];
+        }
+
+        var scan = new CommentScan(markdown, document ?? BodyLinkScanner.Parse(markdown, 0, BodyLinkScanner.Plain));
+        var warnings = scan.Warnings();
+        var diagnostics = new List<Diagnostic>(warnings.Count);
+        foreach (var (offset, message) in warnings.OrderBy(w => w.Offset))
+        {
+            var line = source.LineIndexOf(bodyStart + offset) + 1;
+            if (skipLines?.Contains(line - 1) == true)
+            {
+                continue;
+            }
+
+            diagnostics.Add(new Diagnostic("F-SEC-11", DiagnosticSeverity.Warning, line, message));
+        }
+
+        return diagnostics;
     }
 
     private static string Without(string markdown, List<FoundComment> comments)
@@ -282,6 +313,79 @@ public static partial class MarkdownComments
             }
 
             return comments;
+        }
+
+        public List<(int Offset, string Message)> Warnings()
+        {
+            var warnings = new List<(int Offset, string Message)>();
+            var matchedCloses = new HashSet<int>();
+
+            foreach (var open in _opens)
+            {
+                if (IsEscaped(open))
+                {
+                    continue;
+                }
+
+                if (_fenceLines.Find(open, this) is { } fenceLine)
+                {
+                    var close = _markdown.IndexOf("-->", open + 2, fenceLine.End - (open + 2), StringComparison.Ordinal);
+                    if (close < 0)
+                    {
+                        warnings.Add((open, "Unclosed HTML comment '<!--': add '-->' to close it."));
+                    }
+                    else
+                    {
+                        matchedCloses.Add(close);
+                    }
+
+                    continue;
+                }
+
+                var endComment = EndOfComment(open);
+                if (endComment is null)
+                {
+                    warnings.Add((open, "Unclosed HTML comment '<!--': add '-->' to close it."));
+                }
+                else
+                {
+                    if (string.CompareOrdinal(_markdown, open + 2, "-->", 0, 3) == 0)
+                    {
+                        matchedCloses.Add(open + 2);
+                    }
+                    else if (string.CompareOrdinal(_markdown, open + 3, "-->", 0, 3) == 0)
+                    {
+                        matchedCloses.Add(open + 3);
+                    }
+                    else
+                    {
+                        var firstClose = FirstAtOrAfter(_closes, open + 4);
+                        if (firstClose >= 0)
+                        {
+                            var inner = FirstAtOrAfter(_innerOpens, open + 4);
+                            if (inner >= 0 && inner < firstClose)
+                            {
+                                warnings.Add((inner, "Nested-looking HTML comment: HTML comments can't be nested, and this can hide text unexpectedly."));
+                            }
+
+                            var closingIndex = _balanced.TryGetValue(open, out var balanced) && !HasBlankLine(firstClose, balanced)
+                                ? balanced - 3
+                                : firstClose;
+                            matchedCloses.Add(closingIndex);
+                        }
+                    }
+                }
+            }
+
+            foreach (var close in _closes)
+            {
+                if (!matchedCloses.Contains(close))
+                {
+                    warnings.Add((close, "Stray '-->' with no HTML comment open before it."));
+                }
+            }
+
+            return warnings;
         }
 
         private void ReadBlocks(MarkdownDocument document)

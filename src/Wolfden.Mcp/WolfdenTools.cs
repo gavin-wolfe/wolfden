@@ -230,7 +230,7 @@ public sealed class WolfdenTools
         "('fields.pov.1') changes that item in place, keeping a comment on it. A path is dotted: 'status', 'from', 'aliases', 'fields.born', " +
         "'fields.rank.1.from' (item numbers from 0). An entry is {\"value\": x, \"from\": \"book:chapter\", \"until\": ..., \"status\": ..., \"pin\": true}. " +
         "The id never changes. Aliases can be added and moved here, known_as entries added, and a known_as entry's from set ('known_as.0.from'), " +
-        "which changes no link; to rename the entity, or change or remove an alias or a known_as name, use rename_entity or " +
+        "check_text set, or allow_in changed ('known_as.0.allow_in'), which changes no link; to rename the entity, or change or remove an alias or a known_as name, use rename_entity or " +
         "change_alias, which rewrite the links that used the old text. A 'from', 'until', or position field value you set must be a position the " +
         "universe has (bad_position otherwise); null leaves it out. Read without as_of before changing a field: a read with as_of leaves out a position " +
         "field's later values, so a field missing from it may be set in the note, and its list item numbers may not match the note's, " +

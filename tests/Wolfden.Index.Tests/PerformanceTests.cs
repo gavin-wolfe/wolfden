@@ -121,6 +121,60 @@ public sealed class PerformanceTests(ITestOutputHelper output)
         Assert.True(rebuild < Bound, $"The rebuild took {rebuild} of processor time.");
     }
 
+    /// <summary>
+    /// The plain-text name check (format.md F-NAME-1, #67) on the large den, with a
+    /// hundred names readers learn in book two, five of them written in book one.
+    /// A first look at each note's raw text for the names' longest words means only
+    /// the notes that may hold one are read closely, so the check costs little more
+    /// than a check with spoiler checks off; in development the names add well under
+    /// a second. The bound covers the whole check, so it only catches a gross
+    /// slowdown, such as every name compared with every word of the den. Reading
+    /// every note closely costs too little here to tell from a busy machine, so the
+    /// first look's correctness is tested by <c>NameCheckTests</c>, not timed.
+    /// </summary>
+    [Fact]
+    [Trait("Scenario", "SC-CHECK-65")]
+    public void ALargeDenIsCheckedForNamesReadersLearnLaterQuickly()
+    {
+        const int names = 100;
+        var files = LargeDen();
+        for (var k = 0; k < names; k++)
+        {
+            var path = $"universes/big/series/saga/entities/characters/person-{k * (Count / names)}.md";
+            files[path] = files[path].Replace("status: canon\n", $"status: canon\nknown_as: [{{ value: {SecretName(k)}, from: \"two:3\" }}]\n", StringComparison.Ordinal);
+        }
+
+        for (var k = 0; k < 5; k++)
+        {
+            files[$"universes/big/series/saga/entities/characters/person-{(k * 37) + 1}.md"] += $"\n## Rumour\n<!-- wolfden: from=one:1 -->\nSome say {SecretName(k * 7)} was here.\n";
+        }
+
+        using var den = TempDen.FromFiles(files);
+        var denYaml = Path.Combine(den.Root, "den.yaml");
+        _ = Wolfden.Core.Links.LinkIndex.Load(den.Root);
+        var watch = ThreadCpuWatch.StartNew();
+        var off = Wolfden.Core.Checks.DenCheck.Run(den.Root);
+        var checkOff = watch.Cpu;
+        File.WriteAllText(denYaml, "format: 1\nspoiler_checks: true\n");
+        watch.Restart();
+        var on = Wolfden.Core.Checks.DenCheck.Run(den.Root);
+        var checkOn = watch.Cpu;
+        output.WriteLine(
+            $"{Count} entities, {names} names readers learn later, in processor time: check with spoiler checks off {checkOff.TotalMilliseconds:F0} ms, " +
+            $"on {checkOn.TotalMilliseconds:F0} ms ({watch.Clock.TotalMilliseconds:F0} ms by the clock).");
+
+        Assert.DoesNotContain(off.Diagnostics, d => d.Diagnostic.RuleId == "F-NAME-1");
+        Assert.Equal(5, on.Diagnostics.Count(d => d.Diagnostic.RuleId == "F-NAME-1"));
+        Assert.True(checkOn < Bound, $"The check took {checkOn} of processor time.");
+    }
+
+    /// <summary>A two-word name made of invented words that the large den's text doesn't hold: Zorvath Quillane and two letters for <paramref name="k"/>.</summary>
+    private static string SecretName(int k)
+    {
+        var letters = $"{(char)('a' + (k / 10))}{(char)('a' + (k % 10))}";
+        return $"Zorvath{letters} Quillane{letters}";
+    }
+
     /// <summary>One universe of <see cref="Books"/> standalone books, each with three chapters and two characters who link to each other.</summary>
     private static Dictionary<string, string> StandaloneBooks()
     {

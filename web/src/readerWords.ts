@@ -28,7 +28,30 @@ export function notReachedWords(what: 'book' | 'chapter' | 'series'): string {
 
 /** Tags for a search hit whose words are where a reader's page doesn't show them. */
 export const ONLY_IN_ALIAS = 'only in an alias'
-export const ONLY_IN_ALIAS_WHY = "Readers don't know this name here: it's one they learn later, or a link stands for it, and the Reader's view shows the note's name for the link."
+export const ONLY_IN_ALIAS_WHY = "The words are in an alias of a note this one links to, and the Reader's view shows that note's name for the link."
+
+/**
+ * The words for a name readers learn partway through the story (`known_as`, #67) that readers at this point
+ * don't know yet: on the note's own list of names (`name`), on a link written by it (`link`), or on a search
+ * hit found only by it (`search`). `ahead` names where they learn it; `unplaced` says no position does.
+ */
+export function laterNameWords(mark: ReaderMark | undefined, positions: readonly PositionView[], on: 'name' | 'link' | 'search'): { words: string; why: string } {
+  const at = mark?.kind === 'ahead' ? mark.at : null
+  const place = at === null ? null : placeWords(at, positions)
+  const where = at === null ? null : describePosition(at, positions)
+  const unplaced = mark?.kind === 'unplaced'
+  const learned = place !== null ? `at ${place}` : 'later'
+  const words = on === 'name' ? (unplaced ? 'readers never learn this' : `readers learn this ${learned}`)
+    : on === 'link' ? (unplaced ? 'a name readers never learn' : `a name readers learn ${learned}`)
+    : unplaced ? 'only in a name readers never learn' : `only in a name readers learn ${learned}`
+  const when = unplaced
+    ? `${mark?.at ? `Its from, ${mark.at}, isn't a chapter or book this universe has` : 'It has no from'}, so no point in the story knows this name.`
+    : where !== null ? `Readers at this point in the story don't know this name yet. They learn it at ${where}.` : "Readers at this point in the story don't know this name yet."
+  const why = on === 'link' ? `${when} Until then, the Reader's view shows the note's name for this link.`
+    : on === 'search' ? `${when} A search in the Reader's view here doesn't find it.`
+    : when
+  return { words, why }
+}
 export const ONLY_IN_LINK_TARGET = "only in a link's target"
 export const ONLY_IN_LINK_TARGET_WHY = 'Readers see only the label of a labelled link, so a search in the Reader\'s view looks only at that.'
 

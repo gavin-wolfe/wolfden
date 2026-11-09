@@ -6,7 +6,8 @@ namespace Wolfden.Index.Reading;
 /// <summary>
 /// The links of a universe's notes as a reader's page shows them (#300), so a Reader's
 /// search looks at what's on that page rather than what's written: a note's name for a
-/// link written by its alias or key, and no target behind a label.
+/// link written by its alias or key, the name as written for a link by a <c>known_as</c>
+/// name readers know there (#67), and no target behind a label.
 /// </summary>
 /// <remarks>
 /// <see cref="Shown"/> is the server's copy of the web's <c>linkText</c> in
@@ -27,12 +28,17 @@ public sealed class ReadersLinks
     /// name readers learn later reads as written by the note's name (F-VIEW-7): that link
     /// shows as the rewritten one does. Null for text as written.
     /// </param>
-    public ReadersLinks(IndexDbContext db, int universeId, Func<EntityRecord, bool> met, Func<EntityRecord, string, bool> knowsSection, StoryHorizon? horizon = null)
+    /// <param name="point">
+    /// Without a <paramref name="horizon"/>, the point readers are at, for which <c>known_as</c>
+    /// names they know: a link by one they know shows as written. Null for every name known.
+    /// </param>
+    public ReadersLinks(
+        IndexDbContext db, int universeId, Func<EntityRecord, bool> met, Func<EntityRecord, string, bool> knowsSection, StoryHorizon? horizon = null, long? point = null)
     {
         ArgumentNullException.ThrowIfNull(db);
         ArgumentNullException.ThrowIfNull(met);
         ArgumentNullException.ThrowIfNull(knowsSection);
-        _shown = new Lazy<Dictionary<(int, string), string>>(() => Load(db, universeId, met, knowsSection, horizon));
+        _shown = new Lazy<Dictionary<(int, string), string>>(() => Load(db, universeId, met, knowsSection, horizon, horizon?.Point ?? point));
     }
 
     /// <summary>The sections a canon view has, for a <c>knowsSection</c>.</summary>
@@ -46,10 +52,12 @@ public sealed class ReadersLinks
     /// <summary>
     /// What a page shows for a link: its label, else the note it reaches if readers have met it, else its target as written, with the heading if it has no label.
     /// A Reader's page gives no heading for a section readers don't know, so a later section isn't named.
+    /// A link written by a <c>known_as</c> name readers know (<paramref name="asWritten"/>) shows that name rather than
+    /// the note's (#67, §4), so prose after the reveal that says <c>[[Corin Hask]]</c> keeps saying it.
     /// </summary>
-    public static string Shown(string? label, string? metName, string target, string? heading)
+    public static string Shown(string? label, string? metName, string target, string? heading, bool asWritten = false)
     {
-        var name = label ?? metName ?? target;
+        var name = label ?? (asWritten && metName is not null ? target.Trim() : metName) ?? target;
         return !string.IsNullOrEmpty(heading) && label is null ? $"{name}: {heading}" : name;
     }
 
@@ -70,8 +78,15 @@ public sealed class ReadersLinks
             ? LinkSyntax.WithLinksShown(text, markdown, link => _shown.Value.GetValueOrDefault((note, link)))
             : text;
 
+    /// <summary>
+    /// True for a link written by a <c>known_as</c> name (F-ENT-10, its row's <c>NameFromOrdinal</c>)
+    /// that readers at <paramref name="point"/> know, or with no point, by any <c>known_as</c> name.
+    /// </summary>
+    public static bool ByKnownName(long? nameFrom, long? point) =>
+        nameFrom is { } learned && (point is not { } at || learned <= at);
+
     private static Dictionary<(int, string), string> Load(
-        IndexDbContext db, int universeId, Func<EntityRecord, bool> met, Func<EntityRecord, string, bool> knowsSection, StoryHorizon? horizon)
+        IndexDbContext db, int universeId, Func<EntityRecord, bool> met, Func<EntityRecord, string, bool> knowsSection, StoryHorizon? horizon, long? point)
     {
         var targets = db.Entities.Where(e => e.UniverseId == universeId).ToList()
             .GroupBy(e => e.Key)
@@ -79,14 +94,14 @@ public sealed class ReadersLinks
         var shown = new Dictionary<(int, string), string>();
         var links = db.Links
             .Where(l => l.UniverseId == universeId && l.SourceEntityId != null)
-            .Select(l => new { Note = l.SourceEntityId!.Value, l.Path, l.Text, l.Label, l.Target, l.Heading, l.TargetKey, l.TargetSection })
+            .Select(l => new { Note = l.SourceEntityId!.Value, l.Path, l.Text, l.Label, l.Target, l.Heading, l.TargetKey, l.TargetSection, l.NameFromOrdinal })
             .ToList();
         foreach (var link in links)
         {
             var target = link.TargetKey is { } key ? targets.GetValueOrDefault(key) : null;
             var reached = target is not null && met(target) ? target : null;
             var heading = reached is not null && link.TargetSection is { } section && knowsSection(reached, section) ? link.Heading : null;
-            shown.TryAdd((link.Note, link.Text), Shown(link.Label, reached?.Name, link.Target, heading));
+            shown.TryAdd((link.Note, link.Text), Shown(link.Label, reached?.Name, link.Target, heading, ByKnownName(link.NameFromOrdinal, point)));
 
             // The same link as a read at the position has it, by the note's name (F-VIEW-7).
             if (horizon?.LinkAsKnown(link.Path, link.Text) is { } known && LinkSyntax.FindLinks(known) is [var rewritten])

@@ -760,18 +760,25 @@ function ValueInput({
   )
 }
 
+/** True if PositionInput opens on `value` as "Type a position": a value that's neither a listed chapter nor a book. */
+export function startsTyping(value: string, positions: readonly PositionView[]): boolean {
+  return value !== '' && !positions.some((p) => p.position === value && p.chapter !== null) && !positions.some((p) => p.book === value)
+}
+
 /**
  * A story position: a book and a chapter from the den's books, or, with
  * "Type a position", any position as text, such as one for a chapter the
- * book doesn't list yet.
+ * book doesn't list yet. `onTyping` hears when "Type a position" is chosen or left,
+ * so a form can tell a position left blank from `none`.
  */
-function PositionInput({
+export function PositionInput({
   id,
   label,
   none,
   value,
   positions,
   onChange,
+  onTyping,
 }: {
   id: string
   label: string
@@ -779,6 +786,7 @@ function PositionInput({
   value: string
   positions: PositionView[]
   onChange: (position: string) => void
+  onTyping?: (typing: boolean) => void
 }) {
   const books = useMemo(() => {
     const seen = new Map<string, string>()
@@ -790,7 +798,7 @@ function PositionInput({
   }, [positions])
   const known = positions.find((p) => p.position === value && p.chapter !== null)
   const isBook = books.some((b) => b.key === value)
-  const [typing, setTyping] = useState(value !== '' && !known && !isBook)
+  const [typing, setTyping] = useState(() => startsTyping(value, positions))
   const book = typing ? '*' : known ? known.book : isBook ? value : ''
   return (
     <fieldset className="position-input">
@@ -803,6 +811,7 @@ function PositionInput({
           onChange={(e) => {
             const next = e.target.value
             setTyping(next === '*')
+            onTyping?.(next === '*')
             if (next !== '*') {
               onChange(next)
             }
@@ -956,7 +965,7 @@ function RefInput({
       {showing && (
         <ul className="ref-options" role="listbox" id={listId} aria-label={`Notes for ${label}`}>
           {options.map((hit, i) => {
-            const { name, alias } = matchLabel(hit)
+            const { name, alias, learned } = matchLabel(hit)
             return (
               <li
                 key={hit.entity.key}
@@ -972,6 +981,7 @@ function RefInput({
                 {alias !== null && (
                   <>
                     , as <em>{alias}</em>
+                    {learned !== null && <span className="ahead-of-readers"> {learned}</span>}
                   </>
                 )}{' '}
                 <span className="muted">{hit.entity.type}</span>

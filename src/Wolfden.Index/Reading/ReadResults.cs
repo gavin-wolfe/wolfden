@@ -421,6 +421,12 @@ public sealed record LookupHit(EntitySummary Entity, string MatchedBy, string? A
     /// written in a link.
     /// </summary>
     public string? LinkText { get; init; }
+
+    /// <summary>True for a match by a name readers learn partway through the story (<c>known_as</c>, format.md F-ENT-10); otherwise null.</summary>
+    public bool? KnownAs { get; init; }
+
+    /// <summary>For a match by a <c>known_as</c> name, where readers learn it, as written, or null if no <c>from</c> places it.</summary>
+    public string? From { get; init; }
 }
 
 /// <summary>The result of a lookup by name and alias (#198).</summary>

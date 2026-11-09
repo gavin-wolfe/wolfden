@@ -1601,19 +1601,23 @@ in a field, a section readers reach early, and one they reach later.
 - `change_alias` from `Mara Voss` to `Mara Holt` rewrites all three links, at every
   position, and the entry keeps its `from`. With `keep_old_alias`, the new name goes
   beside the old, with the same `from`. Removed, its links get the note's name.
-- Given `plain: true`, the name becomes a plain alias, and no link changes; the effects
-  say a secret is given away. A name that's in `aliases` too only leaves `known_as`.
-  `from: ""` or a blank `from` counts as left out, so it changes nothing. Given a
-  position, a plain alias becomes a `known_as` name from there, or a `known_as`
-  name's `from` changes, and no link changes. A `from` that isn't a position the
-  universe has is `bad_position`, and `plain` with a `from` is `bad_argument`.
+- With `plain: true`, the name becomes a plain alias and no link changes. The effects
+  warn that this gives the secret away. If the name is also in `aliases`, it's only
+  taken out of `known_as`.
+- With a position in `from`, a plain alias becomes a `known_as` name from there, or a
+  `known_as` name gets that `from`. No link changes.
+- An empty or blank `from` is treated as no `from` at all, so on its own it changes
+  nothing. A `from` the universe doesn't have is `bad_position`, and `plain` with a
+  `from` is `bad_argument`.
 - A name kept beside a `known_as` entry with no `from` goes in `known_as` with no
   `from` too, so it stays hidden. In a flow list (`known_as: [{ ... }, { ... }]`)
   each tool finds the entry by its name.
 - `update_fields` doesn't move a `known_as` entry, and says why: the earliest `from`
   counts, not the order.
 - `rename_entity` to one of the note's own `known_as` names takes the entry out, and
-  says the name is known everywhere now. `create_entity` takes `known_as`.
+  says the name is known everywhere now. With `keep_old_name`, the effects say the
+  old name is a plain alias with no `from`, so readers know it wherever they know the
+  note. `create_entity` takes `known_as`.
 
 Spec: F-ENT-10, F-RT-5 (#67, §9). Covered by: `KnownAsWriteTests`.
 
@@ -7034,3 +7038,82 @@ I'm at Dracula chapter 3 with `?readers=1`.
 
 Spec: design.md §9 (#300). Covered by: `web/src/ReaderBookPages.test.tsx`,
 `ReadersBookPagesTests.MovingForwardGivesOnlyTheOnePosition`.
+
+### SC-WEB-112. The Author sees a name readers learn later
+
+The Courier has `known_as: [{ value: Mara Voss, from: "ash:2" }]`, and The post book
+says `Signed by [[Mara Voss]].` I'm at `ember:3`.
+
+- In the Author's view, The Courier's names list `Mara Voss` with `from` beside it,
+  tagged `readers learn this at` ash chapter 2. At `ash:2` it has no tag. With no
+  position, each `known_as` name shows its `from`. A name can't be learned before its
+  note is met, so one whose `from` is earlier is tagged with the note's entry; one with
+  no `from`, or one the universe doesn't have, says readers never learn it.
+- The post book's link shows `Mara Voss`, as written, tagged `a name readers learn at`
+  ash chapter 2, since the Reader's view shows The Courier there. A labelled link has no
+  tag. The Courier's **Linked from** tags that line too.
+- Searching `Voss` finds The Courier, tagged `only in a name readers learn at` ash
+  chapter 2, after what readers can find. So is The post book's lead, found only by its
+  link `[[Mara Voss]]`; its labelled `[[Mara Voss|The stranger]]` is `only in a link's
+  target`. The Reader's view finds nothing, and its page lists only `the Messenger`.
+- A hidden name doesn't raise a note in the Reader's search: two notes alike but for a
+  later name that repeats the word come in path order.
+
+Spec: #67 §4, §13 (PR 3). Covered by: `KnownAsWebTests` (API), `web/src/KnownAs.test.tsx`.
+
+### SC-WEB-113. A note filed under a description
+
+`The man in the grey coat` has `known_as: [{ value: Corin Hask, from: "ash:2" }]`, and a
+section of the dock log from `ash:2` says `[[Corin Hask]] signed it.`
+
+- In the Reader's view at `ash:2`, the page title is unchanged, its names list `Corin
+  Hask`, and the link shows `Corin Hask`, as written, not the note's name. The Reader's
+  search finds the dock log by "Hask signed", and not by "grey coat signed".
+- No badge says the note is unfinished, with or without a `known_as`.
+- What a link shows is one rule in two places, the page's `linkText` and the server's
+  `ReadersLinks.Shown`, kept equal by `tests/shared/link-text-cases.json`.
+
+Spec: #67 §4. Covered by: `KnownAsWebTests.ALinkByANameReadersKnowShowsAsWrittenInTheReadersView`,
+`ReadersSearchTests.TheServersRuleForWhatALinkShowsIsThePages`, `web/src/linkText.test.ts`,
+`web/src/KnownAs.test.tsx`.
+
+### SC-WEB-114. They until the reveal
+
+A character's `pronouns` are `{ value: they/them, until: "ash:3" }` then
+`{ value: he/him, from: "ash:3" }`. At `ember:3`, the Reader's view shows `they/them`
+and nothing of `he/him`. The Author's view shows both, with `he/him` tagged as ahead
+of readers until `ash:3`.
+
+Spec: #67 §11. Covered by: `KnownAsWebTests.PronounsUntilTheRevealReadPlainlyToReadersAndMarkedToTheAuthor`.
+
+### SC-WEB-115. I edit a note's other names on its page
+
+**Other names**, beside **Edit file**, lists the note's aliases (`always known`) and
+`known_as` names (with their `from`).
+
+- **Rename** rewrites the links that use the name, in every note; a `known_as` name
+  keeps its `from`.
+- **When readers learn it** with a chapter makes an alias a `known_as` name, or moves
+  its `from`, and changes no link. **Always** makes a `known_as` name an alias, after a
+  warning that a secret would show at every position.
+- **Remove** asks, then takes it out; links that use it get the note's name. An empty
+  rename doesn't remove anything (`/api/edit/name` needs `remove: true`).
+- **Add a name** adds an alias, or with a chapter, a `known_as` entry. A `known_as`
+  entry with no `from` is refused (**Type a position** left blank, even when it opened on a
+  `from` the book doesn't list), as are a `from` the universe doesn't have
+  (`bad_position`), a `from` on a plain alias, and a name the note already goes by.
+  Nothing changes. A name is trimmed.
+- Each goes through `change_alias` or `update_fields`, the writes an AI assistant uses.
+
+Spec: #67 §9. Covered by: `KnownAsWebTests.TheEditorAddsANameWithWhereReadersLearnItAndRefusesOneWithout`,
+`KnownAsWebTests.TheEditorRenamesMovesAndRemovesANameThroughChangeAlias`, `web/src/KnownAs.test.tsx`.
+
+### SC-WEB-116. The link picker finds a note by a later name
+
+Typing `mara` in a link picker finds The Courier, and the row says `as Mara Voss`, with
+`readers learn it at ash:2`. A plain alias says nothing more. Picking it links by that
+name: an editor shows everything, and `wolfden check` warns about text readers reach
+first.
+
+Spec: #67 §4. Covered by: `KnownAsWebTests.TheLinkLookupSaysWhichNameMatchedAndWhereReadersLearnIt`,
+`web/src/KnownAs.test.tsx`.

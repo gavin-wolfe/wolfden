@@ -777,6 +777,9 @@ the pages don't have a form for it yet. The rules are in
 - **Edit file** opens the whole note, frontmatter and all, for anything
   the other controls don't do, such as a section's
   `<!-- wolfden: ... -->` comment.
+- **Other names** edits the note's aliases and the names readers learn later,
+  rewriting the links that use a renamed one
+  ([Editing names on the page](#other-names-aliases-and-known_as)).
 - **While you edit, you see everything.** The page shows the whole note,
   and says "Editing shows everything". With a story position picked, that's the
   Author's view, tags included. The Reader's view can't be edited.
@@ -859,9 +862,10 @@ you're in is always highlighted.
 
   **Search** finds everything. Notes with something a reader could find come first, then
   a dashed line, then the rest, with tags saying why. Hits in a comment say `in a
-  comment`, and `only in an alias` or `only in a link's target` means a reader's search
-  wouldn't find it there. If you find a note by the name or alias of a note it links to,
-  and readers haven't met that one, the hit says where they do.
+  comment`, and `only in a name readers learn at chapter 38`, `only in an alias`, or `only
+  in a link's target` means a reader's search wouldn't find it there. If you find a note
+  by the name or alias of a note it links to, and readers haven't met that one, the hit
+  says where they do.
 - **The Reader's view** shows what a reader at that chapter knows, and nothing else:
   no tags, no later dates, no comments, and no sections with an error. A note they
   haven't met says where they first meet it. It's read-only, and it has no history,
@@ -881,7 +885,8 @@ you're in is always highlighted.
   `[[halden-pike|the stranger]]` is found by "stranger" and never by "pike", even once
   they've met him, which is why the tip above works. With no label, a link to a note
   they've met is found by that note's name, however you wrote it, and one to a note
-  they haven't met is found as you wrote it. A note is found by its name and the other
+  they haven't met is found as you wrote it. A link written by a `known_as` name readers
+  have reached is the exception: it shows, and is found, as you wrote it. A note is found by its name and the other
   names readers know it by at that point, which its page lists: its aliases, and each
   `known_as` name they've reached ([Other names](#other-names-aliases-and-known_as)).
   A type's default values aren't searched. A comment inside a field's value isn't hidden, here or on the page: comments
@@ -1015,9 +1020,16 @@ drafting there, is told:
   chapter 12, reads `[[The Courier]] signed it` there, so the link doesn't hand
   over the name. The file isn't changed.
 - **From `ember:38`**, it's listed with the note's other names, like an alias,
-  with no date beside it, and found by search.
-- **In the Author's view and with no position**, you see everything:
-  `known_as` with each `from`.
+  with no date beside it, and found by search. A link you wrote with it shows as
+  you wrote it, `Mara Voss`, not as the note's name.
+- **In the Author's view and with no position**, you see everything: each
+  `known_as` name with its `from` beside it, such as `from Ember chapter 38`. In
+  the Author's view before chapter 38, the name is also tagged `readers learn this
+  at Ember chapter 38`. A link you wrote with it shows as written, tagged `a name
+  readers learn at Ember chapter 38`, since the Reader's view shows the note's name
+  there, and so does its line in **Linked from**. A search hit found only by that
+  name says `only in a name readers learn at Ember chapter 38`, and comes after what
+  readers can find.
 
 **A secret written as a plain alias shows at every position.** If a name is a
 reveal, it goes in `known_as`, never `aliases`: an alias is listed on the note's
@@ -1070,13 +1082,33 @@ that never gets a real name.
 - It hides names, not prose. `Mara Voss` typed as plain words in an early
   section shows there, so read summary sections for it as for any reveal.
 - There's no `until`: readers who have learned a name don't forget it.
-- For now, the web editor doesn't edit `known_as`: use **Edit file**, or ask an
-  AI assistant. In Obsidian, `known_as` is a property it doesn't know, so edit
-  it in Source mode, as with `fields`.
+- In Obsidian, `known_as` is a property it doesn't know, so edit it in Source mode,
+  as with `fields`.
 - To move a reveal earlier or later, change its `from`: no link changes, since
   links don't depend on where you are in the story. An assistant can do it with
   `update_fields`, and its `change_alias` can move a name between `aliases` and
   `known_as`, or rename one, rewriting the links that use it.
+
+**Editing names on the page.** In the Author's view, or with no position,
+**Other names** beside **Edit file** opens a list of the note's aliases and
+`known_as` names, each with when readers learn it (`always known` for an alias).
+Each change is saved as soon as you make it:
+
+- **Rename** changes the name and rewrites every link that uses it, in every note.
+  A `known_as` name keeps its `from`.
+- **When readers learn it** picks the book and chapter. Choosing **Always** makes it
+  a plain alias, and the page warns first that a secret would show at every position.
+  Picking a chapter for an alias makes it a `known_as` name from there. No link
+  changes either way.
+- **Remove** takes the name out, and links that use it change to the note's name.
+- **Add a name** adds one: with **Always**, as an alias; with a chapter, as a
+  `known_as` name from there. A name readers learn later needs its chapter: **Type a
+  position** left blank is refused, rather than adding the name as an alias.
+
+The link pickers find a note by its `known_as` names too, and say so:
+`Mina Harker, as Mrs. Harker readers learn it at dracula:5`. An editor shows
+everything, so it links by that name if you pick it; `wolfden check` warns if
+readers reach that text before the name's `from`.
 
 ## Images
 
@@ -1779,7 +1811,8 @@ in it, which Wolfden calls a checkpoint.
   **Edit file** or in your editor leaves the links that used the old
   name broken. The web UI can't rename a note yet. An AI assistant
   working through Wolfden can, and rewrites the links, or keeps the old
-  name as an alias.
+  name as an alias. A note's other names you can rename on its page, with
+  **Other names**, and their links follow.
 - **Moving a note's file can change where links go.** Since the nearest
   note of a name wins, a file moved to another book, or up to the
   universe, can take links from another note, or lose its own. An AI

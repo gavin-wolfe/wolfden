@@ -204,7 +204,7 @@ public sealed partial class DenTools
                 throw new DenToolException(
                     ToolErrorCodes.BadArgument,
                     $"'{target.Name}' already goes by '{newAlias}' ({(LinkText.Matches(target.Name, newAlias) ? "its name" : "another alias")}). " +
-                    $"To drop '{oldAlias}', call change_alias without 'new_alias', which points its links at the name.");
+                    $"To drop '{oldAlias}', {Words.DropAlias}, which points its links at the name.");
             }
 
             var keep = keepOldAlias && !sameForLinks;
@@ -242,10 +242,10 @@ public sealed partial class DenTools
                 SameForLinks: sameForLinks,
                 KeepHint: newAlias is null
                     ? "Leave the alias as it is."
-                    : "To make the change, pass keep_old_alias: true to add the new alias beside the old one instead, which leaves those links as they are.",
+                    : $"To make the change, {Words.KeepOldAlias}, which leaves those links as they are.",
                 LostHint: newAlias is null
                     ? "keep the alias, or change those links to the entity's id or file name first"
-                    : "choose another alias, or pass keep_old_alias: true to add the new alias beside the old one instead, which leaves those links as they are",
+                    : $"choose another alias, or {Words.KeepOldAlias}, which leaves those links as they are",
                 Notes: notes)
             {
                 Learned = learned is null ? null : Learning(newAlias ?? oldAlias, toKnown ? newFrom : null, slot),
@@ -549,6 +549,13 @@ public sealed partial class DenTools
                 if (target.File.Title is { } title && title.Trim() == c.OldText)
                 {
                     effects.Add($"Its title heading, '# {title}', now reads '# {c.NewText}' too.");
+                }
+
+                if (c.Kept is { } kept)
+                {
+                    effects.Add(
+                        $"'{kept}' is a plain alias now, with no from, so readers know it wherever they know the note, at every story position. " +
+                        "If readers should learn it partway through, give it a from, which makes it a known_as name.");
                 }
 
                 if (c.DroppedAlias is { } dropped)

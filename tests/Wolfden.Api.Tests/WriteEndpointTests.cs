@@ -728,4 +728,26 @@ public class WriteEndpointTests
         Assert.Contains("pinned", json.GetProperty("message").GetString(), StringComparison.Ordinal);
         Assert.Equal(before, den.Read(Reach));
     }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-55")]
+    public async Task EditFileSaysWhenTheTextNamesSomeoneBeforeReadersLearnTheName()
+    {
+        using var den = TempDen.Starfall();
+        const string Courier = "universes/starfall/entities/notes/the-courier.md";
+        const string Ledger = "universes/starfall/entities/notes/the-ledger.md";
+        den.Write(Courier, "---\ntype: note\nname: The Courier\nknown_as:\n  - { value: Mara Voss, from: \"ash:2\" }\nstatus: canon\nfrom: \"ember:1\"\n---\n\nCarries the post.\n");
+        den.Write(Ledger, "---\nid: 01M4TF5F0EKGGWD5FNVBAEY8Z2\ntype: note\nname: The ledger\nstatus: canon\nfrom: \"ember:1\"\n---\n\nKept at the Reach.\n");
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root));
+        var source = await server.GetJsonAsync($"/api/entity/source?universe=starfall&entity={Uri.EscapeDataString(Ledger)}", HttpStatusCode.OK);
+
+        var text = den.Read(Ledger) + "Mara Voss signed it.\n";
+        var (status, json) = await PostAsync(server, "/api/edit/file", new { entity = Ledger, universe = "starfall", expectedHash = Hash(source), text });
+
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.Equal(text, den.Read(Ledger));
+        Assert.Contains(
+            json.GetProperty("effects").EnumerateArray().Select(e => e.GetString()),
+            e => e!.StartsWith($"{Ledger}:10: warning F-NAME-1: 'Mara Voss' is a name of 'The Courier' that readers learn at ash:2, and this text is at ember:1.", StringComparison.Ordinal));
+    }
 }

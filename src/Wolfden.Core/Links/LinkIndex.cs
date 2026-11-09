@@ -240,28 +240,9 @@ public sealed class LinkIndex
             }
 
             // A link by a name readers learn later than they meet the note runs ahead until that name's
-            // from, even at the start of the story. With a label, nothing shows the name (format.md F-LINK-13).
-            var known = spoilerChecks && link.Label is null && resolution.MatchedBy == LinkMatchKind.Alias ? target.KnownNameMatching(link.Target) : null;
-            if (known?.Point is { } learned && (target.EntersCanon is not { } met || learned > met))
-            {
-                var early = occurrence.Positions.Where(p => learned > p.Point).ToList();
-                foreach (var position in early.Where(p => p.Chapter is null))
-                {
-                    Warn(occurrence, "F-LINK-13",
-                        $"{link.Text}: '{known.Value}' is a name of '{target.Name}' that readers learn at {known.From}, after this link's position, {position.Description}. It may be a spoiler.");
-                }
-
-                var inheriting = early.Where(p => p.Chapter is not null).OrderBy(p => p.Point).Select(p => p.Chapter!.ToString()).ToList();
-                if (inheriting.Count > 0)
-                {
-                    var where = inheriting.Count == 1
-                        ? $"chapter {inheriting[0]}, which inherits this default"
-                        : $"chapters {ListChapters(inheriting)}, which inherit this default";
-                    Warn(occurrence, "F-LINK-13",
-                        $"{link.Text}: '{known.Value}' is a name of '{target.Name}' that readers learn at {known.From}, after {where}. It may be a spoiler.");
-                }
-            }
-            else if (spoilerChecks && target.EntersCanon is { } enters)
+            // from (LaterName). Any other link to a note runs ahead until the note enters canon.
+            if (spoilerChecks && !LaterName(occurrence, resolution, target, (message, _) => Warn(occurrence, "F-LINK-13", message))
+                && target.EntersCanon is { } enters)
             {
                 var ahead = occurrence.Positions.Where(p => !p.Point.IsStartOfStory && enters > p.Point).ToList();
                 foreach (var position in ahead.Where(p => p.Chapter is null))
@@ -285,6 +266,73 @@ public sealed class LinkIndex
         }
 
         return new ResolvedLink(occurrence, resolution, section);
+    }
+
+    /// <summary>
+    /// F-LINK-13 for a link by a name readers learn later than they meet the
+    /// note: it runs ahead until that name's from, even at the start of the
+    /// story. With a label, nothing shows the name (format.md F-LINK-13).
+    /// </summary>
+    /// <returns>True if the link matched by such a name, so it isn't checked against the note's own entry.</returns>
+    /// <param name="occurrence">The link.</param>
+    /// <param name="resolution">What it resolved to.</param>
+    /// <param name="target">The note it reaches.</param>
+    /// <param name="warn">Takes each warning's message, and a key for it that leaves out the note's name (<see cref="Checks.LaterNameKey"/>).</param>
+    private static bool LaterName(LinkOccurrence occurrence, TargetResolution resolution, CatalogEntity target, Action<string, string> warn)
+    {
+        var link = occurrence.Link;
+        var known = link.Label is null && resolution.MatchedBy == LinkMatchKind.Alias ? target.KnownNameMatching(link.Target) : null;
+        if (known?.Point is not { } learned || (target.EntersCanon is { } met && learned <= met))
+        {
+            return false;
+        }
+
+        var early = occurrence.Positions.Where(p => learned > p.Point).ToList();
+        foreach (var position in early.Where(p => p.Chapter is null))
+        {
+            warn($"{link.Text}: '{known.Value}' is a name of '{target.Name}' that readers learn at {known.From}, after this link's position, {position.Description}. It may be a spoiler.",
+                $"{link.Text}\n{known.Value}\n{known.From}\n{position.Description}");
+        }
+
+        var inheriting = early.Where(p => p.Chapter is not null).OrderBy(p => p.Point).Select(p => p.Chapter!.ToString()).ToList();
+        if (inheriting.Count > 0)
+        {
+            var where = inheriting.Count == 1
+                ? $"chapter {inheriting[0]}, which inherits this default"
+                : $"chapters {ListChapters(inheriting)}, which inherit this default";
+            warn($"{link.Text}: '{known.Value}' is a name of '{target.Name}' that readers learn at {known.From}, after {where}. It may be a spoiler.",
+                $"{link.Text}\n{known.Value}\n{known.From}\n{where}");
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// F-LINK-13's warnings for the links in one note's text that are by a name
+    /// readers learn later (<see cref="LaterName"/>), word for word as a build of
+    /// the whole den gives them, for a write's effects (#67). The caller checks
+    /// <c>spoiler_checks</c>.
+    /// </summary>
+    internal static List<DenDiagnostic> LaterNameLinks(LinkResolver resolver, CatalogEntity entity, Bookkeeping bookkeeping, Dictionary<Diagnostic, Checks.LaterNameKey>? keys = null)
+    {
+        var occurrences = new List<LinkOccurrence>();
+        new LinkScanner(bookkeeping, occurrences, []).ScanEntity(entity);
+        var found = new List<DenDiagnostic>();
+        foreach (var occurrence in occurrences.Where(o => !o.IsBookkeeping))
+        {
+            var resolution = resolver.Resolve(occurrence.Scope, occurrence.Link.Target);
+            if (resolution.Entity is { } target)
+            {
+                LaterName(occurrence, resolution, target, (message, key) =>
+                {
+                    var warning = new Diagnostic("F-LINK-13", DiagnosticSeverity.Warning, occurrence.Link.Line, message);
+                    found.Add(new DenDiagnostic(occurrence.Path, warning));
+                    keys?.Add(warning, new Checks.LaterNameKey("F-LINK-13", target.Path, key));
+                });
+            }
+        }
+
+        return found;
     }
 
     /// <summary>The <c>ref</c> field a link is in (types.md F-FT-9): an entity field of its type, or a chapter field. Null otherwise.</summary>

@@ -261,7 +261,8 @@ prompts. This list is for knowing what the assistant can do.
   story: a status that takes an entity out of canon views, a chapter left
   with no POV, the links a rename rewrote, and any link that would now
   reach a different entity (a change like that is refused unless the
-  assistant is told to allow it).
+  assistant is told to allow it). With spoiler checks on, they also warn
+  when the text written names someone by a name readers learn later.
 - **Your comments stay put.** A YAML comment you wrote on a field or a
   list item (`- "[[mina-harker]]"  # main`) is kept when the assistant
   changes something else. Moving or changing one list item in place
@@ -486,6 +487,19 @@ docs. The writer's own list is in
   reason to read with no position before replacing text. You can still write a
   link by a later name: it resolves, and `check` warns that it's ahead of its
   position, which you should tell the writer.
+- **A write's effects warn about a later name.** With `spoiler_checks` on, when the
+  text a write saves names someone by a name readers learn later than that text's
+  position, as plain words (F-NAME-1) or as a link (F-LINK-13), the result's
+  `effects` list the warning in `check`'s words, with the file and line:
+  `.../the-ledger.md:14: warning F-NAME-1: 'Mara Voss' is a name of 'The Courier'
+  that readers learn at ash:2, and this text is at ember:12. ...`. The write is
+  made anyway. Tell the writer, and if it's a slip, fix it: give the text a later
+  `from`, take the name out, or use the name readers know there. Only the notes the
+  write saved are looked at, and only warnings they didn't have before, so a name
+  already in the note at that position isn't repeated. Every write to a note says
+  this: `create_entity`, `update_fields`, `append_section`, `add_idea`,
+  `rename_section`, `rename_entity`, `change_alias` (for the links it rewrites),
+  `copy_entity`, and `move_entity`.
 - **A read at a position only goes by positions.** Text the writer put in a
   section or lead, a field the note's type doesn't define, or a `ref` field's
   value can still mention later events, and so can a later name written as plain

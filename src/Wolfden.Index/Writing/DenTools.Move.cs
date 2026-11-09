@@ -193,6 +193,8 @@ public sealed partial class DenTools
             }
 
             RefuseUnreadable(den);
+            var early = Core.Checks.WrittenTextChecks.LaterNames(
+                catalog, plan.After.Catalog, files.Keys, new Dictionary<string, string>(StringComparer.Ordinal) { [plan.To] = path });
             SaveMove(path, plan.To, plan.Interim, files, plan.Originals);
             var after = EntityCatalog.ReadEntityFile(check.Structure, plan.To, files[plan.To]).Entity!;
             var effects = new List<string>
@@ -241,6 +243,7 @@ public sealed partial class DenTools
                     $"{string.Join(", ", plan.SkippedPaths)}. Once they're fixed, check that those links still reach it.");
             }
 
+            effects.AddRange(LaterNameEffects(early));
             if (idAdded is not null)
             {
                 effects.Add($"The file had no id, so it was given {idAdded} (F-ID-6).");

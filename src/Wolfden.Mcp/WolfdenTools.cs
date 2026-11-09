@@ -184,7 +184,9 @@ public sealed class WolfdenTools
         " The edit goes to the den's files only (nothing is committed until checkpoint), and is checked as the den would read it: " +
         "an edit that would leave an error is refused (invalid_edit), and nothing is written. Nothing in a final (frozen) book can be " +
         "changed (frozen). The result gives the file's new hash, what the edit means where that depends on more than the text written " +
-        "('effects'), any pinned canon it touched ('pinned_canon': check those with the writer), and warnings about the file.";
+        "('effects'), any pinned canon it touched ('pinned_canon': check those with the writer), and warnings about the file. With spoiler " +
+        "checks on, effects also warn, in check's words, where a note's text the edit wrote names someone, or links to them, by a name " +
+        "readers learn later than that text's position (F-NAME-1, F-LINK-13). The edit is still made: tell the writer.";
 
     private const string HashHelp =
         "The hash of the file your edit is based on: 'hash' from get_entity, or from your last write's result. If the file has changed " +

@@ -12,8 +12,10 @@ namespace Wolfden.Core.Checks;
 /// <summary>
 /// The spoiler checks on names readers learn later (format.md F-NAME-1, F-NAME-2,
 /// #67): a <c>known_as</c> name written as plain text that readers reach before
-/// they learn it, and a file name that holds one. They run only in <c>check</c>,
-/// and only with <c>spoiler_checks: true</c>, so a den without them pays one test.
+/// they learn it, and a file name that holds one. They run over the den only in
+/// <c>check</c>, and over the notes a write saves for its effects
+/// (<see cref="WrittenTextChecks"/>), and only with <c>spoiler_checks: true</c>,
+/// so a den without them pays one test.
 /// </summary>
 /// <remarks>
 /// Most notes don't hold a name, so before a note is read closely, its raw text
@@ -28,7 +30,20 @@ internal static class NameChecks
     /// <summary>Stands in for code and a link's hidden target, so the words on either side of it aren't side by side.</summary>
     private const char Gap = '';
 
-    public static List<DenDiagnostic> Run(EntityCatalog catalog, LinkResolver resolver)
+    public static List<DenDiagnostic> Run(EntityCatalog catalog, LinkResolver resolver) => Run(catalog, resolver, null);
+
+    /// <summary>
+    /// F-NAME-1 and F-NAME-2 in the notes of <paramref name="only"/>, or in every
+    /// note if it's null. The names looked for, and the names readers already
+    /// know, are their universes' as always, so a note's warnings are the same
+    /// either way. With <paramref name="only"/>, nothing else is reported: an
+    /// <c>allow_in</c> that reaches no note is its owner's warning, which <c>check</c> gives.
+    /// </summary>
+    /// <param name="catalog">The den's notes.</param>
+    /// <param name="resolver">Resolves <c>allow_in</c>.</param>
+    /// <param name="only">The notes to read, or null for all.</param>
+    /// <param name="keys">If given, each warning's <see cref="LaterNameKey"/>, by the warning's <see cref="Diagnostic"/>, for a write's effects.</param>
+    internal static List<DenDiagnostic> Run(EntityCatalog catalog, LinkResolver resolver, IReadOnlySet<CatalogEntity>? only, Dictionary<Diagnostic, LaterNameKey>? keys = null)
     {
         var found = new List<DenDiagnostic>();
         if (!catalog.Structure.SpoilerChecks)
@@ -37,25 +52,31 @@ internal static class NameChecks
         }
 
         Bookkeeping? bookkeeping = null;
-        foreach (var universe in catalog.Entities.Where(e => e.KnownAs.Count > 0).Select(e => e.Universe).Distinct())
+        var universes = catalog.Entities.Where(e => e.KnownAs.Count > 0).Select(e => e.Universe).Distinct();
+        if (only is not null)
+        {
+            universes = universes.Where(u => only.Any(e => e.Universe == u));
+        }
+
+        foreach (var universe in universes.ToList())
         {
             var entities = catalog.Entities.Where(e => e.Universe == universe).ToList();
-            var names = Names(entities, resolver, found);
+            var names = Names(entities, resolver, found, keys);
             if (names.Count > 0)
             {
                 bookkeeping ??= new Bookkeeping(catalog.Structure.BookkeepingSections);
-                new TextScan(names, entities, bookkeeping, found).Run();
+                new TextScan(names, entities, bookkeeping, found, keys).Run(only);
             }
         }
 
-        return found;
+        return only is null ? found : found.Where(d => d.Diagnostic.RuleId is "F-NAME-1" or "F-NAME-2" && only.Any(e => e.Path == d.Path)).ToList();
     }
 
     /// <summary>
     /// The names of one universe that F-NAME-1 looks for, with F-NAME-2 for each
     /// note's file name, and the warnings for an <c>allow_in</c> that reaches no note.
     /// </summary>
-    private static List<CheckedName> Names(List<CatalogEntity> entities, LinkResolver resolver, List<DenDiagnostic> found)
+    private static List<CheckedName> Names(List<CatalogEntity> entities, LinkResolver resolver, List<DenDiagnostic> found, Dictionary<Diagnostic, LaterNameKey>? keys)
     {
         var names = new List<CheckedName>();
         foreach (var entity in entities.Where(e => e.KnownAs.Count > 0))
@@ -84,10 +105,12 @@ internal static class NameChecks
                 // F-NAME-2: a file name is chosen, so even a one-word name counts.
                 if ((point is null || met < point) && IndexOf(fileWords, words) >= 0)
                 {
-                    found.Add(new DenDiagnostic(entity.Path, new Diagnostic("F-NAME-2", DiagnosticSeverity.Warning, known.Line,
+                    var warning = new Diagnostic("F-NAME-2", DiagnosticSeverity.Warning, known.Line,
                         $"The file name '{fileName}.md' holds '{known.Value}', a name of '{entity.Name}' that readers learn at {learnedAt}, " +
                         $"and a file's name shows in every read from the note's entry, {entity.EntersCanonDescription}. " +
-                        "Rename the file after the name the note is filed under, with Edit file in the web or by hand.")));
+                        "Rename the file after the name the note is filed under, with Edit file in the web or by hand.");
+                    found.Add(new DenDiagnostic(entity.Path, warning));
+                    keys?.Add(warning, new LaterNameKey("F-NAME-2", entity.Path, $"{known.Value}\n{learnedAt}\n{fileName}\n{entity.EntersCanonDescription}"));
                 }
 
                 if (!known.IsTextChecked)
@@ -158,17 +181,19 @@ internal static class NameChecks
         private readonly List<CatalogEntity> _entities;
         private readonly Bookkeeping _bookkeeping;
         private readonly List<DenDiagnostic> _found;
+        private readonly Dictionary<Diagnostic, LaterNameKey>? _keys;
         private readonly Dictionary<string, List<CheckedName>> _byFirstWord = new(StringComparer.Ordinal);
         private readonly SearchValues<string> _firstLook;
 
         /// <summary>For each checked name's words, where each note's names that have the same words become known (F-VIEW-7).</summary>
         private readonly Dictionary<string, List<StoryPoint>> _knownFrom = new(StringComparer.Ordinal);
 
-        public TextScan(List<CheckedName> names, List<CatalogEntity> entities, Bookkeeping bookkeeping, List<DenDiagnostic> found)
+        public TextScan(List<CheckedName> names, List<CatalogEntity> entities, Bookkeeping bookkeeping, List<DenDiagnostic> found, Dictionary<Diagnostic, LaterNameKey>? keys)
         {
             _entities = entities;
             _bookkeeping = bookkeeping;
             _found = found;
+            _keys = keys;
             foreach (var name in names.OrderBy(n => n.Learned is null).ThenBy(n => n.Learned))
             {
                 if (!_byFirstWord.TryGetValue(name.Words[0], out var list))
@@ -184,9 +209,10 @@ internal static class NameChecks
             KnowNames();
         }
 
-        public void Run()
+        /// <summary>Reads the notes of <paramref name="only"/> in this universe, or all of its notes if it's null.</summary>
+        public void Run(IReadOnlySet<CatalogEntity>? only)
         {
-            foreach (var entity in _entities)
+            foreach (var entity in only is null ? _entities : _entities.Where(only.Contains))
             {
                 if (entity.Status.IsInCanon() && entity.EntersCanon is not null && entity.File.IsReadable && (MayHold(entity.File.Text) || FrontmatterMayHold(entity)))
                 {
@@ -452,10 +478,12 @@ internal static class NameChecks
                     var line = lineOf(tokens[i].Start);
                     if ((warned ??= []).Add((line, name.Phrase)))
                     {
-                        _found.Add(new DenDiagnostic(entity.Path, new Diagnostic("F-NAME-1", DiagnosticSeverity.Warning, line,
+                        var warning = new Diagnostic("F-NAME-1", DiagnosticSeverity.Warning, line,
                             $"'{name.Known.Value}' is a name of '{name.Entity.Name}' that readers learn at {name.LearnedAt}, and this text is at {at}. " +
                             "It may be a spoiler. If it is, give the text a later from, or take the name out; if it means someone else, " +
-                            $"list this note in the name's allow_in.")));
+                            $"list this note in the name's allow_in.");
+                        _found.Add(new DenDiagnostic(entity.Path, warning));
+                        _keys?.Add(warning, new LaterNameKey("F-NAME-1", name.Entity.Path, $"{name.Known.Value}\n{name.LearnedAt}\n{at}"));
                     }
                 }
             }

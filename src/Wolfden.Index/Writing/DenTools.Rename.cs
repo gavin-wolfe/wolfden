@@ -281,7 +281,12 @@ public sealed partial class DenTools
     private static string Learning(string name, string? from, NameSlot slot) => from is null
         ? $"'{name}' is a plain alias now, known wherever the note is: a read at any story position lists it and finds the note by it." +
           (slot.IsKnownAs ? " If it's a secret, that gives it away; put it back in known_as with a from." : "")
-        : $"'{name}' is a name readers learn at {from} now (known_as): a read at an earlier position doesn't know it, and shows a link written by it as the note's name.";
+        : $"'{name}' is a name readers learn at {from} now (known_as): a read at an earlier position doesn't know it, and shows a link written by it as the note's name." +
+          LaterTextElsewhere;
+
+    /// <summary>Said when where readers learn a name moves: a write's effects look only at the notes it saves (#67).</summary>
+    private const string LaterTextElsewhere =
+        " With spoiler checks on, run check to find text and links in other notes that name it before then: this result looks only at the notes written.";
 
     /// <summary>Refuses a <c>known_as</c> <c>from</c> that isn't a position the universe has (F-ENT-10, F-POS-4).</summary>
     private void CheckKnownFrom(Universe universe, string name, string from)
@@ -533,6 +538,7 @@ public sealed partial class DenTools
             }
 
             RefuseUnreadable(den);
+            var early = Core.Checks.WrittenTextChecks.LaterNames(catalog, afterLinks.Catalog, files.Keys);
             Save(files, plan.Originals, created: null);
             var after = EntityCatalog.ReadEntityFile(check.Structure, path, files[path]).Entity!;
             var ownMoved = moved.Any(l => l.Before.Target?.Path == path);
@@ -590,6 +596,7 @@ public sealed partial class DenTools
                     $"{string.Join(", ", plan.SkippedPaths)}. Once they're fixed, check those links and change the ones to it to '{c.LinkText}' by hand.");
             }
 
+            effects.AddRange(LaterNameEffects(early));
             if (idAdded is not null)
             {
                 effects.Add($"The file had no id, so it was given {idAdded} (F-ID-6).");

@@ -64,6 +64,11 @@ namespace Wolfden.Index.Reading;
 /// tool that reads them and <c>{1}</c> for the API path:
 /// <c>{0} lists its items; name one by its number from 0 in 'item'.</c>
 /// </param>
+/// <param name="KeepOldAlias">
+/// How to add a new alias beside the old one rather than change it, so no link changes, lowercase:
+/// <c>pass keep_old_alias: true to add the new alias beside the old one instead</c>.
+/// </param>
+/// <param name="DropAlias">How to remove an alias, pointing its links at the name, lowercase: <c>call change_alias without 'new_alias'</c>.</param>
 /// <param name="NotWritten">
 /// What to do about a change of a chapter field's list items where the
 /// chapter (or container) doesn't write the field, so it inherits it (#197),
@@ -83,7 +88,9 @@ public sealed record ToolWords(
     string ReplaceOrClear = "To replace it, send a 'set' change with the whole value; to {0}, send a 'clear' change.",
     string SetOne = "To change it, send a 'set' change with the new value.",
     string ItemsListed = "{0} lists its items; name one by its number from 0 in 'item'.",
-    string NotWritten = "It inherits '{0}' from {1}: to change it there, use update_chapter_defaults; to give it a value of its own here, send a 'set' change with the whole value.")
+    string NotWritten = "It inherits '{0}' from {1}: to change it there, use update_chapter_defaults; to give it a value of its own here, send a 'set' change with the whole value.",
+    string KeepOldAlias = "pass keep_old_alias: true to add the new alias beside the old one instead",
+    string DropAlias = "call change_alias without 'new_alias'")
 {
     /// <summary>The MCP tools' own words, the default.</summary>
     public static ToolWords Mcp { get; } = new(

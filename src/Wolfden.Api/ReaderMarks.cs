@@ -393,6 +393,11 @@ internal sealed class ReaderMarks
                     return null;
                 }
 
+                if (FoundByLaterNameLink(query, section.Name, section.Body, l => l.SourceSectionId == section.Id, out nameMark))
+                {
+                    return InALaterName;
+                }
+
                 return DenReader.FoundWithoutComments(query, section.Name, section.Body) ? InALinkTarget : InAComment;
             }
 
@@ -401,9 +406,15 @@ internal sealed class ReaderMarks
             var rows = _marks._db.Aliases.Where(a => a.EntityId == noteId).OrderBy(a => a.Order).ToList();
             var knownRows = rows.Where(a => a.IsKnownAt(_marks._point)).ToList();
             var known = knownRows.Select(a => a.Alias).Prepend(_note.Name).ToList();
-            if (DenReader.ReadersCanFind(query, string.Join("\n", known), _note.Lead, _marks.Links, _note.Id))
+            var knownNames = string.Join("\n", known);
+            if (DenReader.ReadersCanFind(query, knownNames, _note.Lead, _marks.Links, _note.Id))
             {
                 return null;
+            }
+
+            if (FoundByLaterNameLink(query, knownNames, _note.Lead, l => l.Site == "entity_lead", out nameMark))
+            {
+                return InALaterName;
             }
 
             // Only in a name readers learn later (F-ENT-10): the one that, learned in story order, first lets them find it,
@@ -421,6 +432,39 @@ internal sealed class ReaderMarks
 
             var names = string.Join("\n", rows.Select(a => a.Alias).Prepend(_note.Name));
             return DenReader.FoundWithoutComments(query, names, _note.Lead) ? InALinkTarget : InAComment;
+        }
+
+        /// <summary>
+        /// Whether a reader's search would find the words if the unlabelled links in <paramref name="text"/> written by
+        /// names readers learn later read as written, which the Reader's view shows by the note's name (F-VIEW-7). Those
+        /// links are read as written in story order of their names, and <paramref name="nameMark"/> is the mark of the
+        /// one that first lets the words be found (#67).
+        /// </summary>
+        private bool FoundByLaterNameLink(string query, string title, string text, Func<LinkRecord, bool> inText, out ReaderMark? nameMark)
+        {
+            nameMark = null;
+            var noteId = _note.Id;
+            var point = _marks._point;
+            var later = _marks._db.Links
+                .Where(l => l.SourceEntityId == noteId && l.Label == null && l.NameFromOrdinal != null && l.NameFromOrdinal > point)
+                .ToList()
+                .Where(inText)
+                .OrderBy(l => l.NameFromOrdinal)
+                .ThenBy(l => l.Line)
+                .ToList();
+            foreach (var link in later)
+            {
+                text = text.Replace(link.Text, link.Target, StringComparison.Ordinal);
+                if (DenReader.ReadersCanFind(query, title, text, _marks.Links, noteId))
+                {
+                    var universeId = _marks._universeId;
+                    var target = link.TargetKey is { } key ? _marks._db.Entities.FirstOrDefault(e => e.UniverseId == universeId && e.Key == key) : null;
+                    nameMark = _marks.OfLinkName(link, target);
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>

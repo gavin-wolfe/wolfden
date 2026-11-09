@@ -760,6 +760,11 @@ function ValueInput({
   )
 }
 
+/** True if PositionInput opens on `value` as "Type a position": a value that's neither a listed chapter nor a book. */
+export function startsTyping(value: string, positions: readonly PositionView[]): boolean {
+  return value !== '' && !positions.some((p) => p.position === value && p.chapter !== null) && !positions.some((p) => p.book === value)
+}
+
 /**
  * A story position: a book and a chapter from the den's books, or, with
  * "Type a position", any position as text, such as one for a chapter the
@@ -793,7 +798,7 @@ export function PositionInput({
   }, [positions])
   const known = positions.find((p) => p.position === value && p.chapter !== null)
   const isBook = books.some((b) => b.key === value)
-  const [typing, setTyping] = useState(value !== '' && !known && !isBook)
+  const [typing, setTyping] = useState(() => startsTyping(value, positions))
   const book = typing ? '*' : known ? known.book : isBook ? value : ''
   return (
     <fieldset className="position-input">

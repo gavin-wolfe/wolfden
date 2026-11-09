@@ -14,11 +14,14 @@ import { entities, page, renderApp, stubApi } from './test/harness'
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
+  minaFrom = 'dracula:5'
 })
 
 const lucy = entities.find((e) => e.key === 'E-LUCY')!
 const mina = entities.find((e) => e.key === 'E-MINA')!
 const later = { kind: 'ahead' as const, at: 'dracula:5' }
+// Where readers learn Mina's later name; a test can make it a from the book doesn't list.
+let minaFrom = 'dracula:5'
 
 /** Mina's page, with a later name, as the view asks for it. */
 function minaPage(at: string | null, readers: boolean): EntityPage {
@@ -29,7 +32,7 @@ function minaPage(at: string | null, readers: boolean): EntityPage {
 
   return page(mina, {
     aliases: ['Madam Mina'],
-    knownAs: [{ value: 'Mrs. Harker', from: 'dracula:5', ...(at !== null && at !== 'dracula:5' ? { readerMark: later } : {}) }],
+    knownAs: [{ value: 'Mrs. Harker', from: minaFrom, ...(at !== null && at !== 'dracula:5' ? { readerMark: later } : {}) }],
   })
 }
 
@@ -332,6 +335,24 @@ describe('SC-WEB-115: editing a note’s other names', () => {
     fireEvent.click(within(form).getByRole('button', { name: 'Add name' }))
     expect((await within(panel).findByRole('alert')).textContent).toContain('Say where readers learn the name')
     expect(posts[2].body).toMatchObject({ name: 'Wilhelmina', knownAs: true, from: null })
+  })
+
+  it('keeps a from the book doesn’t list as typed, so clearing it asks for a position rather than making an alias', async () => {
+    minaFrom = 'dracula:99'
+    const posts = stubEditing()
+    const panel = await openNames()
+
+    fireEvent.click(within(panel).getByRole('button', { name: 'When readers learn “Mrs. Harker”' }))
+    const form = within(panel).getByRole('form', { name: 'When readers learn “Mrs. Harker”' })
+    const typed = within(form).getByRole('textbox', { name: 'Position' })
+    expect((typed as HTMLInputElement).value).toBe('dracula:99')
+    fireEvent.change(typed, { target: { value: '' } })
+
+    expect(within(form).queryByRole('note')).toBeNull()
+    expect(within(form).queryByRole('button', { name: 'Make it an alias' })).toBeNull()
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
+    expect((await within(panel).findByRole('alert')).textContent).toContain('Say where readers learn the name')
+    expect(posts).toEqual([])
   })
 
   it('removes a name after asking, and says its links go to the note’s name', async () => {

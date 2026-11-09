@@ -7053,8 +7053,9 @@ says `Signed by [[Mara Voss]].` I'm at `ember:3`.
   ash chapter 2, since the Reader's view shows The Courier there. A labelled link has no
   tag. The Courier's **Linked from** tags that line too.
 - Searching `Voss` finds The Courier, tagged `only in a name readers learn at` ash
-  chapter 2, after what readers can find. The Reader's view finds nothing, and its page
-  lists only `the Messenger`.
+  chapter 2, after what readers can find. So is The post book's lead, found only by its
+  link `[[Mara Voss]]`; its labelled `[[Mara Voss|The stranger]]` is `only in a link's
+  target`. The Reader's view finds nothing, and its page lists only `the Messenger`.
 - A hidden name doesn't raise a note in the Reader's search: two notes alike but for a
   later name that repeats the word come in path order.
 
@@ -7098,8 +7099,10 @@ Spec: #67 §11. Covered by: `KnownAsWebTests.PronounsUntilTheRevealReadPlainlyTo
 - **Remove** asks, then takes it out; links that use it get the note's name. An empty
   rename doesn't remove anything (`/api/edit/name` needs `remove: true`).
 - **Add a name** adds an alias, or with a chapter, a `known_as` entry. A `known_as`
-  entry with no `from` is refused (**Type a position** left blank), as are a `from` the
-  universe doesn't have (`bad_position`) and a `from` on a plain alias. Nothing changes.
+  entry with no `from` is refused (**Type a position** left blank, even when it opened on a
+  `from` the book doesn't list), as are a `from` the universe doesn't have
+  (`bad_position`), a `from` on a plain alias, and a name the note already goes by.
+  Nothing changes. A name is trimmed.
 - Each goes through `change_alias` or `update_fields`, the writes an AI assistant uses.
 
 Spec: #67 §9. Covered by: `KnownAsWebTests.TheEditorAddsANameWithWhereReadersLearnItAndRefusesOneWithout`,

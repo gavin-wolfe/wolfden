@@ -58,6 +58,8 @@ public static partial class WriteEndpoints
         CheckPath = "open '{0}' in your editor, or run 'wolfden check' in the den's folder,",
         NameLinks = "An AI assistant working through Wolfden can rename the note and rewrite those links.",
         AliasLinks = "Other names, on the note's page, changes an alias and rewrites those links.",
+        KeepOldAlias = "add the new name with Add a name instead and keep the old one",
+        DropAlias = "remove it with Remove",
         ChapterKeys = "pick a chapter the book lists",
         Unfreeze = "Unfreeze… on the page of book '{0}' opens it for editing again.",
         ReplaceOrClear = "To replace it, edit the field and save the whole value; to {0}, choose {1}.",
@@ -122,7 +124,7 @@ public static partial class WriteEndpoints
 
         // A note's other names (#67): a plain alias, or a name readers learn partway through (known_as, F-ENT-10).
         MapEdit(api, "/edit/name/add", tools, ["name", "knownAs", "from"], (b, entity, universe, hash) =>
-            tools.UpdateFields(entity, hash, NameAdded(b.Text("name"), b.OptionalBool("knownAs") ?? false, b.OptionalText("from")), universe));
+            tools.UpdateFields(entity, hash, NameAdded(b.Text("name"), b.OptionalBool("knownAs") ?? false, b.OptionalText("from")), universe, refuseNamesItHas: true));
         MapEdit(api, "/edit/name", tools, ["name", "newName", "keepOld", "from", "plain", "remove"], (b, entity, universe, hash) =>
         {
             var newName = b.OptionalText("newName");
@@ -160,7 +162,7 @@ public static partial class WriteEndpoints
             throw new DenToolException(ToolErrorCodes.BadArgument, "'from' is for a name readers learn later: give 'knownAs': true with it.");
         }
 
-        object value = knownAs ? new Dictionary<string, string> { ["value"] = name.Trim(), ["from"] = from! } : name;
+        object value = knownAs ? new Dictionary<string, string> { ["value"] = name.Trim(), ["from"] = from! } : name.Trim();
         return JsonSerializer.SerializeToElement(new[] { new Dictionary<string, object> { ["op"] = "add", ["path"] = knownAs ? "known_as" : "aliases", ["value"] = value } });
     }
 

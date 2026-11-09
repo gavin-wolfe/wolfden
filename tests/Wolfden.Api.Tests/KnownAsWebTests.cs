@@ -175,6 +175,14 @@ public sealed class KnownAsWebTests : IDisposable
         Assert.Equal("ahead ash:2", MarkOf(courier, "nameMark"));
         Assert.False(courier.GetProperty("met").GetBoolean());
 
+        // Another note's link written by the later name is tagged so too, since the Reader's view shows The Courier there.
+        // A labelled link hides its target from readers whatever its name, so that one is a link's target.
+        var post = hits.Where(h => h.GetProperty("entity").GetProperty("name").GetString() == "The post book").ToList();
+        var lead = post.Single(h => h.GetProperty("section").ValueKind == JsonValueKind.Null);
+        Assert.Equal("laterName", lead.GetProperty("hiddenIn").GetString());
+        Assert.Equal("ahead ash:2", MarkOf(lead, "nameMark"));
+        Assert.Equal("linkTarget", post.Single(h => h.GetProperty("section").GetString() == "Entries").GetProperty("hiddenIn").GetString());
+
         // The Reader's view there finds nothing by it.
         var readers = await server.GetJsonAsync("/api/search?universe=starfall&query=Voss&asOf=ember:3&readers=true", HttpStatusCode.OK);
         Assert.Equal(0, readers.GetProperty("count").GetInt32());
@@ -282,7 +290,7 @@ public sealed class KnownAsWebTests : IDisposable
     {
         await using var server = await Start();
 
-        var (status, json) = await PostAsync(server, "/api/edit/name/add", new() { ["name"] = "Tam", ["knownAs"] = false });
+        var (status, json) = await PostAsync(server, "/api/edit/name/add", new() { ["name"] = "  Tam  ", ["knownAs"] = false });
         Assert.True(status == HttpStatusCode.OK, json.ToString());
         (status, json) = await PostAsync(server, "/api/edit/name/add", new() { ["name"] = "Mara Holt", ["knownAs"] = true, ["from"] = "ash:3" });
         Assert.True(status == HttpStatusCode.OK, json.ToString());
@@ -301,6 +309,21 @@ public sealed class KnownAsWebTests : IDisposable
         Assert.Equal("bad_position", json.GetProperty("code").GetString());
         (status, _) = await PostAsync(server, "/api/edit/name/add", new() { ["name"] = "Wren", ["from"] = "ash:3" });
         Assert.Equal(HttpStatusCode.BadRequest, status);
+
+        // A name the note already goes by is refused, whichever key it's in, so Other names never holds one it can't show.
+        foreach (var (name, knownAs) in new[] { ("mara voss", false), ("The Courier", true), ("TAM", false), ("the messenger", true) })
+        {
+            var body = new Dictionary<string, object> { ["name"] = name, ["knownAs"] = knownAs };
+            if (knownAs)
+            {
+                body["from"] = "ash:3";
+            }
+
+            (status, json) = await PostAsync(server, "/api/edit/name/add", body);
+            Assert.Equal(HttpStatusCode.BadRequest, status);
+            Assert.Contains("already goes by", json.GetProperty("message").GetString(), StringComparison.Ordinal);
+        }
+
         Assert.Equal(before, _den.Read(CourierPath));
     }
 
@@ -310,8 +333,13 @@ public sealed class KnownAsWebTests : IDisposable
     {
         await using var server = await Start();
 
+        // A refusal says what to do in the page's words, not the tool's.
+        var (status, json) = await PostAsync(server, "/api/edit/name", new() { ["name"] = "Mara Voss", ["newName"] = "the Messenger" });
+        Assert.Equal(HttpStatusCode.BadRequest, status);
+        Assert.EndsWith("To drop 'Mara Voss', remove it with Remove, which points its links at the name.", json.GetProperty("message").GetString(), StringComparison.Ordinal);
+
         // Renamed: links follow, and the entry keeps its from.
-        var (status, json) = await PostAsync(server, "/api/edit/name", new() { ["name"] = "Mara Voss", ["newName"] = "Mara Holt" });
+        (status, json) = await PostAsync(server, "/api/edit/name", new() { ["name"] = "Mara Voss", ["newName"] = "Mara Holt" });
         Assert.True(status == HttpStatusCode.OK, json.ToString());
         Assert.Contains("{ value: Mara Holt, from: \"ash:2\" }", _den.Read(CourierPath), StringComparison.Ordinal);
         Assert.Contains("Signed by [[Mara Holt]].", _den.Read(PostBookPath), StringComparison.Ordinal);

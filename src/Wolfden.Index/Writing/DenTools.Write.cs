@@ -262,7 +262,11 @@ public sealed partial class DenTools
     /// which is written exactly so. The web UI sends numbers so, since a browser's JSON loses
     /// <c>2.50</c>'s last digit and a long number's precision.
     /// </param>
-    public WriteResult UpdateFields(string entity, string expectedHash, JsonElement changes, string? universe = null, bool numbersAsText = false)
+    /// <param name="refuseNamesItHas">
+    /// True to refuse adding an alias or a <c>known_as</c> name the entity already goes by (its name or another
+    /// of its names, under F-LINK-4), as the web's Other names does; otherwise it's added as asked.
+    /// </param>
+    public WriteResult UpdateFields(string entity, string expectedHash, JsonElement changes, string? universe = null, bool numbersAsText = false, bool refuseNamesItHas = false)
     {
         var hash = RequireHash(expectedHash);
         var ops = Changes(changes, chapter: false, numbersAsText);
@@ -302,6 +306,15 @@ public sealed partial class DenTools
                 if (path[0] == "known_as" && op.Op == "add")
                 {
                     added.Add(KnownAsAdded(op.RawValue));
+                }
+
+                // The web's Other names refuses a name the note goes by already, which it couldn't then show or remove.
+                if (refuseNamesItHas && path[0] is "aliases" or "known_as" && op.Op == "add" && added.Count > 0
+                    && (LinkText.Matches(catalog.Name, added[^1]) || catalog.AllAliases.Any(a => LinkText.Matches(a, added[^1]))))
+                {
+                    throw new DenToolException(
+                        ToolErrorCodes.BadArgument,
+                        $"'{catalog.Name}' already goes by '{added[^1]}' ({(LinkText.Matches(catalog.Name, added[^1]) ? "its name" : "another of its names")}), so nothing was added.");
                 }
 
                 if (path[0] == "known_as" && op.Op == "set" && op.RawValue is not { ValueKind: JsonValueKind.String })

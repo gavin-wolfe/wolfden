@@ -5,7 +5,7 @@ import { EditError, postEdit, sourceQuery, type EditPath } from '../editApi'
 import { placeWords } from '../story'
 import { LaterNameTag } from './AheadOfReaders'
 import { DiscardPrompt, SaveError, useAfterSave, useEditing } from './Editing'
-import { PositionInput } from './FieldEditing'
+import { PositionInput, startsTyping } from './FieldEditing'
 
 // A note's other names (#67): its plain aliases, which readers know wherever they
 // know the note, and its `known_as` names, which readers learn at a `from`. The page
@@ -111,7 +111,8 @@ export function NamesEditor({ entity, positions }: { entity: EntityPage; positio
     const name = next === null ? null : names[next.index]
     setText(name?.value ?? '')
     setFrom(name?.from ?? '')
-    setTyping(false)
+    // A from that isn't a chapter or book the den lists opens PositionInput as "Type a position", so blank is still typing.
+    setTyping(startsTyping(name?.from ?? '', positions))
   }
 
   const send = async (path: EditPath, body: Record<string, unknown>) => {

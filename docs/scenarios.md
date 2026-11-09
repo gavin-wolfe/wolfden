@@ -3892,6 +3892,10 @@ With `spoiler_checks: true`, The Courier has `known_as: [{ value: Mara Voss, fro
   warns about The Courier's own text at `ash:2`.
 - `rename_entity` of the ledger to `Mara Voss` says nothing, as `check` does: those
   words are the ledger's own name from its entry.
+- Renaming The Courier to The Envoy, with `rename_entity` or by changing `name:` in
+  **Edit file**, repeats none of the ledger's warnings, since only the display name
+  changed. Moving a reveal also says to run `check` for other notes.
+- A new mention added above an old one at the same position is said at its own line.
 - A line added above an existing mention, or a move that keeps views, says nothing new.
   With `spoiler_checks: false`, or no `known_as`, nothing is said, and the write
   loads nothing more.

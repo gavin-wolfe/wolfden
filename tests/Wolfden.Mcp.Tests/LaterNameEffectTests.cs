@@ -134,6 +134,7 @@ public sealed class LaterNameEffectTests : IDisposable
 
         var warned = Assert.Single(Warned(result));
         Assert.Contains("readers learn at ash:3, and this text is at ash:2", warned, StringComparison.Ordinal);
+        Assert.Contains(result.Effects, e => e.Contains("run check to find text and links in other notes", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -159,6 +160,22 @@ public sealed class LaterNameEffectTests : IDisposable
         Assert.True(result.Changed);
         Assert.Empty(Warned(result));
         Assert.DoesNotContain(Tools.Check(null, null, 5000, "starfall").Diagnostics, d => d.Path == Ledger && d.Rule == "F-NAME-1");
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-55")]
+    public void RenamingTheNoteWhoseNameItIsRepeatsNothing()
+    {
+        _den.Write(Ledger, _den.Read(Ledger).Replace("A stranger paid.", "[[Mara Voss]] too. [[The Courier]]", StringComparison.Ordinal));
+        _den.Write(Courier, _den.Read(Courier).Replace("Carries the post.", "Carries the post. Mara Voss, really.", StringComparison.Ordinal));
+
+        var renamed = Tools.RenameEntity("The Courier", "The Envoy", Hash("The Courier"), universe: "starfall");
+        Assert.Contains("[[The Envoy]]", _den.Read(Ledger), StringComparison.Ordinal);
+        Assert.Empty(Warned(renamed));
+
+        // A whole-file save that changes name: is the same.
+        var text = _den.Read(Courier).Replace("name: The Envoy", "name: The Emissary", StringComparison.Ordinal);
+        Assert.Empty(Warned(Tools.ReplaceFile("The Envoy", text, Hash("The Envoy"), "starfall")));
     }
 
     [Fact]

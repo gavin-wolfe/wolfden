@@ -926,8 +926,14 @@ longest words keeps it cheap, and the pass over the den runs only in `check`,
 never on a write or an index update, nor when the web reads the den's errors.
 A write runs the same code on the notes it saves, and nothing else: its
 `effects` list the F-NAME-1, F-NAME-2, and F-LINK-13 (by a later name) warnings
-those notes didn't have before, compared by rule and message, not by line. It
-never refuses the write. With spoiler checks off, or no `known_as` in the
+those notes didn't have before. They're compared by rule, the note the name
+belongs to (by path, so renaming it changes nothing), the name, where readers
+learn it, the text's position, and a link's text, not by line; repeats are
+paired by their lines' text first, so a new mention above an old one is the one
+said. A `change_alias` that renames a later name says each early link it
+rewrites again under the new name, a departure from §9's "the same warning as
+before" in #67's design, since the writer may not know those links are there.
+It never refuses the write. With spoiler checks off, or no `known_as` in the
 universe, it reads nothing more: a write that loads only its own note asks the
 index, in the lookup it already makes, whether the universe has any `known_as`.
 

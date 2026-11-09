@@ -105,6 +105,35 @@ public class WrittenTextCheckTests
 
     [Fact]
     [Trait("Scenario", "SC-MCP-55")]
+    public void ANewMentionAboveAnOldOneIsSaidAtItsOwnLine()
+    {
+        var den = WithCourier().With(Ledger, LedgerFile("\nKept at the Reach.\nMara Voss signed it.\n"));
+
+        var added = Write(den, Ledger, LedgerFile("\nKept at the Reach.\nMara Voss paid.\nMara Voss signed it.\n"));
+
+        var found = Assert.Single(added);
+        Assert.Equal(8, found.Diagnostic.Line);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-55")]
+    public void RenamingTheNoteWhoseNameItIsSaysNothingNew()
+    {
+        var den = WithCourier()
+            .Entity(Starfall, "the-courier", Character("The Courier", MaraVoss), "\nMara Voss, really.\n")
+            .With(Ledger, LedgerFile("\nMara Voss signed it. [[Mara Voss]] too. [[The Courier]]\n"));
+        var files = new Dictionary<string, byte[]>(StringComparer.Ordinal)
+        {
+            [Courier] = Encoding.UTF8.GetBytes($"---\n{Character("The Envoy", MaraVoss)}\n---\n\nMara Voss, really.\n"),
+            [Ledger] = Encoding.UTF8.GetBytes(LedgerFile("\nMara Voss signed it. [[Mara Voss]] too. [[The Envoy]]\n")),
+        };
+
+        Assert.NotEmpty(Checked(den, Ledger));
+        Assert.Empty(WrittenTextChecks.LaterNames(den, DenStructure.Load(den), files));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-55")]
     public void ANoteThatGainsALaterNameHearsAboutItsOwnText()
     {
         var den = WithCourier().Entity(Starfall, "the-harbour", Character("The Harbour"), "\nRun by the Lamplighter.\n");

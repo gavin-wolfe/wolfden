@@ -1,3 +1,4 @@
+using Wolfden.Core.Documents;
 using Wolfden.Core.Editing;
 using Wolfden.Core.Entities;
 using Wolfden.Core.Links;
@@ -14,12 +15,16 @@ namespace Wolfden.Core.Checks;
 /// </summary>
 /// <remarks>
 /// A warning is new if the note didn't have it before the write, compared by
-/// rule and message and counted, but not by line. The message names the name,
-/// where readers learn it, and the text's position, so a name that was already
-/// in the note at the same position isn't reported again, wherever the write
-/// moved its line, and a second one is. A write that changes a position, or
-/// where readers learn a name, changes the message, so the note's warnings
-/// that follow from it are new. The warnings never refuse a write.
+/// a <see cref="LaterNameKey"/> and counted, but not by line: the rule, the
+/// note the name belongs to (by path, not its display name, so renaming it
+/// changes nothing), the name, where readers learn it, the text's position,
+/// and a link's text. So a name that was already in the note at the same
+/// position isn't reported again, wherever the write moved its line, and a
+/// second one is. When a key occurs more than once, old and new warnings are
+/// paired by the text of their lines first, so the one reported is the new
+/// line. A write that changes a position, or where readers learn a name,
+/// changes the key, so the note's warnings that follow from it are new. The
+/// warnings never refuse a write.
 /// </remarks>
 public static class WrittenTextChecks
 {
@@ -69,6 +74,15 @@ public static class WrittenTextChecks
             return [];
         }
 
+        // Before the den's notes are put together again: with no name readers learn later in the universes written,
+        // and none in the notes the write saves, there's nothing to say.
+        var universes = written.Concat(movedFrom?.Values ?? []).Select(p => EntityCatalog.EntityFileScope(before.Structure, p)?.Universe.Key).OfType<string>().ToHashSet(StringComparer.Ordinal);
+        if (!universes.Any(u => HasLaterNames(before, u))
+            && !written.Any(p => universes.Count > 0 && after.TryReadFile(p) is { } bytes && System.Text.Encoding.UTF8.GetString(bytes).Contains("known_as", StringComparison.Ordinal)))
+        {
+            return [];
+        }
+
         return LaterNames(before, before.Update(after, written.Concat(movedFrom?.Values ?? [])), written, movedFrom);
     }
 
@@ -99,35 +113,53 @@ public static class WrittenTextChecks
         }
 
         var newPath = oldPath.ToDictionary(p => p.Value, p => p.Key, StringComparer.Ordinal);
-        var counts = new Dictionary<(string, string, string), int>();
-        foreach (var d in Scan(before, had))
+        string Now(string path) => newPath.GetValueOrDefault(path, path);
+
+        // The old warnings' line texts, by key, each one paired off at most once.
+        var old = new Dictionary<(string, LaterNameKey), List<string>>();
+        var beforeLines = new Lines(before);
+        foreach (var (d, key) in Scan(before, had))
         {
-            var key = (newPath.GetValueOrDefault(d.Path, d.Path), d.Diagnostic.RuleId, d.Diagnostic.Message);
-            counts[key] = counts.GetValueOrDefault(key) + 1;
+            var k = (Now(d.Path), key with { Owner = Now(key.Owner) });
+            if (!old.TryGetValue(k, out var texts))
+            {
+                old[k] = texts = [];
+            }
+
+            texts.Add(beforeLines.Of(d));
         }
 
-        var added = new List<DenDiagnostic>();
-        foreach (var d in Scan(after, wrote))
+        var afterLines = new Lines(after);
+        var found = Scan(after, wrote);
+        var matched = new bool[found.Count];
+
+        // First by the text of the line, so a new mention above an old one is the one said; then by count alone.
+        foreach (var byText in new[] { true, false })
         {
-            var key = (d.Path, d.Diagnostic.RuleId, d.Diagnostic.Message);
-            if (counts.GetValueOrDefault(key) is > 0 and var left)
+            for (var i = 0; i < found.Count; i++)
             {
-                counts[key] = left - 1;
-            }
-            else
-            {
-                added.Add(d);
+                if (matched[i] || !old.TryGetValue((found[i].Warning.Path, found[i].Key), out var texts) || texts.Count == 0)
+                {
+                    continue;
+                }
+
+                var at = byText ? texts.IndexOf(afterLines.Of(found[i].Warning)) : 0;
+                if (at >= 0)
+                {
+                    texts.RemoveAt(at);
+                    matched[i] = true;
+                }
             }
         }
 
-        return added;
+        return found.Where((_, i) => !matched[i]).Select(f => f.Warning).ToList();
     }
 
     private static bool HasLaterNames(EntityCatalog catalog, string universe) =>
         catalog.Entities.Any(e => e.KnownAs.Count > 0 && e.Universe.Key == universe);
 
-    /// <summary>F-NAME-1, F-NAME-2, and F-LINK-13 by a later name, in <paramref name="notes"/>, by path and line.</summary>
-    private static List<DenDiagnostic> Scan(EntityCatalog catalog, IReadOnlySet<CatalogEntity> notes)
+    /// <summary>F-NAME-1, F-NAME-2, and F-LINK-13 by a later name, in <paramref name="notes"/>, by path and line, each with its key.</summary>
+    private static List<(DenDiagnostic Warning, LaterNameKey Key)> Scan(EntityCatalog catalog, IReadOnlySet<CatalogEntity> notes)
     {
         if (notes.Count == 0)
         {
@@ -136,9 +168,40 @@ public static class WrittenTextChecks
 
         var resolver = new LinkResolver(catalog);
         var bookkeeping = new Bookkeeping(catalog.Structure.BookkeepingSections);
-        return NameChecks.Run(catalog, resolver, notes)
-            .Concat(notes.SelectMany(e => LinkIndex.LaterNameLinks(resolver, e, bookkeeping)))
+        var keys = new Dictionary<Diagnostic, LaterNameKey>(ReferenceEqualityComparer.Instance);
+        return NameChecks.Run(catalog, resolver, notes, keys)
+            .Concat(notes.SelectMany(e => LinkIndex.LaterNameLinks(resolver, e, bookkeeping, keys)))
             .OrderBy(d => d.Path, StringComparer.Ordinal).ThenBy(d => d.Diagnostic.Line ?? 0)
+            .Select(d => (d, keys[d.Diagnostic]))
             .ToList();
     }
+
+    /// <summary>The text of a warning's line in its note, read once a note.</summary>
+    private sealed class Lines(EntityCatalog catalog)
+    {
+        private readonly Dictionary<string, string[]> _files = new(StringComparer.Ordinal);
+
+        public string Of(DenDiagnostic warning)
+        {
+            if (!_files.TryGetValue(warning.Path, out var lines))
+            {
+                var file = catalog.FindByPath(warning.Path)?.File;
+                _files[warning.Path] = lines = file is null ? [] : System.Text.Encoding.UTF8.GetString(file.ToBytes()).Split('\n');
+            }
+
+            var line = (warning.Diagnostic.Line ?? 0) - 1;
+            return line >= 0 && line < lines.Length ? lines[line].TrimEnd('\r') : "";
+        }
+    }
 }
+
+/// <summary>
+/// What tells one later-name warning from another across a write, for its effects
+/// (<see cref="WrittenTextChecks"/>): its rule, the note whose name it is, by path, and
+/// the rest of what the message says (the name, where readers learn it, the text's
+/// position, a link's text), without that note's display name, which a rename changes.
+/// </summary>
+/// <param name="Rule">The rule.</param>
+/// <param name="Owner">The path of the note whose name it is.</param>
+/// <param name="Rest">The rest, joined by line breaks.</param>
+internal sealed record LaterNameKey(string Rule, string Owner, string Rest);

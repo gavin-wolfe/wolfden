@@ -2217,6 +2217,13 @@ public sealed partial class DenTools
                 : $"It now enters canon at {fromAfter}: views before that leave it out (F-ENT-6).";
         }
 
+        // A name readers learn later that's new, or whose from changed (#67).
+        var moved = after.KnownAs.Where(k => !before.KnownAs.Any(b => b.Value == k.Value && b.From == k.From)).Select(k => $"'{k.Value}'").Distinct().ToList();
+        if (moved.Count > 0)
+        {
+            yield return $"Where readers learn {string.Join(", ", moved)} is set now (known_as).{LaterTextElsewhere}";
+        }
+
         if (before.Type != after.Type)
         {
             yield return after.Definition is { } type

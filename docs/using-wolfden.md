@@ -1205,10 +1205,11 @@ writes one, and the text written names someone, or links to them, by a name
 readers learn later than that text's position, the save's result lists the
 warning under what the save did. Only the note's own text is looked at, not the
 whole den, and only warnings it didn't already have, so a name that was already
-there at the same position isn't repeated. The save always goes ahead: it's a
-warning. Renaming a name or a note says so too, for the links it rewrites, and
-so do a copy, a move, and a new note. A change to a name's `from` lists the
-note's own text that it now gives away; text in other notes is `check`'s job.
+there at the same position isn't repeated, and neither is one whose note was only
+renamed. The save always goes ahead: it's a warning. Renaming a later name says
+so too, for the links it rewrites to the new name, and so do a copy, a move,
+and a new note. A change to a name's `from` lists the note's own text that it
+now gives away, and says to run `check` for text in other notes.
 Nothing is said with `spoiler_checks` off.
 
 ## Images

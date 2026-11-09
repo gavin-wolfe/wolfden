@@ -317,7 +317,7 @@ public sealed partial class DenTools
                         $"'{catalog.Name}' already goes by '{added[^1]}' ({(LinkText.Matches(catalog.Name, added[^1]) ? "its name" : "another of its names")}), so nothing was added.");
                 }
 
-                if (path[0] == "known_as" && op.Op == "set" && op.RawValue is not { ValueKind: JsonValueKind.String })
+                if (path[0] == "known_as" && op.Op == "set" && path[^1] == "from" && op.RawValue is not { ValueKind: JsonValueKind.String })
                 {
                     throw new DenToolException(
                         ToolErrorCodes.BadArgument,
@@ -1999,6 +1999,9 @@ public sealed partial class DenTools
                 break;
             case "known_as" when op == "set" && path[^1] == "from" && path.Count == (IsIndex(path[1]) ? 3 : 2):
                 // Where readers learn a name is an ordinary edit: links don't depend on it (#67, §9).
+                break;
+            case "known_as" when path.Count > 1 && path.Count > (IsIndex(path[1]) ? 2 : 1) && path[IsIndex(path[1]) ? 2 : 1] is "check_text" or "allow_in":
+                // Only the plain-text check reads these (F-NAME-1), so no link depends on them.
                 break;
             case "known_as":
                 throw new DenToolException(

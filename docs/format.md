@@ -490,8 +490,8 @@ same as leaving it out. Any other shape is an [error]. A pattern made
 only of `*` and spaces, which matches every section, is a [warning].
 
 **F-DEN-7.** `spoiler_checks` is an optional boolean that turns on the
-spoiler checks. In format 1 that's one check, F-LINK-13. It defaults to
-`false`.
+spoiler checks. In format 1 those are F-LINK-13, F-NAME-1, and F-NAME-2.
+It defaults to `false`.
 The positions on facts record where the reader learns each one, so a
 writer can pace the reveals. The check helps writers who track that, by
 flagging a link to something the reader hasn't met yet. A null value is
@@ -814,8 +814,21 @@ known_as:
 - An entry is a mapping with `value`, the name, one line of non-empty text,
   and `from`, a position (§8) where readers learn it. A `value` that's
   missing, empty, more than one line, or not a string is an [error], and so
-  is an item that's a list or a null. Any other key is a [warning], and is
-  kept and ignored.
+  is an item that's a list or a null. Two more keys are optional, and only
+  the spoiler checks read them (F-NAME-1): `check_text` and `allow_in`. Any
+  other key is a [warning], and is kept and ignored.
+- `check_text` is a boolean: whether F-NAME-1 looks for the name in plain
+  text. Without it, a name of two or more words is looked for and a name of
+  one word isn't, counting words as search does. A null is the same as
+  leaving it out. Any other value is a [warning], and reads as `true`, so
+  the name is still looked for.
+- `allow_in` is a list of entities, each written as a link's target is (a
+  slug, a name, an alias, or an id, without `[[ ]]`), or one such entity
+  on its own. F-NAME-1 doesn't look for the name in their text. An item
+  that isn't one line of text is a [warning] and is ignored. With spoiler
+  checks on, an item that doesn't resolve to one entity from this one's
+  scope (F-LINK-5 to F-LINK-7) is a [warning] and is ignored too. Either
+  way the name is still looked for there: a mistake here fails safe.
 - **It fails closed.** An entry with no `from`, or a `from` that doesn't
   resolve (F-POS-4), is a [warning], and the name isn't known at any
   position. A malformed `from` is an [error] (F-POS-3). A plain string item
@@ -1533,8 +1546,9 @@ with the real name in `known_as`, and its file name SHOULD come from that
 `name` too, since a file name shows in every read.
 
 `known_as` hides a name, not prose. The same name written as plain text in a
-section that readers reach first still shows there, so read summary prose for
-it as for any other reveal.
+section that readers reach first still shows there. With spoiler checks on,
+F-NAME-1 flags it, and F-NAME-2 flags a file name that holds it, but a
+nickname or a description that gives the secret away still needs reading for.
 
 ## 10. Links
 
@@ -1662,7 +1676,77 @@ warning that names them (types.md F-CHAP-4).
 This check is a spoiler check: it runs only in a den whose `den.yaml` has
 `spoiler_checks: true` (F-DEN-7). It sees links only, not prose. A section
 that mentions a later fact in plain text gets no warning, so prose needs
-the same care (§9.5).
+the same care (§9.5). F-NAME-1 covers one case of prose: a `known_as` name.
+
+### 10.4 Names in plain text
+
+**F-NAME-1.** A `known_as` name (F-ENT-10) written in canon text that readers
+reach before they learn the name is a [warning]. Readers learn it at its
+`from`, or when they meet its entity, if that's later. Only names whose entry
+is checked (`check_text`, F-ENT-10) are looked for, only in the entity's own
+universe, and only names of an entity in canon whose `from`s resolve.
+
+The text and its position, as F-LINK-12 and F-LINK-13 define them, except
+that text at the start of the story is checked too:
+
+| Text | Position | Checked |
+|---|---|---|
+| An entity's lead, its title included, and its plain field values | The entity's `from` (F-ENT-6) | Yes, if the entity is in canon |
+| A section's heading and its own text | Its effective `from` (F-SEC-9) | Yes, if it's live (F-SEC-8) |
+| A field entry's `value` | Its `from`, or the start of the story | Yes, if it's live (F-TMP-4) |
+| A link's label | Where it's written | Yes |
+| A link's target | | No: F-LINK-13 checks a link with no label, and nothing shows one with a label |
+| HTML comments, code spans, code blocks, and a fence's info string | | No: they aren't prose, and no read at a position shows a comment (F-VIEW-6) |
+| Bookkeeping sections, out-of-canon facts, sections an error leaves out | | No |
+| Container bodies, chapter fields, outlines | | No |
+
+A position earlier than the entity's own entry counts as that entry, since
+nothing in an entity shows before readers meet it.
+
+A name matches where its words appear side by side as whole words, as search
+splits and compares them: case and Latin accents don't matter (`Zoe` matches
+`Zoë`, though `Soren` doesn't match `Søren`, since `ø` has no accent to take
+off), and punctuation, emphasis, and line breaks between the words don't
+either. A comment between them is taken out first, as a read does, while code
+or a link with no label between them keeps them apart.
+
+It isn't a warning:
+
+- in an entity that the name's `allow_in` lists (F-ENT-10);
+- where the same words, compared the same way, are already a name readers know
+  at that position (F-VIEW-7), of this entity or another, since the text may
+  mean that one.
+
+Each line warns once for each name, and once for names that share their
+words, naming the one readers learn first.
+
+**F-NAME-2.** A file name that holds one of its own entity's `known_as` names,
+compared as F-NAME-1 compares words (`mara-voss.md` holds `Mara Voss`), is a
+[warning] if the entity enters canon before that name's `from`: a file name
+shows in every read of the entity. It doesn't depend on `check_text`, since a
+file name is chosen. Renaming the file fixes it (§9.5).
+
+Both are spoiler checks, so they run only with `spoiler_checks: true`
+(F-DEN-7), and only in `wolfden check` and the MCP `check` tool, not when
+the index is built or a note is written.
+
+| Text, in a section at `ember:12`; `Mara Voss` has `from: "ember:38"` | Result |
+|---|---|
+| `Mara Voss signed it.` | [warning] F-NAME-1 |
+| `Mara Voss's ship`, `**MARA VOSS**`, `Mara` and `Voss` on two lines | [warning] F-NAME-1 |
+| `Mara Vossler`, or `Mara, the other one` | no match |
+| `Mara <!-- note --> Voss` | [warning] F-NAME-1: the comment goes first |
+| `` `Mara Voss` ``, or `<!-- Mara Voss -->` | not prose |
+| `[[The Courier\|Mara Voss]]` | [warning] F-NAME-1: the label shows |
+| `[[Mara Voss\|the stranger]]` | nothing shows the target |
+| `[[Mara Voss]]` | F-LINK-13, not F-NAME-1 |
+| `Zoe Arkwright`, for `{ value: Zoë Arkwright, from: "ember:38" }` | [warning] F-NAME-1 |
+| `Rose went home`, for `{ value: Rose, from: "ember:38" }` | not looked for: one word |
+| The same, with `check_text: true` | [warning] F-NAME-1 |
+| In a section with `from=ember:38` | after the name's `from` |
+| In `## Session notes` | bookkeeping |
+| In a note listed in `allow_in` | allowed |
+| `Old Tam`, also an alias of a note readers have met by `ember:12` | a name readers know |
 
 ## 11. Outlines
 

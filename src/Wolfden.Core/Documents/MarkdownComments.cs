@@ -104,6 +104,22 @@ public static partial class MarkdownComments
         return comments.Count == 0 ? markdown : Without(markdown, comments);
     }
 
+    /// <summary>
+    /// Where <paramref name="markdown"/> holds what doesn't count as its prose, for
+    /// the plain-text name check (format.md F-NAME-1): each HTML comment, read as
+    /// widely as <see cref="Strip"/> reads it, since no read at a position shows it
+    /// (F-VIEW-6); and each code span, code block, and fence's info string, whose
+    /// text is code, not story. A body too deep to parse (F-FM-2) has no code.
+    /// </summary>
+    /// <returns>The comments' ranges and the code's, each from start to just past the end.</returns>
+    internal static (List<(int Start, int End)> Comments, List<(int Start, int End)> Code) NotProse(string markdown)
+    {
+        ArgumentNullException.ThrowIfNull(markdown);
+        var scan = new CommentScan(markdown, BodyLinkScanner.Parse(markdown, 0, BodyLinkScanner.Plain));
+        var comments = markdown.Contains("<!--", StringComparison.Ordinal) ? scan.Comments().ConvertAll(c => (c.Start, c.End)) : [];
+        return (comments, scan.Code());
+    }
+
     private static string Without(string markdown, List<FoundComment> comments)
     {
         var text = new StringBuilder(markdown.Length);
@@ -266,6 +282,9 @@ public static partial class MarkdownComments
         }
 
         public long Steps { get; private set; }
+
+        /// <summary>The code spans and blocks, and the fences' info strings.</summary>
+        public List<(int Start, int End)> Code() => [.. _code.All, .. _fenceLines.All];
 
         public List<FoundComment> Comments()
         {
@@ -527,6 +546,8 @@ public static partial class MarkdownComments
         {
             private readonly List<(int Start, int End)> _ranges = [];
             private List<int>? _starts;
+
+            public IReadOnlyList<(int Start, int End)> All => _ranges;
 
             public void Add(int start, int end)
             {

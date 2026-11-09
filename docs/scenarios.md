@@ -1251,6 +1251,93 @@ Spec: format.md F-GEN-5 (#298). Covered by:
 `SharedFileWriteTests.ReadToolsSeeABookFileOpenElsewhere` (MCP),
 `SharedFileWriteTests.AWrongNameInEveryReadLookupDoesntBlameANoteOpenElsewhere` (MCP).
 
+### SC-CHECK-65. A name in plain text before its reveal
+
+The Courier has `known_as: [{ value: Mara Voss, from: "ash:2" }]`, and the den
+has `spoiler_checks: true`. A note says `Mara Voss signed it` in a section that
+readers reach at `ember:2`, or in its lead, at the start of the story.
+
+- `check` gives F-NAME-1 on that line, with both positions: "'Mara Voss' is a
+  name of 'The Courier' that readers learn at ash:2, and this text is at
+  ember:2." So do `Mara Voss's`, `**MARA VOSS**`, the name split over two
+  lines, `Mara <!-- x --> Voss`, and a link's label, `[[The Courier|Mara Voss]]`.
+- `Mara Vossler` doesn't, nor does the name in a code span or block, a comment,
+  a link's target, a section with `from=ash:2`, `## Session notes`, or a section
+  with `status=idea`.
+- The Courier's own lead, title, headings, and field values are checked too.
+- `Zoe Arkwright` matches `Zoë Arkwright`, and `Noël Várga` matches `Noel
+  Varga`. `Soren` doesn't match `Søren`.
+- Text in a note readers meet only at `ash:3` is at `ash:3`, whatever its
+  sections say.
+
+Spec: format.md F-NAME-1 (#67). Covered by:
+`NameCheckTests.ANameInPlainTextBeforeItsRevealIsAWarning`,
+`NameCheckTests.TheNotesOwnTextHeadingsTitleAndFieldValuesAreChecked`,
+`NameCheckTests.TextReadersReachOnlyAfterTheyMeetTheNoteIsAtThatEntry`,
+`NameCheckTests.ANameReadersLearnOnlyWhenTheyMeetTheNoteCountsFromThere`,
+`NameCheckTests.MatchingIgnoresAccentsBothWays`,
+`NameCheckTests.LettersThatDontDecomposeArentFolded`,
+`NameCheckTests.AnUnaccentedSpellingListedAsItsOwnEntryIsCheckedFromItsOwnFrom` (Core),
+`NameCheckToolTests.CheckListsBothRules` (MCP),
+`PerformanceTests.ALargeDenIsCheckedForNamesReadersLearnLaterQuickly` (Index).
+
+### SC-CHECK-66. A common one-word name
+
+The Courier has `{ value: Rose, from: "ember:2" }`.
+
+- It resolves and hides as any other `known_as` name, and `the rose bloomed` at
+  the start of the story has no warning.
+- With `check_text: true`, it's F-NAME-1. With `check_text: yes`, which isn't a
+  boolean, it's an F-ENT-10 warning, and the name is checked as if it said true.
+- `Rose Hale` is checked without `check_text`, and not with `check_text: false`.
+
+Spec: format.md F-ENT-10, F-NAME-1 (#67). Covered by:
+`NameCheckTests.AOneWordNameIsCheckedOnlyWhenTheEntrySaysSo`,
+`NameCheckTests.AOneWordNameThatIsntCheckedStillHides`,
+`NameCheckTests.ACheckTextThatIsntABooleanIsAWarningAndChecks` (Core).
+
+### SC-CHECK-67. A real false alarm
+
+A different `Mara Voss`, long dead, is in `the-old-ledger`.
+
+- `allow_in: [the-old-ledger]` on the entry silences every line of that note,
+  and elsewhere the name still warns.
+- `allow_in: [the-old-leger]`, a typo, is an F-ENT-10 warning that says it
+  reaches no note, and the old ledger still warns: a mistake fails safe.
+- An assistant can set it with `update_fields`
+  (`known_as.0.allow_in`, `known_as.0.check_text`), which changes no link.
+
+Spec: format.md F-ENT-10, F-NAME-1 (#67). Covered by:
+`NameCheckTests.AllowInSilencesAWholeNoteAndNoOther`,
+`NameCheckTests.AnAllowInThatReachesNoNoteIsAWarningAndKeepsChecking` (Core),
+`NameCheckToolTests.UpdateFieldsSetsAllowInAndCheckTextAndChangesNoLink` (MCP).
+
+### SC-CHECK-68. Spoiler checks off
+
+The same den with `spoiler_checks: false`.
+
+- `check` gives no F-NAME-1 or F-NAME-2, and no warning about `allow_in`.
+- `known_as` still hides the name at a position, since hiding isn't a check.
+- The web's list of the den's errors never runs these checks, on or off.
+
+Spec: format.md F-DEN-7, F-NAME-1 (#67). Covered by:
+`NameCheckTests.WithSpoilerChecksOffNothingIsCheckedAndTheNameStillHides`,
+`NameCheckTests.TheCheckThatOnlyWantsUnreadableFilesSkipsTheNames` (Core).
+
+### SC-CHECK-69. A file name holding the later name
+
+`mara-voss.md` has `name: The Courier` and `known_as: [{ value: Mara Voss, from: "ash:2" }]`.
+
+- `check` gives F-NAME-2, which says to rename the file. So does
+  `the-courier-mara-voss.md`, and `voss.md` for a one-word `Voss`, whatever
+  `check_text` says.
+- `the-courier.md` and `mara-vossler.md` don't, and neither does a note that
+  readers meet only at `ash:2`.
+
+Spec: format.md F-NAME-2 (#67). Covered by:
+`NameCheckTests.AFileNameThatHoldsTheLaterNameIsAWarning` (Core),
+`NameCheckToolTests.CheckListsBothRules` (MCP).
+
 ## RT: saving a note keeps what the writer wrote
 
 Background: the files are the writer's, and Wolfden is only one of the

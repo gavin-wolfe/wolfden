@@ -232,7 +232,8 @@ public sealed class DenErrorWatch(string root, TimeSpan watcherWait, string? pin
     {
         IndexBuilder.EnsureUpToDate(root, watcherWait);
         var tracked = new TrackingDenSource(FileSystemDenSource.ForViews(root));
-        _ = DenCheck.Run(tracked, pinned);
+        // Only what couldn't be read is wanted, so not the checks that read every note's text (#67).
+        _ = DenCheck.Run(tracked, pinned, namesInText: false);
 
         // Even pinned, the other universes' container files are read, for story order.
         var unreadable = tracked.Unreadable.Where(u => !DenErrors.IsOutsidePin(u.Path, pinned)).ToList();

@@ -909,14 +909,21 @@ reference and continuity checks all build on it.
 - Duplicate IDs (for example, from copying files by hand).
 - **Spoiler checks**, off by default: a link to an entity the reader
   hasn't met yet at the link's position, such as a reference from an
-  earlier book to an entity that first appears in a later one.
+  earlier book to an entity that first appears in a later one, and a name
+  readers learn later written as plain text before they learn it.
 
 **Decided (#68): spoiler checks are opt-in.** The positions on facts record
 where the reader learns each one, so a writer can pace the reveals. Not
 every writer tracks that, so the check that helps them is off unless
 `den.yaml` sets `spoiler_checks: true` (format.md F-DEN-7). It sees links,
 not prose, so summary prose that runs ahead of the story is the writer's
-to place (format.md §9.5).
+to place (format.md §9.5). The one exception is a name readers learn later
+(#67): with spoiler checks on, `check` also looks for a `known_as` name written
+as plain words before its `from`, and for a file name that holds one
+(F-NAME-1, F-NAME-2). Names of one word are looked for only on request, and
+`allow_in` silences a note. A first look at each file's raw text for the names'
+longest words keeps it cheap, and it runs only in `check`, never on a write or
+an index update, nor when the web reads the den's errors.
 
 Later rules: a character appearing after their death, travel times that
 don't fit the timeline, and open threads at a frozen book's end.

@@ -1063,8 +1063,9 @@ which `wolfden check` reports.
 **When a note's name is the secret,** file it under what readers first know it
 by, `name: The man in the grey coat`, with the real name in `known_as`, and give
 the file the same name (`the-man-in-the-grey-coat.md`): a file name shows in
-every read, so `corin-hask.md` would give it away. Nothing warns about a note
-that never gets a real name.
+every read, so `corin-hask.md` would give it away, and with spoiler checks on,
+`check` warns about it (see [Catching the name in plain text](#catching-the-name-in-plain-text)).
+Nothing warns about a note that never gets a real name.
 
 **What to watch for.**
 
@@ -1080,7 +1081,8 @@ that never gets a real name.
   with no `from` of its own, such as a universe-level note. A labelled link
   (`[[Mara Voss|the stranger]]`) shows only its label, so it isn't flagged.
 - It hides names, not prose. `Mara Voss` typed as plain words in an early
-  section shows there, so read summary sections for it as for any reveal.
+  section shows there. With spoiler checks on, `check` finds it (next section),
+  but a nickname or a description that gives her away is still yours to watch.
 - There's no `until`: readers who have learned a name don't forget it.
 - In Obsidian, `known_as` is a property it doesn't know, so edit it in Source mode,
   as with `fields`.
@@ -1109,6 +1111,90 @@ The link pickers find a note by its `known_as` names too, and say so:
 `Mina Harker, as Mrs. Harker readers learn it at dracula:5`. An editor shows
 everything, so it links by that name if you pick it; `wolfden check` warns if
 readers reach that text before the name's `from`.
+
+#### Catching the name in plain text
+
+`known_as` keeps a name out of a read until its `from`, but it can't take the
+name out of your own prose. If an early section says "The Courier, really Mara
+Voss", that sentence shows at that chapter. `wolfden check` can look for this.
+Turn it on in `den.yaml`, along with the other spoiler checks:
+
+```yaml
+spoiler_checks: true
+```
+
+Then `check` (and an assistant's `check` tool) warns wherever a `known_as` name
+appears as plain words in text readers reach before its `from`:
+
+```text
+universes/starfall/entities/notes/the-ledger.md:14: warning F-NAME-1: 'Mara Voss' is a name of 'The Courier' that readers learn at ember:38, and this text is at ember:12. ...
+```
+
+What it catches:
+
+- The name's words side by side, ignoring case and Latin accents, and whatever
+  is between them other than letters: `Mara Voss's ship`, `**MARA VOSS**`, the
+  name split over two lines, and `Zoe Arkwright` for `Zoë Arkwright`. Not
+  `Mara Vossler`.
+- Leads, titles, section headings and text, field values, and a link's label
+  (`[[The Courier|Mara Voss]]`), each at the position readers reach it. Text at
+  the start of the story counts, so a universe-level note with no `from` that
+  names her is caught. So is The Courier's own `## Overview`.
+- Not comments, code, a link's target (a link with no label is the link check's
+  job), bookkeeping sections like `## Session notes`, or out-of-canon text.
+- A file name that holds the name, such as `mara-voss.md` for The Courier: a
+  file name shows in every read, so rename the file after the name it's filed
+  under, with **Edit file** or by hand.
+
+Spellings follow search, not links: `Zoe` matches `Zoë`, `José` matches `Jose`,
+and `Çelik` matches `Celik`, but `Søren` doesn't match `Soren`, `Łucja` doesn't
+match `Lucja`, and `Đorđe` doesn't match `Djordje`, and Cyrillic and Latin never
+match each other. So list each spelling you use as its own `known_as` entry, as
+above: each one is hidden, and looked for, from its own `from`.
+
+**Names of one word.** A name of two or more words is looked for by default. A
+name of one word isn't, since `Rose`, `Hope`, or `Will` would fire all over a den.
+To have one looked for, say so on its entry, and to stop a longer one, say `false`:
+
+```yaml
+known_as:
+  - { value: Mara Voss, from: "ember:38" }                  # looked for
+  - { value: Voss, from: "ember:38" }                       # hidden, but not looked for
+  - { value: Quillon, from: "ash:2", check_text: true }     # an unusual name: looked for
+  - { value: The Harbour Company, from: "ember:9", check_text: false }
+```
+
+Words are counted as search splits them, so `Jean-Luc` and `O'Brien` count as
+two. If you type the short form alone and haven't set `check_text: true`, nothing
+warns.
+
+**When a warning is wrong.** In this order:
+
+1. Give the text the position it really has: a `from=` on the section is
+   usually the real fix, since the warning is right that the text shows there.
+2. Move it out of canon text: into an HTML comment, a bookkeeping section, or
+   a section with `status=idea`.
+3. If the note means someone else with the same name, list it in the entry's
+   `allow_in`, by its file name, name, alias, or id. That silences the whole
+   note for this name, so a real slip there later won't be caught either.
+
+   ```yaml
+   known_as:
+     - { value: Mara Voss, from: "ember:38", allow_in: [the-old-ledger] }
+   ```
+
+There's no warning when the words are already a name readers know at that
+point, such as an alias of another note they've met, since the text may well
+mean that one.
+
+A mistake in either key fails safe, with a warning, and the name is still
+looked for: a `check_text` that isn't `true` or `false` counts as `true`, and an
+`allow_in` item that doesn't reach a note silences nothing. An assistant can set
+both with `update_fields` (`known_as.0.check_text`, `known_as.0.allow_in`).
+
+These warnings come from `wolfden check` and the assistant's `check` tool. The
+web shows a den's errors, not its warnings, so they don't appear there, and
+nothing checks the text as you save it.
 
 ## Images
 

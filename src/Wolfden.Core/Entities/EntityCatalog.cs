@@ -485,10 +485,63 @@ public sealed partial class EntityCatalog
     }
 
     /// <summary>A <c>known_as</c> entry as read, before its <c>from</c> is resolved.</summary>
-    private sealed record KnownEntry(string Value, StoryPosition? From, int Line);
+    private sealed record KnownEntry(string Value, StoryPosition? From, int Line)
+    {
+        public bool? CheckText { get; init; }
+
+        public IReadOnlyList<string> AllowIn { get; init; } = [];
+    }
 
     /// <summary>The keys a <c>known_as</c> entry has a meaning for (F-ENT-10).</summary>
-    private static readonly string[] KnownAsKeys = ["value", "from"];
+    private static readonly string[] KnownAsKeys = ["value", "from", "check_text", "allow_in"];
+
+    /// <summary>
+    /// An entry's <c>check_text</c> (F-ENT-10): a boolean, or null if it has none. Any
+    /// other value is a warning and reads as true, so the name is still checked.
+    /// </summary>
+    private static bool? ReadCheckText(YamlMapping entry, string value, Action<int, string> warn)
+    {
+        switch (entry["check_text"])
+        {
+            case null or YamlScalar { IsNull: true }:
+                return null;
+            case YamlScalar scalar when scalar.AsBoolean() is bool on:
+                return on;
+            case var node:
+                warn(node.Line, $"known_as: check_text of '{value}' is '{Describe(node)}', which isn't true or false, so the name is checked in plain text as if it said true.");
+                return true;
+        }
+    }
+
+    /// <summary>
+    /// An entry's <c>allow_in</c> (F-ENT-10): a list of notes, by anything a link
+    /// reaches a note by, or one. An item that isn't text is a warning and is left
+    /// out, so the name is still checked there.
+    /// </summary>
+    private static List<string> ReadAllowIn(YamlMapping entry, string value, Action<int, string> warn)
+    {
+        var items = new List<string>();
+        IReadOnlyList<YamlNode> nodes = entry["allow_in"] switch
+        {
+            null or YamlScalar { IsNull: true } => [],
+            YamlSequence list => list.Items,
+            YamlScalar one => [one],
+            var other => [other],
+        };
+        foreach (var node in nodes)
+        {
+            if (node is YamlScalar { IsNull: false } item && item.Text.Trim().Length > 0 && item.Text.IndexOfAny(['\r', '\n']) < 0)
+            {
+                items.Add(item.Text.Trim());
+            }
+            else
+            {
+                warn(node.Line, $"known_as: allow_in of '{value}' has '{Describe(node)}', which isn't a note's slug, name, alias, or id, so it's ignored and the name is still checked everywhere.");
+            }
+        }
+
+        return items;
+    }
 
     /// <summary>
     /// F-ENT-10: <c>known_as</c> is a list of entries, or a single entry, each a
@@ -525,8 +578,11 @@ public sealed partial class EntityCatalog
 
                     foreach (var other in entry.Entries.Where(e => e.KeyText is not { } key || !KnownAsKeys.Contains(key)))
                     {
-                        Warn(other.Key.Line, $"known_as: '{other.KeyText}' isn't a key a known_as entry has, so it's kept and ignored. An entry has a value and a from.");
+                        Warn(other.Key.Line, $"known_as: '{other.KeyText}' isn't a key a known_as entry has, so it's kept and ignored. An entry has a value and a from, and may have check_text and allow_in.");
                     }
+
+                    var checkText = ReadCheckText(entry, value.Text, Warn);
+                    var allowIn = ReadAllowIn(entry, value.Text, Warn);
 
                     StoryPosition? from = null;
                     if (entry["from"] is YamlScalar { IsNull: false } f && StoryPosition.TryParse(f.Text, out var parsed, out _))
@@ -539,7 +595,7 @@ public sealed partial class EntityCatalog
                     }
 
                     // A from that doesn't parse is already an error (F-POS-3), from the position scan.
-                    entries.Add(new KnownEntry(value.Text, from, entry.Line));
+                    entries.Add(new KnownEntry(value.Text, from, entry.Line) { CheckText = checkText, AllowIn = allowIn });
                     break;
                 default:
                     error("F-ENT-10", item.Line, "known_as must be a list of entries, each a name and where readers learn it, such as '- { value: Mara Voss, from: \"ember:38\" }'.");
@@ -564,7 +620,7 @@ public sealed partial class EntityCatalog
     {
         void Warn(int line, string message) => diagnostics.Add(new Diagnostic("F-ENT-10", DiagnosticSeverity.Warning, line, message));
         var resolved = entries
-            .Select(e => new KnownName(e.Value, e.From, e.From is { } f ? universe.Resolve(f) : null, e.Line))
+            .Select(e => new KnownName(e.Value, e.From, e.From is { } f ? universe.Resolve(f) : null, e.Line) { CheckText = e.CheckText, AllowIn = e.AllowIn })
             .ToList();
         var kept = new List<KnownName>();
         foreach (var group in resolved.GroupBy(k => Links.LinkText.Normalize(k.Value), StringComparer.Ordinal))

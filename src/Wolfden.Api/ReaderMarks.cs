@@ -70,7 +70,7 @@ internal sealed class ReaderMarks
     public long Point => _point;
 
     /// <summary>The links of the universe's notes as a Reader's page at the position shows them. A note a reader has met has no mark and is in canon.</summary>
-    private ReadersLinks Links => _links ??= new ReadersLinks(_db, _universeId, e => IsInCanon(e.Status) && OfNote(e) is null, (e, section) => _view.Value(e, section));
+    private ReadersLinks Links => _links ??= new ReadersLinks(_db, _universeId, e => IsInCanon(e.Status) && OfNote(e) is null, (e, section) => _view.Value(e, section), point: _point);
 
     /// <summary>
     /// The marks at <paramref name="position"/>. Its universe is chosen as an
@@ -130,6 +130,62 @@ internal sealed class ReaderMarks
             .ToList();
         var shown = marked.Take(limit).ToList();
         return new MarkedEntityListResult(ReadEndpoints.ResultVersion, shown.Count, marked.Count, marked.Count > limit, shown, Position);
+    }
+
+    /// <summary>
+    /// The mark of a name of <paramref name="note"/> that readers learn partway through
+    /// (<c>known_as</c>, format.md F-ENT-10, F-VIEW-7), or null if readers at the position
+    /// know it. <paramref name="learned"/> is where they learn it, as the index has it: null,
+    /// or <see cref="IndexQueries.EndOfStory"/>, if no <c>from</c> places it, which is
+    /// <c>unplaced</c>. A name can't be known before its note is met, so it's <c>ahead</c>
+    /// until the later of the two. A note out of canon, or one no position places, keeps its
+    /// own badge or tag, so its names have none.
+    /// </summary>
+    public ReaderMark? OfName(EntityRecord note, long? learned, string? fromText)
+    {
+        ArgumentNullException.ThrowIfNull(note);
+        if (!IsInCanon(note.Status) || note.FromOrdinal is not { } met)
+        {
+            return null;
+        }
+
+        if (learned is not { } at || at == IndexQueries.EndOfStory)
+        {
+            return new ReaderMark(ReaderMark.Unplaced, fromText);
+        }
+
+        var known = Math.Max(at, met);
+        if (known <= _point)
+        {
+            return null;
+        }
+
+        var named = known == at && fromText is not null && _points.TryGetValue(fromText, out var written) && written == at
+            ? fromText
+            : known == met ? EntityPages.Entry(note, _containers).Position ?? _names.GetValueOrDefault(known) : _names.GetValueOrDefault(known);
+        return new ReaderMark(ReaderMark.Ahead, named);
+    }
+
+    /// <summary>
+    /// The mark of a link written by a name readers learn partway through, which a Reader's
+    /// page at the position shows by the note's name (F-VIEW-7, #67 §4), or null for any
+    /// other link. A labelled link shows only its label, so it has none.
+    /// </summary>
+    public ReaderMark? OfLinkName(LinkRecord link, EntityRecord? target)
+    {
+        ArgumentNullException.ThrowIfNull(link);
+        if (link.NameFromOrdinal is not { } learned || link.Label is not null || target is null)
+        {
+            return null;
+        }
+
+        var normalized = Wolfden.Core.Links.LinkText.Normalize(link.Target);
+        // Of a name listed twice, the entry that counts: the one whose from the link's row has.
+        var fromText = _db.Aliases.Where(a => a.EntityId == target.Id && a.IsKnownAs && a.AliasNormalized == normalized)
+            .Select(a => new { a.FromText, a.FromOrdinal }).AsEnumerable()
+            .OrderBy(a => (a.FromOrdinal ?? IndexQueries.EndOfStory) == learned ? 0 : 1)
+            .Select(a => a.FromText).FirstOrDefault();
+        return OfName(target, learned, fromText);
     }
 
     /// <summary>
@@ -208,6 +264,7 @@ internal sealed class ReaderMarks
         private const string InAnAlias = "alias";
         private const string InALinkTarget = "linkTarget";
         private const string InALaterNote = "laterNote";
+        private const string InALaterName = "laterName";
 
         private readonly ReaderMarks _marks;
         private readonly EntityRecord _note;
@@ -282,13 +339,15 @@ internal sealed class ReaderMarks
         /// </summary>
         public SearchPageHit Mark(SearchPageHit hit, string query, Dictionary<string, EntityRecord> records)
         {
-            var hiddenIn = hit.Field is not null ? HiddenInValue(hit, query, records) : HiddenInText(hit, query);
+            ReaderMark? nameMark = null;
+            var hiddenIn = hit.Field is not null ? HiddenInValue(hit, query, records) : HiddenInText(hit, query, out nameMark);
             var marked = Marks(hit) with
             {
                 NoteMark = Note,
                 LaterLink = _marks.LaterOf(hit.LinkedNotes, records),
                 InComment = hit.InComment || hiddenIn == InAComment,
-                HiddenIn = hiddenIn is InAnAlias or InALinkTarget ? hiddenIn : null,
+                HiddenIn = hiddenIn is InAnAlias or InALinkTarget or InALaterName ? hiddenIn : null,
+                NameMark = hiddenIn == InALaterName ? nameMark : null,
             };
             return marked with
             {
@@ -322,8 +381,9 @@ internal sealed class ReaderMarks
         /// Where a hit in text has words a reader's search can't find, by that search's own
         /// rule, or null if it can find them. Text with no comment or link has nothing to check.
         /// </summary>
-        private string? HiddenInText(SearchPageHit hit, string query)
+        private string? HiddenInText(SearchPageHit hit, string query, out ReaderMark? nameMark)
         {
+            nameMark = null;
             if (hit.Section is not null && hit.Line is { } line)
             {
                 if (_sections.GetValueOrDefault(line) is not { } section
@@ -339,16 +399,28 @@ internal sealed class ReaderMarks
             // Readers find a note by its name and the other names they know at the position (F-VIEW-7).
             var noteId = _note.Id;
             var rows = _marks._db.Aliases.Where(a => a.EntityId == noteId).OrderBy(a => a.Order).ToList();
-            var known = string.Join("\n", rows.Where(a => a.IsKnownAt(_marks._point)).Select(a => a.Alias).Prepend(_note.Name));
-            if (DenReader.ReadersCanFind(query, known, _note.Lead, _marks.Links, _note.Id))
+            var knownRows = rows.Where(a => a.IsKnownAt(_marks._point)).ToList();
+            var known = knownRows.Select(a => a.Alias).Prepend(_note.Name).ToList();
+            if (DenReader.ReadersCanFind(query, string.Join("\n", known), _note.Lead, _marks.Links, _note.Id))
             {
                 return null;
             }
 
+            // Only in a name readers learn later (F-ENT-10): the one that, learned in story order, first lets them find it,
+            // so the tag says where a reader's search starts to (#67, §4). One no from places comes last.
+            foreach (var later in rows.Except(knownRows).OrderBy(a => a.FromOrdinal ?? IndexQueries.EndOfStory).ThenBy(a => a.Order))
+            {
+                known.Add(later.Alias);
+                if (DenReader.ReadersCanFind(query, string.Join("\n", known), _note.Lead, _marks.Links, _note.Id))
+                {
+                    // A note out of canon, or one no position places, keeps its own tag, so the name has none to add.
+                    nameMark = _marks.OfName(_note, later.FromOrdinal, later.FromText);
+                    return InALaterName;
+                }
+            }
+
             var names = string.Join("\n", rows.Select(a => a.Alias).Prepend(_note.Name));
-            return DenReader.ReadersCanFind(query, names, _note.Lead, _marks.Links, _note.Id) ? InAnAlias
-                : DenReader.FoundWithoutComments(query, names, _note.Lead) ? InALinkTarget
-                : InAComment;
+            return DenReader.FoundWithoutComments(query, names, _note.Lead) ? InALinkTarget : InAComment;
         }
 
         /// <summary>

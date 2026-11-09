@@ -551,6 +551,13 @@ public sealed partial class DenTools
                     effects.Add($"Its title heading, '# {title}', now reads '# {c.NewText}' too.");
                 }
 
+                if (c.Kept is { } kept)
+                {
+                    effects.Add(
+                        $"'{kept}' is a plain alias now, with no from, so readers know it wherever they know the note, at every story position. " +
+                        "If readers should learn it partway through, give it a from, which makes it a known_as name.");
+                }
+
                 if (c.DroppedAlias is { } dropped)
                 {
                     effects.Add($"'{dropped}' was one of its aliases; it's the name now, so it was taken out of aliases. Links that use it still reach it, by name now.");

@@ -108,6 +108,9 @@ public sealed class RenameEntityToolTests : IDisposable
 
         var kept = Tools.RenameEntity("Mr. Swales", "Old Swales", hash, keepOldName: true);
         Assert.True(kept.Changed);
+
+        // A kept name is a plain alias: it has no from, so readers know it wherever they know the note (#67).
+        Assert.Contains(kept.Effects, e => e.StartsWith("'Mr. Swales' is a plain alias now, with no from, so readers know it wherever they know the note", StringComparison.Ordinal));
         Assert.Contains("Recall [[Mr. Swales]].", _den.Read("universes/dracula/books/aftermath/entities/notes/memories.md"), StringComparison.Ordinal);
 
         // An entity in a final book isn't renamed at all.

@@ -5,5 +5,9 @@
   { "about": "a met note shows its name, however it's written", "label": null, "name": "Halden Pike", "target": "the-old-pilot", "heading": null, "shown": "Halden Pike" },
   { "about": "a met note with a heading", "label": null, "name": "Halden Pike", "target": "halden-pike", "heading": "Early life", "shown": "Halden Pike: Early life" },
   { "about": "a note not met shows its target as written", "label": null, "name": null, "target": "halden-pike", "heading": null, "shown": "halden-pike" },
-  { "about": "a note not met with a heading", "label": null, "name": null, "target": "halden-pike", "heading": "Early life", "shown": "halden-pike: Early life" }
+  { "about": "a note not met with a heading", "label": null, "name": null, "target": "halden-pike", "heading": "Early life", "shown": "halden-pike: Early life" },
+  { "about": "a link by a known_as name readers know shows as written", "label": null, "name": "The man in the grey coat", "target": "Corin Hask", "heading": null, "asWritten": true, "shown": "Corin Hask" },
+  { "about": "a link by a known_as name readers know, with a heading", "label": null, "name": "The man in the grey coat", "target": "Corin Hask", "heading": "Early life", "asWritten": true, "shown": "Corin Hask: Early life" },
+  { "about": "a label wins over a known_as name too", "label": "the stranger", "name": "The man in the grey coat", "target": "Corin Hask", "heading": null, "asWritten": true, "shown": "the stranger" },
+  { "about": "a plain alias still shows the note's name", "label": null, "name": "Halden Pike", "target": "the old pilot", "heading": null, "asWritten": false, "shown": "Halden Pike" }
 ]

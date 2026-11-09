@@ -817,7 +817,17 @@ public sealed partial class DenReader
             var universes = new Dictionary<int, string> { [u.Id] = u.Key };
             var scopes = Scopes(db);
             var shown = matches.Take(limit)
-                .Select(x => new LookupHit(Summary(x.Entity, universes, scopes), x.Match!.By, x.Match.Alias) { LinkText = LinkTextOf(x.Entity, x.Match) })
+                .Select(x =>
+                {
+                    // A name readers learn later says so, with where, so a picker can mark it (#67, §4).
+                    var known = x.Match!.By == "alias" ? aliasRows.FirstOrDefault(a => a.EntityId == x.Entity.Id && a.IsKnownAs && a.Alias == x.Match.Alias) : null;
+                    return new LookupHit(Summary(x.Entity, universes, scopes), x.Match.By, x.Match.Alias)
+                    {
+                        LinkText = LinkTextOf(x.Entity, x.Match),
+                        KnownAs = known is null ? null : true,
+                        From = known?.FromText,
+                    };
+                })
                 .ToList();
             return new LookupResult(ResultVersion, u.Key, query, asOf, shown.Count, matches.Count > limit, shown);
         });

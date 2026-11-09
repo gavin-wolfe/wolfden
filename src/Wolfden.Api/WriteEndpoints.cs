@@ -38,7 +38,7 @@ public static partial class WriteEndpoints
 
     /// <summary>The paths under <c>/api</c> that answer POST.</summary>
     public static readonly IReadOnlyList<string> PostPaths =
-        ["edit/lead", "edit/section", "edit/section/add", "edit/section/rename", "edit/section/remove", "edit/file", "edit/field"];
+        ["edit/lead", "edit/section", "edit/section/add", "edit/section/rename", "edit/section/remove", "edit/file", "edit/field", "edit/name/add", "edit/name"];
 
     /// <summary>
     /// The words the edits' messages use for what to do next. Their errors
@@ -57,7 +57,7 @@ public static partial class WriteEndpoints
         CheckTool = "run 'wolfden check' in the den's folder",
         CheckPath = "open '{0}' in your editor, or run 'wolfden check' in the den's folder,",
         NameLinks = "An AI assistant working through Wolfden can rename the note and rewrite those links.",
-        AliasLinks = "An AI assistant working through Wolfden can change an alias and rewrite those links.",
+        AliasLinks = "Other names, on the note's page, changes an alias and rewrites those links.",
         ChapterKeys = "pick a chapter the book lists",
         Unfreeze = "Unfreeze… on the page of book '{0}' opens it for editing again.",
         ReplaceOrClear = "To replace it, edit the field and save the whole value; to {0}, choose {1}.",
@@ -119,6 +119,49 @@ public static partial class WriteEndpoints
             tools.ReplaceFile(entity, b.Text("text"), hash, universe));
         MapEdit(api, "/edit/field", tools, ["field", "changes"], (b, entity, universe, hash) =>
             tools.UpdateFields(entity, hash, FieldChanges(b.Text("field").Trim(), b.Json("changes")), universe, numbersAsText: true));
+
+        // A note's other names (#67): a plain alias, or a name readers learn partway through (known_as, F-ENT-10).
+        MapEdit(api, "/edit/name/add", tools, ["name", "knownAs", "from"], (b, entity, universe, hash) =>
+            tools.UpdateFields(entity, hash, NameAdded(b.Text("name"), b.OptionalBool("knownAs") ?? false, b.OptionalText("from")), universe));
+        MapEdit(api, "/edit/name", tools, ["name", "newName", "keepOld", "from", "plain", "remove"], (b, entity, universe, hash) =>
+        {
+            var newName = b.OptionalText("newName");
+            var from = b.OptionalText("from");
+            var plain = b.OptionalBool("plain") ?? false;
+            var remove = b.OptionalBool("remove") ?? false;
+
+            // A rename sent empty mustn't remove the name: removing is asked for by itself.
+            if (remove != (newName is null && from is null && !plain))
+            {
+                throw new DenToolException(
+                    ToolErrorCodes.BadArgument,
+                    "Give 'newName' to rename it, 'from' or 'plain' to change where readers learn it, or 'remove': true alone to remove it.");
+            }
+
+            return tools.ChangeAlias(entity, b.Text("name"), hash, newName, b.OptionalBool("keepOld") ?? false, universe, from: from, plain: plain);
+        });
+    }
+
+    /// <summary>
+    /// The change for <see cref="DenTools.UpdateFields"/> that adds <paramref name="name"/>: a plain alias, or with
+    /// <paramref name="knownAs"/>, a <c>known_as</c> entry, which must say where readers learn it (F-ENT-10).
+    /// </summary>
+    private static JsonElement NameAdded(string name, bool knownAs, string? from)
+    {
+        if (knownAs && from is null)
+        {
+            throw new DenToolException(
+                ToolErrorCodes.BadArgument,
+                "Say where readers learn the name, such as ember:38. Without one, no point in the story knows it. A name readers know wherever they know the note needs none.");
+        }
+
+        if (!knownAs && from is not null)
+        {
+            throw new DenToolException(ToolErrorCodes.BadArgument, "'from' is for a name readers learn later: give 'knownAs': true with it.");
+        }
+
+        object value = knownAs ? new Dictionary<string, string> { ["value"] = name.Trim(), ["from"] = from! } : name;
+        return JsonSerializer.SerializeToElement(new[] { new Dictionary<string, object> { ["op"] = "add", ["path"] = knownAs ? "known_as" : "aliases", ["value"] = value } });
     }
 
     /// <summary>The members a change of <c>/api/edit/field</c> takes.</summary>

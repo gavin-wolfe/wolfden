@@ -126,9 +126,11 @@ public sealed class PerformanceTests(ITestOutputHelper output)
     /// hundred names readers learn in book two, five of them written in book one.
     /// A first look at each note's raw text for the names' longest words means only
     /// the notes that may hold one are read closely, so the check costs little more
-    /// than a check with spoiler checks off. The bound only catches a gross slowdown,
-    /// such as every note read closely and every name compared with every word; in
-    /// development the names add well under a second.
+    /// than a check with spoiler checks off; in development the names add well under
+    /// a second. The bound covers the whole check, so it only catches a gross
+    /// slowdown, such as every name compared with every word of the den. Reading
+    /// every note closely costs too little here to tell from a busy machine, so the
+    /// first look's correctness is tested by <c>NameCheckTests</c>, not timed.
     /// </summary>
     [Fact]
     [Trait("Scenario", "SC-CHECK-65")]

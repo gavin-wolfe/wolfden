@@ -324,6 +324,70 @@ public class NameCheckTests
     }
 
     [Fact]
+    [Trait("Scenario", "SC-CHECK-65")]
+    public void ANotesNameAndAliasesAreChecked()
+    {
+        var source = WithCourier().Entity(Starfall, "the-letter", Character("Mara Voss's Letter", "aliases: [the letter, Voss letter, letter of Mara Voss]"));
+        var path = $"{Starfall}/entities/characters/the-letter.md";
+        var file = System.Text.Encoding.UTF8.GetString(source.ReadFile(path));
+
+        Assert.Equal([(path, "F-NAME-1", (int?)LineOf(file, "name:")), (path, "F-NAME-1", LineOf(file, "aliases:"))], Names(source));
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-CHECK-65")]
+    [InlineData("<div>\n\nPara.\n\n    Mara Voss, indented code.\n")]
+    [InlineData("<div>\r\n\r\nPara.\r\n\r\n    Mara Voss, indented code.\r\n")]
+    [InlineData("<div>\n\n```\nMara Voss, in a fence nothing closes.\n")]
+    [InlineData("<div>\r\n\r\n```\r\nMara Voss, in a fence nothing closes.\r\n")]
+    [InlineData("Text.\r\n\r\n```text\r\nMara Voss\r\n```\r\n\r\nMore `Mara Voss` text.\r\n")]
+    public void CodeAfterAnHtmlBlockIsCodeWhateverTheLineBreaks(string body)
+    {
+        var source = WithCourier().Entity(Starfall, "the-ledger", Character("The Ledger"), "\n" + body);
+
+        Assert.Empty(Names(source));
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-CHECK-65")]
+    [InlineData("Mara Voss`'s` ship.")]
+    [InlineData("Mara Voss[[the-courier]] left.")]
+    [InlineData("A `code`Mara Voss.")]
+    [InlineData("[[the-ledger]]Mara Voss.")]
+    public void CodeOrALinkTouchingTheNameDoesntHideIt(string text)
+    {
+        var source = WithCourier().Entity(Starfall, "the-ledger", Character("The Ledger"), $"\n{text}\n");
+
+        Assert.Single(Names(source));
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-CHECK-65")]
+    [InlineData("known_as: [{ value: Mara Voss, from: \"ash:9\" }]")]
+    [InlineData("known_as: [{ value: Mara Voss }]")]
+    public void ANameReadersNeverLearnIsLookedForEverywhere(string knownAs)
+    {
+        // Its from is missing or doesn't resolve, so readers never learn it, and every use gives it away.
+        var source = WithCourier(knownAs).Entity(Starfall, "the-ledger", Character("The Ledger"),
+            "\n## Late\n<!-- wolfden: from=ash:3 -->\nMara Voss signed it.\n");
+
+        var warning = Assert.Single(DenCheck.Run(source).Diagnostics, d => d.Diagnostic.RuleId == "F-NAME-1");
+        Assert.Contains("that readers learn at no point in the story, since its from doesn't resolve, and this text is at ash:3", warning.Diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-CHECK-65")]
+    public void ANameSpelledWithAYamlEscapeIsFound()
+    {
+        // The raw text holds neither the accent nor the folded word, so the first look reads the frontmatter's strings too.
+        var source = Den()
+            .Entity(Starfall, "the-courier", Character("The Courier", "known_as: [{ value: Amélie Roux, from: \"ash:2\" }]"))
+            .Entity(Starfall, "the-ledger", Character("The Ledger", "fields:\n  signer: \"Am\\u00e9lie Roux\""));
+
+        Assert.Single(Names(source));
+    }
+
+    [Fact]
     public void NotesOutOfCanonAreNeitherCheckedNorCheckedFor()
     {
         var source = Den()

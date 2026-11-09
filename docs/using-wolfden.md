@@ -1132,11 +1132,13 @@ universes/starfall/entities/notes/the-ledger.md:14: warning F-NAME-1: 'Mara Voss
 
 What it catches:
 
-- The name's words side by side, ignoring case and Latin accents, and whatever
-  is between them other than letters: `Mara Voss's ship`, `**MARA VOSS**`, the
+- The name's words side by side, ignoring case and Latin accents, with only
+  spaces, punctuation, or markup between them, not other letters or digits:
+  `Mara Voss's ship`, `**MARA VOSS**`, the
   name split over two lines, and `Zoe Arkwright` for `Zoë Arkwright`. Not
   `Mara Vossler`.
-- Leads, titles, section headings and text, field values, and a link's label
+- A note's name and aliases, leads, titles, section headings and text, field
+  values, and a link's label
   (`[[The Courier|Mara Voss]]`), each at the position readers reach it. Text at
   the start of the story counts, so a universe-level note with no `from` that
   names her is caught. So is The Courier's own `## Overview`.

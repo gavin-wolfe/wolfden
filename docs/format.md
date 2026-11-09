@@ -1682,16 +1682,18 @@ the same care (§9.5). F-NAME-1 covers one case of prose: a `known_as` name.
 
 **F-NAME-1.** A `known_as` name (F-ENT-10) written in canon text that readers
 reach before they learn the name is a [warning]. Readers learn it at its
-`from`, or when they meet its entity, if that's later. Only names whose entry
-is checked (`check_text`, F-ENT-10) are looked for, only in the entity's own
-universe, and only names of an entity in canon whose `from`s resolve.
+`from`, or when they meet its entity, if that's later. An entry with no `from`,
+or one that doesn't resolve, is a name readers never learn (F-ENT-10), so it's
+looked for in all canon text. Only names whose entry is checked (`check_text`,
+F-ENT-10) are looked for, only in the entity's own universe, and only names of
+an entity in canon whose own `from` resolves.
 
 The text and its position, as F-LINK-12 and F-LINK-13 define them, except
 that text at the start of the story is checked too:
 
 | Text | Position | Checked |
 |---|---|---|
-| An entity's lead, its title included, and its plain field values | The entity's `from` (F-ENT-6) | Yes, if the entity is in canon |
+| An entity's `name`, `aliases`, lead, title, and plain field values | The entity's `from` (F-ENT-6) | Yes, if the entity is in canon |
 | A section's heading and its own text | Its effective `from` (F-SEC-9) | Yes, if it's live (F-SEC-8) |
 | A field entry's `value` | Its `from`, or the start of the story | Yes, if it's live (F-TMP-4) |
 | A link's label | Where it's written | Yes |
@@ -1707,8 +1709,10 @@ A name matches where its words appear side by side as whole words, as search
 splits and compares them: case and Latin accents don't matter (`Zoe` matches
 `Zoë`, though `Soren` doesn't match `Søren`, since `ø` has no accent to take
 off), and punctuation, emphasis, and line breaks between the words don't
-either. A comment between them is taken out first, as a read does, while code
-or a link with no label between them keeps them apart.
+either. Any other letter or digit between them keeps them apart. A comment
+between them is taken out first, as a read does, while code or a link with no
+label between them keeps them apart, though code or a link touching the name
+doesn't hide it (``Mara Voss`'s` ship``).
 
 It isn't a warning:
 
@@ -1722,7 +1726,8 @@ words, naming the one readers learn first.
 
 **F-NAME-2.** A file name that holds one of its own entity's `known_as` names,
 compared as F-NAME-1 compares words (`mara-voss.md` holds `Mara Voss`), is a
-[warning] if the entity enters canon before that name's `from`: a file name
+[warning] if the entity enters canon before that name's `from`, or the name has
+no `from` that resolves: a file name
 shows in every read of the entity. It doesn't depend on `check_text`, since a
 file name is chosen. Renaming the file fixes it (§9.5).
 

@@ -1264,7 +1264,14 @@ readers reach at `ember:2`, or in its lead, at the start of the story.
 - `Mara Vossler` doesn't, nor does the name in a code span or block, a comment,
   a link's target, a section with `from=ash:2`, `## Session notes`, or a section
   with `status=idea`.
-- The Courier's own lead, title, headings, and field values are checked too.
+- The Courier's own lead, title, headings, and field values are checked too,
+  and so is any note's name and aliases: `name: Mara Voss's Letter` warns.
+- ``Mara Voss`'s` ship`` and `Mara Voss[[the-courier]]` warn: code or a link
+  touching the name doesn't hide it. Code after an HTML block stays code in a
+  CRLF note as in an LF one.
+- A name whose `from` is missing or doesn't resolve is one readers never learn,
+  so it warns in all canon text.
+- A name the raw text spells with a YAML escape (`"Amélie Roux"`) is found.
 - `Zoe Arkwright` matches `Zoë Arkwright`, and `Noël Várga` matches `Noel
   Varga`. `Soren` doesn't match `Søren`.
 - Text in a note readers meet only at `ash:3` is at `ash:3`, whatever its
@@ -1277,7 +1284,12 @@ Spec: format.md F-NAME-1 (#67). Covered by:
 `NameCheckTests.ANameReadersLearnOnlyWhenTheyMeetTheNoteCountsFromThere`,
 `NameCheckTests.MatchingIgnoresAccentsBothWays`,
 `NameCheckTests.LettersThatDontDecomposeArentFolded`,
-`NameCheckTests.AnUnaccentedSpellingListedAsItsOwnEntryIsCheckedFromItsOwnFrom` (Core),
+`NameCheckTests.AnUnaccentedSpellingListedAsItsOwnEntryIsCheckedFromItsOwnFrom`,
+`NameCheckTests.ANotesNameAndAliasesAreChecked`,
+`NameCheckTests.CodeAfterAnHtmlBlockIsCodeWhateverTheLineBreaks`,
+`NameCheckTests.CodeOrALinkTouchingTheNameDoesntHideIt`,
+`NameCheckTests.ANameReadersNeverLearnIsLookedForEverywhere`,
+`NameCheckTests.ANameSpelledWithAYamlEscapeIsFound` (Core),
 `NameCheckToolTests.CheckListsBothRules` (MCP),
 `PerformanceTests.ALargeDenIsCheckedForNamesReadersLearnLaterQuickly` (Index).
 

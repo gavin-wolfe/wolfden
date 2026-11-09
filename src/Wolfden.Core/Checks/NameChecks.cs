@@ -68,7 +68,9 @@ internal static class NameChecks
 
             var fileName = entity.Path[(entity.Path.LastIndexOf('/') + 1)..^3];
             var fileWords = SearchTokens.Tokens(fileName).ConvertAll(t => t.Folded);
-            foreach (var known in entity.KnownAs.Where(k => k.IsLive))
+            // An entry with no from, or one that doesn't resolve, is a name readers never learn (F-ENT-10 warns),
+            // so every use of it gives it away.
+            foreach (var known in entity.KnownAs)
             {
                 var words = SearchTokens.Tokens(known.Value).ConvertAll(t => t.Folded).ToArray();
                 if (words.Length == 0)
@@ -76,13 +78,14 @@ internal static class NameChecks
                     continue;
                 }
 
-                var point = known.Point!.Value;
+                var point = known.Point;
+                var learnedAt = point is null ? "no point in the story, since its from doesn't resolve" : $"{known.From}";
 
                 // F-NAME-2: a file name is chosen, so even a one-word name counts.
-                if (met < point && IndexOf(fileWords, words) >= 0)
+                if ((point is null || met < point) && IndexOf(fileWords, words) >= 0)
                 {
                     found.Add(new DenDiagnostic(entity.Path, new Diagnostic("F-NAME-2", DiagnosticSeverity.Warning, known.Line,
-                        $"The file name '{fileName}.md' holds '{known.Value}', a name of '{entity.Name}' that readers learn at {known.From}, " +
+                        $"The file name '{fileName}.md' holds '{known.Value}', a name of '{entity.Name}' that readers learn at {learnedAt}, " +
                         $"and a file's name shows in every read from the note's entry, {entity.EntersCanonDescription}. " +
                         "Rename the file after the name the note is filed under, with Edit file in the web or by hand.")));
                 }
@@ -109,7 +112,9 @@ internal static class NameChecks
                 }
 
                 // Readers can't learn a name before they meet the note.
-                var (learned, at) = met > point ? (met, entity.EntersCanonDescription) : (point, known.From!.ToString());
+                var (learned, at) = point is null ? (null, learnedAt)
+                    : met > point ? ((StoryPoint?)met, entity.EntersCanonDescription)
+                    : (point, learnedAt);
                 names.Add(new CheckedName(entity, known, words, string.Join(' ', words), learned, at, allowed));
             }
         }
@@ -142,10 +147,10 @@ internal static class NameChecks
     /// <param name="Known">Its <c>known_as</c> entry.</param>
     /// <param name="Words">Its words, folded.</param>
     /// <param name="Phrase">Its words joined by spaces, to compare with other names.</param>
-    /// <param name="Learned">Where readers learn it: its <c>from</c>, or the note's entry if that's later.</param>
+    /// <param name="Learned">Where readers learn it: its <c>from</c>, or the note's entry if that's later. Null if they never do: its <c>from</c> is missing or doesn't resolve.</param>
     /// <param name="LearnedAt">That position, for the message.</param>
     /// <param name="AllowIn">The notes its <c>allow_in</c> reaches.</param>
-    private sealed record CheckedName(CatalogEntity Entity, KnownName Known, string[] Words, string Phrase, StoryPoint Learned, string LearnedAt, HashSet<CatalogEntity> AllowIn);
+    private sealed record CheckedName(CatalogEntity Entity, KnownName Known, string[] Words, string Phrase, StoryPoint? Learned, string LearnedAt, HashSet<CatalogEntity> AllowIn);
 
     /// <summary>F-NAME-1 over one universe's notes.</summary>
     private sealed class TextScan
@@ -164,7 +169,7 @@ internal static class NameChecks
             _entities = entities;
             _bookkeeping = bookkeeping;
             _found = found;
-            foreach (var name in names.OrderBy(n => n.Learned))
+            foreach (var name in names.OrderBy(n => n.Learned is null).ThenBy(n => n.Learned))
             {
                 if (!_byFirstWord.TryGetValue(name.Words[0], out var list))
                 {
@@ -183,7 +188,7 @@ internal static class NameChecks
         {
             foreach (var entity in _entities)
             {
-                if (entity.Status.IsInCanon() && entity.EntersCanon is not null && entity.File.IsReadable && MayHold(entity.File.Text))
+                if (entity.Status.IsInCanon() && entity.EntersCanon is not null && entity.File.IsReadable && (MayHold(entity.File.Text) || FrontmatterMayHold(entity)))
                 {
                     ReadClosely(entity);
                 }
@@ -224,6 +229,32 @@ internal static class NameChecks
             }
         }
 
+        /// <summary>The note's <c>name</c> and the aliases that count, as written in its frontmatter.</summary>
+        private static IEnumerable<YamlScalar> Names(CatalogEntity entity)
+        {
+            var frontmatter = entity.File.Frontmatter;
+            if (frontmatter?["name"] is YamlScalar { IsNull: false } name)
+            {
+                yield return name;
+            }
+
+            if (frontmatter?["aliases"] is YamlSequence aliases)
+            {
+                foreach (var alias in aliases.Items.OfType<YamlScalar>().Where(a => !a.IsNull && entity.Aliases.Contains(a.Text)))
+                {
+                    yield return alias;
+                }
+            }
+        }
+
+        /// <summary>
+        /// The first look again, at the frontmatter's strings as YAML reads them, for a
+        /// name the raw text spells with an escape, such as <c>"Amélie"</c>.
+        /// </summary>
+        private bool FrontmatterMayHold(CatalogEntity entity) =>
+            entity.File.Frontmatter is { } frontmatter
+            && Names(entity).Concat(frontmatter["fields"] is { } fields ? LinkScanner.Strings(fields) : []).Any(s => MayHold(s.Text));
+
         /// <summary>The first look: false only if <paramref name="text"/> can't hold any of the names.</summary>
         private bool MayHold(ReadOnlySpan<char> text) =>
             SearchTokens.MayHoldAccents(text) || text.IndexOfAny(_firstLook) >= 0;
@@ -240,6 +271,13 @@ internal static class NameChecks
             // The lead, title included, is at the note's entry.
             var leadEnd = sections.Count > 0 ? sections[0].HeadingStart : text.Length;
             ScanMarkdown(entity, source, file.BodyStart, leadEnd, met, entity.EntersCanonDescription);
+
+            // So are its name and aliases. An alias that's also a known_as name was taken out (F-ENT-10), and
+            // another note's name that's the same words is a name readers know there.
+            foreach (var name in Names(entity))
+            {
+                ScanValues(entity, name, met, entity.EntersCanonDescription);
+            }
 
             // Each section's heading and its own text, at its effective from, if it's live.
             foreach (var section in sections)
@@ -281,10 +319,9 @@ internal static class NameChecks
                 return;
             }
 
-            // A lone CR would end no line for the comment rules, which read LF text.
-            var markdown = source.Text[start..end].Replace('\r', ' ');
+            var markdown = source.Text[start..end];
             var shown = markdown.ToCharArray();
-            var (comments, code) = MarkdownComments.NotProse(markdown);
+            var (comments, code) = NotProse(markdown);
 
             // A read leaves a comment out as if it weren't there, so the words around it meet.
             foreach (var (from, to) in comments)
@@ -303,6 +340,39 @@ internal static class NameChecks
             }
 
             Find(entity, new string(shown), offset => source.LineIndexOf(start + offset) + 1, point, at);
+        }
+
+        /// <summary>
+        /// <see cref="MarkdownComments.NotProse"/> for text that may have CRLF or lone CR
+        /// line breaks: the comment rules and the parser read LF text, as a read gives
+        /// them, so it's read with LF breaks and the ranges are mapped back.
+        /// </summary>
+        internal static (List<(int Start, int End)> Comments, List<(int Start, int End)> Code) NotProse(string markdown)
+        {
+            if (!markdown.Contains('\r', StringComparison.Ordinal))
+            {
+                return MarkdownComments.NotProse(markdown);
+            }
+
+            // map[i] is where the LF text's offset i is in markdown; one past the end maps to the end.
+            var lf = new System.Text.StringBuilder(markdown.Length);
+            var map = new List<int>(markdown.Length + 1);
+            for (var i = 0; i < markdown.Length; i++)
+            {
+                if (markdown[i] == '\r' && i + 1 < markdown.Length && markdown[i + 1] == '\n')
+                {
+                    continue;
+                }
+
+                lf.Append(markdown[i] == '\r' ? '\n' : markdown[i]);
+                map.Add(i);
+            }
+
+            map.Add(markdown.Length);
+            var (comments, code) = MarkdownComments.NotProse(lf.ToString());
+            return (comments.ConvertAll(Back), code.ConvertAll(Back));
+
+            (int Start, int End) Back((int Start, int End) r) => (map[Math.Min(r.Start, map.Count - 1)], map[Math.Min(r.End, map.Count - 1)]);
         }
 
         /// <summary>The strings of a field's value, with links' hidden targets taken out. A field's value isn't markdown.</summary>
@@ -352,9 +422,10 @@ internal static class NameChecks
                 shown[i] = ' ';
             }
 
-            if (gap && from < to)
+            // In the middle, with a space on each side, so it's a word of its own and doesn't join the words beside it.
+            if (gap && to - from >= 3)
             {
-                shown[from] = Gap;
+                shown[from + ((to - from) / 2)] = Gap;
             }
         }
 

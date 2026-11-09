@@ -922,8 +922,14 @@ to place (format.md §9.5). The one exception is a name readers learn later
 as plain words before its `from`, and for a file name that holds one
 (F-NAME-1, F-NAME-2). Names of one word are looked for only on request, and
 `allow_in` silences a note. A first look at each file's raw text for the names'
-longest words keeps it cheap, and it runs only in `check`, never on a write or
-an index update, nor when the web reads the den's errors.
+longest words keeps it cheap, and the pass over the den runs only in `check`,
+never on a write or an index update, nor when the web reads the den's errors.
+A write runs the same code on the notes it saves, and nothing else: its
+`effects` list the F-NAME-1, F-NAME-2, and F-LINK-13 (by a later name) warnings
+those notes didn't have before, compared by rule and message, not by line. It
+never refuses the write. With spoiler checks off, or no `known_as` in the
+universe, it reads nothing more: a write that loads only its own note asks the
+index, in the lookup it already makes, whether the universe has any `known_as`.
 
 Later rules: a character appearing after their death, travel times that
 don't fit the timeline, and open threads at a frozen book's end.

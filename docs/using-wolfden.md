@@ -1080,6 +1080,7 @@ Nothing warns about a note that never gets a real name.
   by a `known_as` name in text readers reach before its `from`, even in a note
   with no `from` of its own, such as a universe-level note. A labelled link
   (`[[Mara Voss|the stranger]]`) shows only its label, so it isn't flagged.
+  Saving such a link warns too (see [As you save](#catching-the-name-in-plain-text)).
 - It hides names, not prose. `Mara Voss` typed as plain words in an early
   section shows there. With spoiler checks on, `check` finds it (next section),
   but a nickname or a description that gives her away is still yours to watch.
@@ -1109,8 +1110,8 @@ Each change is saved as soon as you make it:
 
 The link pickers find a note by its `known_as` names too, and say so:
 `Mina Harker, as Mrs. Harker readers learn it at dracula:5`. An editor shows
-everything, so it links by that name if you pick it; `wolfden check` warns if
-readers reach that text before the name's `from`.
+everything, so it links by that name if you pick it; with spoiler checks on, the
+save and `wolfden check` warn if readers reach that text before the name's `from`.
 
 #### Catching the name in plain text
 
@@ -1195,8 +1196,20 @@ looked for: a `check_text` that isn't `true` or `false` counts as `true`, and an
 both with `update_fields` (`known_as.0.check_text`, `known_as.0.allow_in`).
 
 These warnings come from `wolfden check` and the assistant's `check` tool. The
-web shows a den's errors, not its warnings, so they don't appear there, and
-nothing checks the text as you save it.
+web's list of a den's problems shows errors, not warnings, so they don't appear
+there.
+
+**As you save.** A save also says, in the same words, what it adds: when you save
+a note in the web (**Edit file**, a section, the lead, a field), or an assistant
+writes one, and the text written names someone, or links to them, by a name
+readers learn later than that text's position, the save's result lists the
+warning under what the save did. Only the note's own text is looked at, not the
+whole den, and only warnings it didn't already have, so a name that was already
+there at the same position isn't repeated. The save always goes ahead: it's a
+warning. Renaming a name or a note says so too, for the links it rewrites, and
+so do a copy, a move, and a new note. A change to a name's `from` lists the
+note's own text that it now gives away; text in other notes is `check`'s job.
+Nothing is said with `spoiler_checks` off.
 
 ## Images
 

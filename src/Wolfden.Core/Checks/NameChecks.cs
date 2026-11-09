@@ -28,7 +28,16 @@ internal static class NameChecks
     /// <summary>Stands in for code and a link's hidden target, so the words on either side of it aren't side by side.</summary>
     private const char Gap = '';
 
-    public static List<DenDiagnostic> Run(EntityCatalog catalog, LinkResolver resolver)
+    public static List<DenDiagnostic> Run(EntityCatalog catalog, LinkResolver resolver) => Run(catalog, resolver, null);
+
+    /// <summary>
+    /// F-NAME-1 and F-NAME-2 in the notes of <paramref name="only"/>, or in every
+    /// note if it's null. The names looked for, and the names readers already
+    /// know, are their universes' as always, so a note's warnings are the same
+    /// either way. With <paramref name="only"/>, nothing else is reported: an
+    /// <c>allow_in</c> that reaches no note is its owner's warning, which <c>check</c> gives.
+    /// </summary>
+    internal static List<DenDiagnostic> Run(EntityCatalog catalog, LinkResolver resolver, IReadOnlySet<CatalogEntity>? only)
     {
         var found = new List<DenDiagnostic>();
         if (!catalog.Structure.SpoilerChecks)
@@ -37,18 +46,24 @@ internal static class NameChecks
         }
 
         Bookkeeping? bookkeeping = null;
-        foreach (var universe in catalog.Entities.Where(e => e.KnownAs.Count > 0).Select(e => e.Universe).Distinct())
+        var universes = catalog.Entities.Where(e => e.KnownAs.Count > 0).Select(e => e.Universe).Distinct();
+        if (only is not null)
+        {
+            universes = universes.Where(u => only.Any(e => e.Universe == u));
+        }
+
+        foreach (var universe in universes.ToList())
         {
             var entities = catalog.Entities.Where(e => e.Universe == universe).ToList();
             var names = Names(entities, resolver, found);
             if (names.Count > 0)
             {
                 bookkeeping ??= new Bookkeeping(catalog.Structure.BookkeepingSections);
-                new TextScan(names, entities, bookkeeping, found).Run();
+                new TextScan(names, entities, bookkeeping, found).Run(only);
             }
         }
 
-        return found;
+        return only is null ? found : found.Where(d => d.Diagnostic.RuleId is "F-NAME-1" or "F-NAME-2" && only.Any(e => e.Path == d.Path)).ToList();
     }
 
     /// <summary>
@@ -184,9 +199,10 @@ internal static class NameChecks
             KnowNames();
         }
 
-        public void Run()
+        /// <summary>Reads the notes of <paramref name="only"/> in this universe, or all of its notes if it's null.</summary>
+        public void Run(IReadOnlySet<CatalogEntity>? only)
         {
-            foreach (var entity in _entities)
+            foreach (var entity in only is null ? _entities : _entities.Where(only.Contains))
             {
                 if (entity.Status.IsInCanon() && entity.EntersCanon is not null && entity.File.IsReadable && (MayHold(entity.File.Text) || FrontmatterMayHold(entity)))
                 {

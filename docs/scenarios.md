@@ -3873,6 +3873,33 @@ doesn't have.
 
 Spec: F-ENT-10, F-VIEW-7 (#67). Covered by: `McpStaysStrictTests`, `KnownAsTests`.
 
+### SC-MCP-55. My assistant writes the name before readers learn it
+
+With `spoiler_checks: true`, The Courier has `known_as: [{ value: Mara Voss, from:
+"ash:2" }]`, and the ledger, met at `ember:1`, already says `Mara Voss signed it.`
+
+- `append_section` adds `Mara Voss paid, and [[Mara Voss]] left.` to the ledger. It's
+  written, and `effects` has two warnings, word for word what `check` says of that
+  line: F-NAME-1 (`'Mara Voss' is a name of 'The Courier' that readers learn at ash:2,
+  and this text is at ember:1.`) and F-LINK-13. The mention already there isn't said
+  again.
+- Text without the name, or in a section with `from=ash:3`, says nothing.
+- `create_entity` with the name in its text, `update_fields` setting a field to it,
+  the web's **Edit file**, `copy_entity` of the ledger, and a note saved back into the
+  den each say it. An idea isn't canon text, so `add_idea` doesn't.
+- `change_alias` from `Mara Voss` to `Mara Holt` warns about each link it rewrites
+  that's now ahead of its position. Moving the reveal to `ash:3` with `update_fields`
+  warns about The Courier's own text at `ash:2`.
+- `rename_entity` of the ledger to `Mara Voss` says nothing, as `check` does: those
+  words are the ledger's own name from its entry.
+- A line added above an existing mention, or a move that keeps views, says nothing new.
+  With `spoiler_checks: false`, or no `known_as`, nothing is said, and the write
+  loads nothing more.
+
+Spec: F-NAME-1, F-NAME-2, F-LINK-13 (#67, design §7). Covered by:
+`LaterNameEffectTests` (MCP), `WrittenTextCheckTests` (Core),
+`WriteEndpointTests.EditFileSaysWhenTheTextNamesSomeoneBeforeReadersLearnTheName`.
+
 ## STORE: Wolfden saves, moves, and deletes notes
 
 Background: the den store (design.md §6, #121) is how Wolfden writes a

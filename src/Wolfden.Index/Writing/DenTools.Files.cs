@@ -220,11 +220,15 @@ public sealed partial class DenTools
             }
 
             RefuseUnreadable(tracked);
+
+            // A note back in the den is new to it, so everything its text gives away early is said (#67).
+            var early = entity is not null ? Core.Checks.WrittenTextChecks.LaterNames(den, structure, files) : [];
             Save(files, new Dictionary<string, byte[]>(StringComparer.Ordinal) { [path] = original }, created: null);
 
             List<string> effects = [healed
                 ? kind == DenFileKinds.Den ? "Saved the whole file. The den loads now, so errors in its files can show too." : "Saved the whole file. It's back in the den."
                 : $"Saved the whole file. It still has {errorsAfter.Count.ToString(CultureInfo.InvariantCulture)} error{(errorsAfter.Count == 1 ? "" : "s")}, so the den still leaves it out."];
+            effects.AddRange(LaterNameEffects(early));
             if (idAdded is not null)
             {
                 effects.Add($"The file had no id, so it was given {idAdded} (F-ID-6).");

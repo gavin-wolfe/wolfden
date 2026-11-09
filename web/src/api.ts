@@ -167,6 +167,22 @@ export interface LinkView {
   matches: EntityRef[] | null
   problem: string | null
   inView: boolean | null
+  /**
+   * True for a link written by a `known_as` name (#67) that shows as written, not by the note's name: in the
+   * writer's views always, and in the Reader's view once readers know the name.
+   */
+  byKnownName?: boolean
+  /** In the Author's view, for a link written by a name readers there haven't learned: where they learn it. */
+  nameMark?: ReaderMark
+}
+
+/** A name readers learn partway through the story (`known_as`, #67), on a note's page in the writer's views. */
+export interface PageKnownName {
+  value: string
+  /** Where readers learn it, as written, or null if the entry has none. */
+  from: string | null
+  /** In the Author's view, until readers there know it: where they learn it, or `unplaced`. */
+  readerMark?: ReaderMark
 }
 
 export interface PageField {
@@ -248,6 +264,8 @@ export interface BacklinkView {
   readerMark?: ReaderMark
   /** True for a link in a section an error leaves out, which only the writer's views list. */
   leftOut?: boolean
+  /** In the Author's view, for a link written by a name readers there haven't learned: where they learn it. */
+  nameMark?: ReaderMark
 }
 
 export interface EntityPage {
@@ -273,6 +291,8 @@ export interface EntityPage {
   frozen?: string | null
   /** In the Author's view, for a note readers meet after the position, or that no position places. */
   readerMark?: ReaderMark
+  /** In the writer's views, the names readers learn partway through the story. The Reader's view lists those they know in `aliases`. */
+  knownAs?: PageKnownName[]
 }
 
 export interface EntityPageResult {
@@ -500,8 +520,13 @@ export interface SearchHit {
   unplacedValues?: string[]
   /** With `marksAt`: the snippet names a linked note readers there don't know, so they couldn't have found it by that name. */
   laterLink?: { status: string; readerMark?: ReaderMark }
-  /** With `marksAt`: the words are only where a reader's page doesn't show them: a note's aliases, or a labelled link's target. */
-  hiddenIn?: 'alias' | 'linkTarget'
+  /**
+   * With `marksAt`: the words are only where a reader's page doesn't show them: a name of the note readers
+   * learn later (`laterName`, with `nameMark`), a linked note's alias a link stands for, or a labelled link's target.
+   */
+  hiddenIn?: 'laterName' | 'alias' | 'linkTarget'
+  /** With `hiddenIn: 'laterName'`: where readers learn the name, or `unplaced`; left out for a note that keeps its own tag. */
+  nameMark?: ReaderMark
   /** With `marksAt`: true if a search in the Reader's view there finds this. They come first. */
   met?: boolean
 }

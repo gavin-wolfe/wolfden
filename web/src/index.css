@@ -866,6 +866,23 @@ button.ahead-of-readers {
   background: var(--bg-sunken);
 }
 
+/* Other names (#67): one row per name, its tools beside it, a change's form under it. */
+.names-editor ul.names {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0;
+}
+
+.names-editor ul.names > li {
+  margin: 0.35rem 0;
+}
+
+.names-editor .inline-form .warning {
+  color: var(--text);
+  border-left: 3px solid var(--banner-border);
+  padding-left: 0.5rem;
+}
+
 .inline-form label {
   display: flex;
   flex-direction: column;

@@ -17,7 +17,7 @@ import {
   type PositionView,
   type ReaderMark,
 } from '../api'
-import { AheadOfReaders, MarkList, MarkTag, ReaderTag } from '../components/AheadOfReaders'
+import { AheadOfReaders, LaterNameTag, MarkList, MarkTag, ReaderTag } from '../components/AheadOfReaders'
 import { EntityTabs } from '../components/EntityTabs'
 import { EntityLink, LinkedText, createLinkMatcher, sectionAnchor } from '../components/Links'
 import { Markdown } from '../components/Markdown'
@@ -35,6 +35,7 @@ import {
   type EditTarget,
 } from '../components/Editing'
 import { AddField, FieldEditor, FieldTools } from '../components/FieldEditing'
+import { NamesEditor, OtherNames } from '../components/NamesEditing'
 import { denErrorCountQuery, denErrorsQuery } from '../denErrorsApi'
 import { sourceQuery, type EntitySource } from '../editApi'
 import { ErrorState, Loading, StatusBadge } from '../components/States'
@@ -244,10 +245,13 @@ function EntityArticle({ universe, entity, positions, readersView = false }: { u
         </p>
         <h1>{entity.name}</h1>
         <p className="entry">{entryWords(entity, positions)}</p>
-        {entity.aliases && entity.aliases.length > 0 && <p className="aliases">Also: {entity.aliases.join(', ')}</p>}
+        {target?.kind === 'names' ? <NamesEditor entity={entity} positions={positions} /> : <OtherNames entity={entity} positions={positions} quiet={quiet} />}
         <p className="edit-bar">
           <EditButton target={{ kind: 'file' }} label="Edit file: the note's whole source, frontmatter included">
             Edit file
+          </EditButton>{' '}
+          <EditButton target={{ kind: 'names' }} label="Other names: the note's aliases, and names readers learn later">
+            Other names
           </EditButton>
         </p>
         <FrozenNotice />
@@ -673,7 +677,7 @@ function Backlinks({ universe, backlinks, positions }: { universe: string; backl
   return (
     <section className="backlinks">
       <h2>Linked from</h2>
-      {backlinks.some((b) => b.readerMark) && <p className="muted">{MARKS_LEGEND}</p>}
+      {backlinks.some((b) => b.readerMark || b.nameMark) && <p className="muted">{MARKS_LEGEND}</p>}
       {groups.size === 0 ? (
         <p className="muted">Nothing links here{backlinks.length === 0 ? ' yet' : ''}.</p>
       ) : (
@@ -704,6 +708,7 @@ function Backlinks({ universe, backlinks, positions }: { universe: string; backl
                       {b.bookkeeping && <span className="badge">bookkeeping</span>} <StatusBadge status={b.status} />
                       {b.leftOut && <span className="badge problem">left out</span>}
                       {b.readerMark && <MarkList mark={b.readerMark} positions={positions} />}
+                      {b.nameMark && <LaterNameTag mark={b.nameMark} positions={positions} on="link" list />}
                     </li>
                   ))}
                 </ul>

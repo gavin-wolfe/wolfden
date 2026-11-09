@@ -32,6 +32,7 @@ import {
   ONLY_IN_LINK_TARGET,
   ONLY_IN_LINK_TARGET_WHY,
   aheadValuesWhy,
+  laterNameWords,
   notPlacedWhy,
 } from '../readerWords'
 import { describePosition } from '../story'
@@ -406,6 +407,15 @@ function HitTag({ hit, positions }: { hit: SearchHit; positions: readonly Positi
 
   if (hit.laterLink) {
     return hit.laterLink.readerMark ? <MarkList mark={hit.laterLink.readerMark} positions={positions} note /> : <StatusBadge status={hit.laterLink.status} />
+  }
+
+  if (hit.hiddenIn === 'laterName') {
+    const { words, why } = laterNameWords(hit.nameMark, positions, 'search')
+    return (
+      <span className="ahead-of-readers" title={why}>
+        {words}
+      </span>
+    )
   }
 
   if (hit.hiddenIn) {

@@ -25,6 +25,7 @@ export type EditTarget =
   | { kind: 'file'; from?: string }
   | { kind: 'field'; name: string }
   | { kind: 'add-field' }
+  | { kind: 'names' }
 
 /** The id of the button that opens `target`, where focus goes back when it closes. */
 export function editButtonId(target: EditTarget): string {
@@ -35,6 +36,7 @@ export function editButtonId(target: EditTarget): string {
     case 'lead':
     case 'add':
     case 'add-field':
+    case 'names':
       return `edit-${target.kind}`
     case 'field':
       return `edit-field-${target.name}`

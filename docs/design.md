@@ -1772,6 +1772,13 @@ docs/
     which of a `position` field's values are later than the position, and which
     can't be compared (F-VIEW-5), as written, since only some of a list may be.
     An assistant at the position gets neither. The field keeps its whole `value`.
+  - **Names readers learn later** (`known_as`, #67). The page's `knownAs` lists each
+    with its `from`, in the full view too, and with `marksAt`, a `readerMark` until
+    readers know it: `ahead` at the later of its `from` and the note's entry, or
+    `unplaced` if no `from` places it. An unlabelled link written by one gets a
+    `nameMark` the same way, on the page's links and in **Linked from**, since the
+    Reader's view shows the note's name for it there. A search hit found only by one
+    has `hiddenIn: "laterName"` and a `nameMark`, and comes after what readers can find.
   - **`marksAt`** on the answer repeats the position.
   - **A later `until` on a fact in effect has no mark.** The read gives the
     `until`, and the page's `isAheadOf` tags it from the position, as it already
@@ -1904,7 +1911,9 @@ docs/
   and for the snippet (`ReadersLinks`, from the index's link rows): its label, else the
   note it reaches if readers have met it, else its target as written, with `: heading`
   if it has no label and readers know that section. So a link written by an alias or key finds by the name it shows, not by what
-  was written; a label hides its target, even a met note's; and a later note's name
+  was written. A link written by a `known_as` name readers know there is the exception: it
+  shows as written (`byKnownName` on `/api/entity`'s links, #67 §4), so text after a reveal
+  keeps the real name. A label hides its target, even a met note's; and a later note's name
   doesn't match until readers meet it. `get_entity` gives links as written, so this is in
   the search, and MCP's reads don't change. The rule is written twice, as `linkText` in
   `Links.tsx` and `ReadersLinks.Shown`, since the server can't call the web. Both are
@@ -2340,7 +2349,11 @@ docs/
     level of the one it goes before, or 2 at the end),
     `/api/edit/section/rename` (`index`, `name`, `newName`),
     `/api/edit/section/remove` (`index`, `name`), and `/api/edit/file`
-    (`text`). Part b adds `/api/edit/field` beside them (below). Each answers the
+    (`text`). Part b adds `/api/edit/field` beside them (below). #67 adds a note's
+    other names: `/api/edit/name/add` (`name`, `knownAs`, `from`; `update_fields`'s
+    add to `aliases` or `known_as`, and a `known_as` name needs a `from`) and
+    `/api/edit/name` (`name`, and one of `newName` with `keepOld`, `from`, `plain`,
+    or `remove: true` alone; `change_alias`). Each answers the
     write tools' `WriteResult`. Errors add 409 for `stale_file`,
     `frozen`, `ambiguous_section`, and `already_exists`; 422 for
     `invalid_edit` and `unsupported_edit`; 404 for `unknown_section`;

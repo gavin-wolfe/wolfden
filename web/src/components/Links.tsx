@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
-import type { LinkView } from '../api'
+import type { LinkView, ReaderMark } from '../api'
+import { usePositionsInView } from '../hooks'
+import { LaterNameTag } from './AheadOfReaders'
 
 /** A link to an entity's page, by its key (its id, or its path while it has none). */
 export function EntityLink({ universe, entityKey, className, children }: { universe: string; entityKey: string; className?: string; children: ReactNode }) {
@@ -62,9 +64,13 @@ export function createLinkMatcher(links: readonly LinkView[]): (text: string) =>
   }
 }
 
-/** What a link shows: its label, else the entity it reaches, else its target as written. */
+/**
+ * What a link shows: its label, else the entity it reaches, else its target as written.
+ * A link by a `known_as` name readers know (`byKnownName`, #67) shows that name as written,
+ * so text after the reveal that says `[[Corin Hask]]` doesn't go back to the note's name.
+ */
 export function linkText(link: LinkView): string {
-  const name = link.label ?? link.entity?.name ?? link.target
+  const name = link.label ?? (link.byKnownName && link.entity ? link.target.trim() : link.entity?.name) ?? link.target
   return link.heading && !link.label ? `${name}: ${link.heading}` : name
 }
 
@@ -76,6 +82,32 @@ export function linkText(link: LinkView): string {
  * reaches. `children`, for the Reader's view of a note's text, is its words as markdown read them.
  */
 export function WikiLink({ link, universe, children }: { link: LinkView; universe: string; children?: ReactNode }) {
+  // In the Author's view, a link written by a name readers don't know yet is shown as written, with a tag after it (#67).
+  if (link.nameMark) {
+    return (
+      <>
+        <WikiLinkOnly link={link} universe={universe}>
+          {children}
+        </WikiLinkOnly>{' '}
+        <LinkNameMark mark={link.nameMark} universe={universe} />
+      </>
+    )
+  }
+
+  return (
+    <WikiLinkOnly link={link} universe={universe}>
+      {children}
+    </WikiLinkOnly>
+  )
+}
+
+/** The tag after a link written by a name readers at the position haven't learned. */
+function LinkNameMark({ mark, universe }: { mark: ReaderMark; universe: string }) {
+  const positions = usePositionsInView(universe).data?.positions ?? []
+  return <LaterNameTag mark={mark} positions={positions} on="link" />
+}
+
+function WikiLinkOnly({ link, universe, children }: { link: LinkView; universe: string; children?: ReactNode }) {
   const text = children ?? linkText(link)
   if (link.outcome === 'resolved' && link.entity) {
     return (

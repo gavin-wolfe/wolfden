@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { PositionView, ReaderMark } from '../api'
-import { AHEAD_OF_READERS, AHEAD_WHY, markWords } from '../readerWords'
+import { AHEAD_OF_READERS, AHEAD_WHY, laterNameWords, markWords } from '../readerWords'
 
 /**
  * Says what readers at the story position being viewed don't know (#288, #300).
@@ -30,6 +30,22 @@ export function AheadOfReaders() {
 export function MarkTag({ mark, positions, note = false }: { mark: ReaderMark; positions: readonly PositionView[]; note?: boolean }) {
   const { words, why } = markWords(mark, positions, note)
   return <ReaderTag words={words} why={why} />
+}
+
+/**
+ * The tag for a name readers learn partway through the story (`known_as`, #67) that readers at the
+ * position don't know yet: on the note's list of names, or after a link written by it. `list` is
+ * the plain-text form, for a list with a legend.
+ */
+export function LaterNameTag({ mark, positions, on, list = false }: { mark: ReaderMark; positions: readonly PositionView[]; on: 'name' | 'link'; list?: boolean }) {
+  const { words, why } = laterNameWords(mark, positions, on)
+  return list ? (
+    <span className="ahead-of-readers" title={why}>
+      {words}
+    </span>
+  ) : (
+    <ReaderTag words={words} why={why} />
+  )
 }
 
 /**

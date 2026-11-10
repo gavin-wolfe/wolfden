@@ -60,8 +60,10 @@ that den only
 Inside the clone, the sample is part of Wolfden's own repository, so
 `checkpoint` would commit to Wolfden and `get_history` would show
 Wolfden's commits. In a copy with its own repository, history is the
-den's. A checkpoint is a commit made with the git identity configured for
-that repository. A den without git still works; `get_history` and
+den's. A checkpoint is a commit made with the name and email in git's
+settings for that repository, handed to git for that commit only, so a
+`GIT_AUTHOR_NAME` in the environment that started the server doesn't
+change it. A den without git still works; `get_history` and
 `checkpoint` then say history isn't available.
 
 `samples/dracula` in the clone is fine for the read tools. The server
@@ -513,7 +515,13 @@ docs. The writer's own list is in
   was and the assistant as `co_author`. It records the whole den unless
   `paths` names some files, so tell the writer what's in
   `changed_outside_session`. After `move_entity`, `paths` needs both the
-  old and the new path.
+  old and the new path. The writer's name, or this den's, is the author,
+  never the assistant's. A `co_author` with the name or email from git's
+  global settings is refused when the den records another name, since
+  that may be the writer's other name and a `Co-Authored-By` line is
+  permanent: give your own. Pass on anything in `warnings`, which says
+  when git's settings would have signed the checkpoint differently from
+  the den's own.
 - **Pinned canon: check with the writer.** An edit to a pinned fact is
   made, and `pinned_canon` in the result lists it. Confirm it was meant.
 - **A pinned session sees one universe.** With `--universe`, every call

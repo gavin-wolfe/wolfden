@@ -214,11 +214,12 @@ public sealed class HistoryResult<T>
 {
     private readonly T _value;
 
-    private HistoryResult(bool available, T value, string? reason)
+    private HistoryResult(bool available, T value, string? reason, IReadOnlyList<string>? warnings = null)
     {
         IsAvailable = available;
         _value = value;
         Reason = reason;
+        Warnings = warnings ?? [];
     }
 
     /// <summary>True if the operation was done and <see cref="Value"/> holds its result.</summary>
@@ -231,8 +232,18 @@ public sealed class HistoryResult<T>
     /// <summary>Why the operation wasn't available, for the writer, or null if it was done.</summary>
     public string? Reason { get; }
 
+    /// <summary>
+    /// What the writer should know about a done operation, in words, or none:
+    /// for a checkpoint or tag, that git's settings outside the den's own
+    /// would have signed it differently (design §6, #311).
+    /// </summary>
+    public IReadOnlyList<string> Warnings { get; }
+
     /// <summary>A done operation's result.</summary>
     public static HistoryResult<T> Done(T value) => new(true, value, null);
+
+    /// <summary>A done operation's result, with what the writer should know about it.</summary>
+    public static HistoryResult<T> Done(T value, IReadOnlyList<string> warnings) => new(true, value, null, warnings);
 
     /// <summary>An operation the backend can't do, and why, in words for the writer.</summary>
     public static HistoryResult<T> Unavailable(string reason)

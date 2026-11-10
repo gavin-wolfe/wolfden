@@ -204,8 +204,10 @@ public sealed class GitTimeoutTests
         {
             // An alias runs in the shell: it prints, then leaves a child
             // holding git's standard output open after git has exited.
+            // Saved in the repository's config: GitProcess refuses an alias passed with -c (#311).
+            repo.Git("config", "--local", "alias.wolfden-partial", $"!printf partial; {BackgroundChild}");
             var run = await WithinBound(
-                () => GitProcess.Run(options, repo.Root, ["-c", $"alias.wolfden-partial=!printf partial; {BackgroundChild}", "wolfden-partial"], cancellationToken: Token),
+                () => GitProcess.Run(options, repo.Root, ["wolfden-partial"], cancellationToken: Token),
                 "Git's output was waited for until the child ended.");
 
             Assert.True(run.Succeeded, run.Said);

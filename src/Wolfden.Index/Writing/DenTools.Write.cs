@@ -707,7 +707,8 @@ public sealed partial class DenTools
                     DenReader.ResultVersion, history.Name, true, null, true,
                     new HistoryEntryView(e.Id, e.When, e.Author, e.Message, e.Changes.Select(c => new HistoryChangeView(c.Kind.ToString().ToLowerInvariant(), c.Path, c.OldPath)).ToList()),
                     done.Written,
-                    done.ChangedElsewhere);
+                    done.ChangedElsewhere,
+                    done.Result.Warnings.Count == 0 ? null : done.Result.Warnings);
             }
             catch (ArgumentException e)
             {

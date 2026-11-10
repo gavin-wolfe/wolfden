@@ -167,13 +167,13 @@ public static class CheckpointEndpoints
 
         if (done.Result.Value is not { } entry)
         {
-            return Results.Json(new CheckpointMadeResult(ResultVersion, history.Name, false, null, inProgress, [], 0));
+            return Results.Json(new CheckpointMadeResult(ResultVersion, history.Name, false, null, inProgress, [], 0, []));
         }
 
         var elsewhere = done.ChangedElsewhere.ToHashSet(StringComparer.Ordinal);
         var mine = done.Written.Where(p => !elsewhere.Contains(p)).ToHashSet(StringComparer.Ordinal);
         var (shown, hidden) = Split(options, entry.Changes, c => mine.Contains(c.Path));
-        return Results.Json(new CheckpointMadeResult(ResultVersion, history.Name, true, Summary(entry), inProgress, shown, hidden));
+        return Results.Json(new CheckpointMadeResult(ResultVersion, history.Name, true, Summary(entry), inProgress, shown, hidden, done.Result.Warnings));
     }
 
     /// <summary>What git is in the middle of, or null; null too if git can't say, since it's only a warning.</summary>
@@ -382,5 +382,7 @@ public sealed record AutoCheckpointView(string? Every, string? Problem, bool Run
 /// <param name="InProgress">What git was in the middle of when it was made, in words, or null.</param>
 /// <param name="Changes">The files it recorded, in path order (not those in <paramref name="OtherUniverses"/>).</param>
 /// <param name="OtherUniverses">For a pinned server, how many recorded files are in other universes.</param>
+/// <param name="Warnings">What to tell the writer about the checkpoint made, in words, or none: git's settings outside the den's own would have signed it differently (#311).</param>
 public sealed record CheckpointMadeResult(
-    int Version, string Backend, bool Recorded, CheckpointSummary? Checkpoint, string? InProgress, IReadOnlyList<PendingChange> Changes, int OtherUniverses);
+    int Version, string Backend, bool Recorded, CheckpointSummary? Checkpoint, string? InProgress, IReadOnlyList<PendingChange> Changes, int OtherUniverses,
+    IReadOnlyList<string> Warnings);

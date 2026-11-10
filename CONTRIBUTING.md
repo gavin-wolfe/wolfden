@@ -10,6 +10,8 @@ questions, and feedback on [`docs/design.md`](docs/design.md).
   [issue forms](https://github.com/gavin-wolfe/wolfden/issues/new/choose).
   Each form applies its label for you. A blank issue is fine too, and the
   maintainer will label it.
+- **Security problems:** please report them privately, not in an issue.
+  See [`SECURITY.md`](SECURITY.md).
 - Search existing issues first. The backlog is organized by milestone.
 
 ### Claiming an issue

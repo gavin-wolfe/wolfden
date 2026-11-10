@@ -59,7 +59,7 @@ public static class AccountRoles
 /// without email or phone: <see cref="AccountsDbContext"/> leaves those
 /// columns out of the database, so no address is ever stored (#315 §4.3).
 /// </summary>
-public sealed class WolfdenUser : IdentityUser
+public sealed class WolfdenUser : IdentityUser<Guid>
 {
     /// <summary>The role's word, as <see cref="AccountRoles.Name"/> writes it. One role per account.</summary>
     public string Role { get; set; } = AccountRole.Viewer.Name();

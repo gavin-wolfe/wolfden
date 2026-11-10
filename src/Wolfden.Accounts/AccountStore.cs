@@ -115,7 +115,8 @@ public sealed class AccountStore : IAsyncDisposable, IDisposable
             return AccountResult.Refused(PasswordRules.ErrorCode, passwordProblem);
         }
 
-        var user = new WolfdenUser { UserName = userName, Role = role.Name() };
+        // Version 7: time-ordered, so ids sort by when accounts were made.
+        var user = new WolfdenUser { Id = Guid.CreateVersion7(), UserName = userName, Role = role.Name() };
         var created = await Users.CreateAsync(user, password).ConfigureAwait(false);
         return created.Succeeded
             ? AccountResult.Done($"added '{userName}' as {Article(role)} {role.Name()}.", ToAccount(user))

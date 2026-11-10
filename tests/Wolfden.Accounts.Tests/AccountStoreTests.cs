@@ -62,6 +62,66 @@ public class AccountStoreTests
     }
 
     [Fact]
+    public async Task AnAccountsIdIsAVersion7GuidThatSortsByWhenItWasMade()
+    {
+        using var temp = new TempHome();
+        await using var store = await AccountStore.OpenAsync(temp.Folder, Token);
+        await store.AddAsync("wren", Password, AccountRole.Owner);
+        await store.AddAsync("ash", Password, AccountRole.Writer);
+
+        var first = (await store.Users.FindByNameAsync("wren"))!.Id;
+        var second = (await store.Users.FindByNameAsync("ash"))!.Id;
+
+        Assert.NotEqual(Guid.Empty, first);
+        Assert.Equal(7, first.Version);
+        Assert.Equal(7, second.Version);
+        Assert.True(string.CompareOrdinal(first.ToString("D"), second.ToString("D")) < 0, $"{first} should sort before {second}");
+    }
+
+    [Fact]
+    public async Task IdsAreStoredAsUpperCaseTextAndFoundInEitherCase()
+    {
+        using var temp = new TempHome();
+        Guid id;
+        await using (var store = await AccountStore.OpenAsync(temp.Folder, Token))
+        {
+            await store.AddAsync("wren", Password, AccountRole.Owner);
+            id = (await store.Users.FindByNameAsync("wren"))!.Id;
+            Assert.Equal("wren", (await store.Users.FindByIdAsync(id.ToString("D")))?.UserName);
+            Assert.Equal("wren", (await store.Users.FindByIdAsync(id.ToString("D").ToUpperInvariant()))?.UserName);
+            Assert.Equal(id.ToString("D"), await store.Users.GetUserIdAsync((await store.Users.FindByNameAsync("wren"))!));
+        }
+
+        using var connection = new SqliteConnection(AccountsDbContext.ConnectionString(temp.Folder.AccountsDatabase));
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT Id, typeof(Id) FROM AspNetUsers";
+        using var reader = command.ExecuteReader();
+        Assert.True(reader.Read());
+        Assert.Equal(id.ToString("D").ToUpperInvariant(), reader.GetString(0));
+        Assert.Equal("text", reader.GetString(1));
+    }
+
+    [Fact]
+    public async Task NoAccountIsSavedWithAnEmptyId()
+    {
+        using var temp = new TempHome();
+        await using var store = await AccountStore.OpenAsync(temp.Folder, Token);
+
+        // Identity's default for IdentityUser<Guid> is an empty id; it's refused, not replaced.
+        var created = await Assert.ThrowsAsync<AccountsException>(() => store.Users.CreateAsync(new WolfdenUser { UserName = "wren", Role = "owner" }));
+        Assert.Equal("an account can't be saved without an id.", created.Message);
+        Assert.Empty(await store.ListAsync(Token));
+
+        // And the database itself refuses one written around Wolfden.
+        using var connection = new SqliteConnection(AccountsDbContext.ConnectionString(temp.Folder.AccountsDatabase));
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = $"INSERT INTO AspNetUsers (Id, Role, TwoFactorEnabled, LockoutEnabled, AccessFailedCount) VALUES ('{Guid.Empty}', 'owner', 0, 1, 0)";
+        Assert.Throws<SqliteException>(() => command.ExecuteNonQuery());
+    }
+
+    [Fact]
     public async Task TheSchemaMatchesItsMigrations()
     {
         // accounts.db isn't rebuildable, so every model change needs a migration.

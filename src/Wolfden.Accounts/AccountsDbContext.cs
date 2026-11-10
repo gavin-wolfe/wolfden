@@ -19,7 +19,7 @@ namespace Wolfden.Accounts;
 /// <c>dotnet ef migrations add &lt;Name&gt; --project src/Wolfden.Accounts</c>.
 /// </para>
 /// </remarks>
-public sealed class AccountsDbContext(DbContextOptions<AccountsDbContext> options) : IdentityUserContext<WolfdenUser>(options)
+public sealed class AccountsDbContext(DbContextOptions<AccountsDbContext> options) : IdentityUserContext<WolfdenUser, Guid>(options)
 {
     /// <summary>The connection string for the database at <paramref name="path"/>. No pooling, so the file is let go when the command ends.</summary>
     public static string ConnectionString(string path) => new SqliteConnectionStringBuilder
@@ -42,7 +42,37 @@ public sealed class AccountsDbContext(DbContextOptions<AccountsDbContext> option
             user.Ignore(u => u.PhoneNumber);
             user.Ignore(u => u.PhoneNumberConfirmed);
             user.Property(u => u.Role).HasMaxLength(16).IsRequired();
+
+            // Ids are version 7 Guids that AccountStore sets (maintainer
+            // decision, 2026-11-10). EF mustn't make up a random one in
+            // place of a missing id, and the database refuses an empty one.
+            // SQLite keeps a Guid as TEXT, in upper case.
+            user.Property(u => u.Id).ValueGeneratedNever();
+            user.ToTable(t => t.HasCheckConstraint("CK_AspNetUsers_Id_NotEmpty", $"\"Id\" <> '{Guid.Empty}'"));
         });
+    }
+
+    /// <inheritdoc/>
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        RefuseEmptyIds();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    /// <inheritdoc/>
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        RefuseEmptyIds();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    /// <summary>A new account must have its id set (<see cref="Guid.CreateVersion7()"/>); an empty one is a bug, so it fails loudly.</summary>
+    private void RefuseEmptyIds()
+    {
+        if (ChangeTracker.Entries<WolfdenUser>().Any(e => e.State == EntityState.Added && e.Entity.Id == Guid.Empty))
+        {
+            throw new AccountsException("an account can't be saved without an id.");
+        }
     }
 }
 

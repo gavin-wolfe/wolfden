@@ -146,8 +146,14 @@ internal static class GitProcess
     /// command checks it only before git starts.
     /// </param>
     /// <param name="kind">Whether git may be stopped part way.</param>
+    /// <param name="clearance">
+    /// For a command that makes commits or tags (<see cref="CommitGate.IsGated"/>), what the gate
+    /// decided for it: its name and email go in git's environment last, over anything else, and its
+    /// signing settings go before the command's own arguments. Such a command is refused without one.
+    /// </param>
     /// <exception cref="GitNotFoundException">Git couldn't be started.</exception>
     /// <exception cref="GitTimeoutException">Git didn't finish in time.</exception>
+    /// <exception cref="InvalidOperationException">A command that makes commits or tags was given no <paramref name="clearance"/>.</exception>
     public static GitRun Run(
         GitOptions options,
         string folder,
@@ -155,12 +161,19 @@ internal static class GitProcess
         string? input = null,
         IReadOnlyDictionary<string, string?>? environment = null,
         CancellationToken cancellationToken = default,
-        GitCallKind kind = GitCallKind.Stoppable)
+        GitCallKind kind = GitCallKind.Stoppable,
+        CommitClearance? clearance = null)
     {
+        var argList = args.ToList();
+        if (clearance is null && CommitGate.IsGated(argList))
+        {
+            // Every commit and tag passes the gate (#311): a new path that doesn't fails here, in its first test.
+            throw new InvalidOperationException($"git {CommandName(argList)} makes commits or tags, so it runs only through CommitGate, with a CommitClearance.");
+        }
+
         cancellationToken.ThrowIfCancellationRequested();
         var stoppable = kind == GitCallKind.Stoppable;
         var timeout = stoppable ? options.ReadTimeout : options.WriteTimeout;
-        var argList = args.ToList();
         var start = new ProcessStartInfo(options.Executable)
         {
             WorkingDirectory = folder,
@@ -176,7 +189,8 @@ internal static class GitProcess
 
         // Settings that only keep git from waiting on a person or a terminal.
         // The user's own configuration (signing, hooks, safe.directory) still applies.
-        foreach (var arg in new[] { "-c", "core.quotepath=false", "-c", "color.ui=false" }.Concat(argList))
+        // A clearance's signing settings come next, so the command's own -c can still narrow them.
+        foreach (var arg in new[] { "-c", "core.quotepath=false", "-c", "color.ui=false" }.Concat(clearance?.Settings ?? []).Concat(argList))
         {
             start.ArgumentList.Add(arg);
         }
@@ -196,6 +210,12 @@ internal static class GitProcess
         if (environment is not null)
         {
             Apply(start, environment);
+        }
+
+        if (clearance is not null)
+        {
+            // Last: what the gate decided beats whatever was inherited or passed (E8).
+            Apply(start, clearance.Environment);
         }
 
         var process = new Process { StartInfo = start };
@@ -315,12 +335,12 @@ internal static class GitProcess
         return seconds == 1 ? "1 second" : string.Create(CultureInfo.InvariantCulture, $"{seconds:0.###} seconds");
     }
 
-    /// <summary>The git command in <paramref name="args"/>: the first argument that isn't an option, or the value of <c>-c</c>.</summary>
+    /// <summary>The git command in <paramref name="args"/>: the first argument that isn't an option, or the value of an option that takes the next one.</summary>
     internal static string CommandName(IReadOnlyList<string> args)
     {
         for (var i = 0; i < args.Count; i++)
         {
-            if (args[i] == "-c")
+            if (args[i] is "-c" or "-C" or "--git-dir" or "--work-tree" or "--namespace" or "--config-env")
             {
                 i++;
             }

@@ -544,21 +544,21 @@ public sealed class HistorySetupTests : IDisposable
     [InlineData("GIT_COMMITTER_NAME")]
     [InlineData("GIT_AUTHOR_EMAIL")]
     [InlineData("GIT_COMMITTER_EMAIL")]
-    public void AnEnvironmentVariableThatWouldBeatWhatsGivenRefusesWithNothingChanged(string variable)
+    public void AnEnvironmentVariableDoesntBeatWhatsGivenAndTheStepsSayItsSet(string variable)
     {
+        // The gate hands git the name and email in its environment, so the inherited one doesn't win (#311).
         var den = Den();
         var options = Without(Config("[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n"));
         options = options with { Environment = new Dictionary<string, string?>(options.Environment) { [variable] = "marek" } };
 
         var result = new GitHistorySetup(den, options).TurnOn(new HistorySetupRequest("Ash Calloway", "ash@example.invalid"), Token);
 
-        Assert.Equal(HistorySetupStatus.Refused, result.Status);
-        Assert.Equal(HistorySetupCodes.BadArgument, result.Code);
-        Assert.Contains(variable, result.Problem, StringComparison.Ordinal);
-        Assert.DoesNotContain("marek", result.Problem, StringComparison.OrdinalIgnoreCase);
-        Assert.EndsWith("Nothing was changed.", result.Problem, StringComparison.Ordinal);
-        Assert.False(Directory.Exists(Path.Combine(den, ".git")));
-        Assert.False(File.Exists(Path.Combine(den, ".gitignore")));
+        Assert.Equal(HistorySetupStatus.Done, result.Status);
+        Assert.Equal(AshOnly, FirstCommitIdentity(den, options));
+        Assert.Equal(AshOnly, LaterCommitIdentity(den, options));
+        var said = Assert.Single(result.Steps, s => s.Contains(variable, StringComparison.Ordinal));
+        Assert.Contains("git commands you run yourself use the environment's", said, StringComparison.Ordinal);
+        Assert.DoesNotContain(result.Steps, s => s.Contains("marek", StringComparison.OrdinalIgnoreCase));
     }
 
     [Theory]
@@ -893,7 +893,8 @@ public sealed class HistorySetupTests : IDisposable
                 if (key == "init")
                 {
                     RunGit(den, options, "init", "--quiet");
-                    RunGit(den, options, "commit", "--quiet", "--allow-empty", "-m", "Theirs");
+                    // As the writer would, by hand: not through Wolfden's gate.
+                    TestRepo.RunGit(den, options.Environment, "commit", "--quiet", "--allow-empty", "-m", "Theirs");
                 }
             },
         };

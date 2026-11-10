@@ -108,9 +108,10 @@ public sealed partial class DenTools
             var history = History();
             HistoryEntry? made = null;
             var others = 0;
+            var signing = new List<string>();
             FreezeResult Frozen(string snapshot, string? checkpoint, string? tag, string message) => new(
                 DenReader.ResultVersion, universeKey, target.Key, target.FilePath, HashOf(bytes), "final", changed, history.Name, snapshot,
-                checkpoint ?? made?.Id, tag, message + Others(others), warnings, idAdded, others);
+                checkpoint ?? made?.Id, tag, message + Others(others) + Also(signing), warnings, idAdded, others);
 
             if (history.CheckpointUnavailable is { } why)
             {
@@ -124,9 +125,9 @@ public sealed partial class DenTools
             {
                 if (changed || !BookHeld(history, target, bytes, PendingChanges(history)))
                 {
-                    made = SessionWritten.Checkpoint(history, new CheckpointRequest($"Freeze book '{target.Key}' of universe '{universeKey}'")).Result is { IsAvailable: true } r
-                        ? r.Value
-                        : null;
+                    var result = SessionWritten.Checkpoint(history, new CheckpointRequest($"Freeze book '{target.Key}' of universe '{universeKey}'")).Result;
+                    made = result.IsAvailable ? result.Value : null;
+                    signing.AddRange(result.Warnings);
                     others = made?.Changes.Count(c => !InFolder(c, target.Path)) ?? 0;
                 }
             }
@@ -159,6 +160,7 @@ public sealed partial class DenTools
                 }
 
                 var tag = FreezeTag.Add(history, universeKey, target.Key, at);
+                signing.AddRange(tag.Warnings ?? []);
                 if (tag.Outcome != FreezeTagOutcome.Tagged)
                 {
                     return Frozen(FreezeSnapshot.NotTagged, at, null,
@@ -288,7 +290,7 @@ public sealed partial class DenTools
                 if (made is { IsAvailable: true, Value: { } entry })
                 {
                     others = entry.Changes.Count(c => !InFolder(c, target.Path));
-                    return Unfrozen(FreezeSnapshot.Checkpointed, entry.Id, $"{done} Checkpointed the den ({Short(entry.Id)}).");
+                    return Unfrozen(FreezeSnapshot.Checkpointed, entry.Id, $"{done} Checkpointed the den ({Short(entry.Id)}).{Also(made.Warnings)}");
                 }
 
                 return Unfrozen(FreezeSnapshot.NotCheckpointed, null, $"{done} No checkpoint was made: {made.Reason ?? "there was nothing to record."}");
@@ -407,6 +409,9 @@ public sealed partial class DenTools
         made is null ? "" : sentence ? $" Checkpointed the den ({Short(made.Id)})." : $" and checkpointed ({Short(made.Id)})";
 
     /// <summary>What the checkpoint took in from outside the book, counted, never named (a pinned server mustn't name other universes' files).</summary>
+    /// <summary>What the history said to know about a checkpoint or tag (git's signing differing from the den's own, #311), as sentences to add, or nothing.</summary>
+    private static string Also(IReadOnlyList<string> said) => said.Count == 0 ? "" : " " + string.Join(" ", said);
+
     private static string Others(int others) => others switch
     {
         0 => "",

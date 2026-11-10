@@ -492,6 +492,16 @@ public sealed partial class GitHistory : IHistoryProvider
         // without their content, so 'commit --only' takes them; nothing else
         // is staged.
         var untracked = Git(["ls-files", "-z", "--others", "--exclude-standard", "--", .. specs], cancellationToken);
+        if (untracked.Length == 0 && !HasChanges(head, specs, cancellationToken))
+        {
+            return HistoryResult<HistoryEntry?>.Done(null);
+        }
+
+        // The gate (#311), before anything is marked, so a refusal changes nothing: the name and
+        // email the commit records, from git's settings, and signing pinned to the den's own file.
+        var clearance = Clear(GatedWrite.Commit, cancellationToken);
+        RefuseGlobalCoAuthors(request.CoAuthors, clearance, cancellationToken);
+
         if (untracked.Length > 0)
         {
             // Exactly the files listed, taken literally: 'git add' with an
@@ -516,10 +526,6 @@ public sealed partial class GitHistory : IHistoryProvider
             {
                 throw Failed("add", marked);
             }
-        }
-        else if (!HasChanges(head, specs, cancellationToken))
-        {
-            return HistoryResult<HistoryEntry?>.Done(null);
         }
 
         var message = new StringBuilder(LineFeeds(request.Message.Trim())).Append('\n');
@@ -546,7 +552,7 @@ public sealed partial class GitHistory : IHistoryProvider
         try
         {
             commit = Start(
-                ["commit", "--only", "--quiet", "--file=-", "--", .. specs], CancellationToken.None, input: message.ToString(), kind: GitCallKind.MustFinish);
+                ["commit", "--only", "--quiet", "--file=-", "--", .. specs], CancellationToken.None, input: message.ToString(), kind: GitCallKind.MustFinish, clearance: clearance);
         }
         catch (GitTimeoutException e) when (e.StillRunning is { } running)
         {
@@ -566,7 +572,7 @@ public sealed partial class GitHistory : IHistoryProvider
             // Put the new files back as they were: untracked, not marked.
             Unmark(untracked);
             throw new HistoryException(
-                $"Git refused the checkpoint, so nothing was recorded ({SaidUnlessSigning(commit, "'git add -A' then 'git commit -m <message>'", "the commit", "commit.gpgsign")}). A pre-commit or commit-msg hook, commit signing, " +
+                $"Git refused the checkpoint, so nothing was recorded ({SaidUnlessSigning(commit, clearance, "'git add -A' then 'git commit -m <message>'", "the commit", "commit.gpgsign")}). A pre-commit or commit-msg hook, commit signing, " +
                 "or a merge or rebase in progress can do this. The den's files and what was staged are as they were.");
         }
 
@@ -597,7 +603,7 @@ public sealed partial class GitHistory : IHistoryProvider
             throw new HistoryException("Git made the checkpoint, but the repository has no commit afterwards.");
         }
 
-        return HistoryResult<HistoryEntry?>.Done(entry ?? throw new HistoryException($"Git made the checkpoint {id}, but it doesn't change the den."));
+        return HistoryResult<HistoryEntry?>.Done(entry ?? throw new HistoryException($"Git made the checkpoint {id}, but it doesn't change the den."), clearance.Warnings);
     }
 
     /// <summary>What a git that writes may be waiting on, for a message (#143).</summary>
@@ -753,14 +759,17 @@ public sealed partial class GitHistory : IHistoryProvider
         }
 
         // A lightweight tag can't be signed: with tag.gpgSign, git would
-        // make an annotated tag and ask an editor for its message.
+        // make an annotated tag and ask an editor for its message. This -c
+        // comes after the gate's, so it wins.
         string[] args = request.Message is null
             ? ["-c", "tag.gpgSign=false", "tag", request.Name, at]
             : ["tag", "--file=-", request.Name, at];
+        var clearance = Clear(request.Message is null ? GatedWrite.LightweightTag : GatedWrite.AnnotatedTag, cancellationToken);
         GitRun made;
         try
         {
-            made = Start(args, cancellationToken, input: request.Message is null ? null : LineFeeds(request.Message) + "\n", kind: GitCallKind.MustFinish);
+            made = Start(
+                args, cancellationToken, input: request.Message is null ? null : LineFeeds(request.Message) + "\n", kind: GitCallKind.MustFinish, clearance: clearance);
         }
         catch (GitTimeoutException e)
         {
@@ -771,10 +780,10 @@ public sealed partial class GitHistory : IHistoryProvider
         {
             throw request.Message is null
                 ? Failed("tag", made)
-                : new HistoryException($"git tag failed: {SaidUnlessSigning(made, "'git tag -m <message> <name>'", "the tag", "tag.gpgsign", "tag.forcesignannotated")}");
+                : new HistoryException($"git tag failed: {SaidUnlessSigning(made, clearance, "'git tag -m <message> <name>'", "the tag", "tag.gpgsign", "tag.forcesignannotated")}");
         }
 
-        return HistoryResult<HistoryTag>.Done(new HistoryTag(request.Name, at));
+        return HistoryResult<HistoryTag>.Done(new HistoryTag(request.Name, at), clearance.Warnings);
     }
 
     /// <inheritdoc />
@@ -1705,11 +1714,12 @@ public sealed partial class GitHistory : IHistoryProvider
         CancellationToken cancellationToken,
         string? input = null,
         IReadOnlyDictionary<string, string?>? environment = null,
-        GitCallKind kind = GitCallKind.Stoppable)
+        GitCallKind kind = GitCallKind.Stoppable,
+        CommitClearance? clearance = null)
     {
         try
         {
-            return GitProcess.Run(_options, DenRoot, args, input, environment, cancellationToken, kind);
+            return GitProcess.Run(_options, DenRoot, args, input, environment, cancellationToken, kind, clearance);
         }
         catch (GitTimeoutException e) when (e.StillRunning is { } running && Track(running))
         {
@@ -1723,29 +1733,88 @@ public sealed partial class GitHistory : IHistoryProvider
 
     private static HistoryException Failed(string command, GitRun run) => new($"git {command} failed: {run.Said}");
 
+    /// <summary>Passes a commit or tag through the gate (<see cref="CommitGate"/>), with git's reads stopped by <paramref name="cancellationToken"/>.</summary>
+    private CommitClearance Clear(GatedWrite write, CancellationToken cancellationToken) =>
+        CommitGate.Clear(write, (args, environment) => Run(args, cancellationToken, environment: environment));
+
+    /// <summary>
+    /// Refuses a co-author whose name or email is one of git's global settings for who you are
+    /// (<c>user.*</c>, <c>author.*</c>, <c>committer.*</c> in the global config, without includes)
+    /// when the den records another (#315 design, D9). An agent that knows the writer's other name
+    /// could otherwise write it into a permanent trailer. Names are compared without case and with
+    /// runs of spaces as one; emails without case. Neither the co-author nor git's value is repeated.
+    /// </summary>
+    private void RefuseGlobalCoAuthors(IReadOnlyList<string>? coAuthors, CommitClearance clearance, CancellationToken cancellationToken)
+    {
+        if (coAuthors is not { Count: > 0 })
+        {
+            return;
+        }
+
+        // Exit 1: none set, or no global config file at all.
+        var run = Run(["config", "--global", "--null", "--get-regexp", @"^(user|author|committer)\.(name|email)$"], cancellationToken);
+        if (run.ExitCode == 1)
+        {
+            return;
+        }
+
+        if (!run.Succeeded || !run.OutputComplete)
+        {
+            throw new HistoryException($"Git couldn't read its global settings to check the co-author, so nothing was recorded: {run.Said}");
+        }
+
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var emails = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in run.Output.Split('\0', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var parts = entry.Split('\n', 2);
+            if (parts.Length < 2 || parts[1].Trim().Length == 0)
+            {
+                continue;
+            }
+
+            if (parts[0].EndsWith(".name", StringComparison.OrdinalIgnoreCase))
+            {
+                names.Add(Spaced(parts[1]));
+            }
+            else
+            {
+                emails.Add(parts[1].Trim());
+            }
+        }
+
+        // Only where the den records another: git's global name, when it's the den's too, exposes nothing.
+        names.Remove(Spaced(clearance.Name));
+        emails.Remove(clearance.Email.Trim());
+        foreach (var coAuthor in coAuthors)
+        {
+            // 'Name <email>', checked already (CoAuthorPattern).
+            var open = coAuthor.LastIndexOf('<');
+            var name = Spaced(coAuthor[..open]);
+            var email = coAuthor[(open + 1)..].Trim().TrimEnd('>').Trim();
+            if (names.Contains(name) || emails.Contains(email))
+            {
+                throw new ArgumentException(
+                    "The co-author given has a name or email from git's global settings, which isn't the name this den records checkpoints under, " +
+                    "so nothing was recorded: a Co-Authored-By line is permanent, and could tie that name to this den. " +
+                    "Give the agent's own name and email as the co-author, such as 'Claude <noreply@anthropic.com>'.",
+                    "request");
+            }
+        }
+
+        static string Spaced(string value) => string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+    }
+
     /// <summary>
     /// What git said about a commit or tag it refused, unless one of <paramref name="settings"/>
     /// says that call would sign. Then it isn't repeated, whatever it was: a signing program's
     /// words can name who a key belongs to, and no list of words tells them apart (#286).
     /// A setting git can't read as true or false counts as on.
     /// </summary>
-    private string SaidUnlessSigning(GitRun failed, string commands, string result, params string[] settings)
+    private static string SaidUnlessSigning(GitRun failed, CommitClearance clearance, string commands, string result, params string[] settings)
     {
-        bool signs;
-        try
-        {
-            signs = settings.Any(setting =>
-            {
-                var run = Start(["config", "--type=bool", "--get", setting], CancellationToken.None);
-                return run.ExitCode != 1 && run.Output.Trim() != "false";
-            });
-        }
-        catch (GitTimeoutException)
-        {
-            signs = true;
-        }
-
-        return signs
+        // As the call was run: the gate's pins, and git's settings for the rest.
+        return clearance.WouldSign(settings)
             ? $"git is set to sign, so what it said isn't repeated here, since that can name who a key belongs to: to see it, run {commands} in the den's folder, which makes {result} if it succeeds"
             : failed.Said;
     }

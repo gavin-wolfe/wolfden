@@ -28,10 +28,11 @@ namespace Wolfden.Git;
 /// this run just made, with no commit yet, is taken away again, so nothing
 /// is changed. So does one given without the other, always (maintainer
 /// decision, #286): the two go together, so a pen name is never recorded
-/// beside an email git has, even one that's what git has already. Also one
-/// that a <c>GIT_AUTHOR_NAME</c>-style environment variable would beat, and
-/// any given while <c>GIT_DIR</c> or <c>GIT_COMMON_DIR</c> points git at
-/// another repository.
+/// beside an email git has, even one that's what git has already. Also any
+/// given while <c>GIT_DIR</c> or <c>GIT_COMMON_DIR</c> points git at
+/// another repository. A <c>GIT_AUTHOR_NAME</c>-style environment variable
+/// doesn't refuse: Wolfden's commits don't use it (<see cref="CommitGate"/>),
+/// and the steps say it's set, since git commands run by hand still do.
 /// </para>
 /// <para>
 /// <b>Saved first, and checked.</b> What's given is saved before anything
@@ -263,11 +264,6 @@ public sealed class GitHistorySetup : IHistorySetup
                 return Undo(HistorySetupCodes.IdentityHalfGiven, half, needsName: name is null, needsEmail: email is null);
             }
 
-            if (BeatenByEnvironment(name, email) is { } beaten)
-            {
-                return Undo(HistorySetupCodes.BadArgument, beaten);
-            }
-
             if (given && Unrecordable(name!, email!, cancellationToken) is { } unrecordable)
             {
                 return Undo(HistorySetupCodes.BadArgument, unrecordable);
@@ -333,6 +329,10 @@ public sealed class GitHistorySetup : IHistorySetup
             }
 
             AddSavedSteps();
+            if (SetInEnvironment(name, email) is { } inEnvironment)
+            {
+                steps.Add(inEnvironment);
+            }
         }
 
         // 4. .gitignore.
@@ -375,6 +375,7 @@ public sealed class GitHistorySetup : IHistorySetup
                     : HasCommits(cancellationToken)
                         ? "Made no first checkpoint: the den's files were already recorded, by another checkpoint made meanwhile."
                         : "Made no first checkpoint: the den has no files to record yet.");
+                steps.AddRange(result.Warnings);
             }
             catch (HistoryException e)
             {
@@ -573,9 +574,11 @@ public sealed class GitHistorySetup : IHistorySetup
     {
         const string Causes = "Something git reads after the den's own settings beats them: GIT_CONFIG_COUNT or GIT_CONFIG_PARAMETERS in the environment, " +
             "extensions.worktreeConfig, or an [include] in the repository's config. Remove that, then try again.";
+        // As the gate asks it: from git's settings, not the environment's name and email (CommitGate).
+        var settingsOnly = CommitGate.IdentityVariables.Append("EMAIL").ToDictionary(v => v, _ => (string?)null, StringComparer.Ordinal);
         foreach (var ident in new[] { "GIT_AUTHOR_IDENT", "GIT_COMMITTER_IDENT" })
         {
-            var run = Run(["var", ident], cancellationToken);
+            var run = Run(["var", ident], cancellationToken, environment: settingsOnly);
             if (!run.Succeeded)
             {
                 // Not what git's output said, which can name what git has.
@@ -610,20 +613,21 @@ public sealed class GitHistorySetup : IHistorySetup
     private static string WithoutMark(string value) => value.Replace("\uFEFF", "", StringComparison.Ordinal);
 
     /// <summary>
-    /// Why a name or email given wouldn't be the one git records, in words, or
-    /// null: an environment variable that's set for git beats every setting,
-    /// and can't be saved over. Its value isn't repeated.
+    /// A step that says an environment variable holds another name or email,
+    /// or null. Wolfden's own checkpoints don't use it (<see cref="CommitGate"/>
+    /// gives git the name and email in its environment), but git commands run by
+    /// hand do, since it beats every setting. Its value isn't repeated.
     /// </summary>
-    private string? BeatenByEnvironment(string? name, string? email)
+    private string? SetInEnvironment(string? name, string? email)
     {
-        var beating = new[] { ("GIT_AUTHOR_NAME", name), ("GIT_COMMITTER_NAME", name), ("GIT_AUTHOR_EMAIL", email), ("GIT_COMMITTER_EMAIL", email) }
+        var set = new[] { ("GIT_AUTHOR_NAME", name), ("GIT_COMMITTER_NAME", name), ("GIT_AUTHOR_EMAIL", email), ("GIT_COMMITTER_EMAIL", email) }
             .Where(v => v.Item2 is not null && EnvironmentValue(v.Item1) is { } value && value != v.Item2)
             .Select(v => v.Item1)
             .ToList();
-        return beating.Count == 0
+        return set.Count == 0
             ? null
-            : $"Git would record the checkpoints under {string.Join(", ", beating)} from the environment, which beat{(beating.Count == 1 ? "s" : "")} what's saved for a den, " +
-                "not under the name and email given. Unset that, then try again.";
+            : $"{string.Join(", ", set)} {(set.Count == 1 ? "is" : "are")} set in the environment. Wolfden's checkpoints for this den are recorded under the name and email given anyway, " +
+                "but git commands you run yourself use the environment's, as in any repository.";
     }
 
     /// <summary>A variable as git will see it: <see cref="GitOptions.Environment"/> first, then this process's own.</summary>
@@ -922,11 +926,11 @@ public sealed class GitHistorySetup : IHistorySetup
         }
     }
 
-    private GitRun Run(string[] args, CancellationToken cancellationToken, GitCallKind kind = GitCallKind.Stoppable)
+    private GitRun Run(string[] args, CancellationToken cancellationToken, GitCallKind kind = GitCallKind.Stoppable, IReadOnlyDictionary<string, string?>? environment = null)
     {
         try
         {
-            return GitProcess.Run(_options, _denRoot, args, cancellationToken: cancellationToken, kind: kind);
+            return GitProcess.Run(_options, _denRoot, args, environment: environment, cancellationToken: cancellationToken, kind: kind);
         }
         catch (GitNotFoundException e)
         {

@@ -7752,7 +7752,12 @@ other way).
   again, Save saves the text, still checked against the hash the editor
   opened on: if the note changed meanwhile, both versions are shown, as
   for any save. Only **Log out**, which the person chose, clears the page,
-  and it asks first while an editor or form is open.
+  and it asks first while an editor or form is open. If someone else
+  (`ash`) logs in at that form, the page asks "Someone else was editing
+  here. Discard their unsaved changes and continue?" and, on yes, drops the
+  open editors and shows the pages afresh; on no, `ash` is logged out again
+  and `wren`'s draft stays. If `wren`'s account has become a viewer, the
+  editor stays open with no Save.
 
 Spec: #315 §4.5, review of PR #357. Covered by: `web/src/SessionEnd.test.tsx`, `web/src/Login.test.tsx`.
 
@@ -7766,7 +7771,7 @@ Spec: #315 §4.5, review of PR #357. Covered by: `web/src/SessionEnd.test.tsx`, 
   without a login. Turning login off again doesn't undo that; a restart
   does. The other way round, `wolfden login off` while a server with
   login on runs, it keeps asking for a login until it's restarted, and
-  says so once.
+  says so once. The page shows the `restart_needed` message in a banner.
 
 Spec: #315 §4.5, review of PR #357. Covered by: `LoginTests.LoginTurnedOnWhileServingStopsItUntilARestart`,
-`LoginTests.LoginTurnedOffWhileServingStillAsksForItUntilARestart`.
+`LoginTests.LoginTurnedOffWhileServingStillAsksForItUntilARestart`, `web/src/SessionEnd.test.tsx` (the page's banner).

@@ -1964,7 +1964,12 @@ shows your username and role, and **Log out**.
   for that account, in every browser, at once, as does removing it.
 - **If a session ends while you're editing,** the login form comes up over
   the page. What you were editing is still there underneath: log in again
-  and press Save.
+  and press Save. If someone else logs in there instead, Wolfden asks
+  before it discards what you hadn't saved, and gives them the pages
+  afresh, so nobody saves another person's draft as their own. An account
+  that's become a viewer keeps its open editor but gets no Save.
+- **If `serve` must be restarted** (login was turned on while it ran), the
+  page says so in a banner at the top.
 - **A wrong password and an unknown username get the same answer,** so the
   page never tells a stranger which usernames exist. After 5 wrong tries in
   a row the account is locked for 15 minutes, and the answer still looks the
@@ -1974,7 +1979,8 @@ shows your username and role, and **Log out**.
   there's no limit per address: every request comes from the same one
   (127.0.0.1), so such a limit would let anyone signed in here keep you
   from logging in. The per-username limit and the lockout guard the login
-  instead, and `wolfden user unlock` always gets you back in.
+  instead. `wolfden user unlock` clears a lockout; if someone keeps
+  trying, `wolfden login off` (or restarting `serve`) gets you in.
 - **The login cookie is this installation's own.** Its name includes a
   short random id, so two installations open in one browser (on two ports
   of `localhost`) don't log each other out. It's signed and encrypted with

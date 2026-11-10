@@ -89,10 +89,18 @@ internal static class CommitGate
     /// </summary>
     /// <param name="write">What the write makes.</param>
     /// <param name="run">Runs a git command that only reads, in the den's folder, with more environment for it; it throws a <see cref="HistoryException"/> if git can't be run.</param>
-    /// <exception cref="HistoryException">Git has no name and email in its settings for the den, or can't read its settings.</exception>
+    /// <exception cref="HistoryException">
+    /// Git trusts the den's repository only through config in the environment, has no name and
+    /// email in its settings for the den, or can't read its settings.
+    /// </exception>
     public static CommitClearance Clear(GatedWrite write, Func<IReadOnlyList<string>, IReadOnlyDictionary<string, string?>?, GitRun> run)
     {
         ArgumentNullException.ThrowIfNull(run);
+        if (Untrusted(run) is { } untrusted)
+        {
+            throw new HistoryException(untrusted);
+        }
+
         var (name, email) = Identity(run);
         // GIT_CONFIG would make 'git config' read only that file; a commit never reads it.
         var noConfigFile = new Dictionary<string, string?> { ["GIT_CONFIG"] = null };
@@ -136,6 +144,37 @@ internal static class CommitGate
         return signed
             ? $"This den's own .git/config says to sign, so Wolfden signed this {what}, but git's settings as a whole wouldn't have. {Where}"
             : $"Git's settings would have signed this {what}, but this den's own .git/config says not to, so Wolfden didn't sign it. {Where}";
+    }
+
+    /// <summary>
+    /// Why the name and email can't be worked out from git's config files, or null if they can:
+    /// git finds the den's repository with the full environment, but not without config passed
+    /// in it (<see cref="SettingsOnly"/>). That happens when only <c>GIT_CONFIG_COUNT</c> or
+    /// <c>GIT_CONFIG_PARAMETERS</c> trusts the repository (<c>safe.directory</c>): without them,
+    /// <c>git var</c> would quietly answer from outside it, from the global config alone, while
+    /// the commit, which trusts it, recorded something else. Neither identity is repeated.
+    /// </summary>
+    internal static string? Untrusted(Func<IReadOnlyList<string>, IReadOnlyDictionary<string, string?>?, GitRun> run)
+    {
+        string[] gitDir = ["rev-parse", "--absolute-git-dir"];
+        var withEverything = run(gitDir, null);
+        var onItsOwn = run(gitDir, SettingsOnly());
+        if (withEverything.Succeeded && withEverything.OutputComplete && onItsOwn.Succeeded && onItsOwn.OutputComplete
+            && SamePath(withEverything.Output, onItsOwn.Output))
+        {
+            return null;
+        }
+
+        return "Git trusts this den's repository only through settings passed in the environment (GIT_CONFIG_COUNT or GIT_CONFIG_PARAMETERS, " +
+            "such as safe.directory), not through its own settings, so Wolfden can't tell which name and email the checkpoint would record, and nothing was recorded. " +
+            "To trust the repository in git's own settings, run 'git config --global --add safe.directory <folder>' with the repository's folder, then try again.";
+
+        static bool SamePath(string a, string b)
+        {
+            static string Normal(string path) => Path.TrimEndingDirectorySeparator(Path.GetFullPath(path.Trim()));
+            var comparison = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            return a.Trim().Length > 0 && string.Equals(Normal(a), Normal(b), comparison);
+        }
     }
 
     /// <summary>The name and email git's settings give for the den's repository.</summary>

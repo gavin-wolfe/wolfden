@@ -4769,7 +4769,9 @@ set to the writer's everyday name and email, or passes them as config in
   `committer.name`.
 - If git's settings have no name or email for the den, the checkpoint is
   refused with nothing changed, not even a new file marked, and the
-  message says how to set them. It doesn't use the environment's, or one git
+  message says how to set them. So is one in a repository git trusts only
+  through `safe.directory` passed in the environment: the message says how
+  to trust it in git's own settings, and repeats no name. It doesn't use the environment's, or one git
   would make up from the computer's account, and doesn't repeat either.
 
 Spec: design.md §6, "One gate for every commit and tag" (#311). Covered by:
@@ -4777,6 +4779,8 @@ Spec: design.md §6, "One gate for every commit and tag" (#311). Covered by:
 `CommitGateTests.ANameAndEmailPassedAsConfigInTheEnvironmentArentUsed`,
 `HistorySetupTests.ANameFromConfigInTheEnvironmentDoesntBeatWhatsGiven`,
 `CommitGateTests.TheCommitterIsTheAuthorAsGitsSettingsGiveIt`,
+`CommitGateTests.ARepositoryTrustedOnlyThroughConfigInTheEnvironmentIsRefused`,
+`HistorySetupTests.ARepositoryTrustedOnlyThroughConfigInTheEnvironmentRefusesBeforeTheFirstCheckpoint`,
 `CommitGateTests.WithNoNameInGitsSettingsNothingIsGuessedAndNothingChanges`,
 `HistorySetupTests.AnEnvironmentVariableDoesntBeatWhatsGivenAndTheStepsSayItsSet`.
 
@@ -4814,8 +4818,9 @@ A developer adds a new feature that makes a commit or a tag.
 - Running any git command that makes commits or tags (`commit`, `tag`,
   `commit-tree`, `merge`, `cherry-pick`, `rebase`, `replay`, `subtree`,
   `notes` and the like) without what the gate decided fails before git
-  starts, so the new path fails its first test. So does passing an alias
-  with `-c alias.…`, which could hide one.
+  starts, so the new path fails its first test. So does passing an alias,
+  an `include` or an `includeIf` with `-c` or `--config-env`, which could
+  hide or bring in one.
 - Wolfden starts no git process except through that one place.
 
 Spec: design.md §6, "One gate for every commit and tag" (#311). Covered by:

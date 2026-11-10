@@ -1074,6 +1074,31 @@ public sealed class HistorySetupTests : IDisposable
         Assert.Equal(AshOnly, LaterCommitIdentity(den, options));
     }
 
+    [Fact]
+    [Trait("Scenario", "SC-HIST-21")]
+    public void ARepositoryTrustedOnlyThroughConfigInTheEnvironmentRefusesBeforeTheFirstCheckpoint()
+    {
+        var den = Den();
+        var options = Without(Config("[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n"));
+        options = options with
+        {
+            Environment = new Dictionary<string, string?>(options.Environment)
+            {
+                ["GIT_TEST_ASSUME_DIFFERENT_OWNER"] = "1",
+                ["GIT_CONFIG_COUNT"] = "1",
+                ["GIT_CONFIG_KEY_0"] = "safe.directory",
+                ["GIT_CONFIG_VALUE_0"] = "*",
+            },
+        };
+
+        var result = new GitHistorySetup(den, options).TurnOn(new HistorySetupRequest("Ash Calloway", "ash@example.invalid"), Token);
+
+        Assert.NotEqual(HistorySetupStatus.Done, result.Status);
+        Assert.Contains("safe.directory", result.Problem, StringComparison.Ordinal);
+        Assert.DoesNotContain("Marek", result.Problem, StringComparison.Ordinal);
+        Assert.False(RepositoryHasCommits(den, options));
+    }
+
     [Theory]
     [Trait("Scenario", "SC-HIST-23")]
     [InlineData("gpg")]

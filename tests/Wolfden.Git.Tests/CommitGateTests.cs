@@ -48,6 +48,9 @@ public sealed class CommitGateTests : IDisposable
     [InlineData("-c", "ALIAS.save=commit", "status")]
     [InlineData("-calias.save=commit", "save")]
     [InlineData("--config-env", "alias.save=SOME_VARIABLE", "save")]
+    [InlineData("-c", "include.path=/elsewhere", "status")]
+    [InlineData("-c", "includeIf.gitdir:/.path=/elsewhere", "status")]
+    [InlineData("--config-env=include.path=SOME_VARIABLE", "status")]
     public void AGitCommandThatMakesCommitsOrTagsRunsOnlyThroughTheGate(params string[] args)
     {
         // Refused before git starts, so no folder or repository is needed: a new write path
@@ -91,7 +94,8 @@ public sealed class CommitGateTests : IDisposable
         // The one other process Wolfden starts is the browser, for 'serve --open'.
         var src = Path.Combine(RepoRoot(), "src");
         // Any way of making or starting a process: ProcessStartInfo, Process.Start, new Process(), the full type name.
-        var startsAProcess = new Regex(@"ProcessStartInfo|\bProcess\s*\.\s*Start\b|\bnew\s+(System\.Diagnostics\.)?Process\b|\bnew\s*\(\s*\)\s*\{\s*StartInfo|System\.Diagnostics\.Process\b");
+        var startsAProcess = new Regex(
+            @"ProcessStartInfo|\bStartInfo\b|\bProcess\s*\.\s*Start\b|\bnew\s+(System\.Diagnostics\.)?Process\b|System\.Diagnostics\.Process\b|using\s+static\s+System\.Diagnostics\.Process");
         var starting = Directory.EnumerateFiles(src, "*.cs", SearchOption.AllDirectories)
             .Where(file => !file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
             .Where(file => startsAProcess.IsMatch(File.ReadAllText(file)))
@@ -130,6 +134,36 @@ public sealed class CommitGateTests : IDisposable
         Assert.Equal(PenName, repo.Git("log", "-1", "--format=%an|%ae|%cn|%ce").Trim());
         Assert.True(tagged.IsAvailable, tagged.Reason);
         Assert.Equal("Test Pen Name|<pen@example.invalid>", repo.Git("for-each-ref", "--format=%(taggername)|%(taggeremail)", "refs/tags/book/kestrel/first/final").Trim());
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-24")]
+    public void ARepositoryTrustedOnlyThroughConfigInTheEnvironmentIsRefused()
+    {
+        // git var, without that config, would answer from outside the repository with the global name,
+        // while the commit trusts it: refused before anything is marked.
+        using var repo = TestRepo.Create();
+        var options = Global("[user]\n\tname = Everyday Name\n\temail = everyday@example.invalid\n");
+        RunGit(repo.Root, options, "config", "--local", "user.name", "Test Pen Name");
+        RunGit(repo.Root, options, "config", "--local", "user.email", "pen@example.invalid");
+        repo.WriteDen("notes/one.md", "# One\n");
+        options = With(options, new()
+        {
+            ["GIT_TEST_ASSUME_DIFFERENT_OWNER"] = "1",
+            ["GIT_CONFIG_COUNT"] = "1",
+            ["GIT_CONFIG_KEY_0"] = "safe.directory",
+            ["GIT_CONFIG_VALUE_0"] = "*",
+        });
+        var history = GitHistory.ForDen(repo.DenRoot, options, Token);
+
+        var refused = Assert.Throws<HistoryException>(() => history.Checkpoint(new CheckpointRequest("First"), Token));
+
+        Assert.StartsWith("Git trusts this den's repository only through settings passed in the environment", refused.Message, StringComparison.Ordinal);
+        Assert.Contains("safe.directory", refused.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("Everyday", refused.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Pen Name", refused.Message, StringComparison.Ordinal);
+        Assert.Throws<InvalidOperationException>(() => repo.Git("rev-parse", "--verify", "--quiet", "HEAD"));
+        Assert.Equal("?? den.yaml\n?? notes/one.md\n", repo.Git("status", "--porcelain", "--untracked-files=all"));
     }
 
     [Fact]

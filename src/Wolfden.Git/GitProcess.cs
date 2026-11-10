@@ -121,6 +121,9 @@ internal static class GitProcess
 {
     private static readonly UTF8Encoding Utf8 = new(false);
 
+    /// <summary>Settings never passed to git with <c>-c</c> or <c>--config-env</c>, by prefix.</summary>
+    private static readonly string[] RefusedSettings = ["alias.", "include.", "includeif."];
+
     /// <summary>
     /// How long to wait for a <see cref="GitCallKind.MustFinish"/> command's
     /// output, and any command's standard error, after git exits. The pipes
@@ -165,13 +168,14 @@ internal static class GitProcess
         CommitClearance? clearance = null)
     {
         var argList = args.ToList();
-        if (argList.Select((arg, i) => arg.StartsWith("-calias.", StringComparison.OrdinalIgnoreCase)
-                || ((arg is "-c" or "--config-env") && i + 1 < argList.Count && argList[i + 1].StartsWith("alias.", StringComparison.OrdinalIgnoreCase))
-                || arg.StartsWith("--config-env=alias.", StringComparison.OrdinalIgnoreCase))
-            .Any(b => b))
+        if (argList.Select((arg, i) => (arg is "-c" or "--config-env") && i + 1 < argList.Count ? argList[i + 1]
+                : arg.StartsWith("--config-env=", StringComparison.Ordinal) ? arg["--config-env=".Length..]
+                : arg.StartsWith("-c", StringComparison.Ordinal) && arg.Length > 2 && !arg.StartsWith("--", StringComparison.Ordinal) ? arg[2..]
+                : null)
+            .Any(setting => setting is not null && RefusedSettings.Any(prefix => setting.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))))
         {
-            // An alias could hide a commit behind another name, past the check below.
-            throw new InvalidOperationException("Wolfden never passes git an alias with -c: one could run a commit or tag past CommitGate.");
+            // An alias could hide a commit behind another name, past the check below, and an include could bring one in.
+            throw new InvalidOperationException("Wolfden never passes git an alias, include or includeIf with -c: one could run a commit or tag past CommitGate.");
         }
 
         if (clearance is null && CommitGate.IsGated(argList))

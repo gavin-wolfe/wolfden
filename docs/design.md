@@ -710,7 +710,11 @@ decided, so a new path can't skip it. The gate:
   `GIT_COMMITTER_*`, `EMAIL`, `GIT_CONFIG_PARAMETERS` and `GIT_CONFIG_COUNT`
   taken out of its environment, so only git's config files count), and refuses,
   with nothing changed, when there are none, rather than let git guess one
-  from the computer's account;
+  from the computer's account. It first checks that git finds the den's
+  repository without that config too (`git rev-parse --absolute-git-dir`,
+  the same folder either way), and refuses otherwise: a repository trusted
+  only through `safe.directory` in `GIT_CONFIG_COUNT` or
+  `GIT_CONFIG_PARAMETERS` would have `git var` answer from outside it;
 - hands them to that one git process as `GIT_AUTHOR_NAME`,
   `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME` and `GIT_COMMITTER_EMAIL`, over
   anything inherited, so an inherited `GIT_AUTHOR_NAME` doesn't win, the

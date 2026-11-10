@@ -1482,7 +1482,10 @@ checkpoint, freezing and unfreezing, an AI assistant, or `wolfden init
   doesn't change what's recorded. If git's settings have no name or email, the
   checkpoint is refused with nothing changed, rather than recorded under a
   name git makes up from your computer account, which can be your real
-  name. The message says how to set them.
+  name. The message says how to set them. It's refused too if git trusts
+  the den's folder only through `safe.directory` passed in the environment
+  (`GIT_CONFIG_COUNT`, `GIT_CONFIG_PARAMETERS`): add it to git's own
+  settings with `git config --global --add safe.directory <folder>`.
 - **Signing follows the den's own settings.** If the den's own
   `.git/config` says whether to sign (`commit.gpgsign` for checkpoints,
   `tag.gpgsign` and `tag.forceSignAnnotated` for freeze tags), Wolfden

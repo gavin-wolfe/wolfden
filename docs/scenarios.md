@@ -7514,3 +7514,28 @@ Spec: #315 §3.2, review of PR #350. Covered by: `InstallationTests.ARelativeWol
 `InstallationTests.AFolderInADenIsRefused`, `InstallationTests.AFolderInARepositoryIsFoundForAWarning`,
 `AccountCommandTests.AnInstallationInADenIsRefused`, `AccountCommandTests.AnInstallationInARepositoryIsWarnedAbout`,
 `AccountStoreTests.TheDatabaseIsOnlyForThisAccountOutsideWindows`, `InstallationTests.ALinkIntoADenIsInTheDen`.
+
+### SC-ACCT-10. A password anyone would guess is refused
+
+The writer, adding `wren`, tries `PasswordPassword`, then `qwertyuiop12345`,
+then `Wolfden Wolfden 2026`, then `copper lantern harbor`.
+
+- The first two are refused with `that password is too common. Try a few
+  random words in a row, like "copper lantern harbor".`, which never says
+  what matched; the third says a password can't be the username or
+  `wolfden`, even repeated or with digits added. The last is accepted. The
+  list is 10,000 common passwords, public domain, built into Wolfden and
+  read once, the first time a password is checked; nothing goes online.
+  Passwords are compared ignoring case, spaces and punctuation, and one is
+  refused when it's a list entry, the username or `wolfden`, said once or
+  several times, optionally followed by digits no longer than that part
+  (so `2000` followed by twelve random digits is fine). The same goes for
+  `user add` (typed or `--password-stdin`) and `user reset-password`.
+
+Spec: #354; NIST SP 800-63B rev. 4 §3.1.1.2. Covered by:
+`CommonPasswordTests.ACommonPasswordIsRefusedWhateverItsCase`,
+`CommonPasswordTests.AnUncommonPassphraseIsAccepted`,
+`CommonPasswordTests.TheUsernameOrWolfdenRepeatedOrWithDigitsIsRefused`,
+`CommonPasswordTests.TheRefusalNeverSaysWhichEntryMatched`,
+`CommonPasswordTests.TheStoreRefusesACommonPasswordOnAddAndReset`,
+`AccountCommandTests.ACommonPasswordIsRefusedByAddAndResetPassword`.

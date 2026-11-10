@@ -9,8 +9,10 @@ namespace Wolfden.Accounts;
 /// The password rules (#315 §7): 15 to 256 characters, counting each
 /// Unicode code point once after NFC normalization, with no composition
 /// rules (no "a digit and a symbol"), as NIST SP 800-63B rev. 4 §3.1.1.2
-/// asks. It refuses two passwords anyone could guess from the account
-/// itself: the username, and one character repeated.
+/// asks. It refuses passwords anyone could guess: the username, one
+/// character repeated, and (#354) a common password, the username or
+/// "wolfden", said once or repeated, perhaps with digits added (see
+/// <see cref="IsMadeOf"/>).
 /// </summary>
 public sealed class PasswordRules : IPasswordValidator<WolfdenUser>
 {
@@ -43,7 +45,8 @@ public sealed class PasswordRules : IPasswordValidator<WolfdenUser>
             return $"a password can have at most {MaximumLength} characters, and this one has {length}.";
         }
 
-        if (userName is not null && string.Equals(normalized, TryNormalize(userName, out var name) ? name : userName, StringComparison.OrdinalIgnoreCase))
+        var name = userName is null ? null : TryNormalize(userName, out var normalizedName) ? normalizedName : userName;
+        if (name is not null && string.Equals(normalized, name, StringComparison.OrdinalIgnoreCase))
         {
             return "a password can't be the username.";
         }
@@ -53,7 +56,94 @@ public sealed class PasswordRules : IPasswordValidator<WolfdenUser>
             return "a password can't be one character repeated.";
         }
 
+        var skeleton = Skeleton(normalized);
+        var nameSkeleton = name is null ? string.Empty : Skeleton(name);
+        if (IsMadeOf(skeleton, unit => unit == ProductWord || (nameSkeleton.Length > 0 && unit == nameSkeleton)))
+        {
+            return "a password can't be the username or \"wolfden\", even repeated or with digits added.";
+        }
+
+        if (IsMadeOf(skeleton, CommonPasswords.Default.Contains))
+        {
+            return TooCommon;
+        }
+
         return null;
+    }
+
+    /// <summary>The refusal for a common password. It never says which entry, or which list, matched.</summary>
+    internal const string TooCommon = "that password is too common. Try a few random words in a row, like \"copper lantern harbor\".";
+
+    /// <summary>The one word, besides the username, that anyone guessing a Wolfden password would try first.</summary>
+    internal const string ProductWord = "wolfden";
+
+    /// <summary>
+    /// The form passwords are compared to the blocklist and the context
+    /// words in: the NFC text's letters, combining marks and digits,
+    /// lowercased rune by rune with the invariant culture's simple mapping,
+    /// and nothing else. So <c>Pass Word!</c>, <c>pass-word</c> and
+    /// <c>PASSWORD</c> all compare as <c>password</c>.
+    /// </summary>
+    internal static string Skeleton(string normalized)
+    {
+        var builder = new StringBuilder(normalized.Length);
+        foreach (var rune in normalized.EnumerateRunes())
+        {
+            if (Rune.IsLetterOrDigit(rune) || Rune.GetUnicodeCategory(rune) is UnicodeCategory.NonSpacingMark or UnicodeCategory.SpacingCombiningMark or UnicodeCategory.EnclosingMark)
+            {
+                builder.Append(Rune.ToLowerInvariant(rune).ToString());
+            }
+        }
+
+        return builder.ToString();
+    }
+
+    /// <summary>
+    /// Whether <paramref name="skeleton"/> is one guessable unit said once or
+    /// several times in a row, optionally followed by digits that are no
+    /// longer than the repeated part: <c>password</c>, <c>passwordpassword</c>,
+    /// <c>password1234</c>, but not <c>2000</c> followed by eleven random digits.
+    /// </summary>
+    internal static bool IsMadeOf(string skeleton, Func<string, bool> isGuessable)
+    {
+        var digitsFrom = skeleton.Length;
+        while (digitsFrom > 0 && char.IsAsciiDigit(skeleton[digitsFrom - 1]))
+        {
+            digitsFrom--;
+        }
+
+        // cut: where the repeated part ends and the added digits begin.
+        for (var cut = skeleton.Length; cut >= digitsFrom && cut > 0; cut--)
+        {
+            if (skeleton.Length - cut > cut)
+            {
+                break;
+            }
+
+            var repeated = skeleton.AsSpan(0, cut);
+            for (var period = 1; period <= cut; period++)
+            {
+                if (cut % period == 0 && IsRepeatOf(repeated, period) && isGuessable(skeleton[..period]))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsRepeatOf(ReadOnlySpan<char> text, int period)
+    {
+        for (var i = period; i < text.Length; i++)
+        {
+            if (text[i] != text[i - period])
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /// <summary>

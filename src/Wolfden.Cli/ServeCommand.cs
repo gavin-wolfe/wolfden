@@ -32,7 +32,7 @@ internal static class ServeCommand
 {
     internal static readonly CommandSpec Spec = new(
         "serve",
-        "usage: wolfden serve [<den>] [--den <den>] [--universe <key>] [--port <n>] [--no-open] [--no-watch]",
+        "usage: wolfden serve [<den>] [--den <den>] [--universe <key>] [--port <n>] [--no-open] [--no-watch] [--home <folder>]",
         $"""
         Serves the den's web UI and API on this computer only (127.0.0.1), opens
         it in your default browser, and runs until Ctrl+C. It keeps the den's
@@ -51,14 +51,17 @@ internal static class ServeCommand
           --no-watch          don't watch the files; each request still checks
                               them first and rebuilds the index if they changed
 
-        There are no accounts in this version: anyone who can use this computer
-        can open the page while it runs.
+          --home <folder>     the installation folder (see 'wolfden login --help')
+
+        This version doesn't ask for a login, even after 'wolfden login on' (it
+        says so when it starts): anyone who can use this computer can open the
+        page while it runs.
 
         Exits 0 on Ctrl+C, and 2 if the server couldn't start: no den, a
         --universe the den doesn't have, or a port that's in use or reserved.
         """,
         ["--no-open", "--no-watch"],
-        ["--den", "--universe", "--port"],
+        ["--den", "--universe", "--port", Installation.HomeOption],
         [],
         1,
         "give at most one den folder.");
@@ -151,6 +154,7 @@ internal static class ServeCommand
             output.WriteLine($"wolfden serve: serving the den at '{root}' on {url}");
             output.WriteLine("Press Ctrl+C to stop.");
             output.Flush();
+            WarnIfLoginIsOn(line, log);
 
             if (!line.Has("--no-watch"))
             {
@@ -215,6 +219,32 @@ internal static class ServeCommand
             $"wolfden serve: couldn't listen on 127.0.0.1 port {port}: {e.Message} (the port may be reserved; try another with '--port <n>', or '--port 0' for a free one)",
         _ => null,
     };
+
+    /// <summary>
+    /// Says, once, that login is on but not enforced (#315: the setting
+    /// arrives before the web's login does). Never stops the server: a
+    /// settings file it can't read is a warning too.
+    /// </summary>
+    private static void WarnIfLoginIsOn(CommandLine line, TextWriter log)
+    {
+        var folder = Installation.Resolve(Spec.Name, line, TextWriter.Null);
+        if (folder is null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (Wolfden.Accounts.InstallationSettings.Load(folder).Login)
+            {
+                log.WriteLine($"wolfden serve: login is on for the installation at '{folder.Path}', but this version doesn't ask for it yet: anyone who can use this computer can open the page.");
+            }
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            log.WriteLine($"wolfden serve: couldn't read the installation's login setting: {e.Message}");
+        }
+    }
 
     /// <summary>Opens <paramref name="url"/> in the default browser, or says to open it by hand.</summary>
     private static void Open(string url, TextWriter error)

@@ -53,7 +53,7 @@ internal static class CliApp
     internal static Wolfden.Git.GitOptions Git { get; set; } = Wolfden.Git.GitOptions.Default;
 
     /// <summary>Commands that work, in the order the usage lists them.</summary>
-    internal static readonly string[] Commands = ["init", "check", "index", "query", "new", "copy", "freeze", "unfreeze", "new-id", "serve", "mcp"];
+    internal static readonly string[] Commands = ["init", "check", "index", "query", "new", "copy", "freeze", "unfreeze", "new-id", "serve", "mcp", "user", "login"];
 
     internal static string Version =>
         typeof(CliApp).Assembly
@@ -83,6 +83,9 @@ internal static class CliApp
           new-id [<count>]         print new ids for files made by hand
           serve [<den>]            open the den's web UI in a browser (runs until Ctrl+C)
           mcp [<den>]              run the MCP server over stdio for an AI client
+          user <subcommand>        manage this installation's accounts
+                                   (add, list, remove, set-role, reset-password, unlock)
+          login [on | off]         turn login for the web pages on or off
 
         Run 'wolfden <command> --help' for a command's options. Commands find the
         den from the current folder, or take '--den <folder>', and '--json'
@@ -142,6 +145,10 @@ internal static class CliApp
                 return ServeCommand.Run(rest, output, error, stop);
             case ["mcp", .. var rest]:
                 return McpCommand.Run(rest, output, error, stop);
+            case ["user", .. var rest]:
+                return UserCommand.Run(rest, output, error);
+            case ["login", .. var rest]:
+                return LoginCommand.Run(rest, output, error);
             default:
                 error.WriteLine($"wolfden: unknown command '{args[0]}'.");
                 error.WriteLine(Usage);

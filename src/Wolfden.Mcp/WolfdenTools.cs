@@ -494,10 +494,12 @@ public sealed class WolfdenTools
         "saved since they were last recorded ('written_by_session') apart from those that changed some other way " +
         "('changed_outside_session'); a file you wrote that was changed after, say in the writer's editor, is in both. Tell the writer " +
         "about the second list. If nothing changed since the last checkpoint, nothing is recorded. After move_entity, 'paths' must name " +
-        "both the old and the new path to record the move. If the den has no history, the result says so ('available' false) and the edits are still saved in the files.")]
+        "both the old and the new path to record the move. If the den has no history, the result says so ('available' false) and the edits are still saved in the files. " +
+        "The checkpoint is recorded under the den's own name; a co-author with the name or email git has in its global settings, when the den records " +
+        "another, is refused, since a Co-Authored-By line is permanent. Pass on anything in 'warnings' to the writer.")]
     public CallToolResult Checkpoint(
         [Description("What the checkpoint is, such as 'End of chapter 14 session: Lucy's timeline'.")] string message,
-        [Description("You, as 'Name <email>' on one line, such as 'Claude <noreply@anthropic.com>'.")] string co_author,
+        [Description("You, as 'Name <email>' on one line, such as 'Claude <noreply@anthropic.com>'. Never the writer's name.")] string co_author,
         [Description("Only these files or folders, relative to the den root. Leave it out for the whole den.")] string[]? paths = null,
         CancellationToken cancellationToken = default) =>
         Write(() => _tools.Checkpoint(message, co_author, paths), cancellationToken);

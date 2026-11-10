@@ -36,6 +36,7 @@ public sealed class TestRepo : IDisposable
             ["GIT_AUTHOR_EMAIL"] = null,
             ["GIT_COMMITTER_NAME"] = null,
             ["GIT_COMMITTER_EMAIL"] = null,
+            ["EMAIL"] = null,
             ["GIT_CEILING_DIRECTORIES"] = TempRoot,
             ["GIT_DIR"] = null,
             ["GIT_WORK_TREE"] = null,

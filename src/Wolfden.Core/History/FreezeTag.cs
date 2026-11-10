@@ -21,7 +21,8 @@ public enum FreezeTagOutcome
 /// <param name="Name">The tag's name: <c>book/&lt;universe&gt;/&lt;book&gt;/final</c>, or <c>final-2</c>, <c>final-3</c>, and so on after the first.</param>
 /// <param name="Tag">The tag made; null if none was.</param>
 /// <param name="Message">What happened, in words for the writer.</param>
-public sealed record FreezeTagResult(FreezeTagOutcome Outcome, string Name, HistoryTag? Tag, string Message);
+/// <param name="Warnings">What the writer should know about the tag made (<see cref="HistoryResult{T}.Warnings"/>), or null for none.</param>
+public sealed record FreezeTagResult(FreezeTagOutcome Outcome, string Name, HistoryTag? Tag, string Message, IReadOnlyList<string>? Warnings = null);
 
 /// <summary>
 /// The tag that freezing a book adds when the den has history (design.md
@@ -162,7 +163,7 @@ public static class FreezeTag
         var name = NextName(history, universeKey, bookKey, cancellationToken);
         var tagged = history.Tag(new TagRequest(name, at, $"Freeze book '{bookKey}' of universe '{universeKey}'."), cancellationToken);
         return tagged.IsAvailable
-            ? new FreezeTagResult(FreezeTagOutcome.Tagged, name, tagged.Value, $"{frozen} Tagged its snapshot '{name}'.")
+            ? new FreezeTagResult(FreezeTagOutcome.Tagged, name, tagged.Value, $"{frozen} Tagged its snapshot '{name}'.", tagged.Warnings)
             // The backend can tag, so an unavailable tag means there's no checkpoint to name yet.
             : new FreezeTagResult(FreezeTagOutcome.NothingCheckpointed, name, null, $"{frozen} No tag was added: {tagged.Reason}");
     }

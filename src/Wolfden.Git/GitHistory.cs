@@ -1751,21 +1751,9 @@ public sealed partial class GitHistory : IHistoryProvider
             return;
         }
 
-        // Exit 1: none set, or no global config file at all.
-        var run = Run(["config", "--global", "--null", "--get-regexp", @"^(user|author|committer)\.(name|email)$"], cancellationToken);
-        if (run.ExitCode == 1)
-        {
-            return;
-        }
-
-        if (!run.Succeeded || !run.OutputComplete)
-        {
-            throw new HistoryException($"Git couldn't read its global settings to check the co-author, so nothing was recorded: {run.Said}");
-        }
-
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var emails = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var entry in run.Output.Split('\0', StringSplitOptions.RemoveEmptyEntries))
+        foreach (var entry in GlobalIdentities(cancellationToken))
         {
             var parts = entry.Split('\n', 2);
             if (parts.Length < 2 || parts[1].Trim().Length == 0)
@@ -1797,12 +1785,71 @@ public sealed partial class GitHistory : IHistoryProvider
                 throw new ArgumentException(
                     "The co-author given has a name or email from git's global settings, which isn't the name this den records checkpoints under, " +
                     "so nothing was recorded: a Co-Authored-By line is permanent, and could tie that name to this den. " +
-                    "Give the agent's own name and email as the co-author, such as 'Claude <noreply@anthropic.com>'.",
-                    "request");
+                    "Give the agent's own name and email as the co-author, such as 'Claude <noreply@anthropic.com>'.");
             }
         }
 
         static string Spaced(string value) => string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    /// <summary>
+    /// The global config's <c>user.*</c>, <c>author.*</c> and <c>committer.*</c> names and emails,
+    /// as git's <c>key\nvalue</c> entries: read without includes, and again with them from an empty
+    /// folder outside any repository, so a plain <c>[include]</c> counts but an
+    /// <c>includeIf "gitdir:…"</c>, which is how a pen name is often given, can't match.
+    /// </summary>
+    private List<string> GlobalIdentities(CancellationToken cancellationToken)
+    {
+        string[] read = ["config", "--global", "--null", "--get-regexp", @"^(user|author|committer)\.(name|email)$"];
+        var entries = new List<string>();
+        entries.AddRange(Entries(Run(read, cancellationToken)));
+
+        var outside = Directory.CreateTempSubdirectory("wolfden-global-");
+        try
+        {
+            var environment = new Dictionary<string, string?>
+            {
+                ["GIT_DIR"] = null,
+                ["GIT_WORK_TREE"] = null,
+                ["GIT_COMMON_DIR"] = null,
+                ["GIT_CEILING_DIRECTORIES"] = outside.Parent?.FullName ?? outside.FullName,
+            };
+            GitRun included;
+            try
+            {
+                included = GitProcess.Run(_options, outside.FullName, [read[0], read[1], "--includes", .. read[2..]], environment: environment, cancellationToken: cancellationToken);
+            }
+            catch (GitTimeoutException e)
+            {
+                throw TimedOut(e);
+            }
+            catch (GitNotFoundException e)
+            {
+                throw new HistoryException($"Git couldn't be run ({e.Message}).", e);
+            }
+
+            entries.AddRange(Entries(included));
+        }
+        finally
+        {
+            Delete(outside.FullName, recursive: true);
+        }
+
+        return entries;
+
+        static IEnumerable<string> Entries(GitRun run)
+        {
+            // Exit 1: none set, or no global config file at all.
+            if (run.ExitCode == 1)
+            {
+                return [];
+            }
+
+            // Not what git said: it can name a config file in the user's home folder.
+            return run.Succeeded && run.OutputComplete
+                ? run.Output.Split('\0', StringSplitOptions.RemoveEmptyEntries)
+                : throw new HistoryException("Git couldn't read its global settings to check the co-author, so nothing was recorded. Run 'git config --global --list' to see why.");
+        }
     }
 
     /// <summary>
@@ -1832,11 +1879,18 @@ public sealed partial class GitHistory : IHistoryProvider
             $"{LikelyCauses} Answer or close the prompt, or end that git process. {retry ?? "Then try again."}",
             e);
 
-    private static void Delete(string file)
+    private static void Delete(string file, bool recursive = false)
     {
         try
         {
-            File.Delete(file);
+            if (recursive)
+            {
+                Directory.Delete(file, recursive: true);
+            }
+            else
+            {
+                File.Delete(file);
+            }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {

@@ -1048,7 +1048,7 @@ public sealed class HistorySetupTests : IDisposable
     [Trait("Scenario", "SC-HIST-21")]
     [InlineData("count")]
     [InlineData("parameters")]
-    public void ASettingFromTheEnvironmentThatBeatsWhatsSavedRefusesBeforeTheFirstCheckpoint(string how)
+    public void ANameFromConfigInTheEnvironmentDoesntBeatWhatsGiven(string how)
     {
         var den = Den();
         var options = Without(Config("[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n"));
@@ -1064,13 +1064,14 @@ public sealed class HistorySetupTests : IDisposable
             environment["GIT_CONFIG_PARAMETERS"] = "'user.name=Marek Env'";
         }
 
-        var result = new GitHistorySetup(den, options with { Environment = environment }).TurnOn(new HistorySetupRequest("Ash Calloway", "ash@example.invalid"), Token);
+        options = options with { Environment = environment };
 
-        Assert.Equal(HistorySetupStatus.Refused, result.Status);
-        Assert.Equal(HistorySetupCodes.BadArgument, result.Code);
-        Assert.DoesNotContain("Marek", result.Problem, StringComparison.Ordinal);
-        Assert.EndsWith("Nothing was changed.", result.Problem, StringComparison.Ordinal);
-        Assert.False(Directory.Exists(Path.Combine(den, ".git")));
+        // The gate works the name out from git's config files only (#311 round 1, M2), so this no longer refuses.
+        var result = new GitHistorySetup(den, options).TurnOn(new HistorySetupRequest("Ash Calloway", "ash@example.invalid"), Token);
+
+        Assert.Equal(HistorySetupStatus.Done, result.Status);
+        Assert.Equal(AshOnly, FirstCommitIdentity(den, options));
+        Assert.Equal(AshOnly, LaterCommitIdentity(den, options));
     }
 
     [Theory]

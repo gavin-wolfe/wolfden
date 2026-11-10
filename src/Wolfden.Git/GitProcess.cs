@@ -165,6 +165,15 @@ internal static class GitProcess
         CommitClearance? clearance = null)
     {
         var argList = args.ToList();
+        if (argList.Select((arg, i) => arg.StartsWith("-calias.", StringComparison.OrdinalIgnoreCase)
+                || ((arg is "-c" or "--config-env") && i + 1 < argList.Count && argList[i + 1].StartsWith("alias.", StringComparison.OrdinalIgnoreCase))
+                || arg.StartsWith("--config-env=alias.", StringComparison.OrdinalIgnoreCase))
+            .Any(b => b))
+        {
+            // An alias could hide a commit behind another name, past the check below.
+            throw new InvalidOperationException("Wolfden never passes git an alias with -c: one could run a commit or tag past CommitGate.");
+        }
+
         if (clearance is null && CommitGate.IsGated(argList))
         {
             // Every commit and tag passes the gate (#311): a new path that doesn't fails here, in its first test.

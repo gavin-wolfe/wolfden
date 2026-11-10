@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using Wolfden.Core.History;
 
 namespace Wolfden.Git.Tests;
@@ -41,6 +42,12 @@ public sealed class CommitGateTests : IDisposable
     [InlineData("notes", "add")]
     [InlineData("stash")]
     [InlineData("mktag")]
+    [InlineData("replay", "--onto", "main", "HEAD")]
+    [InlineData("subtree", "add")]
+    [InlineData("-c", "alias.save=commit", "save", "-m", "x")]
+    [InlineData("-c", "ALIAS.save=commit", "status")]
+    [InlineData("-calias.save=commit", "save")]
+    [InlineData("--config-env", "alias.save=SOME_VARIABLE", "save")]
     public void AGitCommandThatMakesCommitsOrTagsRunsOnlyThroughTheGate(params string[] args)
     {
         // Refused before git starts, so no folder or repository is needed: a new write path
@@ -50,6 +57,32 @@ public sealed class CommitGateTests : IDisposable
         Assert.Contains("CommitGate", refused.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [Trait("Scenario", "SC-HIST-24")]
+    [InlineData("parameters")]
+    [InlineData("count")]
+    public void ANameAndEmailPassedAsConfigInTheEnvironmentArentUsed(string how)
+    {
+        using var repo = TestRepo.Create();
+        repo.Git("config", "--local", "user.name", "Test Pen Name");
+        repo.Git("config", "--local", "user.email", "pen@example.invalid");
+        var options = With(TestRepo.Options, how == "parameters"
+            ? new() { ["GIT_CONFIG_PARAMETERS"] = "'user.name=Env Config Name' 'user.email=envcfg@example.invalid'" }
+            : new()
+            {
+                ["GIT_CONFIG_COUNT"] = "2",
+                ["GIT_CONFIG_KEY_0"] = "user.name",
+                ["GIT_CONFIG_VALUE_0"] = "Env Config Name",
+                ["GIT_CONFIG_KEY_1"] = "author.email",
+                ["GIT_CONFIG_VALUE_1"] = "envcfg@example.invalid",
+            });
+
+        var made = GitHistory.ForDen(repo.DenRoot, options, Token).Checkpoint(new CheckpointRequest("First"), Token);
+
+        Assert.True(made.IsAvailable, made.Reason);
+        Assert.Equal(PenName, repo.Git("log", "-1", "--format=%an|%ae|%cn|%ce").Trim());
+    }
+
     [Fact]
     [Trait("Scenario", "SC-HIST-26")]
     public void NothingInWolfdenRunsGitExceptThroughGitProcess()
@@ -57,9 +90,11 @@ public sealed class CommitGateTests : IDisposable
         // GitProcess is where the gate is enforced, so a process started anywhere else could skip it.
         // The one other process Wolfden starts is the browser, for 'serve --open'.
         var src = Path.Combine(RepoRoot(), "src");
+        // Any way of making or starting a process: ProcessStartInfo, Process.Start, new Process(), the full type name.
+        var startsAProcess = new Regex(@"ProcessStartInfo|\bProcess\s*\.\s*Start\b|\bnew\s+(System\.Diagnostics\.)?Process\b|\bnew\s*\(\s*\)\s*\{\s*StartInfo|System\.Diagnostics\.Process\b");
         var starting = Directory.EnumerateFiles(src, "*.cs", SearchOption.AllDirectories)
             .Where(file => !file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-            .Where(file => File.ReadAllText(file) is var text && (text.Contains("ProcessStartInfo", StringComparison.Ordinal) || text.Contains("Process.Start", StringComparison.Ordinal)))
+            .Where(file => startsAProcess.IsMatch(File.ReadAllText(file)))
             .Select(file => Path.GetRelativePath(src, file).Replace('\\', '/'))
             .Order(StringComparer.Ordinal)
             .ToList();
@@ -271,6 +306,46 @@ public sealed class CommitGateTests : IDisposable
         var made = GitHistory.ForDen(repo.DenRoot, options, Token).Checkpoint(new CheckpointRequest("First", CoAuthors: ["Test Pen Name <pen@example.invalid>"]), Token);
 
         Assert.True(made.IsAvailable, made.Reason);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-27")]
+    public void ACoAuthorWithAGlobalNameFromAPlainIncludeIsRefused()
+    {
+        using var repo = TestRepo.Create();
+        var extra = Path.Combine(Folder(), "extra");
+        File.WriteAllText(extra, "[user]\n\tname = Everyday Name\n\temail = everyday@example.invalid\n", new UTF8Encoding(false));
+        var options = Global($"[include]\n\tpath = {extra.Replace('\\', '/')}\n");
+        RunGit(repo.Root, options, "config", "--local", "user.name", "Test Pen Name");
+        RunGit(repo.Root, options, "config", "--local", "user.email", "pen@example.invalid");
+        var history = GitHistory.ForDen(repo.DenRoot, options, Token);
+
+        Assert.Throws<ArgumentException>(() => history.Checkpoint(new CheckpointRequest("First", CoAuthors: ["Everyday Name <agent@example.invalid>"]), Token));
+        var refused = Assert.Throws<ArgumentException>(() => history.Checkpoint(new CheckpointRequest("First", CoAuthors: ["Claude <everyday@example.invalid>"]), Token));
+
+        Assert.DoesNotContain("everyday", refused.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Parameter", refused.Message, StringComparison.Ordinal);
+        Assert.Equal("?? den.yaml\n", RunGit(repo.Root, options, "status", "--porcelain", "--untracked-files=all"));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-27")]
+    public void APenNameFromIncludeIfIsTheDensNameNotAGlobalOne()
+    {
+        using var repo = TestRepo.Create();
+        var pen = Path.Combine(Folder(), "pen");
+        File.WriteAllText(pen, "[user]\n\tname = Test Pen Name\n\temail = pen@example.invalid\n", new UTF8Encoding(false));
+        var root = Path.GetFullPath(repo.Root).Replace('\\', '/').TrimEnd('/');
+        var options = Global(
+            "[user]\n\tname = Everyday Name\n\temail = everyday@example.invalid\n" +
+            $"[includeIf \"gitdir/i:{root}/\"]\n\tpath = {pen.Replace('\\', '/')}\n");
+        var history = GitHistory.ForDen(repo.DenRoot, options, Token);
+
+        Assert.Throws<ArgumentException>(() => history.Checkpoint(new CheckpointRequest("First", CoAuthors: ["Everyday Name <agent@example.invalid>"]), Token));
+        var made = history.Checkpoint(new CheckpointRequest("First", CoAuthors: ["Claude <noreply@anthropic.com>"]), Token);
+
+        Assert.True(made.IsAvailable, made.Reason);
+        Assert.Equal(PenName, RunGit(repo.Root, options, "log", "-1", "--format=%an|%ae|%cn|%ce").Trim());
     }
 
     [Fact]

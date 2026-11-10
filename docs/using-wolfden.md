@@ -1476,9 +1476,10 @@ checkpoint, freezing and unfreezing, an AI assistant, or `wolfden init
 - **The name and email come from git's settings for the den.** That's the
   name saved for this den, or what git has globally, with an `includeIf
   "gitdir:…"` counted. Wolfden hands them to git for that one commit, as
-  both author and committer, so a `GIT_AUTHOR_NAME`, `GIT_COMMITTER_EMAIL`
-  or `EMAIL` set in the environment that started `wolfden serve` doesn't
-  change what's recorded. If git's settings have no name or email, the
+  both author and committer, so a `GIT_AUTHOR_NAME`, `GIT_COMMITTER_EMAIL`,
+  `EMAIL`, or a name passed as config (`GIT_CONFIG_PARAMETERS`,
+  `GIT_CONFIG_COUNT`) in the environment that started `wolfden serve`
+  doesn't change what's recorded. If git's settings have no name or email, the
   checkpoint is refused with nothing changed, rather than recorded under a
   name git makes up from your computer account, which can be your real
   name. The message says how to set them.

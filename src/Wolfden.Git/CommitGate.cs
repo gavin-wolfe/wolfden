@@ -65,11 +65,20 @@ internal static class CommitGate
     internal static readonly FrozenSet<string> GatedCommands = new[]
     {
         "commit", "commit-tree", "tag", "mktag", "merge", "pull", "cherry-pick", "revert", "rebase", "am", "notes", "stash", "replace",
-        "fast-import", "filter-branch",
+        "fast-import", "filter-branch", "replay", "subtree",
     }.ToFrozenSet(StringComparer.Ordinal);
 
     /// <summary>The variables a gated git gets, which decide what it records.</summary>
     internal static readonly string[] IdentityVariables = ["GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL"];
+
+    /// <summary>
+    /// The environment the name and email are worked out in: without the identity variables,
+    /// <c>EMAIL</c>, or config passed through the environment (<c>GIT_CONFIG_PARAMETERS</c>, and
+    /// <c>GIT_CONFIG_COUNT</c>, without which git ignores <c>GIT_CONFIG_KEY_n</c>), so it comes
+    /// from git's config files only, never the environment.
+    /// </summary>
+    internal static Dictionary<string, string?> SettingsOnly() =>
+        IdentityVariables.Concat(["EMAIL", "GIT_CONFIG_PARAMETERS", "GIT_CONFIG_COUNT"]).ToDictionary(v => v, _ => (string?)null, StringComparer.Ordinal);
 
     /// <summary>True if the git command in <paramref name="args"/> makes commits or tags, so it must pass the gate.</summary>
     internal static bool IsGated(IReadOnlyList<string> args) => GatedCommands.Contains(GitProcess.CommandName(args));
@@ -132,8 +141,7 @@ internal static class CommitGate
     /// <summary>The name and email git's settings give for the den's repository.</summary>
     private static (string Name, string Email) Identity(Func<IReadOnlyList<string>, IReadOnlyDictionary<string, string?>?, GitRun> run)
     {
-        var environment = IdentityVariables.Append("EMAIL").ToDictionary(v => v, _ => (string?)null, StringComparer.Ordinal);
-        var said = run(["-c", "user.useConfigOnly=true", "var", "GIT_AUTHOR_IDENT"], environment);
+        var said = run(["-c", "user.useConfigOnly=true", "var", "GIT_AUTHOR_IDENT"], SettingsOnly());
 
         // "Name <email> 1793462796 -0700": git takes '<' and '>' out of both.
         var text = said.OutputComplete ? said.Output.Split('\n')[0] : "";
@@ -160,7 +168,8 @@ internal static class CommitGate
     {
         if (!listed.Succeeded || !listed.OutputComplete)
         {
-            throw new HistoryException($"Git couldn't read {what}, so nothing was recorded: {listed.Said}");
+            // Not what git said: it can name a config file in the user's home folder.
+            throw new HistoryException($"Git couldn't read {what}, so nothing was recorded. Run 'git config --list' in the den's folder to see why.");
         }
 
         var settings = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);

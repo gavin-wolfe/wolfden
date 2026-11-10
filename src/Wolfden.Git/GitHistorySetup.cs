@@ -575,7 +575,7 @@ public sealed class GitHistorySetup : IHistorySetup
         const string Causes = "Something git reads after the den's own settings beats them: GIT_CONFIG_COUNT or GIT_CONFIG_PARAMETERS in the environment, " +
             "extensions.worktreeConfig, or an [include] in the repository's config. Remove that, then try again.";
         // As the gate asks it: from git's settings, not the environment's name and email (CommitGate).
-        var settingsOnly = CommitGate.IdentityVariables.Append("EMAIL").ToDictionary(v => v, _ => (string?)null, StringComparer.Ordinal);
+        var settingsOnly = CommitGate.SettingsOnly();
         foreach (var ident in new[] { "GIT_AUTHOR_IDENT", "GIT_COMMITTER_IDENT" })
         {
             var run = Run(["var", ident], cancellationToken, environment: settingsOnly);

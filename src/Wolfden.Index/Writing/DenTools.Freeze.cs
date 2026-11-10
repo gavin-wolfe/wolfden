@@ -408,10 +408,10 @@ public sealed partial class DenTools
     private static string Checkpointed(HistoryEntry? made, bool sentence = false) =>
         made is null ? "" : sentence ? $" Checkpointed the den ({Short(made.Id)})." : $" and checkpointed ({Short(made.Id)})";
 
-    /// <summary>What the checkpoint took in from outside the book, counted, never named (a pinned server mustn't name other universes' files).</summary>
     /// <summary>What the history said to know about a checkpoint or tag (git's signing differing from the den's own, #311), as sentences to add, or nothing.</summary>
     private static string Also(IReadOnlyList<string> said) => said.Count == 0 ? "" : " " + string.Join(" ", said);
 
+    /// <summary>What the checkpoint took in from outside the book, counted, never named (a pinned server mustn't name other universes' files).</summary>
     private static string Others(int others) => others switch
     {
         0 => "",

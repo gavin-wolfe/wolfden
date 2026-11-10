@@ -649,7 +649,7 @@ repeats what git has. A save that fails in a repository the run
 made takes the repository away again; in one that was there, what was saved
 is taken back if it can be, and the result names what couldn't be. Once saved, git is asked what it would
 record (`git var GIT_AUTHOR_IDENT` and `GIT_COMMITTER_IDENT`, without the
-environment's name and email, as the gate below asks it) and whether
+environment's name, email or config, as the gate below asks it) and whether
 it would sign; anything that still beats them refuses before any commit, with
 what was saved taken back as for a failed save, since left saved, the next
 commit would record the name given and sign it with another key.
@@ -707,7 +707,8 @@ decided, so a new path can't skip it. The gate:
 
 - works out the name and email from git's settings for the den (`git var
   GIT_AUTHOR_IDENT` with `user.useConfigOnly` on and `GIT_AUTHOR_*`,
-  `GIT_COMMITTER_*` and `EMAIL` taken out of its environment), and refuses,
+  `GIT_COMMITTER_*`, `EMAIL`, `GIT_CONFIG_PARAMETERS` and `GIT_CONFIG_COUNT`
+  taken out of its environment, so only git's config files count), and refuses,
   with nothing changed, when there are none, rather than let git guess one
   from the computer's account;
 - hands them to that one git process as `GIT_AUTHOR_NAME`,
@@ -725,7 +726,9 @@ decided, so a new path can't skip it. The gate:
   doesn't set is left to git. The pin doesn't choose a key.
 
 A co-author (MCP `checkpoint`'s `co_author`) whose name or email equals one
-of git's global `user.*`, `author.*` or `committer.*` settings, compared
+of git's global `user.*`, `author.*` or `committer.*` settings (read without
+includes, and with them from a folder outside any repository, so a plain
+`[include]` counts but an `includeIf "gitdir:…"` doesn't), compared
 without case, is refused when the den records another name (D9): an agent
 that has learned the writer's other name could write it into a permanent
 trailer. Neither value is repeated in the message.

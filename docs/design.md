@@ -28,15 +28,16 @@ there's code that depends on it. Decisions already made are recorded in
 - **Not a manuscript editor.** Wolfden holds the story bible, not the prose.
   (Scrivener, Word, and plain markdown already do prose well.)
 - **No publishing or formatting.**
-- **No real-time collaboration in v0.** Multi-user hosting is a later phase
-  (§10). The v0 design must not *rule it out*, but doesn't build for it.
+- **No real-time collaboration in v0.** Two people can work on one
+  installation, and a save never overwrites another's unseen change
+  (§9), but there's no live co-editing. Hosting is a later phase (§10).
 
 ## 2. Core concepts
 
 | Concept | What it is |
 |---|---|
 | **Den** | A Wolfden workspace: the folder that holds `den.yaml`, and the notes in it. It can hold one or many universes. A den can be a git repository of its own or a subfolder of a larger one (§6). A universe that needs its own private remote goes in a den that is its own git repository. |
-| **Author Identity** | Who a work is by: a real name, a pen name, or a collaboration. Metadata in v0, and the anchor for ownership in multi-user mode later. |
+| **Author Identity** | Who a work is by: a real name, a pen name, or a collaboration. An author with `commit_email` is also a name the den's checkpoints may be recorded under (§6; decided in #311 D1, not built yet). Accounts link to these; an account is not an author. |
 | **Universe** | A shared setting for one or more related works. |
 | **Series** | An *ordered* sequence of books within a universe. |
 | **Book** | A single work, either in a series or standalone in a universe. It has an ordered list of chapters. Scenes within chapters come later. |
@@ -1640,9 +1641,11 @@ docs/
   server over stdio for AI clients.
 - **The web scaffold** (#23; v0 behaviour, not a recorded decision).
   `Wolfden.Api` is a library (an ASP.NET Core minimal API), not a program
-  of its own, so `wolfden serve` hosts it in the same process. v0 is
-  single-user with no accounts or authentication, so the server guards
-  the den from everything but its own pages on this computer. It listens
+  of its own, so `wolfden serve` hosts it in the same process. Login is
+  optional (#315). With it off, the server guards the den from everything
+  but its own pages on this computer, as below. With it on, every
+  endpoint needs a session with the endpoint's permission (read, write,
+  owner), and the rules in "Accounts and login" below apply. It listens
   on 127.0.0.1 only, never on another network interface, and no
   configuration can add a listener: Kestrel endpoints in environment
   variables or an `appsettings.json` are ignored, and `ASPNETCORE_URLS`
@@ -1674,7 +1677,6 @@ docs/
   only its own inline style. The den's own images, under `/den-files/`,
   get a policy with `sandbox` ("Images in the den" in §9, #186). The policy comes from `serve`, so `npm run
   dev`, whose page has an inline script for hot reload, isn't affected.
-  Hosting for several users (§10) brings its own authentication.
   The API is JSON under `/api`, in camelCase, as is usual for a web
   client (the MCP tools keep snake_case, §8); errors are `{code,
   message}`, with the MCP tools' codes where they mean the same thing
@@ -1695,6 +1697,75 @@ docs/
   page's, since that page's port is Vite's (and with login on, a change
   needs an `Origin`), and passes any other `Origin` on, so the API still
   refuses a request from another site that comes through the dev server.
+- **Accounts and login** (#315; the #311/#315 design, §4, decided
+  2026-11-09). Roles say what an account may do: owner, writer, or viewer
+  (read-only). The Reader's view says what a person sees, and it's a
+  filter anyone can turn on, never a permission. A viewer sees the whole
+  den, spoilers included. An enforced spoiler limit ("this account reads
+  up to `ember:12`") would be a separate setting on an account, whatever
+  its role, and needs every read endpoint to apply it or refuse first.
+  - **Where accounts live.** In the *installation*, one computer
+    account's Wolfden folder (`--home`, `WOLFDEN_HOME`, or the account's
+    data folder; §7, `user`): `accounts.db` (ASP.NET Core Identity's
+    stores, username and password only, no email or phone), `settings.json`
+    (whether login is on, and a random installation id), and `keys/`
+    (the Data Protection keys for the cookie, protected with DPAPI on
+    Windows). Never in a den, never pushed. One installation is one
+    tenant; a role covers every den it serves (D5). Accounts are managed
+    with the `wolfden` command only (§7, `user` and `login`).
+  - **Login off** (the default): every request acts as the owner, as
+    before accounts, and no cookie keys are kept. **Login on:** `serve`
+    reads `settings.json` when it starts, and fails closed: an
+    installation it can't use or read, or login on with no owner, stops
+    it before it listens.
+  - **Every endpoint declares a permission:** Read, Write or Owner
+    (`.RequireWolfden(...)`, endpoint metadata), or is on a short list
+    that needs no login: `/api/health`, `/api/auth/status`,
+    `/api/auth/login`, and the built UI's own page (static files, no den
+    content). The fallback policy needs Read, so an endpoint someone
+    forgets is refused rather than open, and so is any unknown path under
+    `/api` (401, so a stranger learns nothing of what exists). Read covers
+    every `GET`, `/den-files` included; Write covers edits, creating
+    notes, series, books, chapters and images, checkpoints and freezing;
+    Owner covers unfreezing, turning history on, and saving `den.yaml`
+    through Edit file. A test reads the endpoint list and fails on an
+    endpoint with neither a permission nor a place on the short list, or
+    one that can change the den with only Read; another calls every
+    endpoint with login on, and expects 401 with no cookie and 403 for
+    each role that lacks its permission. The web hides edit controls the
+    account's role lacks, from `/api/auth/status`; the server's 403 is
+    what enforces it.
+  - **The cookie** is `HttpOnly` and `SameSite=Strict`, named
+    `wolfden-<installation id>` so two installations on `localhost`
+    (browsers share a host's cookies across ports) don't overwrite each
+    other. A session slides: 14 days on 127.0.0.1. Each request checks the
+    cookie's account against `accounts.db` (by its Guid id and security
+    stamp), so a removed account, a new password or a new role ends its
+    sessions at once. With a public HTTPS origin (D8, later) it's
+    `Secure` with the `__Host-` prefix, and a session lasts 12 hours.
+  - **Guessing:** a wrong password, an unknown username and a locked
+    account get the same 401 `login_failed`, and an unknown name still
+    costs a password hash. Identity's lockout: 5 failures, then 15 minutes
+    (`wolfden user unlock` ends it). ASP.NET Core's rate limiter allows 10
+    login attempts a minute per client address and per username (in
+    memory only), then answers 429 `too_many_attempts`.
+  - **CSRF and other pages:** `SameSite=Strict`, JSON bodies (a CORS
+    preflight that's never granted), and with login on, every request but
+    `GET` and `HEAD` must carry this server's `Origin` (403
+    `origin_required`). No antiforgery token: every write is a JSON or
+    binary `fetch`, never a form post; a form-post endpoint would need one.
+  - **Who checkpoints record:** with login on or off, the name this copy
+    of the den uses, through the gate (§6); a username is never written
+    into git. Per-account commit names, and `Co-Authored-By` for other
+    people's saves (D7), come with per-user commits (#315 PR 5).
+  - **Error codes:** `unauthenticated` (401), `forbidden` (403, saying
+    what the role allows), `origin_required` (403), `login_failed` (401),
+    `too_many_attempts` (429), and `login_off` (409, a login sent while
+    login is off).
+  - **What login doesn't protect:** the files, the CLI, stdio MCP,
+    backups and sync. Anyone who can open the den's folder reads it
+    without logging in; the guide says so in those words. Network access
+    requires login and comes through a reverse proxy first (D8).
 - **The read API** (#24 to #27; v0 behaviour, not a recorded decision).
   Every endpoint is `GET`, with query parameters in camelCase. The
   answers come from the same read queries as the MCP read tools
@@ -3238,7 +3309,7 @@ docs/
 | **M3: Web UI (read)** | Browse the hierarchy, entity pages, search, a story-position "as of" slider, history and diffs. |
 | **M4: Web UI (edit)** | Edit fields and sections, create from templates, checkpoints, freeze and unfreeze. |
 | **M5: Packs + full sample** | Space opera and fantasy packs, plus the invented multi-book sample with history. |
-| **Later** | Import from existing markdown notes; custom calendars; multi-user hosting (accounts, GitHub and Google OAuth, tenants, roles), Docker, collaboration. |
+| **Later** | Import from existing markdown notes; custom calendars; hosting (tenants, GitHub and Google OAuth, MCP over a network), Docker, collaboration. |
 
 ## 11. Sample datasets
 

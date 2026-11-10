@@ -1800,7 +1800,11 @@ what its role allows.
    themselves out. It prints what login protects and what it doesn't
    (below), and which installation folder it used.
 3. **Restart `wolfden serve`,** and log in. `serve` reads the setting
-   when it starts, and says `Login is on` when it does.
+   when it starts, and says `Login is on` when it does. If you turn login
+   on while it's running, it stops answering (except to say "Restart
+   wolfden serve") until you restart it, so nobody carries on without a
+   login. If you turn it off while it's running, it keeps asking for a
+   login until you restart it.
 
 `wolfden login` on its own says whether it's on. `wolfden login off` turns it
 off, and always works. Restart `serve` after either.
@@ -1815,15 +1819,22 @@ The page asks for your username and password. Once you're in, the top bar
 shows your username and role, and **Log out**.
 
 - **A session lasts 14 days** on this computer, and each visit extends it,
-  so you rarely log in again. Logging out ends it. A new password
-  (`wolfden user reset-password`), a new role (`set-role`) or removing the
-  account ends that account's sessions at once.
+  so you rarely log in again. **Log out** ends the session in this
+  browser. `wolfden user reset-password` or `set-role` ends every session
+  for that account, in every browser, at once, as does removing it.
+- **If a session ends while you're editing,** the login form comes up over
+  the page. What you were editing is still there underneath: log in again
+  and press Save.
 - **A wrong password and an unknown username get the same answer,** so the
   page never tells a stranger which usernames exist. After 5 wrong tries in
   a row the account is locked for 15 minutes, and the answer still looks the
   same; `wolfden user unlock` ends a lockout at once.
-- **At most 10 tries a minute,** from one address and for one username.
-  More are refused with "Too many login attempts"; wait a minute.
+- **At most 10 tries a minute for one username,** whoever tries. More are
+  refused with "Too many login attempts"; wait a minute. On this computer
+  there's no limit per address: every request comes from the same one
+  (127.0.0.1), so such a limit would let anyone signed in here keep you
+  from logging in. The per-username limit and the lockout guard the login
+  instead, and `wolfden user unlock` always gets you back in.
 - **The login cookie is this installation's own.** Its name includes a
   short random id, so two installations open in one browser (on two ports
   of `localhost`) don't log each other out. It's signed and encrypted with
@@ -1928,8 +1939,10 @@ computer account, so the two names' accounts never sit side by side.
 
 Deleting the folder loses the accounts, turns login off, and logs everyone
 out. It loses no notes and no history: run the steps above again. Copying it
-to another computer copies the accounts and the ability to sign a login
-cookie, so treat it like a password.
+to another computer copies the accounts, so treat it like a password. On
+macOS and Linux it also copies the keys that sign login cookies; on Windows
+those keys are locked to your Windows account, so a copy can't use them,
+and logging in again on the other computer makes new ones.
 
 ## Gotchas
 

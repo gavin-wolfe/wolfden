@@ -7464,7 +7464,7 @@ The writer runs `wolfden login on` before adding anyone, then after
   what login protects and what it doesn't (the files, the `wolfden`
   command, `wolfden mcp`, backups and sync), to restart a running `serve`,
   and the installation folder. `serve` then asks for a login
-  (SC-ACCT-10). `wolfden login off` always works. A `settings.json` that
+  (SC-ACCT-11). `wolfden login off` always works. A `settings.json` that
   doesn't read is reported, not ignored, and stops `serve`.
 
 Spec: #315 §4.1, Flow 5. Covered by: `AccountCommandTests.LoginOnNeedsAnOwnerFirst`,
@@ -7514,7 +7514,7 @@ Spec: #315 §3.2, review of PR #350. Covered by: `InstallationTests.ARelativeWol
 `AccountCommandTests.AnInstallationInADenIsRefused`, `AccountCommandTests.AnInstallationInARepositoryIsWarnedAbout`,
 `AccountStoreTests.TheDatabaseIsOnlyForThisAccountOutsideWindows`, `InstallationTests.ALinkIntoADenIsInTheDen`.
 
-### SC-ACCT-10. I log in
+### SC-ACCT-11. I log in
 
 Login is on, `wren` is the owner, and the writer starts `wolfden serve` and
 opens the page.
@@ -7537,7 +7537,7 @@ Spec: #315 §4.5, Flow 5. Covered by: `LoginTests.ALoginGivesAStrictHttpOnlyCook
 `LoginTests.WithLoginOffEveryoneIsTheOwnerAsBefore`, `ServeLoginTests`, `InstallationTests.TheInstallationIdIsRandomKeptAndReplacedWhenItIsntOne`,
 `web/src/Login.test.tsx`.
 
-### SC-ACCT-11. An editor logs in as a viewer
+### SC-ACCT-12. An editor logs in as a viewer
 
 `rook` is a viewer and opens a note, a book and a chapter.
 
@@ -7552,7 +7552,7 @@ Spec: #315 D6, §4.6, Flow 4. Covered by: `LoginTests.AViewerReadsEverythingAndC
 `EndpointPermissionTests.Test2EveryEndpointRefusesAStrangerAndEachRoleWhatItMayntDo`,
 `web/src/Login.test.tsx`.
 
-### SC-ACCT-12. Every endpoint says what it needs
+### SC-ACCT-13. Every endpoint says what it needs
 
 A developer adds an endpoint and forgets to say who may use it.
 
@@ -7567,7 +7567,7 @@ A developer adds an endpoint and forgets to say who may use it.
 
 Spec: #315 §4.5. Covered by: `EndpointPermissionTests`.
 
-### SC-ACCT-13. Someone guesses at a password
+### SC-ACCT-14. Someone guesses at a password
 
 A stranger who can reach the login page tries names and passwords.
 
@@ -7575,18 +7575,28 @@ A stranger who can reach the login page tries names and passwords.
   with the same words, and take about as long; so does a locked account,
   even with the right password. After 5 wrong passwords in a row the
   account is locked for 15 minutes, and the message says the owner can
-  run `wolfden user unlock`. More than 10 tries a minute from one address,
-  or for one name in any case, get 429 `too_many_attempts` with
-  `Retry-After`. A login takes only a JSON body with `username` and
-  `password`.
+  run `wolfden user unlock`. More than 10 tries a minute for one name, in
+  any case, get 429 `too_many_attempts` with `Retry-After`; a name no
+  account can have (such as one spelled with a Kelvin sign for `K`) is
+  refused without taking that name's turn. On this computer every request
+  comes from 127.0.0.1, so there's no limit per address there, which would
+  let anyone on the computer keep the owner out; behind a proxy (a later
+  change) there is, 10 a minute. A login takes only a JSON body with
+  `username` and `password`, of at most 8 KB (413 `too_large`), and an
+  account whose role Wolfden doesn't know gets `login_failed` and no
+  cookie.
 
 Spec: #315 §4.5, §7. Covered by: `LoginTests.AWrongPasswordAndAnUnknownNameGetTheSameAnswer`,
 `LoginTests.FiveWrongPasswordsLockTheAccountAndALockedAccountLooksLikeAWrongPassword`,
 `LoginTests.TooManyAttemptsFromOneAddressAreRefusedForAMinute`,
 `LoginTests.TooManyAttemptsForOneNameAreRefusedWhateverTheCase`,
-`LoginTests.ALoginTakesOnlyAUsernameAndAPasswordAsJson`.
+`LoginTests.ALoginTakesOnlyAUsernameAndAPasswordAsJson`,
+`LoginTests.OnThisComputerOneAddressIsntOneBucketForEveryone`,
+`LoginTests.ANameSpelledWithLookalikeLettersIsntAnotherBucket`,
+`LoginTests.ALoginBodyLongerThanAnyLoginIsRefusedUnread`,
+`LoginTests.AnAccountWithARoleWolfdenDoesntKnowGetsNoCookie`.
 
-### SC-ACCT-14. I change someone's password or role while they're logged in
+### SC-ACCT-15. I change someone's password or role while they're logged in
 
 `ash` is logged in. The owner runs `wolfden user reset-password ash`, or
 `set-role ash viewer`, or `user remove ash`.
@@ -7598,7 +7608,7 @@ Spec: #315 §4.5, §7. Covered by: `LoginTests.AWrongPasswordAndAnUnknownNameGet
 Spec: #315 §4.4. Covered by: `LoginTests.ANewPasswordANewRoleOrRemovingTheAccountEndsItsSessions`,
 `web/src/Login.test.tsx`.
 
-### SC-ACCT-15. A writer freezes a book, and wants to unfreeze it
+### SC-ACCT-16. A writer freezes a book, and wants to unfreeze it
 
 `ash` is a writer.
 
@@ -7610,7 +7620,7 @@ Spec: #315 §4.4. Covered by: `LoginTests.ANewPasswordANewRoleOrRemovingTheAccou
 Spec: #315 §4.6, §7. Covered by: `LoginTests.AWriterFreezesButOnlyTheOwnerUnfreezesTurnsHistoryOnOrFixesDenYaml`,
 `web/src/Login.test.tsx`.
 
-### SC-ACCT-16. A page on another port of this computer tries to use my login
+### SC-ACCT-17. A page on another port of this computer tries to use my login
 
 A dev server on `localhost:3000`, open in the same browser, sends requests
 to `localhost:9653`; browsers share a host's cookies across ports.
@@ -7623,3 +7633,34 @@ to `localhost:9653`; browsers share a host's cookies across ports.
 
 Spec: #315 §4.5. Covered by: `LoginTests.APageOnAnotherPortOfThisComputerIsRefused`,
 `LoginTests.TheApisAnswersAreForItsOwnPagesOnly`, `LoginTests.WithLoginOnAChangeMustCarryThisServersOrigin`.
+
+### SC-ACCT-18. My session ends while I'm editing
+
+`wren` has a section open in the editor, with changes not saved, when the
+owner runs `wolfden user reset-password wren` (or the session ends some
+other way).
+
+- Within a few seconds the login form comes up over the page, saying the
+  session ended and that what was being edited is still there. The page
+  underneath stays as it was, editor and text included. After logging in
+  again, Save saves the text, still checked against the hash the editor
+  opened on: if the note changed meanwhile, both versions are shown, as
+  for any save. Only **Log out**, which the person chose, clears the page,
+  and it asks first while an editor or form is open.
+
+Spec: #315 §4.5, review of PR #357. Covered by: `web/src/SessionEnd.test.tsx`, `web/src/Login.test.tsx`.
+
+### SC-ACCT-19. I turn login on while `wolfden serve` is running
+
+`serve` started with login off; the writer runs `wolfden login on`.
+
+- Within a couple of seconds, `serve` says on its console that login was
+  turned on and it must be restarted, and answers every request but
+  `/api/health` with 503 `restart_needed`, so nobody keeps using the page
+  without a login. Turning login off again doesn't undo that; a restart
+  does. The other way round, `wolfden login off` while a server with
+  login on runs, it keeps asking for a login until it's restarted, and
+  says so once.
+
+Spec: #315 §4.5, review of PR #357. Covered by: `LoginTests.LoginTurnedOnWhileServingStopsItUntilARestart`,
+`LoginTests.LoginTurnedOffWhileServingStillAsksForItUntilARestart`.

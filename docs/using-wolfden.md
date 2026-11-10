@@ -1650,13 +1650,13 @@ Names and emails it records:
     author of 40 checkpoints, committer of 40 checkpoints, tagger of 3 tags
     from 2026-01-05 to 2026-03-30, UTC offset +0100
   Story Helper <helper@example.com>
-    in Co-Authored-By of 12 checkpoints
+    in Co-Authored-By of 12 messages
   Ash Everyday <ash@example.com>
     author of 2 checkpoints, committer of 2 checkpoints
     on 2026-02-11, UTC offset +0100
 
-Elsewhere in checkpoint messages, lines that may name someone:
-  Signed-off-by: Ash Everyday  (1 checkpoint)
+Elsewhere in checkpoint and tag messages, lines that may name someone:
+  Signed-off-by: Ash Everyday  (1 message)
 
 UTC offsets: +0100 (87 dates)
 
@@ -1669,7 +1669,7 @@ Only in this folder (not pushed or cloned):
   Remotes:
     origin  https://github.com/wren-calder/notes.git  (fetch, push)
   Names only the reflogs keep (who moved a branch, or a checkpoint since amended or reset away):
-    Ash Everyday <ash@example.com>: 2 reflog entries, 1 checkpoint only a reflog keeps
+    Ash Everyday <ash@work.example>: 2 reflog entries, 1 checkpoint only a reflog keeps
   Name settings in this copy's git config:
     user.name = Wren Calder
     user.email = wren@example.com
@@ -1679,14 +1679,15 @@ A push or a clone carries the history and den.yaml above. A copy of the folder i
 (a zip, a synced folder, a disk backup) carries all of it, the last part included.
 ```
 
-Here checkpoints were recorded under the writer's everyday name, which is
-easy to miss, and one more was amended away but is still in this folder.
+Here two checkpoints were recorded under the writer's everyday name, which
+is easy to miss. One more, under their work email, was amended away, but
+this folder still keeps it.
 It lists:
 
 - **Every name and email**, as the author or committer of a checkpoint, the
   tagger of a tag (under any branch, tag, or other ref, and tags merged into
   a checkpoint), or on a line such as `Co-Authored-By: Name <email>`
-  anywhere in a checkpoint's message, with how often and when. They're
+  anywhere in a checkpoint's or a tag's message, with how often and when. They're
   shown exactly as git recorded them, so `Wren Calder` and `wren calder` are
   two entries.
 - **Other lines of messages that may name someone,** such as

@@ -363,7 +363,7 @@ public sealed class IdentityAuditTests
         var side = CraftCommit(repo, "side", "Wren Calder", "wren@example.com", signature: null, parent: first);
         var signature = string.Join("\n ", Pgp(Packet(fingerprint: true, keyId: false)).Split('\n'));
         var mergetag =
-            $"mergetag object {side}\n type commit\n tag rel\n tagger Ash Everyday <ash@example.com> 1767600000 +0100\n \n Release notes\n \n    - indented item\n done\n {signature}\n";
+            $"mergetag object {side}\n type commit\n tag rel\n tagger Ash Everyday <ash@example.com> 1767600000 +0100\n \n Release notes\n \n    - indented item\n Thanks Birch Lane <birch@example.com>\n done\n {signature}\n";
         var tree = WriteObject(repo, "tree", "");
         var merge = WriteObject(
             repo,
@@ -382,6 +382,98 @@ public sealed class IdentityAuditTests
         Assert.Equal((0, 0, 1), (key.Commits, key.Tags, key.MergedTags));
         Assert.Equal(["Ash Everyday <ash@example.com>"], key.SignedAs);
         Assert.False(key.OwnerChecked);
+        Assert.Equal([new MessageMention(null, "Thanks Birch Lane <birch@example.com>", 1)], audit.Mentions);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-24")]
+    public void NamesInTagMessagesAreFound()
+    {
+        using var repo = TestRepo.Create();
+        Commit(repo, "Notes", "Wren Calder", "wren@example.com", "2026-01-05T09:00:00+01:00");
+        TestRepo.RunGit(
+            repo.Root,
+            Who("Wren Calder", "wren@example.com", "2026-01-06T09:00:00+01:00"),
+            "tag", "-a", "-m", "Release. Thanks Birch Lane <birch@example.com>", "-m", "Co-Authored-By: Story Helper <helper@example.com>", "v1");
+        TestRepo.RunGit(
+            repo.Root,
+            Who("Wren Calder", "wren@example.com", "2026-01-07T09:00:00+01:00"),
+            "tag", "-a", "-m", "Outer", "-m", "Reviewed-by: reviewer@example.com", "outer", "v1");
+        repo.Git("tag", "-d", "v1");
+
+        var audit = IdentityAudit.Run(repo.DenRoot, TestRepo.Options, Token);
+
+        // v1 is read through outer, with git cat-file; outer through git for-each-ref.
+        Assert.Equal([new TrailerUse("Co-Authored-By", 1)], Single(audit, "Story Helper", "helper@example.com").InTrailers);
+        Assert.Equal(
+            [
+                new MessageMention(null, "Release. Thanks Birch Lane <birch@example.com>", 1),
+                new MessageMention("Reviewed-by", "reviewer@example.com", 1),
+            ],
+            audit.Mentions);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-24")]
+    public void ACommitMadeWhileTheAuditReadsIsReadOnASecondTry()
+    {
+        using var repo = TestRepo.Create();
+        Commit(repo, "Notes", "Wren Calder", "wren@example.com", "2026-01-05T09:00:00+01:00");
+        var moves = 0;
+        IdentityAudit.BetweenReadAndCount = () =>
+        {
+            if (moves++ == 0)
+            {
+                Commit(repo, "Automatic checkpoint", "Juno Pike", "juno@example.com", "2026-01-05T09:30:00+01:00");
+            }
+        };
+        try
+        {
+            var audit = IdentityAudit.Run(repo.DenRoot, TestRepo.Options, Token);
+
+            Assert.Equal(2, moves);
+            Assert.Equal(2, audit.Commits);
+            Assert.Equal(1, Single(audit, "Juno Pike", "juno@example.com").AsAuthor);
+        }
+        finally
+        {
+            IdentityAudit.BetweenReadAndCount = null;
+        }
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-24")]
+    public void ARepositoryThatKeepsChangingWhileItsReadFailsRatherThanReportTooLittle()
+    {
+        using var repo = TestRepo.Create();
+        Commit(repo, "Notes", "Wren Calder", "wren@example.com", "2026-01-05T09:00:00+01:00");
+        var moves = 0;
+        IdentityAudit.BetweenReadAndCount = () => Commit(repo, $"Checkpoint {++moves}", "Juno Pike", "juno@example.com", "2026-01-05T09:30:00+01:00");
+        try
+        {
+            var e = Assert.Throws<Wolfden.Core.History.HistoryException>(() => IdentityAudit.Run(repo.DenRoot, TestRepo.Options, Token));
+
+            Assert.Equal(2, moves);
+            Assert.Contains("twice", e.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            IdentityAudit.BetweenReadAndCount = null;
+        }
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-24")]
+    public void ASigningKeyFileInTheHomeFolderIsShownWithATilde()
+    {
+        using var repo = TestRepo.Create();
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        repo.Git("config", "user.signingkey", Path.Combine(home, ".ssh", "pen.pub"));
+
+        var audit = IdentityAudit.Run(repo.DenRoot, TestRepo.Options, Token);
+
+        var expected = string.Join(Path.DirectorySeparatorChar, "~", ".ssh", "pen.pub");
+        Assert.Contains(new LocalSetting("user.signingkey", expected), audit.Local.Settings);
     }
 
     [Fact]

@@ -709,12 +709,14 @@ the stash), the whole repository when the den is part of a larger one, with
 `GIT_NO_REPLACE_OBJECTS=1` and `--no-use-mailmap`, since a replace ref or a
 `.mailmap` changes only how a commit is shown, and with options that keep
 the user's log settings (colour, signatures, notes, decorations) out of what
-it parses. The commits it read must match `git rev-list --all --count`, or
-it fails rather than report too little. It lists every name and email
+it parses. The commits it read must match `git rev-list --all --count`; on
+a mismatch it reads them once more, since a ref can move meanwhile (an
+automatic checkpoint), and a second mismatch fails rather than report too
+little. It lists every name and email
 exactly as recorded: as author, committer, tagger (of every annotated tag
 object any ref reaches, a tag of a tag followed to the end, and a merge
 commit's embedded tag), or on a `Key: Name <email>` line anywhere in a
-commit message. Other message lines that may name someone (a `…-by:` line
+commit's, an annotated tag's, or a merged tag's message. Other message lines that may name someone (a `…-by:` line
 without an email, a `Key:` line with a bare email, any line with an email)
 are listed apart. With each name, how often, its UTC offsets, and its first
 and last date. Then every offset; the signed commits, annotated tags, and
@@ -732,7 +734,8 @@ a token used as a user name, and a query or fragment replaced by `***`;
 names that only the reflogs keep (who moved a ref, and the author and
 committer of a commit only a reflog reaches, such as an amended one), where
 the history doesn't already hold them; and the name, email, and signing key
-settings in the clone's own `.git/config`. Unreachable objects no reflog
+settings in the clone's own `.git/config` (a key file's path with the home
+folder as `~`). Unreachable objects no reflog
 names aren't read. Paths show the home folder as `~`. Every git command it
 runs is a read, stopped at the read time limit (#143). It's CLI only for
 now; the MCP server has no tool for it, since its output can hold the names

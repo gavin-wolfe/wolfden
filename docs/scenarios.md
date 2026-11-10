@@ -4748,7 +4748,7 @@ more was amended away, and an AI assistant's checkpoints name it in
 
 - It lists every name and email the history records, exactly as recorded
   (`juno pike` and `Juno Pike` are two), as author, committer, tagger, or on
-  a `Key: Name <email>` line anywhere in a message (`Co-Authored-By`,
+  a `Key: Name <email>` line anywhere in a checkpoint's or tag's message (`Co-Authored-By`,
   `Signed-off-by`, one in a paragraph git wouldn't call trailers, one with a
   comment after it), each with how often, its UTC offsets, and its first and
   last date. A line repeated in one commit counts once, whatever its key's
@@ -4760,8 +4760,9 @@ more was amended away, and an AI assistant's checkpoints name it in
   so Ash Everyday shows. Tags are read under any ref, a tag of a tag to the
   end, and a merge commit's embedded tag too. A `.mailmap` or a replace ref
   doesn't hide a name, and colour, signature, or decoration settings don't
-  change what's read; if what it read doesn't add up to git's own count, it
-  stops with an error rather than report too little.
+  change what's read. If what it read doesn't add up to git's own count, it
+  reads once more (a checkpoint may have landed meanwhile), and stops with
+  an error if it still doesn't, rather than report too little.
 - It lists every UTC offset and the authors in `den.yaml` with every value
   they set. Then a section only a copy of the folder carries: the remotes,
   with any account name in their addresses (a password, a token used as a
@@ -4790,6 +4791,10 @@ Spec: design.md §6, "What a copy or push carries", and §7 (#315, design
 `IdentityAuditTests.NamesOnlyTheReflogsKeepAndThisCopysSettingsAreListedApart`,
 `IdentityAuditTests.AShallowCloneSaysSo`,
 `IdentityAuditTests.TheHomeFolderIsShownAsATilde`,
+`IdentityAuditTests.NamesInTagMessagesAreFound`,
+`IdentityAuditTests.ACommitMadeWhileTheAuditReadsIsReadOnASecondTry`,
+`IdentityAuditTests.ARepositoryThatKeepsChangingWhileItsReadFailsRatherThanReportTooLittle`,
+`IdentityAuditTests.ASigningKeyFileInTheHomeFolderIsShownWithATilde`,
 `IdentityCommandTests.TheAuditListsEveryNameTheHistoryAndDenYamlHoldAndChangesNothing`,
 `IdentityCommandTests.JsonGivesTheSameAuditWithAVersion`,
 `IdentityCommandTests.ADenWithNoHistoryStillListsItsAuthors`,

@@ -57,7 +57,7 @@ public sealed class IdentityCommandTests : IDisposable
         Assert.DoesNotContain("larger repository", output, StringComparison.Ordinal);
         Assert.Contains("\n  Wren Calder <wren@example.com>\n    author of 1 checkpoint, committer of 1 checkpoint\n", output, StringComparison.Ordinal);
         Assert.Contains("\n  Juno Pike <juno@example.com>\n", output, StringComparison.Ordinal);
-        Assert.Contains("\n  Story Helper <helper@example.com>\n    in Co-Authored-By of 1 checkpoint\n", output, StringComparison.Ordinal);
+        Assert.Contains("\n  Story Helper <helper@example.com>\n    in Co-Authored-By of 1 message\n", output, StringComparison.Ordinal);
         Assert.Contains("\nSignatures: none of its checkpoints or tags are signed.\n", output, StringComparison.Ordinal);
         Assert.Contains("\nAuthors in den.yaml:\n  wren-calder: name: Wren Calder, email: wren@example.com\n  juno-pike: name: Juno Pike\n", output, StringComparison.Ordinal);
         Assert.Contains(
@@ -165,7 +165,7 @@ public sealed class IdentityCommandTests : IDisposable
             "  SSH key SHA256:def: 1 tag\n" +
             "    signed as: Wren Calder <wren@example.com>\n" +
             "    owner: this computer can't say whose key it is\n" +
-            "  2 signatures whose key isn't recorded (X.509 certificate), signed as Wren Calder <wren@example.com>: 2 checkpoints\n",
+            "  2 signatures whose key isn't recorded (X.509), signed as Wren Calder <wren@example.com>: 2 checkpoints\n",
             output,
             StringComparison.Ordinal);
     }
@@ -205,7 +205,7 @@ public sealed class IdentityCommandTests : IDisposable
 
         Assert.Contains("\nThis copy is shallow:", output, StringComparison.Ordinal);
         Assert.Contains(
-            "\nElsewhere in checkpoint messages, lines that may name someone:\n  Signed-off-by: Ash Everyday  (1 checkpoint)\n  Thanks to ash@example.com  (2 checkpoints)\n",
+            "\nElsewhere in checkpoint and tag messages, lines that may name someone:\n  Signed-off-by: Ash Everyday  (1 message)\n  Thanks to ash@example.com  (2 messages)\n",
             output,
             StringComparison.Ordinal);
         Assert.Contains("\n    Ash Everyday <ash@example.com>: 2 reflog entries, 1 checkpoint only a reflog keeps\n", output, StringComparison.Ordinal);

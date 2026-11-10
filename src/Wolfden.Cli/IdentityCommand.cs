@@ -44,9 +44,9 @@ internal static class IdentityCommand
 
         - every name and email it records, as the author or committer of a
           checkpoint, as the tagger of a tag, or in a commit message line such
-          as Co-Authored-By, with how often, the UTC offsets of their dates, and
+          as Co-Authored-By (in a checkpoint's or a tag's message), with how often, the UTC offsets of their dates, and
           when each was first and last recorded
-        - other lines of commit messages that may name someone: a
+        - other lines of checkpoint and tag messages that may name someone: a
           'Signed-off-by:' without an email, or any line holding an email
         - every UTC offset the dates carry, since the same offset on two names
           hints that they're one person
@@ -254,7 +254,7 @@ internal static class IdentityCommand
                 uses.Add($"tagger of {Count(identity.AsTagger, "tag")}");
             }
 
-            uses.AddRange(identity.InTrailers.Select(t => $"in {t.Key} of {Count(t.Commits, "checkpoint")}"));
+            uses.AddRange(identity.InTrailers.Select(t => $"in {t.Key} of {Count(t.Commits, "message")}"));
             output.WriteLine($"    {string.Join(", ", uses)}");
             if (identity.First is { } first && identity.Last is { } last)
             {
@@ -266,11 +266,11 @@ internal static class IdentityCommand
         if (audit.Mentions.Count > 0)
         {
             output.WriteLine();
-            output.WriteLine("Elsewhere in checkpoint messages, lines that may name someone:");
+            output.WriteLine("Elsewhere in checkpoint and tag messages, lines that may name someone:");
             foreach (var mention in audit.Mentions)
             {
                 var text = mention.Key is null ? mention.Text : $"{mention.Key}: {mention.Text}";
-                output.WriteLine($"  {text}  ({Count(mention.Commits, "checkpoint")})");
+                output.WriteLine($"  {text}  ({Count(mention.Commits, "message")})");
             }
         }
 
@@ -348,7 +348,7 @@ internal static class IdentityCommand
             var total = group.Commits + group.Tags + group.MergedTags;
             var signer = group.SignedAs.Length == 0 ? "" : $", signed as {group.SignedAs}";
             output.WriteLine(
-                $"  {Count(total, "signature")} whose key isn't recorded ({Kind(group.Kind)}){signer}: {What(group.Commits, group.Tags, group.MergedTags)}");
+                $"  {Count(total, "signature")} whose key isn't recorded ({ShortKind(group.Kind)}){signer}: {What(group.Commits, group.Tags, group.MergedTags)}");
         }
 
         if (signing.OwnersNotLookedUp > 0)
@@ -362,6 +362,14 @@ internal static class IdentityCommand
             SignatureKind.Ssh => "SSH key",
             SignatureKind.X509 => "X.509 certificate",
             _ => "unrecognized signature",
+        };
+
+        static string ShortKind(SignatureKind kind) => kind switch
+        {
+            SignatureKind.OpenPgp => "OpenPGP",
+            SignatureKind.Ssh => "SSH",
+            SignatureKind.X509 => "X.509",
+            _ => "unrecognized",
         };
 
         static string What(int commits, int tags, int merged)

@@ -27,9 +27,9 @@ public enum IdentityAuditState
 /// <param name="AsCommitter">How many commits record it as the committer.</param>
 /// <param name="AsTagger">How many annotated tags record it as the tagger, a merge commit's embedded tag included.</param>
 /// <param name="InTrailers">
-/// The <c>Key: Name &lt;email&gt;</c> lines that name it in commit messages,
-/// such as <c>Co-Authored-By</c>, wherever they are in the message, with how
-/// many commits have one.
+/// The <c>Key: Name &lt;email&gt;</c> lines that name it in commit and tag
+/// messages, such as <c>Co-Authored-By</c>, wherever they are in the message,
+/// with how many messages have one.
 /// </param>
 /// <param name="Offsets">The UTC offsets of its author, committer, and tagger dates, such as <c>+0100</c>, most used first.</param>
 /// <param name="First">Its earliest author, committer, or tagger date, or null if it's only in messages.</param>
@@ -45,9 +45,9 @@ public sealed record RecordedIdentity(
     DateTimeOffset? First,
     DateTimeOffset? Last);
 
-/// <summary>A key, such as <c>Co-Authored-By</c>, and how many commits use it for one name.</summary>
+/// <summary>A key, such as <c>Co-Authored-By</c>, and how many commit or tag messages use it for one name.</summary>
 /// <param name="Key">The key, in the spelling that sorts first (keys are compared ignoring case).</param>
-/// <param name="Commits">How many commits.</param>
+/// <param name="Commits">How many commit or tag messages (a merged tag's included).</param>
 public sealed record TrailerUse(string Key, int Commits);
 
 /// <summary>
@@ -57,7 +57,7 @@ public sealed record TrailerUse(string Key, int Commits);
 /// </summary>
 /// <param name="Key">The line's key, such as <c>Reviewed-by</c>, or null for a line of the message.</param>
 /// <param name="Text">The value after the key, or the whole line, trimmed (at most 200 characters).</param>
-/// <param name="Commits">How many commits have it.</param>
+/// <param name="Commits">How many commit or tag messages have it.</param>
 public sealed record MessageMention(string? Key, string Text, int Commits);
 
 /// <summary>A UTC offset recorded in the history, and how many dates carry it.</summary>
@@ -235,20 +235,11 @@ public sealed partial record IdentityAudit(
                 return Empty(IdentityAuditState.Unavailable, $"Git can't use the repository the den is in ({location.Problem})");
         }
 
-        var collector = new Collector();
-        ReadCommits(collector, Git(options, root, ["log", "--all", .. LogOptions, "--format=raw"], cancellationToken));
-        var counted = Git(options, root, ["rev-list", "--all", "--count"], cancellationToken).Trim();
-        if (!int.TryParse(counted, NumberStyles.None, CultureInfo.InvariantCulture, out var expected) || expected != collector.Commits)
-        {
-            throw new HistoryException(
-                $"Wolfden read {collector.Commits} commits from git log, but git rev-list counts {counted}, so the audit stopped rather than miss any. " +
-                "A git setting may be changing git log's output.");
-        }
-
+        var collector = ReadAllCommits(options, root, cancellationToken);
         var tags = ReadTags(collector, Git(
             options,
             root,
-            ["for-each-ref", "--format=%01%(refname)%02%(objectname)%02%(objecttype)%02%(taggername)%02%(taggeremail)%02%(taggerdate:raw)%02%(type)%02%(object)%02%(contents:signature)"],
+            ["for-each-ref", "--format=%01%(refname)%02%(objectname)%02%(objecttype)%02%(taggername)%02%(taggeremail)%02%(taggerdate:raw)%02%(type)%02%(object)%02%(contents:signature)%02%(contents:subject)%02%(contents:body)"],
             cancellationToken));
         while (collector.NextNestedTag() is { } nested)
         {
@@ -259,7 +250,7 @@ public sealed partial record IdentityAudit(
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         var remotes = ReadRemotes(Git(options, root, ["remote", "-v"], cancellationToken), home);
         var signing = collector.Signing(options, root, cancellationToken);
-        var local = ReadLocal(collector, options, root, remotes, cancellationToken);
+        var local = ReadLocal(collector, options, root, remotes, home, cancellationToken);
 
         var repositoryRoot = location.Root!;
         return new IdentityAudit(
@@ -277,6 +268,41 @@ public sealed partial record IdentityAudit(
             collector.OffsetList(),
             signing,
             local);
+    }
+
+    /// <summary>
+    /// For tests: runs between reading the commits and counting them, on
+    /// the thread that runs the audit, as a ref moving at that moment would.
+    /// </summary>
+    [ThreadStatic]
+    internal static Action? BetweenReadAndCount;
+
+    /// <summary>
+    /// Reads every commit, and checks the number read against <c>git rev-list
+    /// --all --count</c>. A mismatch is read once more, since a ref can move
+    /// between the two (an automatic checkpoint from <c>wolfden serve</c>,
+    /// say); a second mismatch fails, rather than report too little.
+    /// </summary>
+    private static Collector ReadAllCommits(GitOptions options, string root, CancellationToken cancellationToken)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            var collector = new Collector();
+            ReadCommits(collector, Git(options, root, ["log", "--all", .. LogOptions, "--format=raw"], cancellationToken));
+            BetweenReadAndCount?.Invoke();
+            var counted = Git(options, root, ["rev-list", "--all", "--count"], cancellationToken).Trim();
+            if (int.TryParse(counted, NumberStyles.None, CultureInfo.InvariantCulture, out var expected) && expected == collector.Commits)
+            {
+                return collector;
+            }
+
+            if (attempt == 2)
+            {
+                throw new HistoryException(
+                    $"Wolfden read {collector.Commits} commits from git log, but git rev-list counts {counted}, twice, so the audit stopped rather than miss any. " +
+                    "A git setting may be changing git log's output, or something kept changing the repository while it read.");
+            }
+        }
     }
 
     private static IdentityAudit Empty(IdentityAuditState state, string? problem) =>
@@ -458,6 +484,13 @@ public sealed partial record IdentityAudit(
                 }
 
                 var begin = value.FindIndex(l => l.StartsWith("-----BEGIN ", StringComparison.Ordinal));
+                var blank = value.IndexOf("");
+                if (blank >= 0)
+                {
+                    // The merged tag's own message, between its headers and its signature.
+                    collector.ScanMessage(value.Skip(blank + 1).Take((begin < 0 ? value.Count : begin) - blank - 1).ToList());
+                }
+
                 if (begin >= 0)
                 {
                     collector.Signed(SignatureKey.Read(string.Join('\n', value.Skip(begin))), taggerIdent, SignedOn.MergedTag, null);
@@ -492,7 +525,7 @@ public sealed partial record IdentityAudit(
         foreach (var record in output.Replace("\r", "", StringComparison.Ordinal).Split('\x01', StringSplitOptions.RemoveEmptyEntries))
         {
             var fields = record.Split('\x02');
-            if (fields.Length < 9)
+            if (fields.Length < 11)
             {
                 continue;
             }
@@ -519,6 +552,11 @@ public sealed partial record IdentityAudit(
                 collector.Signed(SignatureKey.Read(fields[8]), tagger, SignedOn.Tag, fields[1]);
                 collector.SignedTags++;
             }
+
+            // The tag's message: its subject and body (without the signature).
+            var body = fields[10];
+            var cut = body.IndexOf("-----BEGIN ", StringComparison.Ordinal);
+            collector.ScanMessage([fields[9], .. (cut < 0 ? body : body[..cut]).Split('\n')]);
 
             if (fields[6] == "tag")
             {
@@ -556,6 +594,7 @@ public sealed partial record IdentityAudit(
         }
 
         var begin = Array.FindIndex(body, l => l.StartsWith("-----BEGIN ", StringComparison.Ordinal));
+        collector.ScanMessage(begin < 0 ? body : body[..begin]);
         if (begin >= 0)
         {
             collector.Signed(SignatureKey.Read(string.Join('\n', body[begin..])), tagger, SignedOn.Tag, id);
@@ -676,7 +715,7 @@ public sealed partial record IdentityAudit(
         user.Length == 0 || user is "git" or "token" or "anonymous" ? null : user;
 
     /// <summary>The reflogs' names that the history doesn't hold, and this copy's own name and key settings.</summary>
-    private static LocalOnly ReadLocal(Collector collector, GitOptions options, string root, IReadOnlyList<RemoteAddress> remotes, CancellationToken cancellationToken)
+    private static LocalOnly ReadLocal(Collector collector, GitOptions options, string root, IReadOnlyList<RemoteAddress> remotes, string? home, CancellationToken cancellationToken)
     {
         var problems = new List<string>();
         var names = new List<LocalName>();
@@ -704,7 +743,8 @@ public sealed partial record IdentityAudit(
             foreach (var line in run.Output.Replace("\r", "", StringComparison.Ordinal).Split('\n', StringSplitOptions.RemoveEmptyEntries))
             {
                 var space = line.IndexOf(' ', StringComparison.Ordinal);
-                settings.Add(space < 0 ? new LocalSetting(line, "") : new LocalSetting(line[..space], line[(space + 1)..]));
+                // A signing key can be a file in the home folder.
+                settings.Add(space < 0 ? new LocalSetting(line, "") : new LocalSetting(line[..space], Tilde(line[(space + 1)..], home)));
             }
         }
         else if (run.ExitCode != 1)

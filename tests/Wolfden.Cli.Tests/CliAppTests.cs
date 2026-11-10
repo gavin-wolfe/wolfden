@@ -44,6 +44,8 @@ public class CliAppTests
     [InlineData("identity")]
     [InlineData("serve")]
     [InlineData("mcp")]
+    [InlineData("user")]
+    [InlineData("login")]
     public void EveryCommandHasHelpThatStartsWithItsUsage(string command)
     {
         var (exitCode, output, error) = Cli.Run(command, "--help");

@@ -5,6 +5,7 @@ using System.Text.Json;
 namespace Wolfden.Cli.Tests;
 
 /// <summary><c>wolfden serve</c>: the API and web UI on 127.0.0.1 (#23).</summary>
+[Collection(nameof(ServeCommandTests))]
 public class ServeCommandTests
 {
     [Fact]

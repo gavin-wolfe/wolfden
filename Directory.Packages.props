@@ -16,6 +16,11 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.12" />  <!-- MIT; bundles SQLite (public domain) via SQLitePCLRaw (Apache-2.0) -->
   </ItemGroup>
 
+  <ItemGroup Label="Accounts">
+    <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.12" />  <!-- MIT -->
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12" />               <!-- MIT; design time only (dotnet ef migrations), PrivateAssets="all" -->
+  </ItemGroup>
+
   <ItemGroup Label="Mcp">
     <PackageVersion Include="ModelContextProtocol" Version="2.3.0" />                 <!-- Apache-2.0 -->
   </ItemGroup>

@@ -1904,6 +1904,136 @@ out and has no page. Fix it and save.
 
 AI assistants hear about it too: see [the MCP guide](mcp-clients.md).
 
+## Accounts and login
+
+Login is for when someone else can reach your den's web pages: another
+person on this computer, or later another device. Working alone on your own
+computer account, you don't need it.
+
+**This version records the setting but doesn't ask for a login yet.** The
+accounts and the `login` setting are here, so you can set them up; the login
+page itself comes in a later version. Until then, `wolfden serve` answers
+anyone who can use this computer, and says so when it starts with login on.
+
+### Turning login on
+
+1. **Add yourself as the owner.** It asks for a password twice, without
+   showing what you type:
+
+   ```sh
+   wolfden user add wren --owner
+   ```
+
+   A password needs 15 characters or more, up to 256. There are no other
+   rules: no digits or symbols required. A few random words in a row, such
+   as `lantern otter quietly brass`, make an easy passphrase: long, and easy
+   to remember. Pick words that don't go together, not a line you've
+   written. It can't be the username, or one character repeated. No email is asked for,
+   so a pen name's address never reaches the accounts.
+2. **Turn it on:**
+
+   ```sh
+   wolfden login on
+   ```
+
+   It's refused while there's no owner, so nobody can turn it on and lock
+   themselves out. It prints what login protects and what it doesn't
+   (below), and which installation folder it used.
+3. **Restart `wolfden serve`,** and log in, once your version has the
+   login page.
+
+`wolfden login` on its own says whether it's on. `wolfden login off` turns it
+off, and always works.
+
+### What login protects, and what it doesn't
+
+**What logging in protects.** With login on, the web pages ask for a
+username and password before they show or change anything. That keeps out
+other people who can reach the page: someone else using this computer
+under another account, or another device, once you've set up network
+access.
+
+**What it doesn't protect.** Your notes are ordinary files in a folder.
+Anyone, or any program, that can open that folder can read and change
+them without logging in. That includes you in your editor, an AI assistant
+you started with `wolfden mcp`, the `wolfden` command itself, a backup or
+sync program, and anyone who uses your computer account. Login doesn't
+encrypt anything. To keep notes from other people on this computer, give
+each person their own computer account, and turn on disk encryption.
+
+### Accounts and roles
+
+```sh
+wolfden user add ash --role writer
+wolfden user add rook --role viewer
+wolfden user list
+```
+
+A role is what an account may do. It isn't what it sees: the Reader's view
+is a filter anyone can turn on.
+
+| Role | May |
+|---|---|
+| owner | Everything, including unfreezing a book and turning history on |
+| writer | Read and edit notes, make checkpoints, freeze a book |
+| viewer | Read everything a writer reads, spoilers included, and change nothing |
+
+A viewer suits an editor checking continuity, an illustrator, or an
+audiobook narrator. It doesn't hide spoilers: a beta reader who mustn't see
+past chapter 12 should get the chapters themselves for now.
+
+A username is letters, digits, `.`, `-` and `_`, and case doesn't matter
+when logging in. It's never written into a den or its history, but the
+installation's owners can see it, so on a shared installation don't use
+your real name unless you're happy for them to.
+
+`wolfden user set-role ash viewer` changes a role, and `wolfden user remove
+ash` removes an account. There's always at least one owner: removing the
+last one, or giving it another role, is refused.
+
+### Forgotten passwords and lockouts
+
+These are local commands. Anyone who can run `wolfden` as your computer
+account can use them, which is the same trust as opening the files.
+
+- **A forgotten password:** `wolfden user reset-password wren`. It asks for
+  a new one, logs the account out everywhere, and ends any lockout.
+- **Locked out after failed tries:** after 5 wrong passwords in a row, an
+  account is locked for 15 minutes. Anyone who can reach the login page can
+  cause that by guessing, so `wolfden user unlock wren` ends it at once.
+- **The only owner forgot everything:** `wolfden user reset-password <name>`
+  (`wolfden user list` lists the names), or `wolfden login off`.
+
+In a script, pipe the password in with `--password-stdin` (its first line).
+A password is never a command-line argument, where it would land in your
+shell's history.
+
+### Where accounts live
+
+Accounts belong to an *installation*, not a den: one folder of Wolfden's own
+for your computer account. It holds `accounts.db` (the accounts),
+`settings.json` (whether login is on) and, later, the keys that sign login
+cookies. It's never inside a den, and never in a checkpoint or a push.
+
+| On | It's |
+|---|---|
+| Windows | `%LOCALAPPDATA%\Wolfden` |
+| macOS | `~/Library/Application Support/Wolfden` |
+| Linux | `$XDG_DATA_HOME/wolfden`, or `~/.local/share/wolfden` |
+
+`wolfden user list` and `wolfden login` always say which folder they used.
+To use another, set `WOLFDEN_HOME` to a full path, or give `--home <folder>`
+to `user`, `login` and `serve`. A folder inside a den is refused, so your
+checkpoints never record the accounts. A folder inside a git repository
+works, with a warning: keep it out of that repository's commits. A writer with a second pen name kept secret from the
+first should give it its own installation this way, or better, its own
+computer account, so the two names' accounts never sit side by side.
+
+Deleting the folder loses the accounts and turns login off. It loses no
+notes and no history: run the steps above again. Copying it to another
+computer copies the accounts, and later the ability to sign a login cookie,
+so treat it like a password.
+
 ## Gotchas
 
 Things that surprise people, with what happens, why, and what to do.
@@ -1917,9 +2047,10 @@ Each links to the section with the details.
   run build` in the clone's `web/` folder, then publish again and
   restart `serve` ([Getting started](#getting-started), step 1).
 - **Anyone using this computer can open the page.** `wolfden serve`
-  listens on this computer only, never the network, but this version has
-  no accounts, so anyone else signed in to the same computer can open it
-  while it runs. Stop it with Ctrl+C when you're done.
+  listens on this computer only, never the network, but this version
+  doesn't ask for a login yet, even with `wolfden login on`, so anyone
+  else signed in to the same computer can open it while it runs. Stop it
+  with Ctrl+C when you're done ([Accounts and login](#accounts-and-login)).
 - **A new den has no books.** `wolfden init` makes the den and, with
   `--universe`, a first universe. Add series and books with `wolfden new
   series` and `wolfden new book`, or **New series** and **New book** in

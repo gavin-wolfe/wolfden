@@ -48,6 +48,7 @@ of Book 3 (format.md §8).
 | STORE | Saving, moving, and deleting notes through Wolfden's den store |
 | HIST | Version history, checkpoints, and tags, with or without a history backend |
 | WEB | Reading the den in a browser through `wolfden serve` |
+| ACCT | Accounts, roles, and turning login on, in the installation folder (#315) |
 
 ## CANON: what's canon at a point in the story
 
@@ -4961,7 +4962,9 @@ Spec: design.md §6, "What a copy or push carries" (#315, design §3.6 item
 
 Background: `wolfden serve` (design.md §7, §9, #23) hosts the web UI and
 its API on this computer only (127.0.0.1) and opens the default browser.
-v0 has no accounts, so it never listens on the network. The browsing,
+Accounts and the login setting exist (ACCT, #315), but nothing asks for
+a login until the web's login lands (#315 PR 4b), so it never listens on
+the network. The browsing,
 search, and history pages come in M3 (#24 to #27); their read API comes
 first, and SC-WEB-4 to SC-WEB-10 describe what it answers. SC-WEB-11
 to SC-WEB-17 describe the browsing pages, SC-WEB-18 to SC-WEB-21 the
@@ -7466,3 +7469,154 @@ first.
 
 Spec: #67 §4. Covered by: `KnownAsWebTests.TheLinkLookupSaysWhichNameMatchedAndWhereReadersLearnIt`,
 `web/src/KnownAs.test.tsx`.
+
+## ACCT: accounts and login
+
+Background: accounts belong to an *installation*, one computer account's
+Wolfden folder, never to a den (#315, D5). They're ASP.NET Core Identity's
+tables in `accounts.db` there, beside `settings.json`, which says whether
+login is on. A role is what an account may do (owner, writer, viewer); the
+Reader's view is a filter, not a role (D6). This version records the login
+setting; the web's login, which enforces it, comes later (#315 PR 4b).
+Invented names only.
+
+### SC-ACCT-1. My accounts live outside every den
+
+The writer runs `wolfden user list` on Windows, then with `WOLFDEN_HOME`
+set, then with `--home D:\juno-wolfden`.
+
+- The first names `%LOCALAPPDATA%\Wolfden` ("the default for this computer
+  account"); on macOS it's `~/Library/Application Support/Wolfden`, and on
+  Linux `$XDG_DATA_HOME/wolfden` or `~/.local/share/wolfden` (a relative
+  `XDG_DATA_HOME` is ignored). `WOLFDEN_HOME` moves it, and `--home` beats
+  both. The folder holds `accounts.db`, `settings.json` and `keys/`; none of
+  it is in a den, a checkpoint, or a push. A new folder outside Windows is
+  readable only by the computer account (0700).
+
+Spec: #315 §3.2. Covered by: `InstallationTests.HomeBeatsTheEnvironmentWhichBeatsTheDefault`,
+`InstallationTests.TheDefaultIsTheAccountsOwnDataFolder`.
+
+### SC-ACCT-2. I add myself as the owner
+
+The writer runs `wolfden user add wren --owner` and types a password twice.
+
+- It says `Added 'wren' as an owner.`, that login is off and how to turn it
+  on, and the installation folder. `wolfden user list` lists `wren  owner`.
+  A password that doesn't match, or breaks a rule, is asked for again, up to
+  three times; nothing typed is shown or printed. `--password-stdin` reads
+  the first line of standard input instead, for scripts, and a `--password`
+  argument doesn't exist. No role, an unknown role, a username with a space
+  or `@`, or a name that's taken in any case adds nothing; a taken name is
+  said before a password is asked for. `accounts.db` has no email or phone
+  column.
+
+Spec: #315 §4.3, §4.4, Flow 5. Covered by: `AccountCommandTests.TheFirstOwnerIsAddedWithAPasswordTypedTwice`,
+`AccountCommandTests.APasswordThatDoesntMatchOrBreaksTheRulesIsAskedForAgain`,
+`AccountCommandTests.AScriptPipesThePasswordInAndNeverPutsItOnTheCommandLine`,
+`AccountStoreTests.AnAccountIsAddedAndListedInTheInstallationNotADen`,
+`AccountStoreTests.NoEmailOrPhoneColumnIsStored`.
+
+### SC-ACCT-3. A password long enough, with no other rules
+
+The writer tries `fourteen chars`, then `aaaaaaaaaaaaaaaa`, then the
+username, then `café au lait du matin`.
+
+- The first three are refused: fewer than 15 characters (maintainer
+  decision, 2026-11-10: NIST's minimum when a password is the only factor,
+  as login always is), one character repeated, the username. The last is
+  accepted, and it matches whether the `é` is typed as one character or as
+  `e` plus an accent (both are hashed in NFC). Length counts characters
+  after NFC, not bytes, so fourteen emoji are 14, and `e` plus an accent is
+  one; at most 256. There are no composition rules: `alllowercaseabc` is
+  fine.
+
+Spec: #315 §7; NIST SP 800-63B rev. 4 §3.1.1.2. Covered by:
+`AccountStoreTests.APasswordOutsideTheRulesIsRefused`,
+`AccountStoreTests.LengthCountsCharactersFrom15To256WithNoCompositionRules`,
+`AccountStoreTests.APasswordMatchesWhicheverWayItsAccentsWereTyped`.
+
+### SC-ACCT-4. I can't leave the installation without an owner
+
+With `wren` the only owner, the writer runs `wolfden user remove wren`, then
+`wolfden user set-role wren writer`.
+
+- Both are refused (exit 2), saying `wren` is the only owner and to make
+  another account an owner first. Once `juno` is an owner too, either works.
+
+Spec: #315 §4.4. Covered by: `AccountCommandTests.TheLastOwnerStays`,
+`AccountStoreTests.TheLastOwnerCantBeRemovedOrDemoted`.
+
+### SC-ACCT-5. I forgot my password, or someone guessed at it
+
+After 5 wrong passwords in a row, `wren` is locked.
+
+- `wolfden user list` shows `locked until <time>` and the unlock command;
+  the lockout lasts 15 minutes. `wolfden user unlock wren` ends it at once.
+  `wolfden user reset-password wren` asks for a new password twice, ends
+  every session (a new security stamp), and ends a lockout. An unknown name
+  is said before a password is asked for.
+
+Spec: #315 §4.4, §7. Covered by: `AccountCommandTests.AForgottenPasswordIsResetAndALockoutUndoneLocally`,
+`AccountStoreTests.FiveFailuresLockAnAccountForFifteenMinutesAndUnlockEndsIt`,
+`AccountStoreTests.ANewPasswordEndsSessionsAndALockout`.
+
+### SC-ACCT-6. I turn login on
+
+The writer runs `wolfden login on` before adding anyone, then after
+`wolfden user add wren --owner`, then starts `wolfden serve`.
+
+- Before there's an owner, it's refused (exit 2) and lists the two steps in
+  order; `settings.json` isn't written. After, it says `Login is on.`, then
+  what login protects and what it doesn't (the files, the `wolfden`
+  command, `wolfden mcp`, backups and sync), that this version doesn't ask
+  for a login yet, and the installation folder. `serve` warns once that
+  login is on but not asked for yet, and serves as before. `wolfden login
+  off` always works. A `settings.json` that doesn't read is reported, not
+  ignored.
+
+Spec: #315 §4.1, Flow 5. Covered by: `AccountCommandTests.LoginOnNeedsAnOwnerFirst`,
+`AccountCommandTests.LoginOnSaysWhatItDoesntProtectAndThatNothingEnforcesItYet`,
+`ServeLoginWarningTests.ServeWarnsThatLoginIsntEnforcedYet`,
+`InstallationTests.SettingsDefaultToLoginOffAndKeepKeysTheyDontKnow`.
+
+### SC-ACCT-7. I add an editor as a viewer
+
+The writer runs `wolfden user add rook --role viewer`.
+
+- It adds the account and says a viewer sees everything a writer sees,
+  spoilers included, and can't change anything; the Reader's view is a
+  filter, not a limit. `set-role … viewer` says the same. A writer's or an
+  owner's account doesn't get that line.
+
+Spec: #315 D6, §7. Covered by: `AccountCommandTests.AViewerIsToldTheySeeEverythingAWriterSees`.
+
+### SC-ACCT-8. I can see which installation I'm using
+
+A writer keeps a second, secret pen name in its own installation
+(`WOLFDEN_HOME`).
+
+- `wolfden user list` and `wolfden login` always print the installation
+  folder and where it came from, so two names sharing one is visible. Listing
+  an installation that has nothing yet creates nothing.
+
+Spec: #315 §3.6, Flow 7. Covered by: `AccountCommandTests.ListingAnEmptyInstallationCreatesNothingAndNamesTheFolder`,
+`AccountCommandTests.WithoutHomeItUsesAnotherInstallation`.
+
+### SC-ACCT-9. I point the installation at my den by mistake
+
+The writer sets `WOLFDEN_HOME=.` in the den's folder, then tries `--home`
+with the den's folder, then with a folder inside a git repository.
+
+- A relative `WOLFDEN_HOME` is refused: it must be a full path. A folder
+  that is a den, or inside one (a `den.yaml` in it or above it, also
+  through a link or junction), is refused
+  by every `user` and `login` command (exit 2), and nothing is created
+  there, so a checkpoint can never record the accounts. A folder inside a
+  git repository is allowed, with a warning to keep it out of that
+  repository's commits. Outside Windows, `accounts.db` is made 0600, and a
+  folder other accounts can open gets a warning.
+
+Spec: #315 §3.2, review of PR #350. Covered by: `InstallationTests.ARelativeWolfdenHomeIsRefused`,
+`InstallationTests.AFolderInADenIsRefused`, `InstallationTests.AFolderInARepositoryIsFoundForAWarning`,
+`AccountCommandTests.AnInstallationInADenIsRefused`, `AccountCommandTests.AnInstallationInARepositoryIsWarnedAbout`,
+`AccountStoreTests.TheDatabaseIsOnlyForThisAccountOutsideWindows`, `InstallationTests.ALinkIntoADenIsInTheDen`.

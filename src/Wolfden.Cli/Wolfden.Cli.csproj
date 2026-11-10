@@ -16,6 +16,7 @@
     <ProjectReference Include="..\Wolfden.Git\Wolfden.Git.csproj" />
     <ProjectReference Include="..\Wolfden.Api\Wolfden.Api.csproj" />
     <ProjectReference Include="..\Wolfden.Mcp\Wolfden.Mcp.csproj" />
+    <ProjectReference Include="..\Wolfden.Accounts\Wolfden.Accounts.csproj" />
   </ItemGroup>
 
   <!-- The built web UI (npm run build in web/), served by 'wolfden serve' from

@@ -61,6 +61,36 @@ public sealed class CommitGateTests : IDisposable
     }
 
     [Theory]
+    [Trait("Scenario", "SC-HIST-26")]
+    [InlineData("ls-files", "--", "-calias.md")]
+    [InlineData("ls-files", "--", "-cinclude.md")]
+    [InlineData("ls-files", "-calias.md")]
+    [InlineData("-c", "core.quotepath=false", "log", "--oneline", "--", "-cincludeIf.md")]
+    public void AnArgumentAfterTheCommandThatLooksLikeASettingIsntRefused(params string[] args)
+    {
+        // Only git's own options, before the command, can set config; a file named so is the command's.
+        using var repo = TestRepo.Create();
+
+        var run = GitProcess.Run(TestRepo.Options, repo.Root, args, cancellationToken: Token);
+
+        Assert.True(run.ExitCode is 0 or 128 or 129, run.Said);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-26")]
+    public void ADenFileNamedLikeASettingIsCheckpointed()
+    {
+        using var repo = TestRepo.Create();
+        repo.WriteDen("-calias.md", "# Odd name\n");
+        repo.WriteDen("-cinclude.md", "# Odd name\n");
+
+        var made = repo.History.Checkpoint(new CheckpointRequest("Odd names", ["-calias.md", "-cinclude.md"]), Token);
+
+        Assert.True(made.IsAvailable, made.Reason);
+        Assert.Equal(["-calias.md", "-cinclude.md"], made.Value!.Changes.Select(c => c.Path).Order(StringComparer.Ordinal));
+    }
+
+    [Theory]
     [Trait("Scenario", "SC-HIST-24")]
     [InlineData("parameters")]
     [InlineData("count")]

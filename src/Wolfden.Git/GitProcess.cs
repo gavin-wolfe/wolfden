@@ -168,7 +168,11 @@ internal static class GitProcess
         CommitClearance? clearance = null)
     {
         var argList = args.ToList();
-        if (argList.Select((arg, i) => (arg is "-c" or "--config-env") && i + 1 < argList.Count ? argList[i + 1]
+
+        // Only git's own options, before the command, can set config: what comes after, such as a
+        // den file named '-calias.md' after '--', is the command's.
+        var globalOptions = argList.Take(CommandIndex(argList)).ToList();
+        if (globalOptions.Select((arg, i) => (arg is "-c" or "--config-env") && i + 1 < globalOptions.Count ? globalOptions[i + 1]
                 : arg.StartsWith("--config-env=", StringComparison.Ordinal) ? arg["--config-env=".Length..]
                 : arg.StartsWith("-c", StringComparison.Ordinal) && arg.Length > 2 && !arg.StartsWith("--", StringComparison.Ordinal) ? arg[2..]
                 : null)
@@ -349,21 +353,32 @@ internal static class GitProcess
     }
 
     /// <summary>The git command in <paramref name="args"/>: the first argument that isn't an option, or the value of an option that takes the next one.</summary>
-    internal static string CommandName(IReadOnlyList<string> args)
+    internal static string CommandName(IReadOnlyList<string> args) => CommandIndex(args) is var i && i < args.Count ? args[i] : "command";
+
+    /// <summary>
+    /// Where the git command is in <paramref name="args"/>: the first argument that isn't an option
+    /// or the value of one, or the end if there's none. A <c>--</c> ends git's own options too.
+    /// </summary>
+    internal static int CommandIndex(IReadOnlyList<string> args)
     {
         for (var i = 0; i < args.Count; i++)
         {
+            if (args[i] == "--")
+            {
+                return i;
+            }
+
             if (args[i] is "-c" or "-C" or "--git-dir" or "--work-tree" or "--namespace" or "--config-env")
             {
                 i++;
             }
             else if (!args[i].StartsWith('-'))
             {
-                return args[i];
+                return i;
             }
         }
 
-        return "command";
+        return args.Count;
     }
 
     /// <summary>What git did, from its exit code and what was read of its output.</summary>

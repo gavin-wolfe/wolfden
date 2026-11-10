@@ -4962,9 +4962,8 @@ Spec: design.md §6, "What a copy or push carries" (#315, design §3.6 item
 
 Background: `wolfden serve` (design.md §7, §9, #23) hosts the web UI and
 its API on this computer only (127.0.0.1) and opens the default browser.
-Accounts and the login setting exist (ACCT, #315), but nothing asks for
-a login until the web's login lands (#315 PR 4b), so it never listens on
-the network. The browsing,
+With login on, the page asks for a login first (ACCT, #315); it never
+listens on the network. The browsing,
 search, and history pages come in M3 (#24 to #27); their read API comes
 first, and SC-WEB-4 to SC-WEB-10 describe what it answers. SC-WEB-11
 to SC-WEB-17 describe the browsing pages, SC-WEB-18 to SC-WEB-21 the

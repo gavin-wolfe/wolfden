@@ -67,7 +67,7 @@ public static class CheckpointEndpoints
         {
             ReadEndpoints.ApiQuery.Of(c, []);
             return Results.Json(Status(options, c.RequestAborted));
-        }));
+        })).RequireWolfden(Permission.Read);
         api.MapPost("/checkpoint", async (HttpContext c) =>
         {
             try
@@ -94,7 +94,7 @@ public static class CheckpointEndpoints
             }
 
             return Answer(() => Make(options, Message(body), c.RequestAborted));
-        });
+        }).RequireWolfden(Permission.Write);
     }
 
     /// <summary>Whether the den has history, the latest checkpoint, and what a checkpoint now would record.</summary>

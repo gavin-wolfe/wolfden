@@ -79,7 +79,7 @@ public static class HistorySetupEndpoints
             {
                 return Error(ReadEndpoints.StatusOf(e.Code), e.Code, e.Message);
             }
-        });
+        }).RequireWolfden(Permission.Owner);
     }
 
     /// <summary>For the status of a den without history: whether this server can turn it on, and what git still needs.</summary>

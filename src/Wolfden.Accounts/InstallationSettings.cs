@@ -28,6 +28,50 @@ public sealed class InstallationSettings
     }
 
     /// <summary>
+    /// A short random id for this installation (#315 §3.6), or null if it
+    /// has none yet or its value isn't one Wolfden would write. It goes in
+    /// the login cookie's name, so two installations served on
+    /// <c>localhost</c> don't overwrite each other's cookie. It's random,
+    /// not derived from the folder's path, so the cookie's name says
+    /// nothing about the computer account it belongs to.
+    /// </summary>
+    public string? InstallationId
+    {
+        get => _json[InstallationIdKey] is JsonValue value && value.TryGetValue<string>(out var id) && IsInstallationId(id) ? id : null;
+        set => _json[InstallationIdKey] = value;
+    }
+
+    private const string InstallationIdKey = "installation_id";
+
+    /// <summary>True for an id Wolfden writes: 12 lower-case letters and digits.</summary>
+    public static bool IsInstallationId(string? id) =>
+        id is { Length: 12 } && id.All(c => c is (>= 'a' and <= 'z') or (>= '0' and <= '9'));
+
+    /// <summary>
+    /// The installation's id: the one in <c>settings.json</c>, or a new
+    /// random one, which is saved there first. A value that isn't an id
+    /// (a hand edit) is replaced.
+    /// </summary>
+    public static string EnsureInstallationId(InstallationFolder folder)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        var settings = Load(folder);
+        if (settings.InstallationId is { } id)
+        {
+            return id;
+        }
+
+        id = NewInstallationId();
+        settings.InstallationId = id;
+        settings.Save(folder);
+        return id;
+    }
+
+    /// <summary>A new random id: 12 characters from a to z and 0 to 9, about 62 bits.</summary>
+    internal static string NewInstallationId() =>
+        System.Security.Cryptography.RandomNumberGenerator.GetString("abcdefghijklmnopqrstuvwxyz0123456789", 12);
+
+    /// <summary>
     /// Reads the installation's settings. A missing file is the defaults
     /// (login off). A file that isn't a JSON object, or whose <c>login</c>
     /// isn't true or false, throws <see cref="InvalidDataException"/> with a

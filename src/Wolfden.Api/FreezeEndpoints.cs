@@ -36,9 +36,9 @@ public static class FreezeEndpoints
     internal static void Map(RouteGroupBuilder api, DenTools tools)
     {
         api.MapGet("/book/freeze", (HttpContext c) => ReadEndpoints.Answer(
-            c, ["book", "universe"], q => tools.GetBookFreeze(q.Text("book") ?? "", q.Text("universe"))));
-        api.MapPost("/book/freeze", (Func<HttpContext, Task<IResult>>)(c => Change(c, tools, (book, hash, universe) => tools.FreezeBook(book, hash, universe))));
-        api.MapPost("/book/unfreeze", (Func<HttpContext, Task<IResult>>)(c => Change(c, tools, (book, hash, universe) => tools.UnfreezeBook(book, hash, universe))));
+            c, ["book", "universe"], q => tools.GetBookFreeze(q.Text("book") ?? "", q.Text("universe")))).RequireWolfden(Permission.Read);
+        api.MapPost("/book/freeze", (Func<HttpContext, Task<IResult>>)(c => Change(c, tools, (book, hash, universe) => tools.FreezeBook(book, hash, universe)))).RequireWolfden(Permission.Write);
+        api.MapPost("/book/unfreeze", (Func<HttpContext, Task<IResult>>)(c => Change(c, tools, (book, hash, universe) => tools.UnfreezeBook(book, hash, universe)))).RequireWolfden(Permission.Owner);
     }
 
     private static async Task<IResult> Change(HttpContext context, DenTools tools, Func<string, string, string?, FreezeResult> change)

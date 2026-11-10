@@ -33,7 +33,7 @@ public static class ImageEndpoints
 
     /// <summary>Maps the endpoint onto <paramref name="api"/>, writing through <paramref name="tools"/>, the server's one set of write tools.</summary>
     internal static void Map(RouteGroupBuilder api, DenTools tools) =>
-        api.MapPost("/entity/image", (Func<HttpContext, Task<IResult>>)(c => Add(c, tools)));
+        api.MapPost("/entity/image", (Func<HttpContext, Task<IResult>>)(c => Add(c, tools))).RequireWolfden(Permission.Write);
 
     private static async Task<IResult> Add(HttpContext context, DenTools tools)
     {

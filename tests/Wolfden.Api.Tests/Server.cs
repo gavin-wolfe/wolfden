@@ -35,6 +35,7 @@ internal sealed class Server : IAsyncDisposable
             AutoCheckpoints = options.AutoCheckpoints,
             Time = options.Time,
             WriteLockWait = options.WriteLockWait,
+            Login = options.Login,
         });
         configure?.Invoke(app);
         await app.StartAsync(TestContext.Current.CancellationToken);

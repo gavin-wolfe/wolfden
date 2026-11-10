@@ -90,6 +90,14 @@ public sealed class WolfdenApiOptions
     /// </summary>
     public bool AutoCheckpoints { get; init; }
 
+    /// <summary>
+    /// How the server asks for a login (#315), or null for login off: then
+    /// every request acts as the owner, as before accounts. <c>wolfden
+    /// serve</c> sets it when the installation's <c>settings.json</c> turns
+    /// login on.
+    /// </summary>
+    public LoginOptions? Login { get; init; }
+
     /// <summary>The clock and timers automatic checkpoints use; tests replace it.</summary>
     public TimeProvider Time { get; init; } = TimeProvider.System;
 }

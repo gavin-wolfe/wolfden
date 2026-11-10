@@ -62,7 +62,8 @@ internal static class DenFiles
         endpoints.MapMethods(
             Prefix + "/{**path}",
             [HttpMethods.Get, HttpMethods.Head],
-            (HttpContext context, string? path) => Serve(context, options.DenRoot, options.PinnedUniverse, path));
+            (HttpContext context, string? path) => Serve(context, options.DenRoot, options.PinnedUniverse, path))
+            .RequireWolfden(Permission.Read); // The den's images are den content (#315 §4.5).
         return endpoints;
     }
 

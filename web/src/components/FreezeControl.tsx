@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useHoldRefresh, useShownError } from '../formHold'
+import { useAccess } from '../access'
 import { ErrorMark } from './States'
 import { bookFreezeQuery, changeFreeze, FAILED_SNAPSHOTS, type BookFreeze, type FreezeResult } from '../freezeApi'
 
@@ -18,6 +19,8 @@ type Action = 'freeze' | 'finish' | 'unfreeze'
 export function FreezeControl({ universe, book }: { universe: string; book: string }) {
   const status = useQuery(bookFreezeQuery(universe, book))
   const failed = useShownError(status)
+  // Freezing is a writer's; unfreezing is the owner's alone (#315 §7). A viewer has neither.
+  const { canWrite, isOwner } = useAccess()
   const client = useQueryClient()
   const [confirming, setConfirming] = useState<Action | null>(null)
   const [outcome, setOutcome] = useState<FreezeResult | null>(null)
@@ -52,7 +55,7 @@ export function FreezeControl({ universe, book }: { universe: string; book: stri
     }
   }, [outcome])
 
-  if (status.isPending) {
+  if (status.isPending || !canWrite) {
     return null
   }
 
@@ -133,14 +136,18 @@ export function FreezeControl({ universe, book }: { universe: string; book: stri
               Finish freezing…
             </button>
           )}
-          <button type="button" ref={triggerRef} onClick={() => ask(final ? 'unfreeze' : 'freeze')}>
-            {final ? 'Unfreeze…' : 'Freeze…'}
-          </button>
+          {(!final || isOwner) && (
+            <button type="button" ref={triggerRef} onClick={() => ask(final ? 'unfreeze' : 'freeze')}>
+              {final ? 'Unfreeze…' : 'Freeze…'}
+            </button>
+          )}
           <span className="muted">
             {final
               ? current.unfinished
                 ? 'This book is final, but no snapshot holds it as it is now.'
-                : 'This book is final (frozen): its notes can’t be edited.'
+                : isOwner
+                  ? 'This book is final (frozen): its notes can’t be edited.'
+                  : 'This book is final (frozen): its notes can’t be edited. Only an owner can unfreeze it.'
               : 'Freeze the book when it’s finished.'}
           </span>
         </p>

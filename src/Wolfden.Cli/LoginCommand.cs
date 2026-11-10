@@ -8,9 +8,8 @@ namespace Wolfden.Cli;
 /// <c>settings.json</c>, and says what login protects and what it doesn't.
 /// </summary>
 /// <remarks>
-/// Nothing enforces the setting yet: the web's login, and a permission on
-/// every endpoint, come in the next change (#315 PR 4b). Until then
-/// <c>serve</c> warns when login is on.
+/// <c>wolfden serve</c> reads the setting when it starts, so a running
+/// server keeps the setting it started with until it's restarted.
 /// </remarks>
 internal static class LoginCommand
 {
@@ -31,12 +30,11 @@ internal static class LoginCommand
         own computer account, and turn on disk encryption.
         """;
 
-    /// <summary>Said while nothing enforces the setting (until #315 PR 4b).</summary>
-    internal const string NotEnforcedYet =
+    /// <summary>Said when the setting changes: a running server reads it only when it starts.</summary>
+    internal const string RestartServe =
         """
-        This version of Wolfden records the setting but doesn't ask for a login yet:
-        'wolfden serve' still answers anyone who can use this computer. A later
-        version enforces it.
+        A 'wolfden serve' that's already running keeps the setting it started with:
+        restart it for the change to apply.
         """;
 
     internal static readonly CommandSpec Spec = new(
@@ -52,7 +50,7 @@ internal static class LoginCommand
         Login protects the web pages only, not the den's files; 'login on' says
         what that means.
 
-        {NotEnforcedYet}
+        {RestartServe}
 
         'login off' also repairs a settings.json it can't read: it keeps a copy as
         settings.json.broken, then sets "login" to false, keeping other settings
@@ -159,7 +157,7 @@ internal static class LoginCommand
 
             if (line.Has("--json"))
             {
-                CliJson.Write(output, new LoginReport(1, folder.Path, settings.Login, owners, Enforced: false));
+                CliJson.Write(output, new LoginReport(1, folder.Path, settings.Login, owners, Enforced: true));
                 return CliApp.ExitOk;
             }
 
@@ -172,9 +170,9 @@ internal static class LoginCommand
                 output.WriteLine();
             }
 
-            if (settings.Login)
+            if (turnOn is not null)
             {
-                output.WriteLine(NotEnforcedYet.ReplaceLineEndings(output.NewLine));
+                output.WriteLine(RestartServe.ReplaceLineEndings(output.NewLine));
             }
 
             if (turnOn is null && !settings.Login && owners == 0)
@@ -197,6 +195,6 @@ internal static class LoginCommand
     /// <param name="Home">The installation folder.</param>
     /// <param name="Login">Whether login is on.</param>
     /// <param name="Owners">How many owner accounts there are, or null if the accounts couldn't be read (only for <c>login</c> and <c>login off</c>).</param>
-    /// <param name="Enforced">Whether this version's server asks for the login; false until the web's login lands.</param>
+    /// <param name="Enforced">Whether this version's server asks for the login when it's on: true since #315's web login (it was false while only the setting existed).</param>
     internal sealed record LoginReport(int Version, string Home, bool Login, int? Owners, bool Enforced);
 }

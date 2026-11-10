@@ -81,15 +81,15 @@ public static class ContainerEndpoints
     /// <summary>Maps the endpoints onto <paramref name="api"/>, writing through <paramref name="tools"/>, the server's one set of write tools, and with <paramref name="reader"/> for the Reader's view.</summary>
     internal static void Map(RouteGroupBuilder api, DenTools tools, DenReader reader)
     {
-        api.MapGet("/works", (HttpContext c) => ReadEndpoints.Answer(c, ["universe", "series"], q => tools.GetWorks(q.Text("universe"), q.Text("series"))));
+        api.MapGet("/works", (HttpContext c) => ReadEndpoints.Answer(c, ["universe", "series"], q => tools.GetWorks(q.Text("universe"), q.Text("series")))).RequireWolfden(Permission.Read);
         api.MapPost("/series/create", (Func<HttpContext, Task<IResult>>)(c => Create(c, tools, ["name", "universe", "after", "first", "expectedHash"], body =>
-            tools.CreateSeries(Name(body, "series"), body.OptionalText("universe"), body.OptionalText("after"), Hash(body), body.OptionalBool("first") ?? false))));
+            tools.CreateSeries(Name(body, "series"), body.OptionalText("universe"), body.OptionalText("after"), Hash(body), body.OptionalBool("first") ?? false)))).RequireWolfden(Permission.Write);
         api.MapPost("/book/create", (Func<HttpContext, Task<IResult>>)(c => Create(c, tools, ["name", "universe", "series", "after", "first", "chapters", "expectedHash"], body =>
             tools.CreateBook(
                 Name(body, "book"), body.OptionalText("universe"), body.OptionalText("series"), body.OptionalText("after"), body.OptionalInt("chapters"), Hash(body),
-                body.OptionalBool("first") ?? false))));
+                body.OptionalBool("first") ?? false)))).RequireWolfden(Permission.Write);
         api.MapGet("/book/chapters", (HttpContext c) => ReadEndpoints.Answer(
-            c, ["book", "universe"], q => tools.GetChapter(q.Text("book") ?? "", null, q.Text("universe"))));
+            c, ["book", "universe"], q => tools.GetChapter(q.Text("book") ?? "", null, q.Text("universe")))).RequireWolfden(Permission.Read);
         api.MapPost("/chapter/create", (Func<HttpContext, Task<IResult>>)(c => Create(c, tools, ["book", "universe", "title", "after", "fields", "expectedHash"], body =>
             tools.AddChapter(
                 body.OptionalText("book") ?? throw new DenToolException(ToolErrorCodes.BadArgument, "Give the key of the book the chapter goes in, in 'book'."),
@@ -99,7 +99,7 @@ public static class ContainerEndpoints
                     ToolErrorCodes.BadArgument,
                     "Give 'expectedHash': the hash of the book's book.md, from /api/book/chapters. The add is refused if the file has changed since."),
                 body.OptionalText("universe"),
-                body.OptionalJson("fields")))));
+                body.OptionalJson("fields"))))).RequireWolfden(Permission.Write);
 
         api.MapGet("/book/chapter-fields", (HttpContext c) => ReadEndpoints.Answer<object>(
             c,
@@ -110,7 +110,7 @@ public static class ContainerEndpoints
                 return q.Bool("readers")
                     ? ReadEndpoints.AsReaders(q, () => ReadersChapters.Get(reader, tools, q.Text("book") ?? "", q.Text("universe"), q.Position("asOf")!))
                     : tools.GetBookChapterFields(q.Text("book") ?? "", q.Text("universe"));
-            }));
+            })).RequireWolfden(Permission.Read);
         api.MapPost("/chapter/edit", (Func<HttpContext, Task<IResult>>)(c => Create(
             c,
             tools,
@@ -121,9 +121,9 @@ public static class ContainerEndpoints
                 ChapterChanges(body),
                 body.OptionalText("universe"),
                 numbersAsText: true),
-            StatusCodes.Status200OK)));
+            StatusCodes.Status200OK))).RequireWolfden(Permission.Write);
         api.MapGet("/chapter-defaults", (HttpContext c) => ReadEndpoints.Answer(
-            c, ["universe", "series", "book"], q => tools.GetChapterDefaultsSource(q.Text("universe"), q.Text("series"), q.Text("book"))));
+            c, ["universe", "series", "book"], q => tools.GetChapterDefaultsSource(q.Text("universe"), q.Text("series"), q.Text("book")))).RequireWolfden(Permission.Read);
         api.MapPost("/chapter-defaults/edit", (Func<HttpContext, Task<IResult>>)(c => Create(
             c,
             tools,
@@ -134,7 +134,7 @@ public static class ContainerEndpoints
                 body.OptionalText("series"),
                 body.OptionalText("book"),
                 numbersAsText: true),
-            StatusCodes.Status200OK)));
+            StatusCodes.Status200OK))).RequireWolfden(Permission.Write);
     }
 
     /// <summary>The members a change of a chapter field or default takes.</summary>

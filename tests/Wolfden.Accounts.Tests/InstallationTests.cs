@@ -97,6 +97,23 @@ public class InstallationTests
     }
 
     [Fact]
+    [Trait("Scenario", "SC-ACCT-11")]
+    public void TheInstallationIdIsRandomKeptAndReplacedWhenItIsntOne()
+    {
+        using var temp = new TempHome();
+        temp.Folder.Create();
+        File.WriteAllText(temp.Folder.SettingsFile, "{ \"login\": true, \"installation_id\": \"../../x\" }");
+
+        var id = InstallationSettings.EnsureInstallationId(temp.Folder);
+
+        Assert.True(InstallationSettings.IsInstallationId(id));
+        Assert.Equal(id, InstallationSettings.EnsureInstallationId(temp.Folder));
+        Assert.True(InstallationSettings.Load(temp.Folder).Login);
+        using var other = new TempHome();
+        Assert.NotEqual(id, InstallationSettings.EnsureInstallationId(other.Folder));
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-ACCT-1")]
     public void ARelativeWolfdenHomeIsRefused()
     {

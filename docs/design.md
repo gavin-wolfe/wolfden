@@ -28,15 +28,16 @@ there's code that depends on it. Decisions already made are recorded in
 - **Not a manuscript editor.** Wolfden holds the story bible, not the prose.
   (Scrivener, Word, and plain markdown already do prose well.)
 - **No publishing or formatting.**
-- **No real-time collaboration in v0.** Multi-user hosting is a later phase
-  (§10). The v0 design must not *rule it out*, but doesn't build for it.
+- **No real-time collaboration in v0.** Two people can work on one
+  installation, and a save never overwrites another's unseen change
+  (§9), but there's no live co-editing. Hosting is a later phase (§10).
 
 ## 2. Core concepts
 
 | Concept | What it is |
 |---|---|
 | **Den** | A Wolfden workspace: the folder that holds `den.yaml`, and the notes in it. It can hold one or many universes. A den can be a git repository of its own or a subfolder of a larger one (§6). A universe that needs its own private remote goes in a den that is its own git repository. |
-| **Author Identity** | Who a work is by: a real name, a pen name, or a collaboration. Metadata in v0, and the anchor for ownership in multi-user mode later. |
+| **Author Identity** | Who a work is by: a real name, a pen name, or a collaboration. An author with `commit_email` is also a name the den's checkpoints may be recorded under (§6; decided in #311 D1, not built yet). Accounts link to these; an account is not an author. |
 | **Universe** | A shared setting for one or more related works. |
 | **Series** | An *ordered* sequence of books within a universe. |
 | **Book** | A single work, either in a series or standalone in a universe. It has an ordered list of chapters. Scenes within chapters come later. |
@@ -1045,9 +1046,9 @@ commands, and `wolfden <command> --help` describes each one:
 | `wolfden unfreeze <book> [--universe <key>]` | Unfreezes a book (§5, #31): `status: draft` in its `book.md`, then a checkpoint, with no tag, when the den has history. A book that isn't final is left as it is. It exits 0 when the book is unfrozen (or wasn't frozen), and 2 when it's refused or the checkpoint failed. |
 | `wolfden new-id [<count>]` | Prints new ids for files made by hand (format.md F-ID-5). |
 | `wolfden identity audit [--den <den>] [--json]` | Lists what the den's history would show anyone with a copy of it (#315, §6, "What a copy or push carries"): every name and email recorded as author, committer, tagger, or on a `Key: Name <email>` line in a message, other message lines that may name someone, the UTC offsets, signatures and their keys, and the authors in `den.yaml`; then, only in this folder, the remotes, names only the reflogs keep, and the clone's own name settings. Read-only. It exits 0 when the audit is done, a den with no history included, and 2 when there's no den or git can't read the history. `identity` is a group: showing and choosing the name the next checkpoint records come later, as its other subcommands (#311). |
-| `wolfden serve [<den>] [--universe <key>] [--port <n>] [--no-open] [--no-watch] [--home <folder>]` | Serves the web UI and the API on 127.0.0.1 (§9, #23), opens the default browser unless `--no-open`, and runs until Ctrl+C. The port is 9653 by default (WOLF on a phone keypad); `--port 0` picks a free one, and the address is printed either way. A port in use, or one the system won't let it use (reserved, or below 1024 on Linux), exits 2 and says so. `--universe` serves only that universe, as `mcp --universe` pins one; a key the den doesn't have exits 2. It hosts the same watcher as `mcp`, unless `--no-watch`. It's the one command that makes automatic checkpoints, when `den.yaml` sets `auto_checkpoint` (§6). Without a built UI, the API still works and the page says how to build the UI. When the installation (`--home`, see `user`) has login on, it warns once that this version doesn't ask for a login yet (#315); it never stops for that. |
-| `wolfden user add <name> (--role <role> \| --owner) [--password-stdin]`, `user list`, `user remove <name>`, `user set-role <name> <role>`, `user reset-password <name> [--password-stdin]`, `user unlock <name>`, each with `[--home <folder>] [--json]` | The accounts of this installation (#315): ASP.NET Core Identity's stores in `accounts.db`, in the **installation folder**, never in a den and never pushed. That folder is `%LOCALAPPDATA%\Wolfden` on Windows, `~/Library/Application Support/Wolfden` on macOS, and `$XDG_DATA_HOME/wolfden` (or `~/.local/share/wolfden`) elsewhere; `WOLFDEN_HOME` (a full path; a relative one is refused) moves it, and `--home` beats both. A folder that is a den or inside one is refused, by name and by where any symbolic link or junction along its path really leads, so a checkpoint can't record the accounts; one inside a git repository is allowed with a warning. Outside Windows, `accounts.db` is made 0600, and a folder other accounts can open gets a warning. It also holds `settings.json` (whether login is on) and, later, the cookie keys. A role is owner, writer or viewer: what the account may do, not what it sees (the Reader's view stays a filter anyone can turn on). `add` needs a role (`--owner` is `--role owner`), and asks for the password twice without echo, or reads one line from standard input with `--password-stdin`; a password is never a command-line argument. A password is 15 to 256 characters (15 is NIST SP 800-63B rev. 4's minimum for a single factor; maintainer decision, 2026-11-10), counted as Unicode code points after NFC normalization (which is also the form hashed), with no composition rules; the username itself and one character repeated are refused, and so is (#354) a common password from a public-domain list of nearly 10,000 built into `Wolfden.Accounts` (`src/Wolfden.Accounts/CommonPasswords/README.md` says where it comes from; no network calls), the username, or `wolfden`, compared (NFKC, ignoring case, spaces and punctuation, any decimal digits read as ASCII; comparison only, never hashed) and refused when said once or repeated, optionally followed by digits no longer than the whole part before them. A username is 1 to 64 letters, digits, `.`, `-` and `_`, compared without regard to case. No email or phone is stored: those columns aren't in the database. `add --role viewer` and `set-role … viewer` say that a viewer sees everything a writer sees, spoilers included. Removing or demoting the last owner is refused. `set-role` and `reset-password` end the account's sessions (a new security stamp); `reset-password` also ends a lockout. After 5 failed logins an account is locked for 15 minutes, and `unlock` ends that at once. `list` names the installation folder and whether login is on, and creates nothing. Each exits 0 when it did its job and 2 when it's refused or the installation can't be read. |
-| `wolfden login [on \| off] [--home <folder>] [--json]` | Turns login for this installation's web pages on or off in its `settings.json`, or with neither says whether it's on; it always names the installation folder. `on` is refused (exit 2) while there's no owner, so nobody can turn it on and lock themselves out, and prints what login protects and what it doesn't (the files, the CLI, stdio MCP, backups and sync). `off` always works: a `settings.json` that `login` refuses is first copied to `settings.json.broken`, then, if it's still one JSON object, only its `login` is set to false and its other keys are kept; otherwise (bad JSON, or a setting named twice) it's replaced with one that turns login off. It says which. Nothing enforces the setting until the web's login lands (#315 PR 4b): `login` and `serve` say so, and `--json` reports `enforced: false`. |
+| `wolfden serve [<den>] [--universe <key>] [--port <n>] [--no-open] [--no-watch] [--home <folder>]` | Serves the web UI and the API on 127.0.0.1 (§9, #23), opens the default browser unless `--no-open`, and runs until Ctrl+C. The port is 9653 by default (WOLF on a phone keypad); `--port 0` picks a free one, and the address is printed either way. A port in use, or one the system won't let it use (reserved, or below 1024 on Linux), exits 2 and says so. `--universe` serves only that universe, as `mcp --universe` pins one; a key the den doesn't have exits 2. It hosts the same watcher as `mcp`, unless `--no-watch`. It's the one command that makes automatic checkpoints, when `den.yaml` sets `auto_checkpoint` (§6). Without a built UI, the API still works and the page says how to build the UI. When the installation (`--home`, see `user`) has login on, the page asks for a username and password, and each endpoint needs the account's role to allow it (§9, "Accounts and login", #315); the setting is read when `serve` starts. It fails closed: an installation folder it can't use or read (so it can't tell whether login is on), or login on with no owner account, exits 2 and says why. With login on it gives the installation a random id in `settings.json`, for the login cookie's name, and keeps the cookie keys in its `keys/` folder. |
+| `wolfden user add <name> (--role <role> \| --owner) [--password-stdin]`, `user list`, `user remove <name>`, `user set-role <name> <role>`, `user reset-password <name> [--password-stdin]`, `user unlock <name>`, each with `[--home <folder>] [--json]` | The accounts of this installation (#315): ASP.NET Core Identity's stores in `accounts.db`, in the **installation folder**, never in a den and never pushed. That folder is `%LOCALAPPDATA%\Wolfden` on Windows, `~/Library/Application Support/Wolfden` on macOS, and `$XDG_DATA_HOME/wolfden` (or `~/.local/share/wolfden`) elsewhere; `WOLFDEN_HOME` (a full path; a relative one is refused) moves it, and `--home` beats both. A folder that is a den or inside one is refused, by name and by where any symbolic link or junction along its path really leads, so a checkpoint can't record the accounts; one inside a git repository is allowed with a warning. Outside Windows, `accounts.db` is made 0600, and a folder other accounts can open gets a warning. It also holds `settings.json` (whether login is on, and the installation's id) and `keys/`, the Data Protection keys that sign and encrypt login cookies (protected with DPAPI on Windows). A role is owner, writer or viewer: what the account may do, not what it sees (the Reader's view stays a filter anyone can turn on). `add` needs a role (`--owner` is `--role owner`), and asks for the password twice without echo, or reads one line from standard input with `--password-stdin`; a password is never a command-line argument. A password is 15 to 256 characters (15 is NIST SP 800-63B rev. 4's minimum for a single factor; maintainer decision, 2026-11-10), counted as Unicode code points after NFC normalization (which is also the form hashed), with no composition rules; the username itself and one character repeated are refused, and so is (#354) a common password from a public-domain list of nearly 10,000 built into `Wolfden.Accounts` (`src/Wolfden.Accounts/CommonPasswords/README.md` says where it comes from; no network calls), the username, or `wolfden`, compared (NFKC, ignoring case, spaces and punctuation, any decimal digits read as ASCII; comparison only, never hashed) and refused when said once or repeated, optionally followed by digits no longer than the whole part before them. A username is 1 to 64 letters, digits, `.`, `-` and `_`, compared without regard to case. No email or phone is stored: those columns aren't in the database. `add --role viewer` and `set-role … viewer` say that a viewer sees everything a writer sees, spoilers included. Removing or demoting the last owner is refused. `set-role` and `reset-password` end the account's sessions (a new security stamp); `reset-password` also ends a lockout. After 5 failed logins an account is locked for 15 minutes, and `unlock` ends that at once. `list` names the installation folder and whether login is on, and creates nothing. Each exits 0 when it did its job and 2 when it's refused or the installation can't be read. |
+| `wolfden login [on \| off] [--home <folder>] [--json]` | Turns login for this installation's web pages on or off in its `settings.json`, or with neither says whether it's on; it always names the installation folder. `on` is refused (exit 2) while there's no owner, so nobody can turn it on and lock themselves out, and prints what login protects and what it doesn't (the files, the CLI, stdio MCP, backups and sync). `off` always works: a `settings.json` that `login` refuses is first copied to `settings.json.broken`, then, if it's still one JSON object, only its `login` is set to false and its other keys are kept; otherwise (bad JSON, or a setting named twice) it's replaced with one that turns login off. It says which. `serve` reads the setting when it starts, so `on` and `off` say to restart a running one; `--json` reports `enforced: true` (it was false before the web's login, #315 PR 4b). |
 | `wolfden mcp [<den>] [--universe <key>] [--no-watch]` | Runs the MCP server over stdio for an AI client (§8, #20) until the client disconnects or Ctrl+C. `--universe` pins the session to one universe (§8); a key the den doesn't have exits 2. Standard output carries only the protocol; log messages go to standard error. It exits 2 if there's no den and 3 if it stops because of a failure after it started, but serves a den whose `den.yaml` doesn't load, so the client can call `check` to find out why. |
 
 They share one surface:
@@ -1687,9 +1688,11 @@ docs/
   server over stdio for AI clients.
 - **The web scaffold** (#23; v0 behaviour, not a recorded decision).
   `Wolfden.Api` is a library (an ASP.NET Core minimal API), not a program
-  of its own, so `wolfden serve` hosts it in the same process. v0 is
-  single-user with no accounts or authentication, so the server guards
-  the den from everything but its own pages on this computer. It listens
+  of its own, so `wolfden serve` hosts it in the same process. Login is
+  optional (#315). With it off, the server guards the den from everything
+  but its own pages on this computer, as below. With it on, every
+  endpoint needs a session with the endpoint's permission (read, write,
+  owner), and the rules in "Accounts and login" below apply. It listens
   on 127.0.0.1 only, never on another network interface, and no
   configuration can add a listener: Kestrel endpoints in environment
   variables or an `appsettings.json` are ignored, and `ASPNETCORE_URLS`
@@ -1698,10 +1701,13 @@ docs/
   `localhost` or `127.0.0.1`, so a web page on another site can't reach
   the den through a DNS name that points at this machine (DNS rebinding).
   The API refuses, with 403 `cross_site`, a request whose
-  `Sec-Fetch-Site` is `cross-site` or whose `Origin` isn't the server
-  itself (`localhost` or `127.0.0.1` on its port), and sends no CORS
-  headers, so another site's script can't read an answer or send a
-  write. Requests without those headers, such as `curl`'s, are answered.
+  `Sec-Fetch-Site` is anything but `same-origin` or `none` (so
+  `same-site`, such as a page on another port of `localhost`, is refused
+  too, #315) or whose `Origin` isn't the server itself (`localhost` or
+  `127.0.0.1` on its port), and sends no CORS headers, so another site's
+  script can't read an answer or send a write. Its answers also carry
+  `Cross-Origin-Resource-Policy: same-origin`, so no other page can even
+  load them. Requests without those headers, such as `curl`'s, are answered.
   Every response the app sends, its errors included (a refused host, a
   `cross_site` 403, an `internal_error`), has `X-Content-Type-Options:
   nosniff`, and pages are sent with `Cache-Control: no-cache`, so a new
@@ -1718,7 +1724,6 @@ docs/
   only its own inline style. The den's own images, under `/den-files/`,
   get a policy with `sandbox` ("Images in the den" in §9, #186). The policy comes from `serve`, so `npm run
   dev`, whose page has an inline script for hot reload, isn't affected.
-  Hosting for several users (§10) brings its own authentication.
   The API is JSON under `/api`, in camelCase, as is usual for a web
   client (the MCP tools keep snake_case, §8); errors are `{code,
   message}`, with the MCP tools' codes where they mean the same thing
@@ -1735,9 +1740,91 @@ docs/
   get `index.html`, so the UI's own routes survive a reload. For UI work,
   `npm run dev` serves the UI with hot reload and passes `/api` to a
   running `wolfden serve --no-open` (port 9653, or `WOLFDEN_PORT`). The
-  proxy drops the `Origin` of the dev server's own page, since its port
-  is Vite's, and passes any other `Origin` on, so the API still refuses
-  a request from another site that comes through the dev server.
+  proxy puts the server's own `Origin` in place of the dev server's
+  page's, since that page's port is Vite's (and with login on, a change
+  needs an `Origin`), and passes any other `Origin` on, so the API still
+  refuses a request from another site that comes through the dev server.
+- **Accounts and login** (#315; the #311/#315 design, §4, decided
+  2026-11-09). Roles say what an account may do: owner, writer, or viewer
+  (read-only). The Reader's view says what a person sees, and it's a
+  filter anyone can turn on, never a permission. A viewer sees the whole
+  den, spoilers included. An enforced spoiler limit ("this account reads
+  up to `ember:12`") would be a separate setting on an account, whatever
+  its role, and needs every read endpoint to apply it or refuse first.
+  - **Where accounts live.** In the *installation*, one computer
+    account's Wolfden folder (`--home`, `WOLFDEN_HOME`, or the account's
+    data folder; §7, `user`): `accounts.db` (ASP.NET Core Identity's
+    stores, username and password only, no email or phone), `settings.json`
+    (whether login is on, and a random installation id), and `keys/`
+    (the Data Protection keys for the cookie, protected with DPAPI on
+    Windows). Never in a den, never pushed. One installation is one
+    tenant; a role covers every den it serves (the #311/#315 design, D5). Accounts are managed
+    with the `wolfden` command only (§7, `user` and `login`).
+  - **Login off** (the default): every request acts as the owner, as
+    before accounts, and no cookie keys are kept. **Login on:** `serve`
+    reads `settings.json` when it starts, and fails closed: an
+    installation it can't use or read, a `keys/` it can't make, or login
+    on with no owner, stops it before it listens. It reads the setting
+    again every few seconds and fails safe: login turned on after it
+    started makes it answer everything but `/api/health` with 503
+    `restart_needed` until it's restarted; login turned off leaves it
+    asking until then. A session that ends while the page is open brings
+    the login form over the page, which stays mounted, so an open editor
+    keeps its text.
+  - **Every endpoint declares a permission:** Read, Write or Owner
+    (`.RequireWolfden(...)`, endpoint metadata), or is on a short list
+    that needs no login: `/api/health`, `/api/auth/status`,
+    `/api/auth/login`, and the built UI's own page (static files, no den
+    content). The fallback policy needs Read, so an endpoint someone
+    forgets is refused rather than open, and so is any unknown path under
+    `/api` (401, so a stranger learns nothing of what exists). Read covers
+    every `GET`, `/den-files` included; Write covers edits, creating
+    notes, series, books, chapters and images, checkpoints and freezing;
+    Owner covers unfreezing, turning history on, and saving `den.yaml`
+    through Edit file. A test reads the endpoint list and fails on an
+    endpoint with neither a permission nor a place on the short list, or
+    one that can change the den with only Read; another calls every
+    endpoint with login on, and expects 401 with no cookie and 403 for
+    each role that lacks its permission. The web hides edit controls the
+    account's role lacks, from `/api/auth/status`; the server's 403 is
+    what enforces it.
+  - **The cookie** is `HttpOnly` and `SameSite=Strict`, named
+    `wolfden-<installation id>` so two installations on `localhost`
+    (browsers share a host's cookies across ports) don't overwrite each
+    other. A session slides: 14 days on 127.0.0.1. Each request checks the
+    cookie's account against `accounts.db` (by its Guid id and security
+    stamp), so a removed account, a new password or a new role ends its
+    sessions at once. Log out ends the session in that browser only.
+    With a public HTTPS origin (the design's D8, later) it's
+    `Secure` with the `__Host-` prefix, and a session lasts 12 hours.
+  - **Guessing:** a wrong password, an unknown username and a locked
+    account get the same 401 `login_failed`, and an unknown name still
+    costs a password hash. Identity's lockout: 5 failures, then 15 minutes
+    (`wolfden user unlock` ends it). ASP.NET Core's rate limiter allows 10
+    login attempts a minute per username (keyed by Identity's normalized
+    name; a name no account could have takes no turn), then answers 429
+    `too_many_attempts`, in memory only. Per client address, 10 a minute
+    too, but only behind a proxy (a public origin): on 127.0.0.1 every
+    request has one address, so a limit there would let anyone on the
+    computer keep the owner out. A login body is at most 8 KB.
+  - **CSRF and other pages:** `SameSite=Strict`, JSON bodies (a CORS
+    preflight that's never granted), and with login on, every request but
+    `GET` and `HEAD` must carry this server's `Origin` (403
+    `origin_required`). No antiforgery token: every write is a JSON or
+    binary `fetch`, never a form post; a form-post endpoint would need one.
+  - **Who checkpoints record:** with login on or off, the name this copy
+    of the den uses, through the gate (§6); a username is never written
+    into git. Per-account commit names, and `Co-Authored-By` for other
+    people's saves (the design's D7), come with per-user commits (#315 PR 5).
+  - **Error codes:** `unauthenticated` (401), `forbidden` (403, saying
+    what the role allows), `origin_required` (403), `login_failed` (401),
+    `too_many_attempts` (429), `too_large` (413, a login body over 8 KB),
+    `login_off` (409, a login sent while login is off), and
+    `restart_needed` (503, login turned on after `serve` started).
+  - **What login doesn't protect:** the files, the CLI, stdio MCP,
+    backups and sync. Anyone who can open the den's folder reads it
+    without logging in; the guide says so in those words. Network access
+    requires login and comes through a reverse proxy first (the design's D8).
 - **The read API** (#24 to #27; v0 behaviour, not a recorded decision).
   Every endpoint is `GET`, with query parameters in camelCase. The
   answers come from the same read queries as the MCP read tools
@@ -3281,7 +3368,7 @@ docs/
 | **M3: Web UI (read)** | Browse the hierarchy, entity pages, search, a story-position "as of" slider, history and diffs. |
 | **M4: Web UI (edit)** | Edit fields and sections, create from templates, checkpoints, freeze and unfreeze. |
 | **M5: Packs + full sample** | Space opera and fantasy packs, plus the invented multi-book sample with history. |
-| **Later** | Import from existing markdown notes; custom calendars; multi-user hosting (accounts, GitHub and Google OAuth, tenants, roles), Docker, collaboration. |
+| **Later** | Import from existing markdown notes; custom calendars; hosting (tenants, GitHub and Google OAuth, MCP over a network), Docker, collaboration. |
 
 ## 11. Sample datasets
 

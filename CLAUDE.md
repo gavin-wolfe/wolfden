@@ -13,14 +13,23 @@ fiction. See `README.md` for the pitch. Design docs live in `docs/`.
 
 - **License:** MIT for code. Sample datasets are licensed separately under CC-BY-4.0.
 - `packs/` is MIT-0, and Wolfden's licenses place no conditions on the notes, manuscripts, or other content writers create with it.
-- **v0 scope:** local-first and single-user. No accounts or multi-tenancy in
-  v0. Multi-user, multi-tenant hosting (accounts, OAuth with GitHub and
-  Google, roles) comes in a later phase. Don't build for it early, but don't
+- **v0 scope:** local-first, with light multi-user (#315): optional login
+  (ASP.NET Core Identity, cookie), accounts with owner, writer and viewer
+  roles, per-user commits, and two people editing on one installation.
+  A role is what an account may do; the Reader's view is a filter on what
+  it sees, and stays voluntary. An enforced spoiler limit per account
+  comes later.
+  127.0.0.1 is the default; network access requires login and HTTPS, and
+  comes through a reverse proxy first. No tenants: one installation is one
+  tenant. Hosting (tenants, OAuth with GitHub and Google, MCP over a
+  network) comes in a later phase. Don't build for it early, but don't
   design anything that rules it out.
 - **Source of truth:** markdown files with YAML frontmatter, in a folder
   the user controls. Version history and audit trail come from a history
   backend (git by default, local only or with a private remote), not from
-  tables we build ourselves.
+  tables we build ourselves. Accounts are the one exception: they belong
+  to an installation, not a den, live in their own database outside every
+  den, and are never pushed.
 - **Index:** SQLite via EF Core, rebuildable at any time from the files. It
   never holds data that exists only in the database.
 - **Domain model:** Author Identity → Universe → Series (ordered) → Book.

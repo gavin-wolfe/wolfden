@@ -52,12 +52,15 @@ internal static class ServeCommand
                               them first and rebuilds the index if they changed
           --home <folder>     the installation folder (see 'wolfden login --help')
 
-        This version doesn't ask for a login, even after 'wolfden login on' (it
-        says so when it starts): anyone who can use this computer can open the
-        page while it runs.
+        With login off (the default), anyone who can use this computer can open
+        the page while it runs. After 'wolfden login on', the page asks for a
+        username and password, and each account may do what its role allows
+        (see 'wolfden user --help'). Restart serve after turning login on or off.
 
         Exits 0 on Ctrl+C, and 2 if the server couldn't start: no den, a
-        --universe the den doesn't have, or a port that's in use or reserved.
+        --universe the den doesn't have, a port that's in use or reserved, an
+        installation folder it can't read (it can't tell whether login is on),
+        or login on with no owner account.
         """,
         ["--no-open", "--no-watch"],
         ["--den", "--universe", "--port", Installation.HomeOption],
@@ -108,9 +111,19 @@ internal static class ServeCommand
             return CliApp.ExitUsage;
         }
 
+        // Fails closed: a server that can't tell whether login is on doesn't start.
+        if (!TryLogin(line, error, out var login, out var installation))
+        {
+            return CliApp.ExitUsage;
+        }
+
         var log = TextWriter.Synchronized(error);
         var app = WolfdenApi.Build(new WolfdenApiOptions(root)
         {
+            Login = login,
+
+            // A login turned on while it runs stops it answering until it's restarted; one turned off keeps it asking (fail safe).
+            LoginSetting = () => Wolfden.Accounts.InstallationSettings.Load(installation).Login,
             Port = port,
             PinnedUniverse = pinned,
             WebRoot = WebRoot ?? DefaultWebRoot,
@@ -151,9 +164,13 @@ internal static class ServeCommand
 
             var url = app.Urls.First().TrimEnd('/') + "/";
             output.WriteLine($"wolfden serve: serving the den at '{root}' on {url}");
+            if (login is not null)
+            {
+                output.WriteLine($"Login is on: the page asks for a username and password (installation folder '{login.Installation.Path}').");
+            }
+
             output.WriteLine("Press Ctrl+C to stop.");
             output.Flush();
-            WarnIfLoginIsOn(line, log);
 
             if (!line.Has("--no-watch"))
             {
@@ -220,28 +237,56 @@ internal static class ServeCommand
     };
 
     /// <summary>
-    /// Says, once, that login is on but not enforced (#315: the setting
-    /// arrives before the web's login does). Never stops the server: a
-    /// settings file it can't read is a warning too.
+    /// Works out whether the server asks for a login (#315), from the
+    /// installation's <c>settings.json</c>. It fails closed: when the
+    /// installation folder can't be used or read, or login is on but there's
+    /// no owner account, it says why and returns false, and the server
+    /// doesn't start. With login on, it makes sure the installation has an
+    /// id for the cookie's name.
     /// </summary>
-    private static void WarnIfLoginIsOn(CommandLine line, TextWriter log)
+    /// <param name="line">The command line, for <c>--home</c>.</param>
+    /// <param name="error">Where to say why it can't start.</param>
+    /// <param name="login">The login options, or null for login off.</param>
+    /// <param name="folder">The installation folder, when it returns true.</param>
+    internal static bool TryLogin(CommandLine line, TextWriter error, out LoginOptions? login, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out Wolfden.Accounts.InstallationFolder? folder)
     {
-        var folder = Installation.Resolve(Spec.Name, line, TextWriter.Null);
+        login = null;
+        folder = Installation.Resolve(Spec.Name, line, error);
         if (folder is null)
         {
-            return;
+            error.WriteLine("wolfden serve: stopped, because without the installation folder it can't tell whether login is on. Fix --home or WOLFDEN_HOME, or leave both out for the default folder.");
+            return false;
         }
 
         try
         {
-            if (Wolfden.Accounts.InstallationSettings.Load(folder).Login)
+            if (!Wolfden.Accounts.InstallationSettings.Load(folder).Login)
             {
-                log.WriteLine($"wolfden serve: login is on for the installation at '{folder.Path}', but this version doesn't ask for it yet: anyone who can use this computer can open the page.");
+                return true;
             }
+
+            int owners;
+            using (var store = Wolfden.Accounts.AccountStore.OpenExistingAsync(folder).GetAwaiter().GetResult())
+            {
+                owners = store is null ? 0 : store.OwnerCountAsync().GetAwaiter().GetResult();
+            }
+
+            if (owners == 0)
+            {
+                error.WriteLine($"wolfden serve: login is on for the installation at '{folder.Path}', but it has no owner account, so nobody could log in. Add one ('wolfden user add <name> --owner'), or turn login off ('wolfden login off').");
+                return false;
+            }
+
+            login = new LoginOptions(folder, Wolfden.Accounts.InstallationSettings.EnsureInstallationId(folder));
+
+            // The cookie keys' folder, made (and kept private) now, so a folder that can't be made stops serve here with a reason.
+            AuthEndpoints.KeysFolder(folder);
+            return true;
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
+        catch (Exception e) when (Installation.IsFailure(e))
         {
-            log.WriteLine($"wolfden serve: couldn't read the installation's login setting: {e.Message}");
+            error.WriteLine($"wolfden serve: stopped, because it couldn't use the installation at '{folder.Path}', so it can't serve with login as set: {e.Message} Fix it, or run 'wolfden login off', which repairs a settings file it can't read.");
+            return false;
         }
     }
 

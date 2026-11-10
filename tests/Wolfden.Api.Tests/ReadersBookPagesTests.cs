@@ -280,6 +280,17 @@ public sealed class ReadersBookPagesTests : IDisposable
         Assert.DoesNotContain("broken-later", count.GetRawText(), StringComparison.Ordinal);
     }
 
+    [Fact]
+    [Trait("Scenario", "SC-WEB-110")]
+    public async Task WhoIsLoggedInSaysNothingOfTheDen()
+    {
+        await using var server = await Start();
+
+        var status = await server.GetJsonAsync("/api/auth/status", HttpStatusCode.OK);
+
+        Assert.Equal("""{"version":1,"login":false,"user":null,"role":"owner"}""", status.GetRawText());
+    }
+
     /// <summary>A note whose text has every kind of link the Reader's page has to read for itself.</summary>
     private void WriteLinkyNote()
     {

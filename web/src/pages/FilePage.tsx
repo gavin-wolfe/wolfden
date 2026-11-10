@@ -6,6 +6,7 @@ import { ErrorState, Loading } from '../components/States'
 import { FileEditError, fileSourceQuery, saveFile, type FileSource } from '../denErrorsApi'
 import { useHoldRefresh } from '../formHold'
 import { useDocumentTitle } from '../hooks'
+import { IfCanWrite, useAccess } from '../access'
 import type { WriteResult } from '../editApi'
 import '../denErrors.css'
 
@@ -20,6 +21,19 @@ const route = getRouteApi('/file')
 export function FilePage() {
   const { path = '' } = route.useSearch()
   useDocumentTitle('Edit file')
+  // Edit file is a writer's, and den.yaml the owner's (#315 §4.6); the server refuses the rest.
+  const { role, canWrite, isOwner } = useAccess()
+  if (role !== null && !(path === 'den.yaml' ? isOwner : canWrite)) {
+    return (
+      <div className="page-body file-page">
+        <h1>Edit file</h1>
+        <p role="note">
+          {canWrite ? 'Only an owner can change den.yaml.' : 'Your account is a viewer: it can read this den but not change it.'}
+        </p>
+      </div>
+    )
+  }
+
   return <FileEditor key={path} path={path} />
 }
 
@@ -219,9 +233,11 @@ function Editor({
           <MarkdownEditor value={text} onChange={setText} onSave={() => void save()} onCancel={goBack} label={`Text of ${path}`} universe={base.universe ?? ''} autoFocus minLines={20} />
           {error && <SaveError error={error} />}
           <p className="editor-actions">
+            <IfCanWrite>
             <button type="button" className="primary" onClick={() => void save()} disabled={saving || !dirty}>
               {saving ? 'Saving…' : 'Save'}
             </button>
+            </IfCanWrite>
             <button type="button" onClick={goBack} disabled={saving}>
               Close
             </button>

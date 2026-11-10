@@ -4962,9 +4962,8 @@ Spec: design.md §6, "What a copy or push carries" (#315, design §3.6 item
 
 Background: `wolfden serve` (design.md §7, §9, #23) hosts the web UI and
 its API on this computer only (127.0.0.1) and opens the default browser.
-Accounts and the login setting exist (ACCT, #315), but nothing asks for
-a login until the web's login lands (#315 PR 4b), so it never listens on
-the network. The browsing,
+With login on, the page asks for a login first (ACCT, #315); it never
+listens on the network. The browsing,
 search, and history pages come in M3 (#24 to #27); their read API comes
 first, and SC-WEB-4 to SC-WEB-10 describe what it answers. SC-WEB-11
 to SC-WEB-17 describe the browsing pages, SC-WEB-18 to SC-WEB-21 the
@@ -5027,9 +5026,9 @@ Another time, a page on another site sends requests straight to
   `appsettings.json` says, and answers only requests addressed to
   `localhost` or `127.0.0.1`: any other host name gets 400 and nothing
   from the den. The API answers a request the browser marks as from
-  another site (`Sec-Fetch-Site: cross-site`, or an `Origin` other than
-  the server itself) with 403 `cross_site` and nothing from the den, and
-  never sends CORS headers. Its own pages, and requests from outside a
+  anywhere but its own pages (a `Sec-Fetch-Site` other than `same-origin`
+  or `none`, or an `Origin` other than the server itself) with 403
+  `cross_site` and nothing from the den, and never sends CORS headers. Its own pages, and requests from outside a
   browser such as `curl`, are answered.
 
 Spec: design.md §9. Covered by:
@@ -7476,9 +7475,9 @@ Background: accounts belong to an *installation*, one computer account's
 Wolfden folder, never to a den (#315, D5). They're ASP.NET Core Identity's
 tables in `accounts.db` there, beside `settings.json`, which says whether
 login is on. A role is what an account may do (owner, writer, viewer); the
-Reader's view is a filter, not a role (D6). This version records the login
-setting; the web's login, which enforces it, comes later (#315 PR 4b).
-Invented names only.
+Reader's view is a filter, not a role (D6). With login on, the web pages
+ask for a login, and every endpoint needs a permission the account's role
+has (#315 PR 4b). Invented names only.
 
 ### SC-ACCT-1. My accounts live outside every den
 
@@ -7568,15 +7567,14 @@ The writer runs `wolfden login on` before adding anyone, then after
 - Before there's an owner, it's refused (exit 2) and lists the two steps in
   order; `settings.json` isn't written. After, it says `Login is on.`, then
   what login protects and what it doesn't (the files, the `wolfden`
-  command, `wolfden mcp`, backups and sync), that this version doesn't ask
-  for a login yet, and the installation folder. `serve` warns once that
-  login is on but not asked for yet, and serves as before. `wolfden login
-  off` always works. A `settings.json` that doesn't read is reported, not
-  ignored.
+  command, `wolfden mcp`, backups and sync), to restart a running `serve`,
+  and the installation folder. `serve` then asks for a login
+  (SC-ACCT-11). `wolfden login off` always works. A `settings.json` that
+  doesn't read is reported, not ignored, and stops `serve`.
 
 Spec: #315 §4.1, Flow 5. Covered by: `AccountCommandTests.LoginOnNeedsAnOwnerFirst`,
-`AccountCommandTests.LoginOnSaysWhatItDoesntProtectAndThatNothingEnforcesItYet`,
-`ServeLoginWarningTests.ServeWarnsThatLoginIsntEnforcedYet`,
+`AccountCommandTests.LoginOnSaysWhatItDoesntProtectAndToRestartServe`,
+`ServeLoginTests.WithLoginOnServeAsksForALogin`,
 `InstallationTests.SettingsDefaultToLoginOffAndKeepKeysTheyDontKnow`.
 
 ### SC-ACCT-7. I add an editor as a viewer
@@ -7648,3 +7646,159 @@ Spec: #354; NIST SP 800-63B rev. 4 §3.1.1.2. Covered by:
 `CommonPasswordTests.CompatibilityFormsAndOtherDigitsCompareAsTheirPlainForms`,
 `CommonPasswordTests.TheStoreRefusesACommonPasswordOnAddAndReset`,
 `AccountCommandTests.ACommonPasswordIsRefusedByAddAndResetPassword`.
+
+### SC-ACCT-11. I log in
+
+Login is on, `wren` is the owner, and the writer starts `wolfden serve` and
+opens the page.
+
+- `serve` says `Login is on`. The page shows a login form and nothing from
+  the den; the API answers every den request with 401 `unauthenticated`.
+  After `wren` and the right password, the den's pages open, and the top
+  bar shows `wren · owner` and **Log out**. The cookie is `HttpOnly` and
+  `SameSite=Strict`, named `wolfden-<id>` after a random id kept in the
+  installation's `settings.json`, so two installations on `localhost` keep
+  their own; its keys are in the installation's `keys/`, and it still
+  works after `serve` restarts. A session lasts 14 days and slides. Log out
+  ends it. With login off, the page has no login and no account, and every
+  request acts as the owner, as before. `serve` doesn't start, and says
+  why, when it can't use or read the installation folder, or login is on
+  with no owner: it never serves without a login it can't rule out.
+
+Spec: #315 §4.5, Flow 5. Covered by: `LoginTests.ALoginGivesAStrictHttpOnlyCookieNamedForTheInstallation`,
+`LoginTests.ACookieStillWorksAfterARestart`, `LoginTests.LoggingOutEndsTheSession`,
+`LoginTests.WithLoginOffEveryoneIsTheOwnerAsBefore`, `ServeLoginTests`, `InstallationTests.TheInstallationIdIsRandomKeptAndReplacedWhenItIsntOne`,
+`web/src/Login.test.tsx`.
+
+### SC-ACCT-12. An editor logs in as a viewer
+
+`rook` is a viewer and opens a note, a book and a chapter.
+
+- Everything a writer reads is there, spoilers included. There are no edit
+  controls: no Edit buttons, no New menu or New series, no Add chapter, no
+  Freeze, no checkpoint indicator, and chapter fields say a viewer can't
+  change them. A change sent anyway is refused with 403 `forbidden`, whose
+  message says the account is a viewer. The Reader's view is still there
+  as a filter.
+
+Spec: #315 D6, §4.6, Flow 4. Covered by: `LoginTests.AViewerReadsEverythingAndChangesNothing`,
+`EndpointPermissionTests.Test2EveryEndpointRefusesAStrangerAndEachRoleWhatItMayntDo`,
+`web/src/Login.test.tsx`.
+
+### SC-ACCT-13. Every endpoint says what it needs
+
+A developer adds an endpoint and forgets to say who may use it.
+
+- A test that reads the server's endpoint list fails: every endpoint
+  declares Read, Write or Owner, or is one of the few that need no login
+  (`/api/health`, `/api/auth/status`, `/api/auth/login`, and the UI's own
+  page). One that can change the den but declares only Read fails too.
+  If it shipped anyway, it would need a login: the fallback is Read, so
+  a stranger gets 401, never the endpoint. With login on, every endpoint
+  answers a request with no cookie with 401, and every Write and Owner one
+  answers a viewer with 403, before its handler runs.
+
+Spec: #315 §4.5. Covered by: `EndpointPermissionTests`.
+
+### SC-ACCT-14. Someone guesses at a password
+
+A stranger who can reach the login page tries names and passwords.
+
+- A wrong password and an unknown name get the same 401 `login_failed`,
+  with the same words, and take about as long; so does a locked account,
+  even with the right password. After 5 wrong passwords in a row the
+  account is locked for 15 minutes, and the message says the owner can
+  run `wolfden user unlock`. More than 10 tries a minute for one name, in
+  any case, get 429 `too_many_attempts` with `Retry-After`; a name no
+  account can have (such as one spelled with a Kelvin sign for `K`) is
+  refused without taking that name's turn. On this computer every request
+  comes from 127.0.0.1, so there's no limit per address there, which would
+  let anyone on the computer keep the owner out; behind a proxy (a later
+  change) there is, 10 a minute. A login takes only a JSON body with
+  `username` and `password`, of at most 8 KB (413 `too_large`), and an
+  account whose role Wolfden doesn't know gets `login_failed` and no
+  cookie.
+
+Spec: #315 §4.5, §7. Covered by: `LoginTests.AWrongPasswordAndAnUnknownNameGetTheSameAnswer`,
+`LoginTests.FiveWrongPasswordsLockTheAccountAndALockedAccountLooksLikeAWrongPassword`,
+`LoginTests.TooManyAttemptsFromOneAddressAreRefusedForAMinute`,
+`LoginTests.TooManyAttemptsForOneNameAreRefusedWhateverTheCase`,
+`LoginTests.ALoginTakesOnlyAUsernameAndAPasswordAsJson`,
+`LoginTests.OnThisComputerOneAddressIsntOneBucketForEveryone`,
+`LoginTests.ANameSpelledWithLookalikeLettersIsntAnotherBucket`,
+`LoginTests.ALoginBodyLongerThanAnyLoginIsRefusedUnread`,
+`LoginTests.AnAccountWithARoleWolfdenDoesntKnowGetsNoCookie`.
+
+### SC-ACCT-15. I change someone's password or role while they're logged in
+
+`ash` is logged in. The owner runs `wolfden user reset-password ash`, or
+`set-role ash viewer`, or `user remove ash`.
+
+- `ash`'s next request is a 401, and the page shows the login form again.
+  The server checks each request's account against `accounts.db`, so the
+  change applies at once, not when the cookie expires.
+
+Spec: #315 §4.4. Covered by: `LoginTests.ANewPasswordANewRoleOrRemovingTheAccountEndsItsSessions`,
+`web/src/Login.test.tsx`.
+
+### SC-ACCT-16. A writer freezes a book, and wants to unfreeze it
+
+`ash` is a writer.
+
+- `ash` can freeze a book, checkpoint and edit. Unfreezing, turning history
+  on, and saving `den.yaml` through Edit file are the owner's: the server
+  answers 403 saying only an owner can, and the page doesn't offer
+  Unfreeze (it says only an owner can unfreeze) or Turn on history.
+
+Spec: #315 §4.6, §7. Covered by: `LoginTests.AWriterFreezesButOnlyTheOwnerUnfreezesTurnsHistoryOnOrFixesDenYaml`,
+`web/src/Login.test.tsx`.
+
+### SC-ACCT-17. A page on another port of this computer tries to use my login
+
+A dev server on `localhost:3000`, open in the same browser, sends requests
+to `localhost:9653`; browsers share a host's cookies across ports.
+
+- The API refuses any request whose `Sec-Fetch-Site` isn't `same-origin` or
+  `none` (so `same-site` too) with 403 `cross_site`, login on or off, and
+  every API answer has `Cross-Origin-Resource-Policy: same-origin`. With
+  login on, a request that changes anything must carry this server's
+  `Origin`, or it's refused with 403 `origin_required`.
+
+Spec: #315 §4.5. Covered by: `LoginTests.APageOnAnotherPortOfThisComputerIsRefused`,
+`LoginTests.TheApisAnswersAreForItsOwnPagesOnly`, `LoginTests.WithLoginOnAChangeMustCarryThisServersOrigin`.
+
+### SC-ACCT-18. My session ends while I'm editing
+
+`wren` has a section open in the editor, with changes not saved, when the
+owner runs `wolfden user reset-password wren` (or the session ends some
+other way).
+
+- Within a few seconds the login form comes up over the page, saying the
+  session ended and that what was being edited is still there. The page
+  underneath stays as it was, editor and text included. After logging in
+  again, Save saves the text, still checked against the hash the editor
+  opened on: if the note changed meanwhile, both versions are shown, as
+  for any save. Only **Log out**, which the person chose, clears the page,
+  and it asks first while an editor or form is open. If someone else
+  (`ash`) logs in at that form, the page asks "Someone else was editing
+  here. Discard their unsaved changes and continue?" and, on yes, drops the
+  open editors and shows the pages afresh; on no, `ash` is logged out again
+  and `wren`'s draft stays. If `wren`'s account has become a viewer, the
+  editor stays open with no Save.
+
+Spec: #315 §4.5, review of PR #357. Covered by: `web/src/SessionEnd.test.tsx`, `web/src/Login.test.tsx`.
+
+### SC-ACCT-19. I turn login on while `wolfden serve` is running
+
+`serve` started with login off; the writer runs `wolfden login on`.
+
+- Within a couple of seconds, `serve` says on its console that login was
+  turned on and it must be restarted, and answers every request but
+  `/api/health` with 503 `restart_needed`, so nobody keeps using the page
+  without a login. Turning login off again doesn't undo that; a restart
+  does. The other way round, `wolfden login off` while a server with
+  login on runs, it keeps asking for a login until it's restarted, and
+  says so once. The page shows the `restart_needed` message in a banner.
+
+Spec: #315 §4.5, review of PR #357. Covered by: `LoginTests.LoginTurnedOnWhileServingStopsItUntilARestart`,
+`LoginTests.LoginTurnedOffWhileServingStillAsksForItUntilARestart`, `web/src/SessionEnd.test.tsx` (the page's banner).

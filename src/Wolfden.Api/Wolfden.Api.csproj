@@ -13,6 +13,8 @@
   <ItemGroup>
     <ProjectReference Include="..\Wolfden.Core\Wolfden.Core.csproj" />
     <ProjectReference Include="..\Wolfden.Index\Wolfden.Index.csproj" />
+    <!-- Login (#315): Identity's stores over the installation's accounts.db. -->
+    <ProjectReference Include="..\Wolfden.Accounts\Wolfden.Accounts.csproj" />
   </ItemGroup>
 
   <!-- The den's shared read queries and their results (DenReader). -->

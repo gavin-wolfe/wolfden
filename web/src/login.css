@@ -1,0 +1,84 @@
+/* The login page and the top bar's account (#315). */
+
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.login-form {
+  width: 100%;
+  max-width: 22rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.5rem;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.login-form h1 {
+  margin: 0;
+  font-family: var(--font-body);
+}
+
+.login-form p {
+  margin: 0;
+}
+
+.login-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-weight: 600;
+}
+
+.login-form input {
+  font: inherit;
+  font-weight: normal;
+  padding: 0.4rem 0.5rem;
+}
+
+.login-error {
+  color: var(--broken);
+}
+
+.login-help {
+  font-size: 0.875rem;
+}
+
+.account-menu {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+}
+
+.account-role {
+  color: var(--text-muted);
+}
+
+/* The pages stay mounted under the login form when a session ends, so an open editor keeps its text. */
+.auth-pages {
+  display: contents;
+}
+
+.login-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow: auto;
+  background: var(--bg);
+}
+
+.restart-needed {
+  margin: 0;
+  padding: 0.5rem 1rem;
+  background: var(--banner-bg);
+  border-bottom: 1px solid var(--banner-border);
+  color: var(--text);
+}

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { denQuery, hierarchyQuery, type BookNode, type PositionView, type ScopeKind } from '../api'
 import { useShownError } from '../formHold'
+import { useAccess } from '../access'
 import { useEntitiesInView, type ListedEntity } from '../hooks'
 import { MARKS_LEGEND, listCutWords } from '../readerWords'
 import { chapterLabel } from '../story'
@@ -164,6 +165,7 @@ function TypeGroups({
   final: boolean
 }) {
   const types = [...new Set(entities.map((e) => e.type))].sort()
+  const { canWrite } = useAccess()
   return (
     <>
       {types.map((type) => {
@@ -183,7 +185,7 @@ function TypeGroups({
             open={current !== undefined && current.type === type && entities.includes(current)}
           >
             <EntityList universe={universe} entities={ofType} positions={positions} current={current?.key} />
-            {!final && !readers && <NewTypeButton type={type} scope={scope} scopeName={scopeName} />}
+            {!final && !readers && canWrite && <NewTypeButton type={type} scope={scope} scopeName={scopeName} />}
           </TreeNode>
         )
       })}

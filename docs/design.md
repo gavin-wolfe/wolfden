@@ -735,7 +735,53 @@ includes, and with them from a folder outside any repository, so a plain
 `[include]` counts but an `includeIf "gitdir:…"` doesn't), compared
 without case, is refused when the den records another name (D9): an agent
 that has learned the writer's other name could write it into a permanent
-trailer. Neither value is repeated in the message.
+trailer. Neither value is repeated in the message. The gate decides only what new commits and tags record; `wolfden
+identity audit`, below, shows what the history already holds, including
+what was recorded before the gate or by the writer's own git.
+
+**What a copy or push carries** (#315; v0 behaviour). A push or a clone
+carries the whole repository, and a copy of the folder (a zip, a synced
+folder, a disk backup) carries its `.git` folder too. A history can tie two
+names to one person: both recorded in one repository, the same UTC offset
+on both, or one key signing under both. `wolfden identity audit` lists it
+before the writer shares anything, and it's also how to check what the gate
+above recorded. It reads every ref of the repository the
+den is in (`git log --all`: branches, tags, remote-tracking branches, notes,
+the stash), the whole repository when the den is part of a larger one, with
+`GIT_NO_REPLACE_OBJECTS=1` and `--no-use-mailmap`, since a replace ref or a
+`.mailmap` changes only how a commit is shown, and with options that keep
+the user's log settings (colour, signatures, notes, decorations) out of what
+it parses. The commits it read must match `git rev-list --all --count`; on
+a mismatch it reads them once more, since a ref can move meanwhile (an
+automatic checkpoint), and a second mismatch fails rather than report too
+little. It lists every name and email
+exactly as recorded: as author, committer, tagger (of every annotated tag
+object any ref reaches, a tag of a tag followed to the end, and a merge
+commit's embedded tag), or on a `Key: Name <email>` line anywhere in a
+commit's, an annotated tag's, or a merged tag's message. Other message lines that may name someone (a `…-by:` line
+without an email, a `Key:` line with a bare email, any line with an email)
+are listed apart. With each name, how often, its UTC offsets, and its first
+and last date. Then every offset; the signed commits, annotated tags, and
+merged tags, grouped by key, with the names each key signed under. The key
+is read from the signature's own bytes (every OpenPGP signature packet's
+issuer fingerprint or key ID, an SSH key's fingerprint), since verifying
+every commit with gpg takes about a tenth of a second each; signatures that
+don't name a key (X.509) are grouped by signer instead, never merged into
+one key. One commit or tag per key, for at most ten keys, is verified for
+the key's owner as this computer reports it (`%GS`, or `git verify-tag
+--raw`); a key that signed only merged tags isn't, and the output says
+"owner not checked". Then the authors in `den.yaml`, and a section only a
+copy of the folder carries: the remotes (`git remote -v`), with a password,
+a token used as a user name, and a query or fragment replaced by `***`;
+names that only the reflogs keep (who moved a ref, and the author and
+committer of a commit only a reflog reaches, such as an amended one), where
+the history doesn't already hold them; and the name, email, and signing key
+settings in the clone's own `.git/config` (a key file's path with the home
+folder as `~`). Unreachable objects no reflog
+names aren't read. Paths show the home folder as `~`. Every git command it
+runs is a read, stopped at the read time limit (#143). It's CLI only for
+now; the MCP server has no tool for it, since its output can hold the names
+a writer keeps apart, and #312's first push will run the same summary.
 
 **Git or a synced folder, not both.** A git repository inside a synced
 folder (Dropbox, OneDrive, iCloud) can be corrupted when two machines
@@ -982,7 +1028,7 @@ don't fit the timeline, and open threads at a frozen book's end.
 
 ### The command line (v0)
 
-**v0 behaviour, not a recorded decision** (#17). The CLI has thirteen
+**v0 behaviour, not a recorded decision** (#17). The CLI has fourteen
 commands, and `wolfden <command> --help` describes each one:
 
 | Command | What it does |
@@ -998,6 +1044,7 @@ commands, and `wolfden <command> --help` describes each one:
 | `wolfden freeze <book> [--universe <key>]` | Freezes a finished book (§5, #31): `status: final` in its `book.md`, then, when the den has git history, a checkpoint of the whole den and a tag on it, `book/<universe>/<book>/final` (or `final-2`, `final-3`, … for a book frozen before). `--universe` names the book's universe, when the den has several (see "Which universe" below). Freezing a book that's already final finishes a freeze whose checkpoint or tag failed, and otherwise does nothing. It prints the result's message, and exits 0 when the book is frozen (with its snapshot, or with no history to take one in), and 2 when it's refused (no such book, or a section an error leaves out, F-GEN-2) or a step in the history failed; then the message, on standard error, says what to do. |
 | `wolfden unfreeze <book> [--universe <key>]` | Unfreezes a book (§5, #31): `status: draft` in its `book.md`, then a checkpoint, with no tag, when the den has history. A book that isn't final is left as it is. It exits 0 when the book is unfrozen (or wasn't frozen), and 2 when it's refused or the checkpoint failed. |
 | `wolfden new-id [<count>]` | Prints new ids for files made by hand (format.md F-ID-5). |
+| `wolfden identity audit [--den <den>] [--json]` | Lists what the den's history would show anyone with a copy of it (#315, §6, "What a copy or push carries"): every name and email recorded as author, committer, tagger, or on a `Key: Name <email>` line in a message, other message lines that may name someone, the UTC offsets, signatures and their keys, and the authors in `den.yaml`; then, only in this folder, the remotes, names only the reflogs keep, and the clone's own name settings. Read-only. It exits 0 when the audit is done, a den with no history included, and 2 when there's no den or git can't read the history. `identity` is a group: showing and choosing the name the next checkpoint records come later, as its other subcommands (#311). |
 | `wolfden serve [<den>] [--universe <key>] [--port <n>] [--no-open] [--no-watch] [--home <folder>]` | Serves the web UI and the API on 127.0.0.1 (§9, #23), opens the default browser unless `--no-open`, and runs until Ctrl+C. The port is 9653 by default (WOLF on a phone keypad); `--port 0` picks a free one, and the address is printed either way. A port in use, or one the system won't let it use (reserved, or below 1024 on Linux), exits 2 and says so. `--universe` serves only that universe, as `mcp --universe` pins one; a key the den doesn't have exits 2. It hosts the same watcher as `mcp`, unless `--no-watch`. It's the one command that makes automatic checkpoints, when `den.yaml` sets `auto_checkpoint` (§6). Without a built UI, the API still works and the page says how to build the UI. When the installation (`--home`, see `user`) has login on, it warns once that this version doesn't ask for a login yet (#315); it never stops for that. |
 | `wolfden user add <name> (--role <role> \| --owner) [--password-stdin]`, `user list`, `user remove <name>`, `user set-role <name> <role>`, `user reset-password <name> [--password-stdin]`, `user unlock <name>`, each with `[--home <folder>] [--json]` | The accounts of this installation (#315): ASP.NET Core Identity's stores in `accounts.db`, in the **installation folder**, never in a den and never pushed. That folder is `%LOCALAPPDATA%\Wolfden` on Windows, `~/Library/Application Support/Wolfden` on macOS, and `$XDG_DATA_HOME/wolfden` (or `~/.local/share/wolfden`) elsewhere; `WOLFDEN_HOME` (a full path; a relative one is refused) moves it, and `--home` beats both. A folder that is a den or inside one is refused, by name and by where any symbolic link or junction along its path really leads, so a checkpoint can't record the accounts; one inside a git repository is allowed with a warning. Outside Windows, `accounts.db` is made 0600, and a folder other accounts can open gets a warning. It also holds `settings.json` (whether login is on) and, later, the cookie keys. A role is owner, writer or viewer: what the account may do, not what it sees (the Reader's view stays a filter anyone can turn on). `add` needs a role (`--owner` is `--role owner`), and asks for the password twice without echo, or reads one line from standard input with `--password-stdin`; a password is never a command-line argument. A password is 15 to 256 characters (15 is NIST SP 800-63B rev. 4's minimum for a single factor; maintainer decision, 2026-11-10), counted as Unicode code points after NFC normalization (which is also the form hashed), with no composition rules; the username itself and one character repeated are refused. A username is 1 to 64 letters, digits, `.`, `-` and `_`, compared without regard to case. No email or phone is stored: those columns aren't in the database. `add --role viewer` and `set-role … viewer` say that a viewer sees everything a writer sees, spoilers included. Removing or demoting the last owner is refused. `set-role` and `reset-password` end the account's sessions (a new security stamp); `reset-password` also ends a lockout. After 5 failed logins an account is locked for 15 minutes, and `unlock` ends that at once. `list` names the installation folder and whether login is on, and creates nothing. Each exits 0 when it did its job and 2 when it's refused or the installation can't be read. |
 | `wolfden login [on \| off] [--home <folder>] [--json]` | Turns login for this installation's web pages on or off in its `settings.json`, or with neither says whether it's on; it always names the installation folder. `on` is refused (exit 2) while there's no owner, so nobody can turn it on and lock themselves out, and prints what login protects and what it doesn't (the files, the CLI, stdio MCP, backups and sync). `off` always works: a `settings.json` that `login` refuses is first copied to `settings.json.broken`, then, if it's still one JSON object, only its `login` is set to false and its other keys are kept; otherwise (bad JSON, or a setting named twice) it's replaced with one that turns login off. It says which. Nothing enforces the setting until the web's login lands (#315 PR 4b): `login` and `serve` say so, and `--json` reports `enforced: false`. |

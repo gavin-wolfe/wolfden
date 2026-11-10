@@ -1500,6 +1500,11 @@ checkpoint, freezing and unfreezing, an AI assistant, or `wolfden init
   signing as off there, so it always says. When the den's own file turns
   signing on, git picks the key, and Wolfden can't check whose it is.
 
+This check covers what Wolfden records from now on. It doesn't cover a
+commit you make with git yourself, or checkpoints made before it. To see
+what the history already holds, run `wolfden identity audit`
+([What a copy of the history shows](#what-a-copy-of-the-history-shows)).
+
 To put a repository of its own under a name by hand, run these in its folder.
 The `author` and `committer` settings beat `user` if git has them, and the
 last four keep git's own key from signing under that name:
@@ -1527,6 +1532,9 @@ A few things to know:
   then `git push -u origin HEAD --tags`. A backup only has what you've
   pushed, so run `git push origin HEAD --tags` again after later
   checkpoints. `--tags` includes your freeze tags.
+  Before the first push, run `wolfden identity audit` to see what the
+  history would show
+  ([What a copy of the history shows](#what-a-copy-of-the-history-shows)).
 - **A den that's part of a bigger repository** already has history there,
   so there's nothing to turn on, and Wolfden says so.
 - **If a step fails** (a git hook refuses the first checkpoint, say),
@@ -1644,6 +1652,138 @@ checkpoints don't record the `.gitignore` itself, so a clone doesn't have
 it. It does nothing for a file that's already in the history. And Wolfden
 doesn't go by it when it reads notes: a git-ignored note is still indexed,
 still found by search, and still there for an AI assistant.
+
+### What a copy of the history shows
+
+A den's history keeps more than your notes. Every checkpoint records a
+name and an email, the time with your computer's UTC offset (`+0100`,
+`-0500`), and, if git signs your commits, which key signed it. Tags record
+a name too, and a commit message can name more people in lines such as
+`Co-Authored-By: Story Helper <helper@example.com>`. Anyone with a copy of
+the repository, or access to a remote you push it to, can read all of it.
+
+To see what's there before you share it or push it anywhere, or to check
+what the checks in
+[What every checkpoint and tag records](#what-every-checkpoint-and-tag-records)
+recorded, run this in the den's folder:
+
+```text
+wolfden identity audit
+```
+
+```text
+The den's history: 42 checkpoints, 3 tags, 3 annotated tag objects under any ref, on every branch, tag, and other ref.
+
+Names and emails it records:
+  Wren Calder <wren@example.com>
+    author of 40 checkpoints, committer of 40 checkpoints, tagger of 3 tags
+    from 2026-01-05 to 2026-03-30, UTC offset +0100
+  Story Helper <helper@example.com>
+    in Co-Authored-By of 12 messages
+  Ash Everyday <ash@example.com>
+    author of 2 checkpoints, committer of 2 checkpoints
+    on 2026-02-11, UTC offset +0100
+
+Elsewhere in checkpoint and tag messages, lines that may name someone:
+  Signed-off-by: Ash Everyday  (1 message)
+
+UTC offsets: +0100 (87 dates)
+
+Signatures: none of its checkpoints or tags are signed.
+
+Authors in den.yaml:
+  wren-calder: name: Wren Calder
+
+Only in this folder (not pushed or cloned):
+  Remotes:
+    origin  https://github.com/wren-calder/notes.git  (fetch, push)
+  Names only the reflogs keep (who moved a branch, or a checkpoint since amended or reset away):
+    Ash Everyday <ash@work.example>: 2 reflog entries, 1 checkpoint only a reflog keeps
+  Name settings in this copy's git config:
+    user.name = Wren Calder
+    user.email = wren@example.com
+  Objects nothing points to any more (git collects them in time) aren't read.
+
+A push or a clone carries the history and den.yaml above. A copy of the folder itself
+(a zip, a synced folder, a disk backup) carries all of it, the last part included.
+```
+
+Here two checkpoints were recorded under the writer's everyday name, which
+is easy to miss. One more, under their work email, was amended away, but
+this folder still keeps it.
+It lists:
+
+- **Every name and email**, as the author or committer of a checkpoint, the
+  tagger of a tag (under any branch, tag, or other ref, and tags merged into
+  a checkpoint), or on a line such as `Co-Authored-By: Name <email>`
+  anywhere in a checkpoint's or a tag's message, with how often and when. They're
+  shown exactly as git recorded them, so `Wren Calder` and `wren calder` are
+  two entries.
+- **Other lines of messages that may name someone,** such as
+  `Signed-off-by: Ash Everyday` without an email, or any line with an email
+  in it.
+- **Every UTC offset.** The same offset on two names is a hint that
+  they're one person.
+- **Signatures**, by key, with the names each key signed under and, when
+  your computer knows the key, who it belongs to ("owner not checked" when
+  it couldn't look). A key that signs under two names ties them together,
+  and once a key is on a keyserver, its own names are public too.
+- **The authors in `den.yaml`,** which every copy has as well.
+- **Only in this folder:** the remotes, with any account name in an address
+  (a password or a token in one is never printed); names only the reflogs
+  keep, git's record of where each branch has been, such as a checkpoint
+  you amended under another name; and the name settings in this copy's own
+  git config. A push or a clone doesn't carry these, but a copy of the
+  folder does, so zip or sync the den's folder only after checking them.
+
+It reads every branch, tag, and other ref, not only the one you're on. If
+the den is part of a larger repository, it reads that whole repository,
+since a push or a clone carries all of it. A `.mailmap` or a `git replace`
+doesn't hide a name from it. If this copy is shallow (cloned with
+`--depth`), it says so, since the full history may hold more. It changes
+nothing. Your home folder is shown as `~`.
+
+What it prints can include a name you keep apart from this den, so don't
+paste it into an issue or a chat. `--json` gives the same as one JSON
+document.
+
+Wolfden doesn't rewrite history, so a name that's already recorded stays in
+earlier checkpoints, and in every copy and backup already made. Rewriting
+history changes every checkpoint after it and breaks any copy or backup,
+which is why it's best to check before the first push.
+
+### Keeping two pen names apart
+
+If you write under two names and don't want readers to link them, keep
+them apart everywhere a history can show them:
+
+1. **Best: a separate account on your computer** for the second name. Its
+   git settings, keys, browser, and folders are then separate already.
+2. **Otherwise, on one computer account:**
+   - A separate den for each name, each in its own repository, never
+     one den or one repository for both. Each den's `den.yaml` lists only
+     its own name in `authors`.
+   - A separate remote for each, under a separate account on the hosting
+     site.
+   - A name in git for each folder, with git's `includeIf`, so a commit
+     you make by hand there records the right one. In your global git
+     settings (`~/.gitconfig`):
+
+     ```text
+     [includeIf "gitdir/i:~/dens/juno/"]
+         path = ~/dens/juno.gitconfig
+     ```
+
+     `gitdir/i:` matches the folder ignoring case, which is what you want on
+     Windows and macOS, where `Dens` and `dens` are the same folder.
+
+     and in `~/dens/juno.gitconfig`, that name's `[user]` `name` and
+     `email`, and its own signing key or `[commit] gpgsign = false`.
+   - A separate browser profile for each name's `wolfden serve`.
+3. **Before the first push, and now and then after:** run `wolfden identity
+   audit` in each den, and check that only that den's name shows.
+
+Wolfden can't tell that two dens belong to one person, and doesn't try.
 
 ## Freezing a finished book
 
@@ -1953,6 +2093,10 @@ in it, which Wolfden calls a checkpoint.
   change what Wolfden's checkpoints record, but still applies to git
   commands you run yourself
   ([Turning on history](#turning-on-history)).
+- **A push carries every name the history records.** Every checkpoint's
+  name and email, its UTC offset, and its signing key go with any copy or
+  push. `wolfden identity audit` lists them, so run it before the first
+  push ([What a copy of the history shows](#what-a-copy-of-the-history-shows)).
 - **Not in a synced folder.** Git and Dropbox, OneDrive, or iCloud
   together can corrupt the history when two computers sync while git is
   writing. Use one or the other: git with a private remote for a backup,

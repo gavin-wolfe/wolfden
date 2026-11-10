@@ -4,7 +4,7 @@ namespace Wolfden.Accounts;
 
 /// <summary>
 /// The common-password blocklist (#354): <c>CommonPasswords/common-passwords.txt</c>,
-/// a public-domain list of 10,000 (see the README beside it), built into
+/// a public-domain list of nearly 10,000 (see the README beside it), built into
 /// this assembly. It's read once, the first time a password is checked,
 /// and never fetched from anywhere.
 /// </summary>

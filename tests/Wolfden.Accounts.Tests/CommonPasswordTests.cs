@@ -62,6 +62,27 @@ public class CommonPasswordTests
         Assert.Null(PasswordRules.Problem("wren", "copper lantern harbor"));
     }
 
+    [Theory]
+    [Trait("Scenario", "SC-ACCT-10")]
+    [InlineData("ｐａｓｓｗｏｒｄｐａｓｓｗｏｒｄ")] // Fullwidth letters fold to plain ones (NFKC).
+    [InlineData("ＰＡＳＳＷＯＲＤ　１２３４５６７")] // Fullwidth capitals, an ideographic space, fullwidth digits.
+    [InlineData("password١٢٣٤٥٦٧")] // Arabic-Indic digits added.
+    [InlineData("१२३४५६७८९०१२३४५")] // Devanagari digits for 123456789012345.
+    public void CompatibilityFormsAndOtherDigitsCompareAsTheirPlainForms(string password)
+    {
+        Assert.Equal(PasswordRules.TooCommon, PasswordRules.Problem("wren", password));
+    }
+
+    [Fact]
+    public void TheComparisonFormIsNeverTheHashedForm()
+    {
+        const string fullwidth = "ｃｏｐｐｅｒ ｌａｎｔｅｒｎ ｈａｒｂｏｒ";
+
+        Assert.Equal("copperlanternharbor", PasswordRules.Skeleton(fullwidth));
+        Assert.Equal(fullwidth, PasswordRules.Normalize(fullwidth)); // NFC keeps fullwidth; only the comparison folds it.
+        Assert.Equal("password1234", PasswordRules.Skeleton("Password١٢٣٤"));
+    }
+
     [Fact]
     public void TheSkeletonKeepsLettersMarksAndDigitsInLowercase()
     {
@@ -73,7 +94,7 @@ public class CommonPasswordTests
     [Fact]
     public void TheBuiltInListLoadsAndHoldsTheTenThousand()
     {
-        // 10,000 lines; a few symbol-only entries collapse together or are too short to keep.
+        // 9,992 lines; a few symbol-only entries collapse together or are too short to keep.
         Assert.InRange(CommonPasswords.Default.Count, 9_900, 10_000);
         Assert.True(CommonPasswords.Default.Contains("password"));
         Assert.True(CommonPasswords.Default.Contains("filmspicgaleries"));

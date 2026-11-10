@@ -79,17 +79,25 @@ public sealed class PasswordRules : IPasswordValidator<WolfdenUser>
 
     /// <summary>
     /// The form passwords are compared to the blocklist and the context
-    /// words in: the NFC text's letters, combining marks and digits,
-    /// lowercased rune by rune with the invariant culture's simple mapping,
-    /// and nothing else. So <c>Pass Word!</c>, <c>pass-word</c> and
+    /// words in, never the form hashed: the text in NFKC, so compatibility
+    /// forms such as fullwidth <c>ｐａｓｓｗｏｒｄ</c> fold to plain letters;
+    /// then only its letters, combining marks and digits, lowercased rune by
+    /// rune with the invariant culture's simple mapping, with every decimal
+    /// digit (Arabic-Indic <c>١</c>, Devanagari <c>१</c>…) written as its
+    /// ASCII digit. So <c>Pass Word!</c>, <c>pass-word</c> and
     /// <c>PASSWORD</c> all compare as <c>password</c>.
     /// </summary>
     internal static string Skeleton(string normalized)
     {
-        var builder = new StringBuilder(normalized.Length);
-        foreach (var rune in normalized.EnumerateRunes())
+        var compatible = normalized.IsNormalized(NormalizationForm.FormKC) ? normalized : normalized.Normalize(NormalizationForm.FormKC);
+        var builder = new StringBuilder(compatible.Length);
+        foreach (var rune in compatible.EnumerateRunes())
         {
-            if (Rune.IsLetterOrDigit(rune) || Rune.GetUnicodeCategory(rune) is UnicodeCategory.NonSpacingMark or UnicodeCategory.SpacingCombiningMark or UnicodeCategory.EnclosingMark)
+            if (Rune.IsDigit(rune) && Rune.GetNumericValue(rune) is >= 0 and <= 9 and var digit)
+            {
+                builder.Append((char)('0' + (int)digit));
+            }
+            else if (Rune.IsLetterOrDigit(rune) || Rune.GetUnicodeCategory(rune) is UnicodeCategory.NonSpacingMark or UnicodeCategory.SpacingCombiningMark or UnicodeCategory.EnclosingMark)
             {
                 builder.Append(Rune.ToLowerInvariant(rune).ToString());
             }
@@ -101,13 +109,14 @@ public sealed class PasswordRules : IPasswordValidator<WolfdenUser>
     /// <summary>
     /// Whether <paramref name="skeleton"/> is one guessable unit said once or
     /// several times in a row, optionally followed by digits that are no
-    /// longer than the repeated part: <c>password</c>, <c>passwordpassword</c>,
-    /// <c>password1234</c>, but not <c>2000</c> followed by eleven random digits.
+    /// longer than the whole part before them: <c>password</c>,
+    /// <c>passwordpassword</c>, <c>password1234</c>, but not <c>2000</c>
+    /// followed by twelve random digits.
     /// </summary>
     internal static bool IsMadeOf(string skeleton, Func<string, bool> isGuessable)
     {
         var digitsFrom = skeleton.Length;
-        while (digitsFrom > 0 && char.IsAsciiDigit(skeleton[digitsFrom - 1]))
+        while (digitsFrom > 0 && char.IsDigit(skeleton[digitsFrom - 1]))
         {
             digitsFrom--;
         }

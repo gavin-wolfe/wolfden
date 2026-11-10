@@ -15,6 +15,12 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
   </ItemGroup>
 
+  <!-- The common-password blocklist (#354), read once on first use. Public
+       domain: see CommonPasswords/README.md. -->
+  <ItemGroup>
+    <EmbeddedResource Include="CommonPasswords\common-passwords.txt" LogicalName="Wolfden.Accounts.common-passwords.txt" />
+  </ItemGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="Wolfden.Accounts.Tests" />
     <InternalsVisibleTo Include="Wolfden.Cli.Tests" />

@@ -1928,7 +1928,11 @@ anyone who can use this computer, and says so when it starts with login on.
    rules: no digits or symbols required. A few random words in a row, such
    as `lantern otter quietly brass`, make an easy passphrase: long, and easy
    to remember. Pick words that don't go together, not a line you've
-   written. It can't be the username, or one character repeated. No email is asked for,
+   written. It can't be one character repeated, or a password anyone would
+   guess: a common one (Wolfden carries a list of nearly 10,000 and never goes
+   online to check), the username, or `wolfden`, even said twice or with a
+   few digits on the end, so `passwordpassword` and `wolfden 2026!!!!` are
+   refused. Case, spaces and punctuation don't help there. No email is asked for,
    so a pen name's address never reaches the accounts.
 2. **Turn it on:**
 

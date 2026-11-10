@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Accounts for an installation (#315): ASP.NET Core Identity's stores
+       over accounts.db, in the installation folder, outside every den. The
+       CLI's 'user' and 'login' commands use it; the API's login is to use
+       the same services (AccountsServices.AddWolfdenAccounts). -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <!-- Only for 'dotnet ef migrations add' (see AccountsDbContext); never shipped. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Wolfden.Accounts.Tests" />
+    <InternalsVisibleTo Include="Wolfden.Cli.Tests" />
+  </ItemGroup>
+
+</Project>

@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Wolfden.Accounts/Wolfden.Accounts.csproj" />
     <Project Path="src/Wolfden.Api/Wolfden.Api.csproj" />
     <Project Path="src/Wolfden.Cli/Wolfden.Cli.csproj" />
     <Project Path="src/Wolfden.Core/Wolfden.Core.csproj" />
@@ -8,6 +9,7 @@
     <Project Path="src/Wolfden.Mcp/Wolfden.Mcp.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Wolfden.Accounts.Tests/Wolfden.Accounts.Tests.csproj" />
     <Project Path="tests/Wolfden.Api.Tests/Wolfden.Api.Tests.csproj" />
     <Project Path="tests/Wolfden.Cli.Tests/Wolfden.Cli.Tests.csproj" />
     <Project Path="tests/Wolfden.Core.Tests/Wolfden.Core.Tests.csproj" />

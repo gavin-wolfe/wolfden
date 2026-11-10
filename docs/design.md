@@ -1711,13 +1711,19 @@ docs/
     (whether login is on, and a random installation id), and `keys/`
     (the Data Protection keys for the cookie, protected with DPAPI on
     Windows). Never in a den, never pushed. One installation is one
-    tenant; a role covers every den it serves (D5). Accounts are managed
+    tenant; a role covers every den it serves (the #311/#315 design, D5). Accounts are managed
     with the `wolfden` command only (§7, `user` and `login`).
   - **Login off** (the default): every request acts as the owner, as
     before accounts, and no cookie keys are kept. **Login on:** `serve`
     reads `settings.json` when it starts, and fails closed: an
-    installation it can't use or read, or login on with no owner, stops
-    it before it listens.
+    installation it can't use or read, a `keys/` it can't make, or login
+    on with no owner, stops it before it listens. It reads the setting
+    again every few seconds and fails safe: login turned on after it
+    started makes it answer everything but `/api/health` with 503
+    `restart_needed` until it's restarted; login turned off leaves it
+    asking until then. A session that ends while the page is open brings
+    the login form over the page, which stays mounted, so an open editor
+    keeps its text.
   - **Every endpoint declares a permission:** Read, Write or Owner
     (`.RequireWolfden(...)`, endpoint metadata), or is on a short list
     that needs no login: `/api/health`, `/api/auth/status`,
@@ -1741,14 +1747,19 @@ docs/
     other. A session slides: 14 days on 127.0.0.1. Each request checks the
     cookie's account against `accounts.db` (by its Guid id and security
     stamp), so a removed account, a new password or a new role ends its
-    sessions at once. With a public HTTPS origin (D8, later) it's
+    sessions at once. Log out ends the session in that browser only.
+    With a public HTTPS origin (the design's D8, later) it's
     `Secure` with the `__Host-` prefix, and a session lasts 12 hours.
   - **Guessing:** a wrong password, an unknown username and a locked
     account get the same 401 `login_failed`, and an unknown name still
     costs a password hash. Identity's lockout: 5 failures, then 15 minutes
     (`wolfden user unlock` ends it). ASP.NET Core's rate limiter allows 10
-    login attempts a minute per client address and per username (in
-    memory only), then answers 429 `too_many_attempts`.
+    login attempts a minute per username (keyed by Identity's normalized
+    name; a name no account could have takes no turn), then answers 429
+    `too_many_attempts`, in memory only. Per client address, 10 a minute
+    too, but only behind a proxy (a public origin): on 127.0.0.1 every
+    request has one address, so a limit there would let anyone on the
+    computer keep the owner out. A login body is at most 8 KB.
   - **CSRF and other pages:** `SameSite=Strict`, JSON bodies (a CORS
     preflight that's never granted), and with login on, every request but
     `GET` and `HEAD` must carry this server's `Origin` (403
@@ -1757,15 +1768,16 @@ docs/
   - **Who checkpoints record:** with login on or off, the name this copy
     of the den uses, through the gate (§6); a username is never written
     into git. Per-account commit names, and `Co-Authored-By` for other
-    people's saves (D7), come with per-user commits (#315 PR 5).
+    people's saves (the design's D7), come with per-user commits (#315 PR 5).
   - **Error codes:** `unauthenticated` (401), `forbidden` (403, saying
     what the role allows), `origin_required` (403), `login_failed` (401),
-    `too_many_attempts` (429), and `login_off` (409, a login sent while
-    login is off).
+    `too_many_attempts` (429), `too_large` (413, a login body over 8 KB),
+    `login_off` (409, a login sent while login is off), and
+    `restart_needed` (503, login turned on after `serve` started).
   - **What login doesn't protect:** the files, the CLI, stdio MCP,
     backups and sync. Anyone who can open the den's folder reads it
     without logging in; the guide says so in those words. Network access
-    requires login and comes through a reverse proxy first (D8).
+    requires login and comes through a reverse proxy first (the design's D8).
 - **The read API** (#24 to #27; v0 behaviour, not a recorded decision).
   Every endpoint is `GET`, with query parameters in camelCase. The
   answers come from the same read queries as the MCP read tools

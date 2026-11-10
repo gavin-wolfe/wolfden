@@ -35,8 +35,9 @@ and
 That dedication is accepted (maintainer decision, 2026-11-10) for two
 reasons:
 
-- A frequency-ranked list of passwords people used is factual data, with
-  no creative selection or arrangement to hold a copyright (in the US,
+- A list of passwords people used, chosen by how often they were used,
+  is factual data, with no creative selection or arrangement to hold a
+  copyright (in the US,
   *Feist v. Rural*, 1991).
 - The distributor's explicit dedication is the best evidence available.
 

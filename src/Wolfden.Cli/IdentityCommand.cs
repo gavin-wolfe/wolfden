@@ -43,22 +43,28 @@ internal static class IdentityCommand
         so you can check before you push it anywhere or share it:
 
         - every name and email it records, as the author or committer of a
-          checkpoint, as the tagger of a tag, or in a trailer such as
-          Co-Authored-By, with how often, the UTC offsets of their dates, and
+          checkpoint, as the tagger of a tag, or in a commit message line such
+          as Co-Authored-By, with how often, the UTC offsets of their dates, and
           when each was first and last recorded
+        - other lines of commit messages that may name someone: a
+          'Signed-off-by:' without an email, or any line holding an email
         - every UTC offset the dates carry, since the same offset on two names
           hints that they're one person
         - how many checkpoints and tags are signed, by which keys, under which
           names, and who each key belongs to as this computer's gpg or ssh
           setup reports it
-        - the remotes, and any account name in their addresses (a password in
-          one is never printed)
         - the authors in den.yaml, which travels with every copy too
+        - only in this folder: the remotes and any account name in their
+          addresses (a password or token is never printed), names that only
+          the reflogs keep (an amended checkpoint's, say), and the name settings
+          in this copy's own git config
 
-        It reads every branch and tag of the repository the den is in, the
-        whole repository when the den is part of a larger one, since a push or
-        a copy carries all of it. Names are shown as git recorded them: a
-        .mailmap doesn't hide one. It changes nothing.
+        It reads every branch, tag, and other ref of the repository the den is
+        in, the whole repository when the den is part of a larger one, since a
+        push or a clone carries all of it. A copy of the folder itself (a zip,
+        a synced folder, a disk backup) carries the last part too. Names are
+        shown as git recorded them: a .mailmap or a replace ref doesn't hide
+        one. It changes nothing.
 
           --den <den>   the den's folder; by default, the current folder or the
                         nearest folder above it with a den.yaml
@@ -184,6 +190,7 @@ internal static class IdentityCommand
             .ToList();
     }
 
+
     internal static void WriteText(TextWriter output, IdentityAudit audit, IReadOnlyList<DenAuthor>? authors, string? authorsProblem)
     {
         if (audit.State == IdentityAuditState.NoHistory)
@@ -196,15 +203,29 @@ internal static class IdentityCommand
             return;
         }
 
-        output.WriteLine(
-            $"The den's history: {Count(audit.Commits, "checkpoint")} and {Count(audit.Tags, "tag")}" +
-            (audit.Tags > 0 ? $" ({audit.AnnotatedTags} annotated)" : "") +
-            ", on every branch and tag.");
+        var tagParts = new List<string> { Count(audit.Tags, "tag") };
+        if (audit.AnnotatedTags > 0)
+        {
+            tagParts.Add($"{Count(audit.AnnotatedTags, "annotated tag object")} under any ref");
+        }
+
+        if (audit.MergedTags > 0)
+        {
+            tagParts.Add($"{Count(audit.MergedTags, "tag")} merged into checkpoints");
+        }
+
+        output.WriteLine($"The den's history: {Count(audit.Commits, "checkpoint")}, {string.Join(", ", tagParts)}, on every branch, tag, and other ref.");
         if (!audit.DenIsRepositoryRoot)
         {
             output.WriteLine(
-                $"The den is part of a larger repository, at {audit.RepositoryRoot}. A push or a copy carries that " +
+                $"The den is part of a larger repository, at {audit.RepositoryRoot}. A push or a clone carries that " +
                 "repository's whole history, so this covers all of it, not only the den's checkpoints.");
+        }
+
+        if (audit.Shallow)
+        {
+            output.WriteLine(
+                "This copy is shallow: it holds only part of the history, so the full history (where it was cloned from) may record more names.");
         }
 
         output.WriteLine();
@@ -242,6 +263,17 @@ internal static class IdentityCommand
             }
         }
 
+        if (audit.Mentions.Count > 0)
+        {
+            output.WriteLine();
+            output.WriteLine("Elsewhere in checkpoint messages, lines that may name someone:");
+            foreach (var mention in audit.Mentions)
+            {
+                var text = mention.Key is null ? mention.Text : $"{mention.Key}: {mention.Text}";
+                output.WriteLine($"  {text}  ({Count(mention.Commits, "checkpoint")})");
+            }
+        }
+
         output.WriteLine();
         output.WriteLine(audit.Offsets.Count == 0
             ? "UTC offsets: none"
@@ -251,68 +283,57 @@ internal static class IdentityCommand
         WriteSigning(output, audit);
 
         output.WriteLine();
-        output.WriteLine("Remotes:");
-        if (audit.Remotes.Count == 0)
-        {
-            output.WriteLine("  none");
-        }
-
-        foreach (var remote in audit.Remotes)
-        {
-            output.WriteLine($"  {remote.Name}  {remote.Url}  ({string.Join(", ", remote.Uses)})");
-            if (remote.Account is not null)
-            {
-                output.WriteLine($"    account name in the address: {remote.Account}");
-            }
-        }
-
-        output.WriteLine();
         WriteAuthors(output, authors, authorsProblem);
+
         output.WriteLine();
-        output.WriteLine("All of this travels with any copy or push of this den.");
+        WriteLocal(output, audit.Local);
+
+        output.WriteLine();
+        output.WriteLine("A push or a clone carries the history and den.yaml above. A copy of the folder itself");
+        output.WriteLine("(a zip, a synced folder, a disk backup) carries all of it, the last part included.");
     }
 
     private static void WriteSigning(TextWriter output, IdentityAudit audit)
     {
         var signing = audit.Signing;
-        if (signing.SignedCommits == 0 && signing.SignedTags == 0)
+        if (signing.SignedCommits == 0 && signing.SignedTags == 0 && signing.SignedMergedTags == 0)
         {
             output.WriteLine("Signatures: none of its checkpoints or tags are signed.");
             return;
         }
 
+        var parts = new List<string> { $"{signing.SignedCommits} of {Count(audit.Commits, "checkpoint")}" };
+        if (audit.AnnotatedTags > 0)
+        {
+            parts.Add($"{signing.SignedTags} of {Count(audit.AnnotatedTags, "annotated tag")}");
+        }
+
+        if (audit.MergedTags > 0)
+        {
+            parts.Add($"{signing.SignedMergedTags} of {Count(audit.MergedTags, "merged tag")}");
+        }
+
         var keys = signing.Keys.Count;
         output.WriteLine(
-            $"Signatures: {signing.SignedCommits} of {Count(audit.Commits, "checkpoint")}" +
-            (audit.AnnotatedTags > 0 ? $" and {signing.SignedTags} of {Count(audit.AnnotatedTags, "annotated tag")}" : "") +
-            $" signed, with {Count(keys, "key")}. A key ties together every name it signs under, for good.");
+            $"Signatures: {string.Join(", ", parts)} signed" +
+            (keys > 0 ? $", with {Count(keys, "key")}. A key ties together every name it signs under, for good." : "."));
         foreach (var key in signing.Keys)
         {
-            var kind = key.Kind switch
-            {
-                SignatureKind.OpenPgp => "OpenPGP key",
-                SignatureKind.Ssh => "SSH key",
-                SignatureKind.X509 => "X.509 certificate",
-                _ => "Unrecognized signature",
-            };
-            var what = new List<string>();
-            if (key.Commits > 0)
-            {
-                what.Add(Count(key.Commits, "checkpoint"));
-            }
-
-            if (key.Tags > 0)
-            {
-                what.Add(Count(key.Tags, "tag"));
-            }
-
-            output.WriteLine($"  {kind} {key.KeyId ?? "(which one isn't recorded in the signature)"}: {string.Join(", ", what)}");
+            output.WriteLine($"  {Kind(key.Kind)} {key.KeyId}: {What(key.Commits, key.Tags, key.MergedTags)}");
             if (key.SignedAs.Count > 0)
             {
                 output.WriteLine($"    signed as: {string.Join("; ", key.SignedAs)}");
             }
 
-            if (key.Owner is not null)
+            if (!key.OwnerChecked)
+            {
+                output.WriteLine("    owner not checked");
+            }
+            else if (key.Owner is null)
+            {
+                output.WriteLine("    owner: this computer can't say whose key it is");
+            }
+            else
             {
                 output.WriteLine($"    belongs to: {key.Owner} (as this computer reports it)");
                 if (!key.SignedAs.Contains(key.Owner, StringComparer.Ordinal) && key.SignedAs.Count > 0)
@@ -322,10 +343,106 @@ internal static class IdentityCommand
             }
         }
 
+        foreach (var group in signing.Unidentified)
+        {
+            var total = group.Commits + group.Tags + group.MergedTags;
+            var signer = group.SignedAs.Length == 0 ? "" : $", signed as {group.SignedAs}";
+            output.WriteLine(
+                $"  {Count(total, "signature")} whose key isn't recorded ({Kind(group.Kind)}){signer}: {What(group.Commits, group.Tags, group.MergedTags)}");
+        }
+
         if (signing.OwnersNotLookedUp > 0)
         {
             output.WriteLine($"  Owners weren't looked up for {Count(signing.OwnersNotLookedUp, "more key")}.");
         }
+
+        static string Kind(SignatureKind kind) => kind switch
+        {
+            SignatureKind.OpenPgp => "OpenPGP key",
+            SignatureKind.Ssh => "SSH key",
+            SignatureKind.X509 => "X.509 certificate",
+            _ => "unrecognized signature",
+        };
+
+        static string What(int commits, int tags, int merged)
+        {
+            var what = new List<string>();
+            if (commits > 0)
+            {
+                what.Add(Count(commits, "checkpoint"));
+            }
+
+            if (tags > 0)
+            {
+                what.Add(Count(tags, "tag"));
+            }
+
+            if (merged > 0)
+            {
+                what.Add(Count(merged, "merged tag"));
+            }
+
+            return string.Join(", ", what);
+        }
+    }
+
+    private static void WriteLocal(TextWriter output, LocalOnly local)
+    {
+        output.WriteLine("Only in this folder (not pushed or cloned):");
+        output.WriteLine("  Remotes:");
+        if (local.Remotes.Count == 0)
+        {
+            output.WriteLine("    none");
+        }
+
+        foreach (var remote in local.Remotes)
+        {
+            output.WriteLine($"    {remote.Name}  {remote.Url}  ({string.Join(", ", remote.Uses)})");
+            if (remote.Account is not null)
+            {
+                output.WriteLine($"      account name in the address: {remote.Account}");
+            }
+        }
+
+        output.WriteLine("  Names only the reflogs keep (who moved a branch, or a checkpoint since amended or reset away):");
+        if (local.Names.Count == 0)
+        {
+            output.WriteLine("    none");
+        }
+
+        foreach (var name in local.Names)
+        {
+            var what = new List<string>();
+            if (name.ReflogEntries > 0)
+            {
+                what.Add(Count(name.ReflogEntries, "reflog entry", "reflog entries"));
+            }
+
+            if (name.UnreachableCommits > 0)
+            {
+                what.Add(Count(name.UnreachableCommits, "checkpoint only a reflog keeps", "checkpoints only a reflog keeps"));
+            }
+
+            output.WriteLine($"    {name.Name} <{name.Email}>: {string.Join(", ", what)}");
+        }
+
+        output.WriteLine("  Name settings in this copy's git config:");
+        if (local.Settings.Count == 0)
+        {
+            output.WriteLine("    none");
+        }
+
+        foreach (var setting in local.Settings)
+        {
+            output.WriteLine($"    {setting.Key} = {setting.Value}");
+        }
+
+        if (local.Problem is not null)
+        {
+            output.WriteLine($"  Not all of it could be read: {local.Problem}.");
+        }
+
+        output.WriteLine("  Objects nothing points to any more (git collects them in time) aren't read.");
     }
 
     private static void WriteAuthors(TextWriter output, IReadOnlyList<DenAuthor>? authors, string? problem)
@@ -351,7 +468,8 @@ internal static class IdentityCommand
 
     private static string Day(DateTimeOffset date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
-    private static string Count(int count, string noun) => count == 1 ? $"1 {noun}" : $"{count.ToString(CultureInfo.InvariantCulture)} {noun}s";
+    private static string Count(int count, string noun, string? plural = null) =>
+        count == 1 ? $"1 {noun}" : $"{count.ToString(CultureInfo.InvariantCulture)} {plural ?? noun + "s"}";
 
     /// <summary>An author in <c>den.yaml</c>, with the plain values its identity sets.</summary>
     internal sealed record DenAuthor(string Key, IReadOnlyList<DenAuthorField> Fields);
@@ -362,64 +480,77 @@ internal static class IdentityCommand
     /// <summary>
     /// The JSON shape of <c>wolfden identity audit --json</c>. <see cref="History"/>
     /// is <c>audited</c> or <c>none</c> (no repository, and every list empty).
+    /// Paths and addresses show the home folder as <c>~</c>.
     /// </summary>
     /// <param name="Version">The shape's version, 1.</param>
     /// <param name="History"><c>audited</c>, or <c>none</c> when the den isn't in a git repository.</param>
     /// <param name="RepositoryRoot">The repository's top folder, or null.</param>
     /// <param name="DenIsRepositoryRoot">False when the den is part of a larger repository, whose whole history is listed.</param>
+    /// <param name="Shallow">True for a shallow clone, which holds only part of the history.</param>
     /// <param name="Commits">How many commits (checkpoints) the repository holds, on every ref.</param>
-    /// <param name="Tags">How many tags.</param>
-    /// <param name="AnnotatedTags">How many of the tags record a tagger.</param>
+    /// <param name="Tags">How many tags are under <c>refs/tags</c>.</param>
+    /// <param name="AnnotatedTags">How many annotated tag objects any ref reaches.</param>
+    /// <param name="MergedTags">How many tags are embedded in merge commits.</param>
     /// <param name="Identities">Every name and email recorded.</param>
+    /// <param name="Mentions">Other lines of commit messages that may name someone.</param>
     /// <param name="Offsets">Every UTC offset recorded.</param>
     /// <param name="Signing">The signatures and keys.</param>
-    /// <param name="Remotes">The remotes, with any password in an address replaced by <c>***</c>.</param>
     /// <param name="Authors">The authors in <c>den.yaml</c>, or null when it can't be read.</param>
     /// <param name="AuthorsProblem">Why <paramref name="Authors"/> is null.</param>
+    /// <param name="Local">Only in this folder: remotes, names only the reflogs keep, and this copy's name settings.</param>
     internal sealed record AuditReport(
         int Version,
         string History,
         string? RepositoryRoot,
         bool DenIsRepositoryRoot,
+        bool Shallow,
         int Commits,
         int Tags,
         int AnnotatedTags,
+        int MergedTags,
         IReadOnlyList<RecordedIdentity> Identities,
+        IReadOnlyList<MessageMention> Mentions,
         IReadOnlyList<RecordedOffset> Offsets,
         SigningReport Signing,
-        IReadOnlyList<RemoteAddress> Remotes,
         IReadOnlyList<DenAuthor>? Authors,
-        string? AuthorsProblem)
+        string? AuthorsProblem,
+        LocalOnly Local)
     {
         public static AuditReport From(IdentityAudit audit, IReadOnlyList<DenAuthor>? authors, string? authorsProblem) => new(
             1,
             audit.State == IdentityAuditState.Audited ? "audited" : "none",
             audit.RepositoryRoot,
             audit.DenIsRepositoryRoot,
+            audit.Shallow,
             audit.Commits,
             audit.Tags,
             audit.AnnotatedTags,
+            audit.MergedTags,
             audit.Identities,
+            audit.Mentions,
             audit.Offsets,
             new SigningReport(
                 audit.Signing.SignedCommits,
                 audit.Signing.SignedTags,
-                audit.Signing.Keys.Select(k => new KeyReport(
-                    k.Kind switch { SignatureKind.OpenPgp => "openpgp", SignatureKind.Ssh => "ssh", SignatureKind.X509 => "x509", _ => "unknown" },
-                    k.KeyId,
-                    k.Commits,
-                    k.Tags,
-                    k.SignedAs,
-                    k.Owner)).ToList(),
+                audit.Signing.SignedMergedTags,
+                audit.Signing.Keys.Select(k => new KeyReport(KindName(k.Kind), k.KeyId, k.Commits, k.Tags, k.MergedTags, k.SignedAs, k.Owner, k.OwnerChecked)).ToList(),
+                audit.Signing.Unidentified.Select(u => new UnidentifiedReport(KindName(u.Kind), u.SignedAs, u.Commits, u.Tags, u.MergedTags)).ToList(),
                 audit.Signing.OwnersNotLookedUp),
-            audit.Remotes,
             authors,
-            authorsProblem);
+            authorsProblem,
+            audit.Local);
+
+        private static string KindName(SignatureKind kind) =>
+            kind switch { SignatureKind.OpenPgp => "openpgp", SignatureKind.Ssh => "ssh", SignatureKind.X509 => "x509", _ => "unknown" };
     }
 
-    /// <summary>The signatures: how many commits and annotated tags are signed, and by which keys.</summary>
-    internal sealed record SigningReport(int SignedCommits, int SignedTags, IReadOnlyList<KeyReport> Keys, int OwnersNotLookedUp);
+    /// <summary>The signatures: how many commits, annotated tags, and merged tags are signed, and by which keys.</summary>
+    internal sealed record SigningReport(
+        int SignedCommits, int SignedTags, int SignedMergedTags, IReadOnlyList<KeyReport> Keys, IReadOnlyList<UnidentifiedReport> Unidentified, int OwnersNotLookedUp);
 
-    /// <summary>One signing key: <c>openpgp</c>, <c>ssh</c>, <c>x509</c>, or <c>unknown</c>, its fingerprint, what it signed, and its owner as this computer reports it.</summary>
-    internal sealed record KeyReport(string Kind, string? KeyId, int Commits, int Tags, IReadOnlyList<string> SignedAs, string? Owner);
+    /// <summary>One signing key: <c>openpgp</c> or <c>ssh</c>, its fingerprint, what it signed, and its owner as this computer reports it, if that was checked.</summary>
+    internal sealed record KeyReport(string Kind, string? KeyId, int Commits, int Tags, int MergedTags, IReadOnlyList<string> SignedAs, string? Owner, bool OwnerChecked);
+
+    /// <summary>Signatures that don't record their key (<c>x509</c> or <c>unknown</c>), by one signer.</summary>
+    internal sealed record UnidentifiedReport(string Kind, string SignedAs, int Commits, int Tags, int MergedTags);
 }

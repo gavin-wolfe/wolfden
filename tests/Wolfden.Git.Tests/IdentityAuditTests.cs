@@ -85,7 +85,7 @@ public sealed class IdentityAuditTests
         Assert.Equal([new RecordedOffset("+0100", 5), new RecordedOffset("-0500", 4)], audit.Offsets);
         Assert.Equal(0, audit.Signing.SignedCommits);
         Assert.Empty(audit.Signing.Keys);
-        Assert.Empty(audit.Remotes);
+        Assert.Empty(audit.Local.Remotes);
     }
 
     [Fact]
@@ -99,7 +99,7 @@ public sealed class IdentityAuditTests
         var audit = IdentityAudit.Run(repo.DenRoot, TestRepo.Options, Token);
 
         Assert.False(audit.DenIsRepositoryRoot);
-        Assert.Equal(repo.Root, audit.RepositoryRoot, ignoreCase: OperatingSystem.IsWindows());
+        Assert.Equal(IdentityAudit.Tilde(repo.Root, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)), audit.RepositoryRoot, ignoreCase: OperatingSystem.IsWindows());
         Assert.Equal("Juno Pike", Assert.Single(audit.Identities).Name);
     }
 
@@ -140,17 +140,17 @@ public sealed class IdentityAuditTests
 
         var audit = IdentityAudit.Run(repo.DenRoot, TestRepo.Options, Token);
 
-        Assert.Equal(3, audit.Remotes.Count);
-        var fetch = Assert.Single(audit.Remotes, r => r.Name == "origin" && r.Uses.Contains("fetch"));
+        Assert.Equal(3, audit.Local.Remotes.Count);
+        var fetch = Assert.Single(audit.Local.Remotes, r => r.Name == "origin" && r.Uses.Contains("fetch"));
         Assert.Equal("https://wren-calder:***@example.com/wren/notes.git", fetch.Url);
         Assert.Equal("wren-calder", fetch.Account);
-        var push = Assert.Single(audit.Remotes, r => r.Name == "origin" && r.Uses.Contains("push"));
+        var push = Assert.Single(audit.Local.Remotes, r => r.Name == "origin" && r.Uses.Contains("push"));
         Assert.Equal("git@example.com:wren/notes.git", push.Url);
         Assert.Null(push.Account);
-        var backup = Assert.Single(audit.Remotes, r => r.Name == "backup");
+        var backup = Assert.Single(audit.Local.Remotes, r => r.Name == "backup");
         Assert.Equal(["fetch", "push"], backup.Uses);
         Assert.Equal("juno", backup.Account);
-        Assert.DoesNotContain(audit.Remotes, r => r.Url.Contains("s3cret", StringComparison.Ordinal));
+        Assert.DoesNotContain(audit.Local.Remotes, r => r.Url.Contains("s3cret", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -187,6 +187,7 @@ public sealed class IdentityAuditTests
         Assert.Equal((0, 1), (ssh.Commits, ssh.Tags));
         Assert.Equal(["Wren Calder <wren@example.com>"], ssh.SignedAs);
         Assert.Null(ssh.Owner);
+        Assert.True(ssh.OwnerChecked);
 
         // One check of one commit for the one key with a commit; never one per commit.
         Assert.Single(File.ReadAllLines(log));
@@ -262,15 +263,15 @@ public sealed class IdentityAuditTests
     [Trait("Scenario", "SC-HIST-25")]
     public void ASignaturesKeyIsReadFromItsOwnBytes()
     {
-        Assert.Equal(new SignatureKey(SignatureKind.Ssh, SshFingerprint), SignatureKey.Read(SshSignature));
-        Assert.Equal(new SignatureKey(SignatureKind.OpenPgp, Fingerprint), SignatureKey.Read(Pgp(Packet(fingerprint: true, keyId: true))));
-        Assert.Equal(new SignatureKey(SignatureKind.OpenPgp, Fingerprint[^16..], KeyIdIsShort: true), SignatureKey.Read(Pgp(Packet(fingerprint: false, keyId: true))));
-        Assert.Equal(new SignatureKey(SignatureKind.OpenPgp, Fingerprint, false), SignatureKey.Read(Pgp(Packet(fingerprint: true, keyId: false), armorHeader: true)));
-        Assert.Equal(new SignatureKey(SignatureKind.OpenPgp, null), SignatureKey.Read(Pgp(Packet(fingerprint: false, keyId: false))));
-        Assert.Equal(new SignatureKey(SignatureKind.X509, null), SignatureKey.Read("-----BEGIN SIGNED MESSAGE-----\nMIIB\n-----END SIGNED MESSAGE-----"));
-        Assert.Equal(new SignatureKey(SignatureKind.OpenPgp, null), SignatureKey.Read("-----BEGIN PGP SIGNATURE-----\n\nnot base64!\n-----END PGP SIGNATURE-----"));
-        Assert.Equal(new SignatureKey(SignatureKind.OpenPgp, null), SignatureKey.Read("-----BEGIN PGP SIGNATURE-----\n\niQ==\n-----END PGP SIGNATURE-----"));
-        Assert.Equal(new SignatureKey(SignatureKind.Unknown, null), SignatureKey.Read("no signature here"));
+        Assert.Equal([new SignatureKey(SignatureKind.Ssh, SshFingerprint)], SignatureKey.Read(SshSignature));
+        Assert.Equal([new SignatureKey(SignatureKind.OpenPgp, Fingerprint)], SignatureKey.Read(Pgp(Packet(fingerprint: true, keyId: true))));
+        Assert.Equal([new SignatureKey(SignatureKind.OpenPgp, Fingerprint[^16..], KeyIdIsShort: true)], SignatureKey.Read(Pgp(Packet(fingerprint: false, keyId: true))));
+        Assert.Equal([new SignatureKey(SignatureKind.OpenPgp, Fingerprint, false)], SignatureKey.Read(Pgp(Packet(fingerprint: true, keyId: false), armorHeader: true)));
+        Assert.Equal([new SignatureKey(SignatureKind.OpenPgp, null)], SignatureKey.Read(Pgp(Packet(fingerprint: false, keyId: false))));
+        Assert.Equal([new SignatureKey(SignatureKind.X509, null)], SignatureKey.Read("-----BEGIN SIGNED MESSAGE-----\nMIIB\n-----END SIGNED MESSAGE-----"));
+        Assert.Equal([new SignatureKey(SignatureKind.OpenPgp, null)], SignatureKey.Read("-----BEGIN PGP SIGNATURE-----\n\nnot base64!\n-----END PGP SIGNATURE-----"));
+        Assert.Equal([new SignatureKey(SignatureKind.OpenPgp, null)], SignatureKey.Read("-----BEGIN PGP SIGNATURE-----\n\niQ==\n-----END PGP SIGNATURE-----"));
+        Assert.Equal([new SignatureKey(SignatureKind.Unknown, null)], SignatureKey.Read("no signature here"));
     }
 
     [Theory]
@@ -282,9 +283,286 @@ public sealed class IdentityAuditTests
     [InlineData("git@example.com:wren/notes.git", "git@example.com:wren/notes.git", null)]
     [InlineData("juno@example.com:notes.git", "juno@example.com:notes.git", "juno")]
     [InlineData("C:/notes/backup.git", "C:/notes/backup.git", null)]
+    [InlineData("https://pen:p@ss@w0rd@example.com/den.git", "https://pen:***@example.com/den.git", "pen")]
+    [InlineData("https://ghp_abcdefghijklmnopqrstuvwxyz0123456789@github.com/pen/den.git", "https://***@github.com/pen/den.git", null)]
+    [InlineData("https://github_pat_11ABC@github.com/pen/den.git", "https://***@github.com/pen/den.git", null)]
+    [InlineData("https://glpat-xyz@gitlab.example.com/den.git", "https://***@gitlab.example.com/den.git", null)]
+    [InlineData("https://x-access-token:ghs_secret@github.com/pen/den.git", "https://***@github.com/pen/den.git", null)]
+    [InlineData("https://oauth2:glpat-secret@gitlab.example.com/den.git", "https://***@gitlab.example.com/den.git", null)]
+    [InlineData("https://a1b2c3d4e5f6a7b8c9d0e1f2@example.com/den.git", "https://***@example.com/den.git", null)]
+    [InlineData("https://example.com/den.git?access_token=SECRET123", "https://example.com/den.git?***", null)]
+    [InlineData("https://example.com/den.git#SECRET", "https://example.com/den.git#***", null)]
+    [InlineData("https://example.com?token=SECRET", "https://example.com?***", null)]
+    [InlineData("ghp_abcdefghijklmnopqrstuvwxyz0123456789@github.com:pen/den.git", "***@github.com:pen/den.git", null)]
     public void ARemoteAddressKeepsItsAccountNameAndLosesItsPassword(string url, string shown, string? account)
     {
         Assert.Equal((shown, account), IdentityAudit.Redact(url));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-24")]
+    public void AReplaceRefDoesntHideTheNameACommitRecords()
+    {
+        using var repo = TestRepo.Create();
+        Commit(repo, "Leaked", "Ash Everyday", "ash@example.com", "2026-01-05T09:00:00+01:00");
+        var original = repo.Git("rev-parse", "HEAD").Trim();
+        var edited = repo.Git("cat-file", "commit", original).Replace("Ash Everyday <ash@example.com>", "Wren Calder <wren@example.com>", StringComparison.Ordinal);
+        repo.Git("replace", original, WriteObject(repo, "commit", edited));
+        Assert.Contains("Wren Calder", repo.Git("log", "--format=%an"), StringComparison.Ordinal);
+
+        var audit = IdentityAudit.Run(repo.DenRoot, TestRepo.Options, Token);
+
+        Assert.Equal(1, Single(audit, "Ash Everyday", "ash@example.com").AsAuthor);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-24")]
+    public void ColourAndSignatureSettingsDontChangeWhatsRead()
+    {
+        using var repo = TestRepo.Create();
+        Commit(repo, "Notes", "Ash Everyday", "ash@example.com", "2026-01-05T09:00:00+01:00");
+        repo.Git("config", "color.ui", "always");
+        repo.Git("config", "color.diff", "always");
+        repo.Git("config", "log.showSignature", "true");
+        repo.Git("config", "log.decorate", "full");
+
+        var audit = IdentityAudit.Run(repo.DenRoot, TestRepo.Options, Token);
+
+        Assert.Equal(1, audit.Commits);
+        Assert.Equal(1, Single(audit, "Ash Everyday", "ash@example.com").AsAuthor);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-24")]
+    public void ATagOutsideRefsTagsAndATagOfATagAreRead()
+    {
+        using var repo = TestRepo.Create();
+        Commit(repo, "Notes", "Wren Calder", "wren@example.com", "2026-01-05T09:00:00+01:00");
+        TestRepo.RunGit(repo.Root, Who("Ash Everyday", "ash@example.com", "2026-01-06T09:00:00+01:00"), "tag", "-a", "-m", "inner", "inner");
+        TestRepo.RunGit(repo.Root, Who("Juno Pike", "juno@example.com", "2026-01-07T09:00:00+01:00"), "tag", "-a", "-m", "outer", "outer", "inner");
+        repo.Git("tag", "-d", "inner");
+        TestRepo.RunGit(repo.Root, Who("Birch Lane", "birch@example.com", "2026-01-08T09:00:00+01:00"), "tag", "-a", "-m", "kept", "kept");
+        repo.Git("update-ref", "refs/custom/keep", repo.Git("rev-parse", "kept").Trim());
+        repo.Git("tag", "-d", "kept");
+
+        var audit = IdentityAudit.Run(repo.DenRoot, TestRepo.Options, Token);
+
+        Assert.Equal(1, audit.Tags);
+        Assert.Equal(3, audit.AnnotatedTags);
+        Assert.Equal(1, Single(audit, "Ash Everyday", "ash@example.com").AsTagger);
+        Assert.Equal(1, Single(audit, "Juno Pike", "juno@example.com").AsTagger);
+        Assert.Equal(1, Single(audit, "Birch Lane", "birch@example.com").AsTagger);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-25")]
+    public void AMergedTagsSignatureAndTaggerAreReadPastAnIndentedLine()
+    {
+        using var repo = TestRepo.Create();
+        var first = CraftCommit(repo, "main", "Wren Calder", "wren@example.com", signature: null, parent: null);
+        var side = CraftCommit(repo, "side", "Wren Calder", "wren@example.com", signature: null, parent: first);
+        var signature = string.Join("\n ", Pgp(Packet(fingerprint: true, keyId: false)).Split('\n'));
+        var mergetag =
+            $"mergetag object {side}\n type commit\n tag rel\n tagger Ash Everyday <ash@example.com> 1767600000 +0100\n \n Release notes\n \n    - indented item\n done\n {signature}\n";
+        var tree = WriteObject(repo, "tree", "");
+        var merge = WriteObject(
+            repo,
+            "commit",
+            $"tree {tree}\nparent {first}\nparent {side}\nauthor Wren Calder <wren@example.com> 1767600000 +0100\ncommitter Wren Calder <wren@example.com> 1767600000 +0100\n{mergetag}\nMerge tag 'rel'\n");
+        repo.Git("update-ref", "refs/heads/main", merge);
+        repo.Git("branch", "-D", "side");
+
+        var audit = IdentityAudit.Run(repo.DenRoot, TestRepo.Options, Token);
+
+        Assert.Equal(1, audit.MergedTags);
+        Assert.Equal(1, audit.Signing.SignedMergedTags);
+        Assert.Equal(1, Single(audit, "Ash Everyday", "ash@example.com").AsTagger);
+        var key = Assert.Single(audit.Signing.Keys);
+        Assert.Equal(Fingerprint, key.KeyId);
+        Assert.Equal((0, 0, 1), (key.Commits, key.Tags, key.MergedTags));
+        Assert.Equal(["Ash Everyday <ash@example.com>"], key.SignedAs);
+        Assert.False(key.OwnerChecked);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-24")]
+    public void NamesElsewhereInMessagesAreFound()
+    {
+        using var repo = TestRepo.Create();
+        Commit(repo, "one\n\nThanks to the team\nCo-Authored-By: Story Helper <helper@example.com>", "Wren Calder", "wren@example.com", "2026-01-05T09:00:00+01:00");
+        Commit(repo, "two\n\nSigned-off-by: Ash Everyday", "Wren Calder", "wren@example.com", "2026-01-05T09:01:00+01:00");
+        Commit(repo, "three\n\nReviewed-by: reviewer@example.com", "Wren Calder", "wren@example.com", "2026-01-05T09:02:00+01:00");
+        Commit(repo, "four\n\nCo-Authored-By: Juno Pike <juno@example.com> (copyedits)", "Wren Calder", "wren@example.com", "2026-01-05T09:03:00+01:00");
+        Commit(repo, "five\n\nMention Birch Lane <birch@example.com> in the body.\n\nSigned-off-by: Wren Calder <wren@example.com>", "Wren Calder", "wren@example.com", "2026-01-05T09:04:00+01:00");
+        Commit(repo, "six\n\nco-authored-by:Story Helper <helper@example.com>\nCloses: #12\nSee https://example.com/x", "Wren Calder", "wren@example.com", "2026-01-05T09:05:00+01:00");
+
+        var audit = IdentityAudit.Run(repo.DenRoot, TestRepo.Options, Token);
+
+        Assert.Equal([new TrailerUse("Co-Authored-By", 2)], Single(audit, "Story Helper", "helper@example.com").InTrailers);
+        Assert.Equal([new TrailerUse("Co-Authored-By", 1)], Single(audit, "Juno Pike", "juno@example.com").InTrailers);
+        Assert.Equal([new TrailerUse("Signed-off-by", 1)], Single(audit, "Wren Calder", "wren@example.com").InTrailers);
+        Assert.Equal(
+            [
+                new MessageMention(null, "Mention Birch Lane <birch@example.com> in the body.", 1),
+                new MessageMention("Reviewed-by", "reviewer@example.com", 1),
+                new MessageMention("Signed-off-by", "Ash Everyday", 1),
+            ],
+            audit.Mentions);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-24")]
+    public void NamesOnlyTheReflogsKeepAndThisCopysSettingsAreListedApart()
+    {
+        using var repo = TestRepo.Create();
+        Commit(repo, "Start", "Wren Calder", "wren@example.com", "2026-01-05T09:00:00+01:00");
+        TestRepo.RunGit(repo.Root, Who("Ash Everyday", "ash@example.com", "2026-01-05T10:00:00+01:00"), "commit", "--quiet", "--allow-empty", "-m", "oops");
+        TestRepo.RunGit(repo.Root, Who("Wren Calder", "wren@example.com", "2026-01-05T10:01:00+01:00"), "commit", "--quiet", "--allow-empty", "--amend", "--reset-author", "-m", "fixed");
+        repo.Git("config", "user.name", "Juno Pike");
+        repo.Git("config", "user.signingkey", "0123456789ABCDEF");
+
+        var audit = IdentityAudit.Run(repo.DenRoot, TestRepo.Options, Token);
+
+        Assert.DoesNotContain(audit.Identities, i => i.Name == "Ash Everyday");
+        Assert.Null(audit.Local.Problem);
+        var ash = Assert.Single(audit.Local.Names, n => n.Name == "Ash Everyday");
+        // One entry in HEAD's reflog and one in main's.
+        Assert.Equal(("ash@example.com", 2, 1), (ash.Email, ash.ReflogEntries, ash.UnreachableCommits));
+        Assert.DoesNotContain(audit.Local.Names, n => n.Name == "Wren Calder");
+        Assert.Contains(new LocalSetting("user.name", "Juno Pike"), audit.Local.Settings);
+        Assert.Contains(new LocalSetting("user.signingkey", "0123456789ABCDEF"), audit.Local.Settings);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-24")]
+    public void AShallowCloneSaysSo()
+    {
+        using var repo = TestRepo.Create();
+        Commit(repo, "One", "Wren Calder", "wren@example.com", "2026-01-05T09:00:00+01:00");
+        Commit(repo, "Two", "Wren Calder", "wren@example.com", "2026-01-05T09:01:00+01:00");
+        var clone = TestRepo.NewFolder();
+        try
+        {
+            TestRepo.RunGit(clone, "clone", "--quiet", "--depth", "1", new Uri(repo.Root).AbsoluteUri, "copy");
+            var audit = IdentityAudit.Run(Path.Combine(clone, "copy"), TestRepo.Options, Token);
+
+            Assert.True(audit.Shallow);
+            Assert.Equal(1, audit.Commits);
+            Assert.False(IdentityAudit.Run(repo.DenRoot, TestRepo.Options, Token).Shallow);
+        }
+        finally
+        {
+            TestRepo.DeleteFolder(clone);
+        }
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-25")]
+    public void AKeyThatSignedOnlyTagsIsCheckedThroughTheTag()
+    {
+        using var repo = TestRepo.Create();
+        var log = UseFakeGpg(repo, "Ash Everyday <ash@example.com>");
+        var commit = CraftCommit(repo, "main", "Wren Calder", "wren@example.com", signature: null, parent: null);
+        CraftTag(repo, "v1", commit, "Wren Calder", "wren@example.com", Pgp(Packet(fingerprint: true, keyId: false)));
+        repo.Git("config", "log.showSignature", "true");
+
+        var audit = IdentityAudit.Run(repo.DenRoot, TestRepo.Options, Token);
+
+        var key = Assert.Single(audit.Signing.Keys);
+        Assert.Equal((0, 1), (key.Commits, key.Tags));
+        Assert.True(key.OwnerChecked);
+        Assert.Equal("Ash Everyday <ash@example.com>", key.Owner);
+        Assert.Single(File.ReadAllLines(log));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-25")]
+    public void AnOwnerIsReadExactlyWhenGitIsSetToShowSignatures()
+    {
+        using var repo = TestRepo.Create();
+        UseFakeGpg(repo, "Ash Everyday <ash@example.com>");
+        CraftCommit(repo, "main", "Wren Calder", "wren@example.com", Pgp(Packet(fingerprint: true, keyId: false)), parent: null);
+        repo.Git("config", "log.showSignature", "true");
+        repo.Git("config", "color.ui", "always");
+
+        var audit = IdentityAudit.Run(repo.DenRoot, TestRepo.Options, Token);
+
+        Assert.Equal("Ash Everyday <ash@example.com>", Assert.Single(audit.Signing.Keys).Owner);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-25")]
+    public void SignaturesThatDontNameAKeyAreGroupedBySignerNotMergedIntoOneKey()
+    {
+        using var repo = TestRepo.Create();
+        var x509 = "-----BEGIN SIGNED MESSAGE-----\nMIIBcrafted\n-----END SIGNED MESSAGE-----";
+        var first = CraftCommit(repo, "main", "Wren Calder", "wren@example.com", x509, parent: null);
+        var second = CraftCommit(repo, "main", "Ash Everyday", "ash@example.com", x509.Replace("crafted", "other", StringComparison.Ordinal), parent: first);
+        CraftCommit(repo, "main", "Ash Everyday", "ash@example.com", x509, parent: second);
+
+        var audit = IdentityAudit.Run(repo.DenRoot, TestRepo.Options, Token);
+
+        Assert.Empty(audit.Signing.Keys);
+        Assert.Equal(
+            [
+                new UnidentifiedSignatures(SignatureKind.X509, "Ash Everyday <ash@example.com>", 2, 0, 0),
+                new UnidentifiedSignatures(SignatureKind.X509, "Wren Calder <wren@example.com>", 1, 0, 0),
+            ],
+            audit.Signing.Unidentified);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-25")]
+    public void EverySignatureInABlockIsRead()
+    {
+        var other = "FEDCBA9876543210FEDCBA9876543210FEDCBA98";
+        var one = Packet(fingerprint: true, keyId: false);
+        var two = Packet(fingerprint: true, keyId: false, fingerprintHex: other);
+        byte[] packets = [0xC2, (byte)one.Length, .. one, 0x88, (byte)two.Length, .. two];
+
+        Assert.Equal(
+            [new SignatureKey(SignatureKind.OpenPgp, Fingerprint), new SignatureKey(SignatureKind.OpenPgp, other)],
+            SignatureKey.Read(Armor(packets)));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-25")]
+    public void MalformedSignatureBytesEndQuicklyWithNoKey()
+    {
+        // A length far past the end, as in the review's repro.
+        Assert.Equal([new SignatureKey(SignatureKind.OpenPgp, null)], SignatureKey.Read(Armor([0x86, 0xFF, 0xFF, 0xFF, 0xFB])));
+        Assert.Equal([new SignatureKey(SignatureKind.OpenPgp, null)], SignatureKey.Read(Armor([0xC2, 0xFF, 0xFF, 0xFF, 0xFF, 0xFB, 4])));
+        Assert.Equal([new SignatureKey(SignatureKind.OpenPgp, null)], SignatureKey.Read(Armor([0xC2, 8, 4, 0, 22, 10, 0xFF, 0xFF, 0, 0])));
+        Assert.Equal([new SignatureKey(SignatureKind.Ssh, null)], SignatureKey.Read(
+            "-----BEGIN SSH SIGNATURE-----\n" + Convert.ToBase64String([.. "SSHSIG"u8, 0, 0, 0, 1, 0xFF, 0xFF, 0xFF, 0xF0]) + "\n-----END SSH SIGNATURE-----"));
+
+        var random = new Random(315);
+        var clock = Stopwatch.StartNew();
+        for (var i = 0; i < 20_000; i++)
+        {
+            var bytes = new byte[random.Next(0, 80)];
+            random.NextBytes(bytes);
+            if (bytes.Length > 0 && i % 2 == 0)
+            {
+                bytes[0] = (byte)(i % 4 == 0 ? 0xC2 : 0x88);
+            }
+
+            Assert.NotEmpty(SignatureKey.Read(Armor(bytes)));
+        }
+
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(30), $"took {clock.Elapsed}");
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-HIST-24")]
+    [InlineData(@"D:\Homes\wren\dens\notes", @"D:\Homes\wren", @"~\dens\notes")]
+    [InlineData("file:///D:/Homes/wren/backup.git", @"D:\Homes\wren", "file:///~/backup.git")]
+    [InlineData("/home/wren/dens/notes", "/home/wren", "~/dens/notes")]
+    [InlineData("/home/wrenna/dens", "/home/wren", "/home/wrenna/dens")]
+    [InlineData("/srv/dens", "/home/wren", "/srv/dens")]
+    public void TheHomeFolderIsShownAsATilde(string text, string home, string shown)
+    {
+        Assert.Equal(shown, IdentityAudit.Tilde(text, home));
     }
 
     private static RecordedIdentity Single(IdentityAudit audit, string name, string email) =>
@@ -404,10 +682,13 @@ public sealed class IdentityAuditTests
     }
 
     /// <summary>An armored OpenPGP signature holding <paramref name="body"/> as one signature packet.</summary>
-    private static string Pgp(byte[] body, bool oldFormat = false, bool armorHeader = false)
+    private static string Pgp(byte[] body, bool oldFormat = false, bool armorHeader = false) =>
+        Armor(oldFormat ? [0x88, (byte)body.Length, .. body] : [0xC2, (byte)body.Length, .. body], armorHeader);
+
+    /// <summary>Armored OpenPGP signature text around <paramref name="packets"/>.</summary>
+    private static string Armor(byte[] packets, bool armorHeader = false)
     {
-        byte[] packet = oldFormat ? [0x88, (byte)body.Length, .. body] : [0xC2, (byte)body.Length, .. body];
-        var base64 = Convert.ToBase64String(packet);
+        var base64 = Convert.ToBase64String(packets);
         var lines = Enumerable.Range(0, (base64.Length + 63) / 64).Select(i => base64.Substring(i * 64, Math.Min(64, base64.Length - (i * 64))));
         return "-----BEGIN PGP SIGNATURE-----\n" + (armorHeader ? "Comment: crafted\n" : "") + "\n" + string.Join("\n", lines) + "\n=AbCd\n-----END PGP SIGNATURE-----";
     }

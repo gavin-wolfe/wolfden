@@ -698,27 +698,43 @@ asks for the den's history provider on each request, so checkpoints, the
 History tab, freezing, and automatic checkpoints work at once, without a
 restart; while a turn-on runs, an automatic checkpoint skips its poll.
 
-**What a copy or push carries** (#315; v0 behaviour). Everything in the
-repository travels with a copy or a push, and a history can tie two names
-to one person: both recorded in one repository, the same UTC offset on
-both, or one key signing under both. `wolfden identity audit` lists it
+**What a copy or push carries** (#315; v0 behaviour). A push or a clone
+carries the whole repository, and a copy of the folder (a zip, a synced
+folder, a disk backup) carries its `.git` folder too. A history can tie two
+names to one person: both recorded in one repository, the same UTC offset
+on both, or one key signing under both. `wolfden identity audit` lists it
 before the writer shares anything. It reads every ref of the repository the
 den is in (`git log --all`: branches, tags, remote-tracking branches, notes,
-the stash), the whole repository when the den is part of a larger one, and
-lists every name and email exactly as recorded, as author, committer,
-tagger (a merge commit's embedded tag included), or in a trailer of the
-form `Key: Name <email>` (as git finds trailers, so `Co-Authored-By`,
-`Signed-off-by`, and any other); `.mailmap` isn't applied. With each, how
-often, its UTC offsets, and its first and last date. Then every offset; the
-signed commits and annotated tags, grouped by key, with the names each key
-signed under. The key is read from the signature's own bytes (an OpenPGP
+the stash), the whole repository when the den is part of a larger one, with
+`GIT_NO_REPLACE_OBJECTS=1` and `--no-use-mailmap`, since a replace ref or a
+`.mailmap` changes only how a commit is shown, and with options that keep
+the user's log settings (colour, signatures, notes, decorations) out of what
+it parses. The commits it read must match `git rev-list --all --count`, or
+it fails rather than report too little. It lists every name and email
+exactly as recorded: as author, committer, tagger (of every annotated tag
+object any ref reaches, a tag of a tag followed to the end, and a merge
+commit's embedded tag), or on a `Key: Name <email>` line anywhere in a
+commit message. Other message lines that may name someone (a `…-by:` line
+without an email, a `Key:` line with a bare email, any line with an email)
+are listed apart. With each name, how often, its UTC offsets, and its first
+and last date. Then every offset; the signed commits, annotated tags, and
+merged tags, grouped by key, with the names each key signed under. The key
+is read from the signature's own bytes (every OpenPGP signature packet's
 issuer fingerprint or key ID, an SSH key's fingerprint), since verifying
-every commit with gpg takes about a tenth of a second each; only one commit
-per key, for at most ten keys, is verified, for the key's owner as this
-computer reports it (`%GS`). Then the remotes (`git remote -v`), with a
-password in an address replaced and an account name in it picked out, and
-the authors in `den.yaml` with every plain value they set. Every git command
-it runs is a read, stopped at the read time limit (#143). It's CLI only for
+every commit with gpg takes about a tenth of a second each; signatures that
+don't name a key (X.509) are grouped by signer instead, never merged into
+one key. One commit or tag per key, for at most ten keys, is verified for
+the key's owner as this computer reports it (`%GS`, or `git verify-tag
+--raw`); a key that signed only merged tags isn't, and the output says
+"owner not checked". Then the authors in `den.yaml`, and a section only a
+copy of the folder carries: the remotes (`git remote -v`), with a password,
+a token used as a user name, and a query or fragment replaced by `***`;
+names that only the reflogs keep (who moved a ref, and the author and
+committer of a commit only a reflog reaches, such as an amended one), where
+the history doesn't already hold them; and the name, email, and signing key
+settings in the clone's own `.git/config`. Unreachable objects no reflog
+names aren't read. Paths show the home folder as `~`. Every git command it
+runs is a read, stopped at the read time limit (#143). It's CLI only for
 now; the MCP server has no tool for it, since its output can hold the names
 a writer keeps apart, and #312's first push will run the same summary.
 
@@ -982,7 +998,7 @@ commands, and `wolfden <command> --help` describes each one:
 | `wolfden freeze <book> [--universe <key>]` | Freezes a finished book (§5, #31): `status: final` in its `book.md`, then, when the den has git history, a checkpoint of the whole den and a tag on it, `book/<universe>/<book>/final` (or `final-2`, `final-3`, … for a book frozen before). `--universe` names the book's universe, when the den has several (see "Which universe" below). Freezing a book that's already final finishes a freeze whose checkpoint or tag failed, and otherwise does nothing. It prints the result's message, and exits 0 when the book is frozen (with its snapshot, or with no history to take one in), and 2 when it's refused (no such book, or a section an error leaves out, F-GEN-2) or a step in the history failed; then the message, on standard error, says what to do. |
 | `wolfden unfreeze <book> [--universe <key>]` | Unfreezes a book (§5, #31): `status: draft` in its `book.md`, then a checkpoint, with no tag, when the den has history. A book that isn't final is left as it is. It exits 0 when the book is unfrozen (or wasn't frozen), and 2 when it's refused or the checkpoint failed. |
 | `wolfden new-id [<count>]` | Prints new ids for files made by hand (format.md F-ID-5). |
-| `wolfden identity audit [--den <den>]` | Lists what the den's history would show anyone with a copy of it (#315, §6, "What a copy or push carries"): every name and email recorded as author, committer, tagger, or in a trailer, the UTC offsets, signatures and their keys, the remotes, and the authors in `den.yaml`. Read-only. It exits 0 when the audit is done, a den with no history included, and 2 when there's no den or git can't read the history. `identity` is a group: showing and choosing the name the next checkpoint records come later, as its other subcommands (#311). |
+| `wolfden identity audit [--den <den>] [--json]` | Lists what the den's history would show anyone with a copy of it (#315, §6, "What a copy or push carries"): every name and email recorded as author, committer, tagger, or on a `Key: Name <email>` line in a message, other message lines that may name someone, the UTC offsets, signatures and their keys, and the authors in `den.yaml`; then, only in this folder, the remotes, names only the reflogs keep, and the clone's own name settings. Read-only. It exits 0 when the audit is done, a den with no history included, and 2 when there's no den or git can't read the history. `identity` is a group: showing and choosing the name the next checkpoint records come later, as its other subcommands (#311). |
 | `wolfden serve [<den>] [--universe <key>] [--port <n>] [--no-open] [--no-watch]` | Serves the web UI and the API on 127.0.0.1 (§9, #23), opens the default browser unless `--no-open`, and runs until Ctrl+C. The port is 9653 by default (WOLF on a phone keypad); `--port 0` picks a free one, and the address is printed either way. A port in use, or one the system won't let it use (reserved, or below 1024 on Linux), exits 2 and says so. `--universe` serves only that universe, as `mcp --universe` pins one; a key the den doesn't have exits 2. It hosts the same watcher as `mcp`, unless `--no-watch`. It's the one command that makes automatic checkpoints, when `den.yaml` sets `auto_checkpoint` (§6). Without a built UI, the API still works and the page says how to build the UI. |
 | `wolfden mcp [<den>] [--universe <key>] [--no-watch]` | Runs the MCP server over stdio for an AI client (§8, #20) until the client disconnects or Ctrl+C. `--universe` pins the session to one universe (§8); a key the den doesn't have exits 2. Standard output carries only the protocol; log messages go to standard error. It exits 2 if there's no den and 3 if it stops because of a failure after it started, but serves a den whose `den.yaml` doesn't load, so the client can call `check` to find out why. |
 

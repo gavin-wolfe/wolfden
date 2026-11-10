@@ -53,16 +53,23 @@ public sealed class IdentityCommandTests : IDisposable
 
         Assert.Equal(CliApp.ExitOk, exitCode);
         Assert.Empty(error);
-        Assert.StartsWith("The den's history: 2 checkpoints and 0 tags, on every branch and tag.\n", output, StringComparison.Ordinal);
+        Assert.StartsWith("The den's history: 2 checkpoints, 0 tags, on every branch, tag, and other ref.\n", output, StringComparison.Ordinal);
         Assert.DoesNotContain("larger repository", output, StringComparison.Ordinal);
         Assert.Contains("\n  Wren Calder <wren@example.com>\n    author of 1 checkpoint, committer of 1 checkpoint\n", output, StringComparison.Ordinal);
         Assert.Contains("\n  Juno Pike <juno@example.com>\n", output, StringComparison.Ordinal);
         Assert.Contains("\n  Story Helper <helper@example.com>\n    in Co-Authored-By of 1 checkpoint\n", output, StringComparison.Ordinal);
         Assert.Contains("\nSignatures: none of its checkpoints or tags are signed.\n", output, StringComparison.Ordinal);
-        Assert.Contains("\n  origin  https://wren:***@example.com/notes.git  (fetch, push)\n    account name in the address: wren\n", output, StringComparison.Ordinal);
-        Assert.DoesNotContain("hunter22", output, StringComparison.Ordinal);
         Assert.Contains("\nAuthors in den.yaml:\n  wren-calder: name: Wren Calder, email: wren@example.com\n  juno-pike: name: Juno Pike\n", output, StringComparison.Ordinal);
-        Assert.EndsWith("\nAll of this travels with any copy or push of this den.\n", output, StringComparison.Ordinal);
+        Assert.Contains(
+            "\nOnly in this folder (not pushed or cloned):\n  Remotes:\n    origin  https://wren:***@example.com/notes.git  (fetch, push)\n      account name in the address: wren\n",
+            output,
+            StringComparison.Ordinal);
+        Assert.Contains("\n  Name settings in this copy's git config:\n    none\n", output, StringComparison.Ordinal);
+        Assert.DoesNotContain("hunter22", output, StringComparison.Ordinal);
+        Assert.EndsWith(
+            "\nA push or a clone carries the history and den.yaml above. A copy of the folder itself\n(a zip, a synced folder, a disk backup) carries all of it, the last part included.\n",
+            output,
+            StringComparison.Ordinal);
         Assert.Equal(before, Cli.Snapshot(_den.Root));
     }
 
@@ -83,8 +90,10 @@ public sealed class IdentityCommandTests : IDisposable
         var names = json.GetProperty("identities").EnumerateArray().Select(i => $"{i.GetProperty("name").GetString()} <{i.GetProperty("email").GetString()}>").ToList();
         Assert.Equal(["Juno Pike <juno@example.com>", "Wren Calder <wren@example.com>", "Story Helper <helper@example.com>"], names);
         Assert.Equal(0, json.GetProperty("signing").GetProperty("signedCommits").GetInt32());
-        Assert.Equal("https://wren:***@example.com/notes.git", json.GetProperty("remotes")[0].GetProperty("url").GetString());
-        Assert.Equal("wren", json.GetProperty("remotes")[0].GetProperty("account").GetString());
+        var remote = json.GetProperty("local").GetProperty("remotes")[0];
+        Assert.Equal("https://wren:***@example.com/notes.git", remote.GetProperty("url").GetString());
+        Assert.Equal("wren", remote.GetProperty("account").GetString());
+        Assert.Equal(0, json.GetProperty("mentions").GetArrayLength());
         var author = json.GetProperty("authors")[0];
         Assert.Equal("wren-calder", author.GetProperty("key").GetString());
         Assert.Equal("email", author.GetProperty("fields")[1].GetProperty("key").GetString());
@@ -125,32 +134,93 @@ public sealed class IdentityCommandTests : IDisposable
     [Trait("Scenario", "SC-HIST-25")]
     public void AKeyThatBelongsToAnotherNameIsCalledOut()
     {
-        var audit = new Wolfden.Git.IdentityAudit(
-            Wolfden.Git.IdentityAuditState.Audited, null, _den.Root, true, 3, 1, 1, [], [],
+        var audit = Audit(
+            commits: 3,
+            annotatedTags: 1,
+            mergedTags: 1,
             new Wolfden.Git.SigningSummary(
                 2,
                 1,
+                1,
                 [
-                    new Wolfden.Git.SigningKeyUse(Wolfden.Git.SignatureKind.OpenPgp, "0123456789ABCDEF0123456789ABCDEF01234567", 2, 0,
-                        ["Wren Calder <wren@example.com>", "Juno Pike <juno@example.com>"], "Ash Everyday <ash@example.com>"),
-                    new Wolfden.Git.SigningKeyUse(Wolfden.Git.SignatureKind.X509, null, 0, 1, ["Wren Calder <wren@example.com>"], null),
+                    new Wolfden.Git.SigningKeyUse(Wolfden.Git.SignatureKind.OpenPgp, "0123456789ABCDEF0123456789ABCDEF01234567", 2, 0, 0,
+                        ["Wren Calder <wren@example.com>", "Juno Pike <juno@example.com>"], "Ash Everyday <ash@example.com>", true),
+                    new Wolfden.Git.SigningKeyUse(Wolfden.Git.SignatureKind.Ssh, "SHA256:abc", 0, 0, 1, ["Ash Everyday <ash@example.com>"], null, false),
+                    new Wolfden.Git.SigningKeyUse(Wolfden.Git.SignatureKind.Ssh, "SHA256:def", 0, 1, 0, ["Wren Calder <wren@example.com>"], null, true),
                 ],
-                0),
-            []);
-        var output = new StringWriter { NewLine = "\n" };
+                [new Wolfden.Git.UnidentifiedSignatures(Wolfden.Git.SignatureKind.X509, "Wren Calder <wren@example.com>", 2, 0, 0)],
+                0));
 
-        IdentityCommand.WriteText(output, audit, [], null);
+        var output = Text(audit);
 
         Assert.Contains(
-            "\nSignatures: 2 of 3 checkpoints and 1 of 1 annotated tag signed, with 2 keys. A key ties together every name it signs under, for good.\n" +
+            "\nSignatures: 2 of 3 checkpoints, 1 of 1 annotated tag, 1 of 1 merged tag signed, with 3 keys. A key ties together every name it signs under, for good.\n" +
             "  OpenPGP key 0123456789ABCDEF0123456789ABCDEF01234567: 2 checkpoints\n" +
             "    signed as: Wren Calder <wren@example.com>; Juno Pike <juno@example.com>\n" +
             "    belongs to: Ash Everyday <ash@example.com> (as this computer reports it)\n" +
             "    That isn't a name it signed as, so anyone who checks the signature can link the two.\n" +
-            "  X.509 certificate (which one isn't recorded in the signature): 1 tag\n" +
-            "    signed as: Wren Calder <wren@example.com>\n",
-            output.ToString(),
+            "  SSH key SHA256:abc: 1 merged tag\n" +
+            "    signed as: Ash Everyday <ash@example.com>\n" +
+            "    owner not checked\n" +
+            "  SSH key SHA256:def: 1 tag\n" +
+            "    signed as: Wren Calder <wren@example.com>\n" +
+            "    owner: this computer can't say whose key it is\n" +
+            "  2 signatures whose key isn't recorded (X.509 certificate), signed as Wren Calder <wren@example.com>: 2 checkpoints\n",
+            output,
             StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-25")]
+    public void SignaturesOnlyOnMergedTagsArentReportedAsNone()
+    {
+        var audit = Audit(
+            commits: 2,
+            annotatedTags: 0,
+            mergedTags: 1,
+            new Wolfden.Git.SigningSummary(0, 0, 1, [new Wolfden.Git.SigningKeyUse(Wolfden.Git.SignatureKind.Ssh, "SHA256:abc", 0, 0, 1, [], null, false)], [], 0));
+
+        var output = Text(audit);
+
+        Assert.DoesNotContain("none of its checkpoints", output, StringComparison.Ordinal);
+        Assert.Contains("\nSignatures: 0 of 2 checkpoints, 1 of 1 merged tag signed, with 1 key.", output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-24")]
+    public void MentionsTheReflogsAndThisCopysSettingsAreShown()
+    {
+        var audit = Audit(commits: 1, annotatedTags: 0, mergedTags: 0, new Wolfden.Git.SigningSummary(0, 0, 0, [], [], 0)) with
+        {
+            Shallow = true,
+            Mentions = [new Wolfden.Git.MessageMention("Signed-off-by", "Ash Everyday", 1), new Wolfden.Git.MessageMention(null, "Thanks to ash@example.com", 2)],
+            Local = new Wolfden.Git.LocalOnly(
+                [],
+                [new Wolfden.Git.LocalName("Ash Everyday", "ash@example.com", 2, 1)],
+                [new Wolfden.Git.LocalSetting("user.name", "Ash Everyday")],
+                null),
+        };
+
+        var output = Text(audit);
+
+        Assert.Contains("\nThis copy is shallow:", output, StringComparison.Ordinal);
+        Assert.Contains(
+            "\nElsewhere in checkpoint messages, lines that may name someone:\n  Signed-off-by: Ash Everyday  (1 checkpoint)\n  Thanks to ash@example.com  (2 checkpoints)\n",
+            output,
+            StringComparison.Ordinal);
+        Assert.Contains("\n    Ash Everyday <ash@example.com>: 2 reflog entries, 1 checkpoint only a reflog keeps\n", output, StringComparison.Ordinal);
+        Assert.Contains("\n  Name settings in this copy's git config:\n    user.name = Ash Everyday\n", output, StringComparison.Ordinal);
+    }
+
+    private Wolfden.Git.IdentityAudit Audit(int commits, int annotatedTags, int mergedTags, Wolfden.Git.SigningSummary signing) => new(
+        Wolfden.Git.IdentityAuditState.Audited, null, _den.Root, true, false, commits, annotatedTags, annotatedTags, mergedTags, [], [], [], signing,
+        new Wolfden.Git.LocalOnly([], [], [], null));
+
+    private static string Text(Wolfden.Git.IdentityAudit audit)
+    {
+        var output = new StringWriter { NewLine = "\n" };
+        IdentityCommand.WriteText(output, audit, [], null);
+        return output.ToString();
     }
 
     [Theory]

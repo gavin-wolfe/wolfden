@@ -1643,7 +1643,7 @@ wolfden identity audit
 ```
 
 ```text
-The den's history: 42 checkpoints and 3 tags (3 annotated), on every branch and tag.
+The den's history: 42 checkpoints, 3 tags, 3 annotated tag objects under any ref, on every branch, tag, and other ref.
 
 Names and emails it records:
   Wren Calder <wren@example.com>
@@ -1655,39 +1655,63 @@ Names and emails it records:
     author of 2 checkpoints, committer of 2 checkpoints
     on 2026-02-11, UTC offset +0100
 
+Elsewhere in checkpoint messages, lines that may name someone:
+  Signed-off-by: Ash Everyday  (1 checkpoint)
+
 UTC offsets: +0100 (87 dates)
 
 Signatures: none of its checkpoints or tags are signed.
 
-Remotes:
-  origin  https://github.com/wren-calder/notes.git  (fetch, push)
-
 Authors in den.yaml:
   wren-calder: name: Wren Calder
 
-All of this travels with any copy or push of this den.
+Only in this folder (not pushed or cloned):
+  Remotes:
+    origin  https://github.com/wren-calder/notes.git  (fetch, push)
+  Names only the reflogs keep (who moved a branch, or a checkpoint since amended or reset away):
+    Ash Everyday <ash@example.com>: 2 reflog entries, 1 checkpoint only a reflog keeps
+  Name settings in this copy's git config:
+    user.name = Wren Calder
+    user.email = wren@example.com
+  Objects nothing points to any more (git collects them in time) aren't read.
+
+A push or a clone carries the history and den.yaml above. A copy of the folder itself
+(a zip, a synced folder, a disk backup) carries all of it, the last part included.
 ```
 
-Here two checkpoints were recorded under the writer's everyday name, which
-is easy to miss. It lists:
+Here checkpoints were recorded under the writer's everyday name, which is
+easy to miss, and one more was amended away but is still in this folder.
+It lists:
 
 - **Every name and email**, as the author or committer of a checkpoint, the
-  tagger of a tag, or in a line such as `Co-Authored-By` or
-  `Signed-off-by`, with how often and when. They're shown exactly as git
-  recorded them, so `Wren Calder` and `wren calder` are two entries.
+  tagger of a tag (under any branch, tag, or other ref, and tags merged into
+  a checkpoint), or on a line such as `Co-Authored-By: Name <email>`
+  anywhere in a checkpoint's message, with how often and when. They're
+  shown exactly as git recorded them, so `Wren Calder` and `wren calder` are
+  two entries.
+- **Other lines of messages that may name someone,** such as
+  `Signed-off-by: Ash Everyday` without an email, or any line with an email
+  in it.
 - **Every UTC offset.** The same offset on two names is a hint that
   they're one person.
 - **Signatures**, by key, with the names each key signed under and, when
-  your computer knows the key, who it belongs to. A key that signs under
-  two names ties them together, and once a key is on a keyserver, its own
-  names are public too.
-- **The remotes,** and an account name in an address. A password in an
-  address is never printed.
+  your computer knows the key, who it belongs to ("owner not checked" when
+  it couldn't look). A key that signs under two names ties them together,
+  and once a key is on a keyserver, its own names are public too.
 - **The authors in `den.yaml`,** which every copy has as well.
+- **Only in this folder:** the remotes, with any account name in an address
+  (a password or a token in one is never printed); names only the reflogs
+  keep, git's record of where each branch has been, such as a checkpoint
+  you amended under another name; and the name settings in this copy's own
+  git config. A push or a clone doesn't carry these, but a copy of the
+  folder does, so zip or sync the den's folder only after checking them.
 
-It reads every branch and tag, not only the one you're on. If the den is
-part of a larger repository, it reads that whole repository, since a push
-or a copy carries all of it. It changes nothing.
+It reads every branch, tag, and other ref, not only the one you're on. If
+the den is part of a larger repository, it reads that whole repository,
+since a push or a clone carries all of it. A `.mailmap` or a `git replace`
+doesn't hide a name from it. If this copy is shallow (cloned with
+`--depth`), it says so, since the full history may hold more. It changes
+nothing. Your home folder is shown as `~`.
 
 What it prints can include a name you keep apart from this den, so don't
 paste it into an issue or a chat. `--json` gives the same as one JSON
@@ -1716,9 +1740,12 @@ them apart everywhere a history can show them:
      settings (`~/.gitconfig`):
 
      ```text
-     [includeIf "gitdir:~/dens/juno/"]
+     [includeIf "gitdir/i:~/dens/juno/"]
          path = ~/dens/juno.gitconfig
      ```
+
+     `gitdir/i:` matches the folder ignoring case, which is what you want on
+     Windows and macOS, where `Dens` and `dens` are the same folder.
 
      and in `~/dens/juno.gitconfig`, that name's `[user]` `name` and
      `email`, and its own signing key or `[commit] gpgsign = false`.

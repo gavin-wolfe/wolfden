@@ -4742,24 +4742,38 @@ Spec: design.md §6, "Turning history on" (#286). Covered by:
 
 The writer keeps the den under the pen name Wren Calder. Before the first
 push, they run `wolfden identity audit` in the den's folder. Two checkpoints
-on a side branch were made under their everyday name, Ash Everyday, and an
-AI assistant's checkpoints name it in `Co-Authored-By`.
+on a side branch were made under their everyday name, Ash Everyday, one
+more was amended away, and an AI assistant's checkpoints name it in
+`Co-Authored-By`.
 
 - It lists every name and email the history records, exactly as recorded
-  (`juno pike` and `Juno Pike` are two), as author, committer, tagger, or in
-  a trailer such as `Co-Authored-By` or `Signed-off-by`, each with how often,
-  its UTC offsets, and its first and last date. A trailer named twice in one
-  commit counts once; a line such as `Closes: #12` names nobody.
-- It reads every branch and tag, not just the one checked out, so Ash
-  Everyday shows. A `.mailmap` doesn't hide a name.
-- It lists every UTC offset, the remotes with any account name in their
-  addresses (a password is never printed), and the authors in `den.yaml`
-  with every value they set, and ends: "All of this travels with any copy
-  or push of this den."
+  (`juno pike` and `Juno Pike` are two), as author, committer, tagger, or on
+  a `Key: Name <email>` line anywhere in a message (`Co-Authored-By`,
+  `Signed-off-by`, one in a paragraph git wouldn't call trailers, one with a
+  comment after it), each with how often, its UTC offsets, and its first and
+  last date. A line repeated in one commit counts once, whatever its key's
+  case; a line such as `Closes: #12` names nobody.
+- Other message lines that may name someone are listed apart: a
+  `Signed-off-by:` without an email, a `Reviewed-by:` with a bare email, a
+  line of the body with an email in it.
+- It reads every branch, tag, and other ref, not just the one checked out,
+  so Ash Everyday shows. Tags are read under any ref, a tag of a tag to the
+  end, and a merge commit's embedded tag too. A `.mailmap` or a replace ref
+  doesn't hide a name, and colour, signature, or decoration settings don't
+  change what's read; if what it read doesn't add up to git's own count, it
+  stops with an error rather than report too little.
+- It lists every UTC offset and the authors in `den.yaml` with every value
+  they set. Then a section only a copy of the folder carries: the remotes,
+  with any account name in their addresses (a password, a token used as a
+  user name, or a query string is never printed); names only the reflogs
+  keep (Ash Everyday, from the amended checkpoint); and this copy's own name
+  settings. It ends by saying what a push or a clone carries, and that a copy
+  of the folder carries the last section too.
 - A den inside a larger repository is audited for that whole repository,
-  and the output says so. A den with no repository still lists its
-  `den.yaml` authors, and a `den.yaml` that doesn't parse doesn't stop the
-  history's audit.
+  and the output says so; a shallow clone says it holds only part of the
+  history. A den with no repository still lists its `den.yaml` authors, and
+  a `den.yaml` that doesn't parse doesn't stop the history's audit. The home
+  folder is shown as `~`.
 - It changes nothing, and `--json` gives the same as one document.
 
 Spec: design.md §6, "What a copy or push carries", and §7 (#315, design
@@ -4769,29 +4783,43 @@ Spec: design.md §6, "What a copy or push carries", and §7 (#315, design
 `IdentityAuditTests.ADenWithNoRepositoryOrNoCommitsYetHasNothingRecorded`,
 `IdentityAuditTests.RemotesAreListedWithTheirAccountNameAndNeverAPassword`,
 `IdentityAuditTests.ARemoteAddressKeepsItsAccountNameAndLosesItsPassword`,
+`IdentityAuditTests.AReplaceRefDoesntHideTheNameACommitRecords`,
+`IdentityAuditTests.ColourAndSignatureSettingsDontChangeWhatsRead`,
+`IdentityAuditTests.ATagOutsideRefsTagsAndATagOfATagAreRead`,
+`IdentityAuditTests.NamesElsewhereInMessagesAreFound`,
+`IdentityAuditTests.NamesOnlyTheReflogsKeepAndThisCopysSettingsAreListedApart`,
+`IdentityAuditTests.AShallowCloneSaysSo`,
+`IdentityAuditTests.TheHomeFolderIsShownAsATilde`,
 `IdentityCommandTests.TheAuditListsEveryNameTheHistoryAndDenYamlHoldAndChangesNothing`,
 `IdentityCommandTests.JsonGivesTheSameAuditWithAVersion`,
 `IdentityCommandTests.ADenWithNoHistoryStillListsItsAuthors`,
 `IdentityCommandTests.ADenYamlThatDoesntParseStillGetsItsHistoryAudited`,
+`IdentityCommandTests.MentionsTheReflogsAndThisCopysSettingsAreShown`,
 `IdentityCommandTests.AMistakeOnTheCommandLineExitsTwo`,
 `IdentityCommandTests.EachLevelHasItsOwnHelp`.
 
 ### SC-HIST-25. One key signed under both of my names
 
 The writer's git signed some checkpoints with their everyday key, under
-the pen name, and a tag with an SSH key.
+the pen name, a tag with an SSH key, and a release tag they merged.
 
-- The audit counts the signed checkpoints and annotated tags, and groups
-  them by key: an OpenPGP key by its fingerprint (a signature that names only
-  the key ID is counted with the fingerprint it ends), an SSH key by its
-  `SHA256:` fingerprint, an X.509 signature as a certificate it can't name.
-  Each key lists the names it signed under.
+- The audit counts the signed checkpoints, annotated tags, and merged tags,
+  and groups them by key: an OpenPGP key by its fingerprint (a signature that
+  names only the key ID is counted with the fingerprint it ends), an SSH key
+  by its `SHA256:` fingerprint. A block with several signatures counts each
+  key. Each key lists the names it signed under. Signatures that don't name
+  a key (X.509) are counted by signer, never merged into one "key".
+- Signatures only on merged tags still count: the output never says nothing
+  is signed when something is. A merged tag's message with indented lines
+  doesn't cut its signature off.
 - The key is read from each signature's own bytes, so a long history isn't
-  checked with gpg one commit at a time. One commit per key, for at most ten
+  checked with gpg one commit at a time, and malformed bytes end quickly
+  with no key, never a hang. One commit or tag per key, for at most ten
   keys, is checked, to say who the key belongs to as this computer reports
-  it (a real SSH signature's allowed-signers name, say). When that isn't one
-  of the names the key signed under, the output says anyone who checks the
-  signature can link the two.
+  it (a real SSH signature's allowed-signers name, say), whatever
+  `log.showSignature` says. When that isn't one of the names the key signed
+  under, the output says anyone who checks the signature can link the two.
+  A key it couldn't check says "owner not checked".
 
 Spec: design.md §6, "What a copy or push carries" (#315, design §3.6 item
 2). Covered by:
@@ -4799,7 +4827,14 @@ Spec: design.md §6, "What a copy or push carries" (#315, design §3.6 item
 `IdentityAuditTests.OwnersAreLookedUpForTenKeysAtMost`,
 `IdentityAuditTests.ARealSshSignedCheckpointIsReadWithItsKeyAndTheAllowedSignersName`,
 `IdentityAuditTests.ASignaturesKeyIsReadFromItsOwnBytes`,
-`IdentityCommandTests.AKeyThatBelongsToAnotherNameIsCalledOut`.
+`IdentityAuditTests.AMergedTagsSignatureAndTaggerAreReadPastAnIndentedLine`,
+`IdentityAuditTests.AKeyThatSignedOnlyTagsIsCheckedThroughTheTag`,
+`IdentityAuditTests.AnOwnerIsReadExactlyWhenGitIsSetToShowSignatures`,
+`IdentityAuditTests.SignaturesThatDontNameAKeyAreGroupedBySignerNotMergedIntoOneKey`,
+`IdentityAuditTests.EverySignatureInABlockIsRead`,
+`IdentityAuditTests.MalformedSignatureBytesEndQuicklyWithNoKey`,
+`IdentityCommandTests.AKeyThatBelongsToAnotherNameIsCalledOut`,
+`IdentityCommandTests.SignaturesOnlyOnMergedTagsArentReportedAsNone`.
 
 ## WEB: the den in a browser
 

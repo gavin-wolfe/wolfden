@@ -375,9 +375,26 @@ public sealed class AccountCommandTests : IDisposable
         Assert.Contains("names a setting twice", list.Error, StringComparison.Ordinal);
         Assert.Equal(CliApp.ExitOk, exitCode);
         Assert.StartsWith("Login is off: the web pages no longer ask for a login.\n", output, StringComparison.Ordinal);
-        Assert.Contains("It's replaced with one that turns login off", error, StringComparison.Ordinal);
+        Assert.Contains("so it's replaced with one that turns login off; the old file is kept as", error, StringComparison.Ordinal);
         Assert.False(InstallationSettings.Load(Folder).Login);
         Assert.Equal(CliApp.ExitOk, Run("user", "list").ExitCode);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-ACCT-6")]
+    public void LoginOffKeepsTheOtherSettingsWhenOnlyLoginIsWrong()
+    {
+        Folder.Create();
+        var original = "{ \"login\": \"yes\", \"public_origin\": \"https://den.example.net\" }";
+        File.WriteAllText(Path.Combine(Home, "settings.json"), original);
+
+        var (exitCode, _, error) = Run("login", "off");
+
+        Assert.Equal(CliApp.ExitOk, exitCode);
+        Assert.Contains("Its \"login\" is now false, and its other settings are kept; the old file is kept as", error, StringComparison.Ordinal);
+        Assert.Contains("https://den.example.net", File.ReadAllText(Path.Combine(Home, "settings.json")), StringComparison.Ordinal);
+        Assert.Equal(original, File.ReadAllText(Path.Combine(Home, "settings.json.broken")));
+        Assert.False(InstallationSettings.Load(Folder).Login);
     }
 
     [Fact]

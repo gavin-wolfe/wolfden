@@ -54,7 +54,9 @@ internal static class LoginCommand
 
         {NotEnforcedYet}
 
-        'login off' also replaces a settings.json it can't read, with login off.
+        'login off' also repairs a settings.json it can't read: it keeps a copy as
+        settings.json.broken, then sets "login" to false, keeping other settings
+        when the file is still one JSON object.
 
         {Installation.HomeHelp}
           --json              print one JSON document instead of text
@@ -101,9 +103,8 @@ internal static class LoginCommand
             {
                 // 'login off' is the way back in, so it always works: a
                 // settings file it can't read is replaced, with login off.
-                replaced = e.Message;
-                settings = InstallationSettings.Defaults();
-                settings.Save(folder);
+                replaced = $"{e.Message} {InstallationSettings.TurnLoginOffRepairing(folder)}";
+                settings = InstallationSettings.Load(folder);
             }
 
             // Only 'login on' needs the owners; 'login off' never depends on the accounts reading.
@@ -120,7 +121,7 @@ internal static class LoginCommand
 
             if (replaced is not null)
             {
-                error.WriteLine($"wolfden login: {replaced} It's replaced with one that turns login off; any other settings in it are gone.");
+                error.WriteLine($"wolfden login: {replaced}");
             }
 
             string message;

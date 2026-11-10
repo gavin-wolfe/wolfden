@@ -126,6 +126,79 @@ public class InstallationTests
 
     [Fact]
     [Trait("Scenario", "SC-ACCT-9")]
+    public void ALinkIntoADenIsInTheDen()
+    {
+        using var temp = new TempHome();
+        var den = Path.Combine(temp.Root, "den");
+        Directory.CreateDirectory(Path.Combine(den, "private"));
+        File.WriteAllText(Path.Combine(den, "den.yaml"), "format: 1\nname: Test\n");
+        var link = Path.Combine(temp.Root, "link");
+        FolderLink.Create(link, Path.Combine(den, "private"));
+
+        Assert.Null(InstallationFolder.Resolve(link, Env(), out var direct));
+        Assert.Contains($"is inside the den at '{InstallationFolder.RealPath(den)}'", direct, StringComparison.Ordinal);
+        Assert.Null(InstallationFolder.Resolve(Path.Combine(link, "wolfden"), Env(), out var below));
+        Assert.Contains($"is inside the den at '{InstallationFolder.RealPath(den)}'", below, StringComparison.Ordinal);
+        Assert.Throws<AccountsException>(new InstallationFolder(link, InstallationSource.Option).Create);
+        Assert.False(File.Exists(Path.Combine(den, "private", "accounts.db")));
+
+        // A link to the den itself is the den.
+        var toDen = Path.Combine(temp.Root, "to-den");
+        FolderLink.Create(toDen, den);
+        Assert.Null(InstallationFolder.Resolve(toDen, Env(), out var isDen));
+        Assert.Contains("is a den,", isDen, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ALinkOutsideAnyDenIsFine()
+    {
+        using var temp = new TempHome();
+        var real = Path.Combine(temp.Root, "real");
+        Directory.CreateDirectory(real);
+        var link = Path.Combine(temp.Root, "link");
+        FolderLink.Create(link, real);
+
+        Assert.Equal(InstallationFolder.RealPath(real), InstallationFolder.RealPath(link));
+        Assert.Equal(Path.Combine(InstallationFolder.RealPath(real), "not-yet"), InstallationFolder.RealPath(Path.Combine(link, "not-yet")));
+        Assert.NotNull(InstallationFolder.Resolve(link, Env(), out _));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-ACCT-6")]
+    public void RepairingLoginKeepsTheOtherSettingsWhenTheFileStillReads()
+    {
+        using var temp = new TempHome();
+        temp.Folder.Create();
+        File.WriteAllText(temp.Folder.SettingsFile + ".broken", "an older copy");
+        var original = "{ \"login\": \"yes\", \"public_origin\": \"https://den.example.net\" }";
+        File.WriteAllText(temp.Folder.SettingsFile, original);
+        Assert.Throws<InvalidDataException>(() => InstallationSettings.Load(temp.Folder));
+
+        var said = InstallationSettings.TurnLoginOffRepairing(temp.Folder);
+
+        Assert.StartsWith("Its \"login\" is now false, and its other settings are kept;", said, StringComparison.Ordinal);
+        Assert.False(InstallationSettings.Load(temp.Folder).Login);
+        Assert.Contains("\"public_origin\": \"https://den.example.net\"", File.ReadAllText(temp.Folder.SettingsFile), StringComparison.Ordinal);
+        Assert.Equal(original, File.ReadAllText(temp.Folder.SettingsFile + ".broken"));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-ACCT-6")]
+    public void RepairingLoginReplacesAFileThatDoesntRead()
+    {
+        using var temp = new TempHome();
+        temp.Folder.Create();
+        File.WriteAllText(temp.Folder.SettingsFile, "{ \"login\": true, \"login\": false }");
+
+        var said = InstallationSettings.TurnLoginOffRepairing(temp.Folder);
+
+        Assert.StartsWith("It couldn't be read, so it's replaced with one that turns login off;", said, StringComparison.Ordinal);
+        Assert.False(InstallationSettings.Load(temp.Folder).Login);
+        Assert.Equal("{ \"login\": true, \"login\": false }", File.ReadAllText(temp.Folder.SettingsFile + ".broken"));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-ACCT-9")]
     public void AFolderInARepositoryIsFoundForAWarning()
     {
         using var temp = new TempHome();

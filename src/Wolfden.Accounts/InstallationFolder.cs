@@ -128,18 +128,74 @@ public sealed class InstallationFolder
     /// inside one (a <c>den.yaml</c> in it or a folder above). A den's
     /// checkpoints would then record the password hashes and cookie keys.
     /// </summary>
-    public string? DenProblem() =>
-        Above(Path, dir => File.Exists(IOPath.Combine(dir, "den.yaml"))) is { } den
-            ? $"the installation folder '{Path}' is {(den == Path ? "a den" : $"inside the den at '{den}'")}, whose checkpoints would record the accounts. Use a folder outside every den, with --home or {EnvironmentVariable}."
-            : null;
+    public string? DenProblem()
+    {
+        // By name, and by where links (symbolic links, and junctions on
+        // Windows) really lead: a link to a den's subfolder is in the den.
+        var real = RealPath(Path);
+        var den = Above(Path, IsDen) ?? Above(real, IsDen);
+        if (den is null)
+        {
+            return null;
+        }
+
+        var what = den == Path || den == real ? "a den" : $"inside the den at '{den}'";
+        return $"the installation folder '{Path}' is {what}, whose checkpoints would record the accounts. Use a folder outside every den, with --home or {EnvironmentVariable}.";
+
+        static bool IsDen(string dir) => File.Exists(IOPath.Combine(dir, "den.yaml"));
+    }
+
+    /// <summary>
+    /// <paramref name="path"/> with every link along it followed to its final
+    /// target, folder by folder from the root. Parts that don't exist yet are
+    /// kept as written.
+    /// </summary>
+    internal static string RealPath(string path) => RealPath(path, 0);
+
+    private static string RealPath(string path, int depth)
+    {
+        var full = IOPath.GetFullPath(path);
+        var root = IOPath.GetPathRoot(full) ?? string.Empty;
+        var current = root;
+        var parts = full[root.Length..].Split([IOPath.DirectorySeparatorChar, IOPath.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries);
+
+        // A loop of links has no end; give up following after this many.
+        var hops = 0;
+        foreach (var part in parts)
+        {
+            current = IOPath.Combine(current, part);
+            var info = new DirectoryInfo(current);
+            if (depth + hops < 64 && info.Exists && info.LinkTarget is not null)
+            {
+                hops++;
+                try
+                {
+                    if (info.ResolveLinkTarget(returnFinalTarget: true) is { } target)
+                    {
+                        current = RealPath(target.FullName, depth + hops);
+                    }
+                }
+                catch (IOException)
+                {
+                    // A broken or looping link: keep the name.
+                }
+            }
+        }
+
+        return IOPath.TrimEndingDirectorySeparator(current);
+    }
 
     /// <summary>
     /// The git working tree this folder is inside, or null. Not refused (a
     /// home folder kept in git is common), but worth a warning: a plain
     /// <c>git add</c> there could take <c>accounts.db</c>.
     /// </summary>
-    public string? RepositoryAbove() =>
-        Above(Path, dir => Directory.Exists(IOPath.Combine(dir, ".git")) || File.Exists(IOPath.Combine(dir, ".git")));
+    public string? RepositoryAbove()
+    {
+        return Above(Path, IsRepository) ?? Above(RealPath(Path), IsRepository);
+
+        static bool IsRepository(string dir) => Directory.Exists(IOPath.Combine(dir, ".git")) || File.Exists(IOPath.Combine(dir, ".git"));
+    }
 
     /// <summary>
     /// Outside Windows: a warning when the folder exists and other

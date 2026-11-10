@@ -7386,7 +7386,8 @@ The writer sets `WOLFDEN_HOME=.` in the den's folder, then tries `--home`
 with the den's folder, then with a folder inside a git repository.
 
 - A relative `WOLFDEN_HOME` is refused: it must be a full path. A folder
-  that is a den, or inside one (a `den.yaml` in it or above it), is refused
+  that is a den, or inside one (a `den.yaml` in it or above it, also
+  through a link or junction), is refused
   by every `user` and `login` command (exit 2), and nothing is created
   there, so a checkpoint can never record the accounts. A folder inside a
   git repository is allowed, with a warning to keep it out of that
@@ -7396,4 +7397,4 @@ with the den's folder, then with a folder inside a git repository.
 Spec: #315 §3.2, review of PR #350. Covered by: `InstallationTests.ARelativeWolfdenHomeIsRefused`,
 `InstallationTests.AFolderInADenIsRefused`, `InstallationTests.AFolderInARepositoryIsFoundForAWarning`,
 `AccountCommandTests.AnInstallationInADenIsRefused`, `AccountCommandTests.AnInstallationInARepositoryIsWarnedAbout`,
-`AccountStoreTests.TheDatabaseIsOnlyForThisAccountOutsideWindows`.
+`AccountStoreTests.TheDatabaseIsOnlyForThisAccountOutsideWindows`, `InstallationTests.ALinkIntoADenIsInTheDen`.

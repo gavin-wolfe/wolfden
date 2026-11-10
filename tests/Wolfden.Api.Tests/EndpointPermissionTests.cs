@@ -61,7 +61,7 @@ public class EndpointPermissionTests
     private static string Describe(RouteEndpoint endpoint) => $"{Methods(endpoint)} {endpoint.RoutePattern.RawText}";
 
     [Fact]
-    [Trait("Scenario", "SC-ACCT-12")]
+    [Trait("Scenario", "SC-ACCT-13")]
     public void Test1EveryEndpointDeclaresAPermissionOrIsOnTheShortList()
     {
         var endpoints = Endpoints();
@@ -109,7 +109,7 @@ public class EndpointPermissionTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-ACCT-12")]
+    [Trait("Scenario", "SC-ACCT-13")]
     public async Task AnEndpointSomeoneForgetsNeedsALogin()
     {
         // The fallback policy: an endpoint with no authorization metadata at all still needs a Read permission.
@@ -122,7 +122,7 @@ public class EndpointPermissionTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-ACCT-12")]
+    [Trait("Scenario", "SC-ACCT-13")]
     public async Task AForgottenEndpointIsRefusedWithLoginOn()
     {
         await using var server = await LoginServer.StartAsync(configure: app => app.MapGet("/api/forgotten", () => "Dracula's secrets"));
@@ -154,8 +154,8 @@ public class EndpointPermissionTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-ACCT-11")]
     [Trait("Scenario", "SC-ACCT-12")]
+    [Trait("Scenario", "SC-ACCT-13")]
     public async Task Test2EveryEndpointRefusesAStrangerAndEachRoleWhatItMayntDo()
     {
         await using var server = await LoginServer.StartAsync(webRoot: WebRoot.Built());
@@ -226,7 +226,7 @@ public class EndpointPermissionTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-ACCT-11")]
+    [Trait("Scenario", "SC-ACCT-12")]
     public async Task TheUiAndTheHealthCheckNeedNoLoginButTheDensImagesDo()
     {
         var webRoot = WebRoot.Built();

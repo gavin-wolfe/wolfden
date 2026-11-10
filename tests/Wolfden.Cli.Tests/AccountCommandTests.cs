@@ -488,7 +488,7 @@ public sealed class ServeLoginTests : IDisposable
 
     [Fact]
     [Trait("Scenario", "SC-ACCT-6")]
-    [Trait("Scenario", "SC-ACCT-10")]
+    [Trait("Scenario", "SC-ACCT-11")]
     public async Task WithLoginOnServeAsksForALogin()
     {
         TurnLoginOn();
@@ -513,7 +513,7 @@ public sealed class ServeLoginTests : IDisposable
     }
 
     [Fact]
-    [Trait("Scenario", "SC-ACCT-10")]
+    [Trait("Scenario", "SC-ACCT-11")]
     public async Task WithLoginOffServeAnswersAsBefore()
     {
         var (exitCode, output, _) = await Serve(_home, async url =>
@@ -529,7 +529,7 @@ public sealed class ServeLoginTests : IDisposable
     }
 
     [Fact]
-    [Trait("Scenario", "SC-ACCT-10")]
+    [Trait("Scenario", "SC-ACCT-11")]
     public async Task ASettingsFileThatDoesntReadStopsServe()
     {
         Directory.CreateDirectory(_home);
@@ -538,13 +538,27 @@ public sealed class ServeLoginTests : IDisposable
         var (exitCode, _, error) = await Serve(_home, null);
 
         Assert.Equal(CliApp.ExitUsage, exitCode);
-        Assert.Contains("wolfden serve: stopped, because it couldn't read the installation at", error, StringComparison.Ordinal);
+        Assert.Contains("wolfden serve: stopped, because it couldn't use the installation at", error, StringComparison.Ordinal);
         Assert.Contains("names a setting twice", error, StringComparison.Ordinal);
         Assert.Contains("'wolfden login off'", error, StringComparison.Ordinal);
     }
 
     [Fact]
-    [Trait("Scenario", "SC-ACCT-10")]
+    [Trait("Scenario", "SC-ACCT-11")]
+    public async Task AKeysFolderItCantMakeStopsServeWithAReason()
+    {
+        TurnLoginOn();
+        File.WriteAllText(Path.Combine(_home, "keys"), "a file where the keys folder should be");
+
+        var (exitCode, _, error) = await Serve(_home, null);
+
+        Assert.Equal(CliApp.ExitUsage, exitCode);
+        Assert.StartsWith("wolfden serve: stopped, because it couldn't use the installation at", error, StringComparison.Ordinal);
+        Assert.DoesNotContain("   at ", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-ACCT-11")]
     public async Task LoginOnWithNoOwnerStopsServe()
     {
         Directory.CreateDirectory(_home);
@@ -557,7 +571,7 @@ public sealed class ServeLoginTests : IDisposable
     }
 
     [Fact]
-    [Trait("Scenario", "SC-ACCT-10")]
+    [Trait("Scenario", "SC-ACCT-11")]
     public async Task AnInstallationFolderItCantUseStopsServe()
     {
         using var den = TempDen.DraculaCopy();

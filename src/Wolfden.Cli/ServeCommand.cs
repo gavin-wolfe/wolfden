@@ -112,7 +112,7 @@ internal static class ServeCommand
         }
 
         // Fails closed: a server that can't tell whether login is on doesn't start.
-        if (!TryLogin(line, error, out var login))
+        if (!TryLogin(line, error, out var login, out var installation))
         {
             return CliApp.ExitUsage;
         }
@@ -121,6 +121,9 @@ internal static class ServeCommand
         var app = WolfdenApi.Build(new WolfdenApiOptions(root)
         {
             Login = login,
+
+            // A login turned on while it runs stops it answering until it's restarted; one turned off keeps it asking (fail safe).
+            LoginSetting = () => Wolfden.Accounts.InstallationSettings.Load(installation).Login,
             Port = port,
             PinnedUniverse = pinned,
             WebRoot = WebRoot ?? DefaultWebRoot,
@@ -244,10 +247,11 @@ internal static class ServeCommand
     /// <param name="line">The command line, for <c>--home</c>.</param>
     /// <param name="error">Where to say why it can't start.</param>
     /// <param name="login">The login options, or null for login off.</param>
-    internal static bool TryLogin(CommandLine line, TextWriter error, out LoginOptions? login)
+    /// <param name="folder">The installation folder, when it returns true.</param>
+    internal static bool TryLogin(CommandLine line, TextWriter error, out LoginOptions? login, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out Wolfden.Accounts.InstallationFolder? folder)
     {
         login = null;
-        var folder = Installation.Resolve(Spec.Name, line, error);
+        folder = Installation.Resolve(Spec.Name, line, error);
         if (folder is null)
         {
             error.WriteLine("wolfden serve: stopped, because without the installation folder it can't tell whether login is on. Fix --home or WOLFDEN_HOME, or leave both out for the default folder.");
@@ -274,11 +278,14 @@ internal static class ServeCommand
             }
 
             login = new LoginOptions(folder, Wolfden.Accounts.InstallationSettings.EnsureInstallationId(folder));
+
+            // The cookie keys' folder, made (and kept private) now, so a folder that can't be made stops serve here with a reason.
+            AuthEndpoints.KeysFolder(folder);
             return true;
         }
         catch (Exception e) when (Installation.IsFailure(e))
         {
-            error.WriteLine($"wolfden serve: stopped, because it couldn't read the installation at '{folder.Path}' to see whether login is on: {e.Message} Fix it, or run 'wolfden login off', which repairs a settings file it can't read.");
+            error.WriteLine($"wolfden serve: stopped, because it couldn't use the installation at '{folder.Path}', so it can't serve with login as set: {e.Message} Fix it, or run 'wolfden login off', which repairs a settings file it can't read.");
             return false;
         }
     }

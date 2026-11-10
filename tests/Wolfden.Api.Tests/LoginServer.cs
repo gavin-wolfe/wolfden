@@ -45,7 +45,11 @@ internal sealed class LoginServer : IAsyncDisposable
 
     /// <summary>A new installation with the three accounts, and a server for it.</summary>
     public static async Task<LoginServer> StartAsync(
-        Func<InstallationFolder, string, LoginOptions>? options = null, string? webRoot = null, Action<Microsoft.AspNetCore.Builder.WebApplication>? configure = null)
+        Func<InstallationFolder, string, LoginOptions>? options = null,
+        string? webRoot = null,
+        Action<Microsoft.AspNetCore.Builder.WebApplication>? configure = null,
+        TextWriter? log = null,
+        Func<bool>? loginSetting = null)
     {
         var home = Path.Combine(Path.GetTempPath(), "wolfden-api-tests", "homes", Guid.NewGuid().ToString("N"));
         var installation = new InstallationFolder(Path.Combine(home, "home"), InstallationSource.Option);
@@ -59,7 +63,7 @@ internal sealed class LoginServer : IAsyncDisposable
         var id = InstallationSettings.EnsureInstallationId(installation);
         var login = options?.Invoke(installation, id) ?? new LoginOptions(installation, id);
         var den = TempDen.Dracula();
-        var server = await Server.StartAsync(new WolfdenApiOptions(den.Root) { Login = login, WebRoot = webRoot }, configure);
+        var server = await Server.StartAsync(new WolfdenApiOptions(den.Root) { Login = login, WebRoot = webRoot, Log = log, LoginSetting = loginSetting, LoginSettingEvery = TimeSpan.Zero }, configure);
         return new LoginServer(den, home, installation, login, server);
     }
 

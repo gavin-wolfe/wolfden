@@ -14,7 +14,7 @@ public class LoginTests
         JsonDocument.Parse(await response.Content.ReadAsStringAsync(Token)).RootElement.Clone();
 
     [Fact]
-    [Trait("Scenario", "SC-ACCT-10")]
+    [Trait("Scenario", "SC-ACCT-11")]
     public async Task WithLoginOffEveryoneIsTheOwnerAsBefore()
     {
         using var den = TempDen.Dracula();
@@ -32,7 +32,7 @@ public class LoginTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-ACCT-10")]
+    [Trait("Scenario", "SC-ACCT-11")]
     public async Task ALoginGivesAStrictHttpOnlyCookieNamedForTheInstallation()
     {
         await using var server = await LoginServer.StartAsync();
@@ -71,7 +71,7 @@ public class LoginTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-ACCT-10")]
+    [Trait("Scenario", "SC-ACCT-11")]
     public async Task UnderASecureOriginTheCookieIsSecureWithTheHostPrefixAndLastsTwelveHours()
     {
         await using var server = await LoginServer.StartAsync((home, id) => new LoginOptions(home, id) { SecureOrigin = true });
@@ -86,7 +86,7 @@ public class LoginTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-ACCT-10")]
+    [Trait("Scenario", "SC-ACCT-11")]
     public async Task TwoInstallationsHaveCookiesOfTheirOwn()
     {
         await using var first = await LoginServer.StartAsync();
@@ -96,7 +96,7 @@ public class LoginTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-ACCT-10")]
+    [Trait("Scenario", "SC-ACCT-11")]
     public async Task ACookieStillWorksAfterARestart()
     {
         await using var server = await LoginServer.StartAsync();
@@ -117,7 +117,7 @@ public class LoginTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-ACCT-13")]
+    [Trait("Scenario", "SC-ACCT-14")]
     public async Task AWrongPasswordAndAnUnknownNameGetTheSameAnswer()
     {
         await using var server = await LoginServer.StartAsync();
@@ -134,7 +134,7 @@ public class LoginTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-ACCT-13")]
+    [Trait("Scenario", "SC-ACCT-14")]
     public async Task FiveWrongPasswordsLockTheAccountAndALockedAccountLooksLikeAWrongPassword()
     {
         await using var server = await LoginServer.StartAsync();
@@ -167,10 +167,10 @@ public class LoginTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-ACCT-13")]
+    [Trait("Scenario", "SC-ACCT-14")]
     public async Task TooManyAttemptsFromOneAddressAreRefusedForAMinute()
     {
-        await using var server = await LoginServer.StartAsync((home, id) => new LoginOptions(home, id) { AttemptsPerAddress = 3, AttemptsPerUser = 100 });
+        await using var server = await LoginServer.StartAsync((home, id) => new LoginOptions(home, id) { AttemptsPerAddress = 3, AttemptsPerUser = 100, LimitAddressesOverride = true });
         using var client = server.Client();
 
         for (var i = 0; i < 3; i++)
@@ -186,7 +186,127 @@ public class LoginTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-ACCT-13")]
+    [Trait("Scenario", "SC-ACCT-14")]
+    public async Task OnThisComputerOneAddressIsntOneBucketForEveryone()
+    {
+        // Everyone on 127.0.0.1 is one address: a per-address limit there would let anyone keep the owner out.
+        await using var server = await LoginServer.StartAsync((home, id) => new LoginOptions(home, id) { AttemptsPerAddress = 3, AttemptsPerUser = 100 });
+        using var client = server.Client();
+        Assert.False(server.Login.LimitsAddresses);
+
+        for (var i = 0; i < 5; i++)
+        {
+            using var response = await LoginServer.LogInAsync(client, $"guess{i}", "not the right password at all");
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        using var owner = await LoginServer.LogInAsync(client, "wren", LoginServer.Password);
+        Assert.Equal(HttpStatusCode.OK, owner.StatusCode);
+
+        // Behind a proxy (a secure origin, a later change), addresses count.
+        Assert.True(new LoginOptions(server.Installation, server.Login.InstallationId) { SecureOrigin = true }.LimitsAddresses);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-ACCT-14")]
+    public async Task ANameSpelledWithLookalikeLettersIsntAnotherBucket()
+    {
+        await using var server = await LoginServer.StartAsync((home, id) => new LoginOptions(home, id) { AttemptsPerUser = 2 });
+        using var client = server.Client();
+
+        (await LoginServer.LogInAsync(client, "rook", "not the right password at all")).Dispose();
+        (await LoginServer.LogInAsync(client, "ROOK", "not the right password at all")).Dispose();
+
+        // U+212A KELVIN SIGN: Identity's lookup would take it for K. It's no account's name, so it's refused without a lookup.
+        using var kelvin = await LoginServer.LogInAsync(client, "roo\u212A", LoginServer.Password);
+        Assert.Equal(HttpStatusCode.Unauthorized, kelvin.StatusCode);
+        Assert.Equal("login_failed", (await Json(kelvin)).GetProperty("code").GetString());
+        Assert.False(kelvin.Headers.Contains("Set-Cookie"));
+
+        using var limited = await LoginServer.LogInAsync(client, "rook", LoginServer.Password);
+        Assert.Equal(HttpStatusCode.TooManyRequests, limited.StatusCode);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-ACCT-14")]
+    public async Task ALoginBodyLongerThanAnyLoginIsRefusedUnread()
+    {
+        await using var server = await LoginServer.StartAsync();
+        using var client = server.Client();
+
+        using var response = await client.PostAsJsonAsync("/api/auth/login", new { username = "wren", password = new string('x', 9000) }, Token);
+
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
+        Assert.Equal("too_large", (await Json(response)).GetProperty("code").GetString());
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-ACCT-14")]
+    public async Task AnAccountWithARoleWolfdenDoesntKnowGetsNoCookie()
+    {
+        await using var server = await LoginServer.StartAsync();
+        await using (var db = new Microsoft.Data.Sqlite.SqliteConnection(AccountsDbContext.ConnectionString(server.Installation.AccountsDatabase)))
+        {
+            await db.OpenAsync(Token);
+            await using var update = db.CreateCommand();
+            update.CommandText = "UPDATE AspNetUsers SET Role = 'editor' WHERE UserName = 'ash'";
+            Assert.Equal(1, await update.ExecuteNonQueryAsync(Token));
+        }
+
+        using var client = server.Client();
+        using var response = await LoginServer.LogInAsync(client, "ash", LoginServer.Password);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal("login_failed", (await Json(response)).GetProperty("code").GetString());
+        Assert.False(response.Headers.Contains("Set-Cookie"));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-ACCT-19")]
+    public async Task LoginTurnedOnWhileServingStopsItUntilARestart()
+    {
+        using var den = TempDen.Dracula();
+        var on = false;
+        var log = new StringWriter();
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root)
+        {
+            LoginSetting = () => on, LoginSettingEvery = TimeSpan.Zero, Log = TextWriter.Synchronized(log),
+        });
+        await server.GetJsonAsync("/api/den", HttpStatusCode.OK);
+
+        on = true;
+
+        var refused = await server.GetJsonAsync("/api/den", HttpStatusCode.ServiceUnavailable);
+        Assert.Equal("restart_needed", refused.GetProperty("code").GetString());
+        Assert.Contains("Restart wolfden serve", refused.GetProperty("message").GetString(), StringComparison.Ordinal);
+        using var page = await server.Client.GetAsync("/", Token);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, page.StatusCode);
+        await server.GetJsonAsync("/api/health", HttpStatusCode.OK);
+
+        // Turning it off again doesn't undo that: only a restart does.
+        on = false;
+        await server.GetJsonAsync("/api/den", HttpStatusCode.ServiceUnavailable);
+        Assert.Contains("wolfden serve: Login was turned on. Restart wolfden serve", log.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-ACCT-19")]
+    public async Task LoginTurnedOffWhileServingStillAsksForItUntilARestart()
+    {
+        var on = true;
+        var log = new StringWriter();
+        await using var server = await LoginServer.StartAsync(log: TextWriter.Synchronized(log), loginSetting: () => on);
+        using var stranger = server.Client();
+
+        on = false;
+
+        using var response = await stranger.GetAsync("/api/den", Token);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Contains("login was turned off, but this server keeps asking for it until it's restarted", log.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-ACCT-14")]
     public async Task TooManyAttemptsForOneNameAreRefusedWhateverTheCase()
     {
         await using var server = await LoginServer.StartAsync((home, id) => new LoginOptions(home, id) { AttemptsPerAddress = 100, AttemptsPerUser = 2 });
@@ -203,7 +323,7 @@ public class LoginTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-ACCT-10")]
+    [Trait("Scenario", "SC-ACCT-11")]
     public async Task LoggingOutEndsTheSession()
     {
         await using var server = await LoginServer.StartAsync();
@@ -217,7 +337,7 @@ public class LoginTests
     }
 
     [Theory]
-    [Trait("Scenario", "SC-ACCT-14")]
+    [Trait("Scenario", "SC-ACCT-15")]
     [InlineData("reset-password")]
     [InlineData("set-role")]
     [InlineData("remove")]
@@ -243,7 +363,7 @@ public class LoginTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-ACCT-11")]
+    [Trait("Scenario", "SC-ACCT-12")]
     public async Task AViewerReadsEverythingAndChangesNothing()
     {
         await using var server = await LoginServer.StartAsync();
@@ -261,7 +381,7 @@ public class LoginTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-ACCT-15")]
+    [Trait("Scenario", "SC-ACCT-16")]
     public async Task AWriterFreezesButOnlyTheOwnerUnfreezesTurnsHistoryOnOrFixesDenYaml()
     {
         await using var server = await LoginServer.StartAsync();
@@ -286,7 +406,7 @@ public class LoginTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-ACCT-16")]
+    [Trait("Scenario", "SC-ACCT-17")]
     public async Task WithLoginOnAChangeMustCarryThisServersOrigin()
     {
         await using var server = await LoginServer.StartAsync();
@@ -305,7 +425,7 @@ public class LoginTests
     }
 
     [Theory]
-    [Trait("Scenario", "SC-ACCT-16")]
+    [Trait("Scenario", "SC-ACCT-17")]
     [InlineData(false)]
     [InlineData(true)]
     public async Task APageOnAnotherPortOfThisComputerIsRefused(bool loginOn)
@@ -324,7 +444,7 @@ public class LoginTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-ACCT-16")]
+    [Trait("Scenario", "SC-ACCT-17")]
     public async Task TheApisAnswersAreForItsOwnPagesOnly()
     {
         using var den = TempDen.Dracula();
@@ -338,7 +458,7 @@ public class LoginTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-ACCT-13")]
+    [Trait("Scenario", "SC-ACCT-14")]
     public async Task ALoginTakesOnlyAUsernameAndAPasswordAsJson()
     {
         await using var server = await LoginServer.StartAsync();

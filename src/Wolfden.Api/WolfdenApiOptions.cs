@@ -98,6 +98,16 @@ public sealed class WolfdenApiOptions
     /// </summary>
     public LoginOptions? Login { get; init; }
 
+    /// <summary>
+    /// Reads the installation's login setting as it is now, or null to not
+    /// watch it. <c>wolfden serve</c> sets it, so a login turned on while it
+    /// runs stops it answering until it's restarted (<see cref="LoginWatch"/>).
+    /// </summary>
+    public Func<bool>? LoginSetting { get; init; }
+
+    /// <summary>How often, at most, <see cref="LoginSetting"/> is read. Tests shorten it.</summary>
+    internal TimeSpan LoginSettingEvery { get; init; } = TimeSpan.FromSeconds(2);
+
     /// <summary>The clock and timers automatic checkpoints use; tests replace it.</summary>
     public TimeProvider Time { get; init; } = TimeProvider.System;
 }

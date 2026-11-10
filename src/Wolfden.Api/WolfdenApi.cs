@@ -108,6 +108,12 @@ public static class WolfdenApi
         var app = builder.Build();
         app.UseExceptionHandler(errors => errors.Run(InternalError));
         app.UseHostFiltering();
+        if (options.LoginSetting is { } setting)
+        {
+            var watch = new LoginWatch(options.Login is not null, setting, options.Time, options.LoginSettingEvery, options.Log);
+            app.Use(watch.Guard);
+        }
+
         app.UseWhen(context => context.Request.Path.StartsWithSegments("/api"), api => api.Use(CrossSiteGuard));
         MapWebUi(app, options.WebRoot);
 

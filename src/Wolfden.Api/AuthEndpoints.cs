@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Routing;
@@ -136,14 +137,20 @@ internal static class AuthEndpoints
 
         services.AddRateLimiter(limiter =>
         {
-            limiter.AddPolicy(LoginPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
-                context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                _ => new FixedWindowRateLimiterOptions
-                {
-                    PermitLimit = login?.AttemptsPerAddress ?? 10,
-                    Window = login?.AttemptWindow ?? TimeSpan.FromMinutes(1),
-                    QueueLimit = 0,
-                }));
+            // Per client address only when addresses mean something: behind a proxy
+            // (a public origin, #315 D8). On 127.0.0.1 everyone is one address, so one
+            // bucket would let anyone on this computer keep the owner from logging in;
+            // the per-username limit and the lockout guard a local login instead.
+            limiter.AddPolicy(LoginPolicy, context => login?.LimitsAddresses == true
+                ? RateLimitPartition.GetFixedWindowLimiter(
+                    context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = login.AttemptsPerAddress,
+                        Window = login.AttemptWindow,
+                        QueueLimit = 0,
+                    })
+                : RateLimitPartition.GetNoLimiter("loopback"));
             limiter.OnRejected = (context, _) =>
             {
                 context.HttpContext.Response.Headers.RetryAfter = ((int)(login?.AttemptWindow ?? TimeSpan.FromMinutes(1)).TotalSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -165,7 +172,15 @@ internal static class AuthEndpoints
             return Directory.CreateDirectory(path);
         }
 
-        return Directory.CreateDirectory(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        // Wolfden's own folder, so it's made private even if it was there already, keys and all.
+        var folder = Directory.CreateDirectory(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        foreach (var key in Directory.EnumerateFiles(path))
+        {
+            File.SetUnixFileMode(key, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+
+        return folder;
     }
 
     /// <summary>Maps <c>/api/auth/status</c>, <c>/api/auth/login</c> and <c>/api/auth/logout</c>.</summary>
@@ -203,12 +218,27 @@ internal static class AuthEndpoints
             return Error(StatusCodes.Status415UnsupportedMediaType, "unsupported_media_type", "'/api/auth/login' takes a JSON body: send it with 'Content-Type: application/json'.");
         }
 
+        // Read no more than a login can need, before any limit or hash.
+        if (context.Request.ContentLength > MaxLoginBody)
+        {
+            return TooLarge();
+        }
+
+        if (context.Features.Get<IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } size)
+        {
+            size.MaxRequestBodySize = MaxLoginBody;
+        }
+
         string userName;
         string password;
         try
         {
             using var document = await JsonDocument.ParseAsync(context.Request.Body, cancellationToken: context.RequestAborted).ConfigureAwait(false);
             (userName, password) = Credentials(document.RootElement);
+        }
+        catch (BadHttpRequestException e) when (e.StatusCode == StatusCodes.Status413PayloadTooLarge)
+        {
+            return TooLarge();
         }
         catch (JsonException)
         {
@@ -219,16 +249,24 @@ internal static class AuthEndpoints
             return Error(StatusCodes.Status400BadRequest, "bad_argument", e.Message);
         }
 
-        // Per username, from any address: someone trying many addresses against one account is still slowed.
-        using var lease = context.RequestServices.GetRequiredService<UserAttempts>().Acquire(userName);
+        var users = context.RequestServices.GetRequiredService<UserManager<WolfdenUser>>();
+        var signIn = context.RequestServices.GetRequiredService<SignInManager<WolfdenUser>>();
+
+        // A name no account can have takes no one's slot, and costs a hash like any other failure.
+        if (UserNameRules.Problem(userName) is not null)
+        {
+            SpendAHash(users, password);
+            return Failed();
+        }
+
+        // Per username, from any address, counted under the name Identity looks it up by.
+        using var lease = context.RequestServices.GetRequiredService<UserAttempts>().Acquire(users.NormalizeName(userName));
         if (!lease.IsAcquired)
         {
             context.Response.Headers.RetryAfter = ((int)state.Options!.AttemptWindow.TotalSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
             return Error(StatusCodes.Status429TooManyRequests, "too_many_attempts", TooManyAttempts);
         }
 
-        var users = context.RequestServices.GetRequiredService<UserManager<WolfdenUser>>();
-        var signIn = context.RequestServices.GetRequiredService<SignInManager<WolfdenUser>>();
         var user = await users.FindByNameAsync(userName).ConfigureAwait(false);
         if (user is null)
         {
@@ -237,7 +275,8 @@ internal static class AuthEndpoints
             return Failed();
         }
 
-        var result = await signIn.PasswordSignInAsync(user, password, isPersistent: true, lockoutOnFailure: true).ConfigureAwait(false);
+        // The password (and lockout) first, with no cookie; then a cookie only for an account with a role Wolfden knows.
+        var result = await signIn.CheckPasswordSignInAsync(user, password, lockoutOnFailure: true).ConfigureAwait(false);
         if (!result.Succeeded)
         {
             if (result.IsLockedOut || result.IsNotAllowed)
@@ -249,8 +288,13 @@ internal static class AuthEndpoints
             return Failed();
         }
 
-        var role = AccountRoles.TryParse(user.Role, out var parsed) ? parsed.Name() : null;
-        return Results.Json(new AuthStatus(StatusVersion, true, user.UserName, role));
+        if (!AccountRoles.TryParse(user.Role, out var role))
+        {
+            return Failed();
+        }
+
+        await signIn.SignInAsync(user, isPersistent: true).ConfigureAwait(false);
+        return Results.Json(new AuthStatus(StatusVersion, true, user.UserName, role.Name()));
     }
 
     private static async Task<IResult> Logout(HttpContext context)
@@ -305,6 +349,12 @@ internal static class AuthEndpoints
     }
 
     private static IResult Failed() => Error(StatusCodes.Status401Unauthorized, "login_failed", LoginFailed);
+
+    /// <summary>The most a login's body may hold: a username and a password, with room to spare.</summary>
+    internal const int MaxLoginBody = 8 * 1024;
+
+    private static IResult TooLarge() =>
+        Error(StatusCodes.Status413PayloadTooLarge, "too_large", "A login is a username and a password: that body is far longer than one.");
 
     /// <summary>Hashes <paramref name="password"/> against a made-up account, for the time it takes.</summary>
     private static void SpendAHash(UserManager<WolfdenUser> users, string password)
@@ -377,8 +427,8 @@ internal static class AuthEndpoints
             name,
             _ => new FixedWindowRateLimiterOptions { PermitLimit = login.AttemptsPerUser, Window = login.AttemptWindow, QueueLimit = 0 }));
 
-        /// <summary>One attempt for <paramref name="userName"/>, counted without regard to case, as Identity matches names.</summary>
-        public RateLimitLease Acquire(string userName) => _limiter.AttemptAcquire(userName.ToUpperInvariant());
+        /// <summary>One attempt for the account named <paramref name="normalizedName"/>, as Identity's lookup normalizer gives it.</summary>
+        public RateLimitLease Acquire(string normalizedName) => _limiter.AttemptAcquire(normalizedName);
 
         public void Dispose() => _limiter.Dispose();
     }

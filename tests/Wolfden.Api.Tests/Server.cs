@@ -35,6 +35,8 @@ internal sealed class Server : IAsyncDisposable
             AutoCheckpoints = options.AutoCheckpoints,
             Time = options.Time,
             WriteLockWait = options.WriteLockWait,
+            LoginSetting = options.LoginSetting,
+            LoginSettingEvery = options.LoginSettingEvery,
             Login = options.Login,
         });
         configure?.Invoke(app);

@@ -47,7 +47,19 @@ public sealed class LoginOptions
     /// </summary>
     public string CookieName => (SecureOrigin ? "__Host-" : "") + "wolfden-" + InstallationId;
 
-    /// <summary>Login attempts allowed from one address in <see cref="AttemptWindow"/> (#315 §7: 10 a minute).</summary>
+    /// <summary>
+    /// True if login attempts are also limited per client address
+    /// (<see cref="AttemptsPerAddress"/>). Only under a secure origin, where
+    /// requests come through a proxy that says who sent them (#315 D8): on
+    /// 127.0.0.1 every request has the same address, so one bucket for all
+    /// would let anyone on this computer keep the owner out.
+    /// </summary>
+    public bool LimitsAddresses => LimitAddressesOverride ?? SecureOrigin;
+
+    /// <summary>For tests: limit per address whatever the origin.</summary>
+    internal bool? LimitAddressesOverride { get; init; }
+
+    /// <summary>Login attempts allowed from one address in <see cref="AttemptWindow"/>, when <see cref="LimitsAddresses"/> (#315 §7: 10 a minute).</summary>
     internal int AttemptsPerAddress { get; init; } = 10;
 
     /// <summary>Login attempts allowed for one username in <see cref="AttemptWindow"/>, from anywhere (#315 §7: 10 a minute).</summary>

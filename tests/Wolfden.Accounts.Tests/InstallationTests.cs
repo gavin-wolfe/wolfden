@@ -97,7 +97,7 @@ public class InstallationTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-ACCT-10")]
+    [Trait("Scenario", "SC-ACCT-11")]
     public void TheInstallationIdIsRandomKeptAndReplacedWhenItIsntOne()
     {
         using var temp = new TempHome();

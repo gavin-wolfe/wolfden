@@ -3904,6 +3904,21 @@ Spec: F-NAME-1, F-NAME-2, F-LINK-13 (#67, design §7). Covered by:
 `LaterNameEffectTests` (MCP), `WrittenTextCheckTests` (Core),
 `WriteEndpointTests.EditFileSaysWhenTheTextNamesSomeoneBeforeReadersLearnTheName`.
 
+### SC-MCP-56. My assistant uses my everyday name as co-author
+
+The den records checkpoints as Test Pen Name. Git's global settings hold
+the writer's everyday name. The assistant, which has seen that name
+somewhere, passes it, or its email, as `co_author`.
+
+- `checkpoint` is refused with `bad_argument`, saying a co-author from
+  git's global settings isn't allowed when the den records another name,
+  without repeating it. Nothing is recorded.
+- With its own name, the checkpoint is recorded under Test Pen Name, with
+  the assistant's `Co-Authored-By` line.
+
+Spec: design.md §6, "One gate for every commit and tag" (decision D9).
+Covered by: `HistoryToolTests.ACoAuthorWithGitsGlobalNameIsRefusedWhenTheDenRecordsAPenName`.
+
 ## STORE: Wolfden saves, moves, and deletes notes
 
 Background: the den store (design.md §6, #121) is how Wolfden writes a
@@ -4624,19 +4639,19 @@ is for what they write as Ash Calloway, so they run `wolfden init --git
 
 - The name and email given win, for this den only. They're saved with `git
   config --local` before the first checkpoint, so that checkpoint has Ash
-  Calloway as both author and committer, and so do later ones, as long as
-  nothing stronger is set when they're made: `GIT_AUTHOR_NAME` in the
-  environment of `wolfden serve` or a later run still beats them, as it does
-  for any git repository. The global settings aren't changed, and the
-  output doesn't repeat them.
+  Calloway as both author and committer, and so do later ones, even with
+  `GIT_AUTHOR_NAME` in the environment of `wolfden serve` or a later run
+  (SC-HIST-24). The global settings aren't changed, and the output doesn't
+  repeat them.
 - The same goes for a name git gives only inside a repository (`includeIf
   "gitdir:…"`), for global `author.name` or `committer.email` settings,
   which git otherwise prefers to `user.name` and `user.email`, and for a
   repository with no checkpoints yet that has a name of its own already.
-- An environment variable such as `GIT_AUTHOR_NAME` beats every setting, so
-  it would defeat what was given. That's refused, naming the variable but
-  not its value, with nothing changed. So is `GIT_DIR` or `GIT_COMMON_DIR`,
-  which would save them in another repository.
+- An environment variable such as `GIT_AUTHOR_NAME` doesn't defeat what was
+  given: Wolfden's checkpoints don't use it. The output names the variable,
+  not its value, and says git commands run by hand still use it.
+  `GIT_DIR` or `GIT_COMMON_DIR`, which would save them in another
+  repository, is refused with nothing changed.
 - Once they're saved, git is asked what it would record. If something it
   reads later still beats them (`GIT_CONFIG_COUNT`, `GIT_CONFIG_PARAMETERS`,
   `extensions.worktreeConfig`, an `[include]` in the repository's config),
@@ -4653,7 +4668,7 @@ Spec: design.md §6, "Turning history on" (maintainer decision, 2026-11-03,
 `HistorySetupTests.AGivenNameAndEmailWinOverOnesGitGivesOnlyInsideTheRepository`,
 `HistorySetupTests.AGivenNameAndEmailWinOverAuthorAndCommitterSettings`,
 `HistorySetupTests.AGivenNameAndEmailReplaceOnesInARepositoryWithNoCheckpointsYet`,
-`HistorySetupTests.AnEnvironmentVariableThatWouldBeatWhatsGivenRefusesWithNothingChanged`,
+`HistorySetupTests.AnEnvironmentVariableDoesntBeatWhatsGivenAndTheStepsSayItsSet`,
 `HistorySetupTests.ASettingFromTheEnvironmentThatBeatsWhatsSavedRefusesBeforeTheFirstCheckpoint`,
 `HistorySetupTests.ALaterSettingInTheRepositoryThatBeatsWhatsSavedStopsBeforeTheFirstCheckpoint`,
 `HistorySetupTests.WhatBeatsSigningBeingOffGetsItAllTakenBackSoNoLaterCommitSignsTheNameGiven`,
@@ -4737,6 +4752,88 @@ Spec: design.md §6, "Turning history on" (#286). Covered by:
 `HistorySetupTests.ASigningSettingFromTheEnvironmentThatStaysOnRefusesBeforeTheFirstCheckpoint`,
 `HistorySetupTests.WhatBeatsSigningBeingOffGetsItAllTakenBackSoNoLaterCommitSignsTheNameGiven`,
 `InitHistoryTests.AGivenNameTurnsSigningOffForTheDenAndSaysSo`.
+
+### SC-HIST-24. My shell has my everyday name in the environment
+
+The den's repository is set to Test Pen Name. The terminal that starts
+`wolfden serve` has `GIT_AUTHOR_NAME`, `GIT_COMMITTER_EMAIL` and `EMAIL`
+set to the writer's everyday name and email.
+
+- Every checkpoint and freeze tag Wolfden makes records Test Pen Name, as
+  author and committer, or as an annotated tag's tagger. The environment's
+  values aren't used.
+- The committer is the author, even if git's settings give a different
+  `committer.name`.
+- If git's settings have no name or email for the den, the checkpoint is
+  refused with nothing changed, not even a new file marked, and the
+  message says how to set them. It doesn't use the environment's, or one git
+  would make up from the computer's account, and doesn't repeat either.
+
+Spec: design.md §6, "One gate for every commit and tag" (#311). Covered by:
+`CommitGateTests.AnInheritedNameAndEmailDontWinAtACheckpointOrATag`,
+`CommitGateTests.TheCommitterIsTheAuthorAsGitsSettingsGiveIt`,
+`CommitGateTests.WithNoNameInGitsSettingsNothingIsGuessedAndNothingChanges`,
+`HistorySetupTests.AnEnvironmentVariableDoesntBeatWhatsGivenAndTheStepsSayItsSet`.
+
+### SC-HIST-25. Something outside the den's own settings turns signing on
+
+The den's own `.git/config` says `commit.gpgsign = false` and
+`tag.gpgsign = false`. Later, an `[include]` in that file, a
+`config.worktree`, or `GIT_CONFIG_COUNT` or `GIT_CONFIG_PARAMETERS` in the
+environment turns signing on, with a key of another name's.
+
+- The next checkpoint and freeze tag aren't signed. Each result has a
+  warning that git's settings would have signed it but the den's own
+  settings say not to, naming the kinds of setting that do this but not
+  the key. The checkpoint isn't refused.
+- The other way round, the den's own file saying sign wins over an
+  environment that says not to, and the result says so too.
+- When the den's own file doesn't say, git decides, as before, and nothing
+  is said. A key in that file with no value counts as on. A lightweight tag
+  is never signed.
+
+Spec: design.md §6, "One gate for every commit and tag" (#311, decision
+D4). Covered by:
+`CommitGateTests.SigningTurnedOnOutsideTheDensOwnFileDoesntSignAndTheResultSaysSo`,
+`CommitGateTests.TheDensOwnFileSayingSignWinsOverAnEnvironmentThatSaysNot`,
+`CommitGateTests.WithNothingInTheDensOwnFileGitDecidesAsBeforeAndNothingIsSaid`,
+`CommitGateTests.AValueWithoutAnEqualsSignInTheDensOwnFileIsPinnedAsOn`,
+`CheckpointEndpointTests.ACheckpointPassesOnTheGatesSigningWarning`,
+`FreezeTagTests.AFreezeTagCarriesTheGatesSigningWarning`,
+`Checkpoint.test.tsx` (web).
+
+### SC-HIST-26. A new way to commit can't skip the gate
+
+A developer adds a new feature that makes a commit or a tag.
+
+- Running any git command that makes commits or tags (`commit`, `tag`,
+  `commit-tree`, `merge`, `cherry-pick`, `rebase`, `notes` and the like)
+  without what the gate decided fails before git starts, so the new path
+  fails its first test.
+- Wolfden starts no git process except through that one place.
+
+Spec: design.md §6, "One gate for every commit and tag" (#311). Covered by:
+`CommitGateTests.AGitCommandThatMakesCommitsOrTagsRunsOnlyThroughTheGate`,
+`CommitGateTests.NothingInWolfdenRunsGitExceptThroughGitProcess`.
+
+### SC-HIST-27. A co-author with my everyday name
+
+Git's global settings hold the writer's everyday name and email. The den
+records checkpoints as Test Pen Name. A checkpoint asks for a co-author
+with the everyday name, or its email, in any case or spacing.
+
+- It's refused with nothing changed, and the message repeats neither the
+  co-author nor git's value. A global `author.name` counts too.
+- A co-author with the den's own name, when git's global name is that name
+  too, isn't refused. Nor is any co-author when there's no global config.
+
+Spec: design.md §6, "One gate for every commit and tag" (decision D9).
+Covered by:
+`CommitGateTests.ACoAuthorWithGitsGlobalNameOrEmailIsRefusedWhenTheDenRecordsAnother`,
+`CommitGateTests.ACoAuthorWithGitsGlobalNameIsntRefusedWhenTheDenRecordsThatNameToo`,
+`CommitGateTests.WithNoGlobalConfigAtAllACoAuthorIsntRefused`,
+`HistoryToolTests.ACoAuthorWithGitsGlobalNameIsRefusedWhenTheDenRecordsAPenName`
+(SC-MCP-56).
 
 ## WEB: the den in a browser
 

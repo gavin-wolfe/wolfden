@@ -641,18 +641,19 @@ Refused with nothing changed: one given without the other, always, even if
 it's what git has, since it would be recorded beside what git has for the
 other (a pen name with the everyday email; maintainer decision, 2026-11-04,
 #286; the CLI refuses it before anything is made, a new den included; the API
-answers `identity_needed`, saying which is needed); one that an environment
-variable such as `GIT_AUTHOR_NAME` would beat; and any given while `GIT_DIR` or
-`GIT_COMMON_DIR` points git at another repository. None of these messages
+answers `identity_needed`, saying which is needed); and any given while `GIT_DIR` or
+`GIT_COMMON_DIR` points git at another repository. An environment variable
+such as `GIT_AUTHOR_NAME` doesn't refuse: Wolfden's commits don't use it
+(below), and the result says it's set, since git run by hand does. None of these messages
 repeats what git has. A save that fails in a repository the run
 made takes the repository away again; in one that was there, what was saved
 is taken back if it can be, and the result names what couldn't be. Once saved, git is asked what it would
-record (`git var GIT_AUTHOR_IDENT` and `GIT_COMMITTER_IDENT`) and whether
+record (`git var GIT_AUTHOR_IDENT` and `GIT_COMMITTER_IDENT`, without the
+environment's name and email, as the gate below asks it) and whether
 it would sign; anything that still beats them refuses before any commit, with
 what was saved taken back as for a failed save, since left saved, the next
 commit would record the name given and sign it with another key.
-A later `GIT_AUTHOR_NAME`, when `wolfden serve` or a checkpoint runs, still
-wins, and a clone has none of this, as with any git setting. When a name and
+A clone has none of this, as with any git setting. When a name and
 email are given, signing is saved as off in that repository too, always
 (`commit.gpgsign`, `tag.gpgsign`, `tag.forceSignAnnotated`, `push.gpgSign`;
 maintainer decision, 2026-11-04, #286), even if they're what git has or the
@@ -698,6 +699,37 @@ asks for the den's history provider on each request, so checkpoints, the
 History tab, freezing, and automatic checkpoints work at once, without a
 restart; while a turn-on runs, an automatic checkpoint skips its poll.
 
+**One gate for every commit and tag** (#311; the #311/#315 design, §3.4
+steps 3 and 4, D4). Every checkpoint and tag Wolfden makes, from any
+surface, passes `CommitGate` in `Wolfden.Git` first, and `GitProcess`
+refuses to run a command that makes commits or tags without what the gate
+decided, so a new path can't skip it. The gate:
+
+- works out the name and email from git's settings for the den (`git var
+  GIT_AUTHOR_IDENT` with `user.useConfigOnly` on and `GIT_AUTHOR_*`,
+  `GIT_COMMITTER_*` and `EMAIL` taken out of its environment), and refuses,
+  with nothing changed, when there are none, rather than let git guess one
+  from the computer's account;
+- hands them to that one git process as `GIT_AUTHOR_NAME`,
+  `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME` and `GIT_COMMITTER_EMAIL`, over
+  anything inherited, so an inherited `GIT_AUTHOR_NAME` doesn't win, the
+  committer (or an annotated tag's tagger) is the author, and no config is
+  written;
+- pins `commit.gpgsign`, `tag.gpgsign` and `tag.forceSignAnnotated` with
+  `-c` to the den's own `.git/config` (`git config --local`, which doesn't
+  follow includes), for each one that file sets, so an `[include]`, a
+  `config.worktree`, `GIT_CONFIG_COUNT` or `GIT_CONFIG_PARAMETERS` can't
+  turn signing on, or off. When git's own answer for that write differs,
+  the write goes ahead and its result carries a warning (maintainer
+  decision D4, 2026-11-09: pin and warn, never refuse). One the file
+  doesn't set is left to git. The pin doesn't choose a key.
+
+A co-author (MCP `checkpoint`'s `co_author`) whose name or email equals one
+of git's global `user.*`, `author.*` or `committer.*` settings, compared
+without case, is refused when the den records another name (D9): an agent
+that has learned the writer's other name could write it into a permanent
+trailer. Neither value is repeated in the message.
+
 **Git or a synced folder, not both.** A git repository inside a synced
 folder (Dropbox, OneDrive, iCloud) can be corrupted when two machines
 sync while git is writing. Use git with a private remote, or a synced
@@ -714,7 +746,8 @@ With git as the backend:
   "Checkpoints in the web UI"), naming it ("Notes pass after drafting
   ch 12"), or when an AI agent asks through the MCP `checkpoint` tool.
   Commits made by AI agents through MCP record the agent as
-  `Co-Authored-By`. Automatic checkpoints are opt-in, below.
+  `Co-Authored-By`; the den's name, from the gate above, is the author.
+  Automatic checkpoints are opt-in, below.
 - **Automatic checkpoints** (#30; opt-in is the maintainer's decision,
   the rest v0 behaviour). With `auto_checkpoint: 30m` in `den.yaml`
   (format.md F-DEN-9; from `5m` to `24h`), a running `wolfden serve`

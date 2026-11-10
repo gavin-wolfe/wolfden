@@ -155,6 +155,67 @@ public class AccountStoreTests
     }
 
     [Fact]
+    [Trait("Scenario", "SC-ACCT-3")]
+    public async Task APasswordThatIsntValidUnicodeIsRefusedAndNeverMatches()
+    {
+        using var temp = new TempHome();
+        await using var store = await AccountStore.OpenAsync(temp.Folder, Token);
+        var broken = "a lone half \ud800 here";
+
+        Assert.Contains("broken character", PasswordRules.Problem("wren", broken), StringComparison.Ordinal);
+        Assert.Equal("bad_password", (await store.AddAsync("wren", broken, AccountRole.Owner)).Code);
+        await store.AddAsync("wren", Password, AccountRole.Owner);
+        Assert.Equal("bad_password", (await store.ResetPasswordAsync("wren", broken)).Code);
+
+        var user = (await store.Users.FindByNameAsync("wren"))!;
+        Assert.False(await store.Users.CheckPasswordAsync(user, broken));
+        Assert.False(PasswordRules.TryNormalize(broken, out _));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-ACCT-4")]
+    public async Task AHandEditedRoleStillCountsWhateverItsCase()
+    {
+        using var temp = new TempHome();
+        await using (var store = await AccountStore.OpenAsync(temp.Folder, Token))
+        {
+            await store.AddAsync("wren", Password, AccountRole.Owner);
+        }
+
+        using (var connection = new SqliteConnection(AccountsDbContext.ConnectionString(temp.Folder.AccountsDatabase)))
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE AspNetUsers SET Role = ' Owner'";
+            command.ExecuteNonQuery();
+        }
+
+        await using var reopened = await AccountStore.OpenAsync(temp.Folder, Token);
+        Assert.Equal(1, await reopened.OwnerCountAsync(Token));
+        Assert.Equal("last_owner", (await reopened.RemoveAsync("wren")).Code);
+        Assert.Equal("'wren' is already an owner.", (await reopened.SetRoleAsync("wren", AccountRole.Owner)).Message);
+    }
+
+    [Fact]
+    public async Task TheDatabaseIsOnlyForThisAccountOutsideWindows()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Skip("Windows files have no Unix mode bits.");
+            return;
+        }
+
+        using var temp = new TempHome();
+        temp.Folder.Create();
+        File.SetUnixFileMode(temp.Folder.Path, (UnixFileMode)Convert.ToInt32("755", 8));
+
+        await using var store = await AccountStore.OpenAsync(temp.Folder, Token);
+        await store.AddAsync("wren", Password, AccountRole.Owner);
+
+        Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(temp.Folder.AccountsDatabase));
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-ACCT-4")]
     public async Task TheLastOwnerCantBeRemovedOrDemoted()
     {

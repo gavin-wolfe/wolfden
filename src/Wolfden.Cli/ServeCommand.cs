@@ -50,7 +50,6 @@ internal static class ServeCommand
           --no-open           don't open a browser; the address is printed either way
           --no-watch          don't watch the files; each request still checks
                               them first and rebuilds the index if they changed
-
           --home <folder>     the installation folder (see 'wolfden login --help')
 
         This version doesn't ask for a login, even after 'wolfden login on' (it

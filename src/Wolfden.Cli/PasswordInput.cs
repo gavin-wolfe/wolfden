@@ -28,12 +28,22 @@ internal static class PasswordInput
     private static readonly AsyncLocal<TextReader?> InputOverride = new();
     private static readonly AsyncLocal<Func<string, string?>?> PrompterOverride = new();
 
+    /// <summary>
+    /// Standard input as UTF-8, whatever the console's code page, so a
+    /// password piped in from a file or a script reads the same everywhere.
+    /// </summary>
+    private static readonly Lazy<TextReader> StandardInput = new(() =>
+        new StreamReader(Console.OpenStandardInput(), new UTF8Encoding(false), detectEncodingFromByteOrderMarks: true));
+
     /// <summary>Standard input, for <c>--password-stdin</c>. Tests give their own, for their own flow only.</summary>
     internal static TextReader Input
     {
-        get => InputOverride.Value ?? Console.In;
+        get => InputOverride.Value ?? StandardInput.Value;
         set => InputOverride.Value = value;
     }
+
+    /// <summary>True when standard input is a terminal rather than a pipe or file (a test's own input never is).</summary>
+    private static bool InputIsTerminal => InputOverride.Value is null && !Console.IsInputRedirected;
 
     /// <summary>
     /// For tests, for their own flow only: reads one answer to a prompt as
@@ -53,7 +63,10 @@ internal static class PasswordInput
     /// </summary>
     internal static string? ReadNew(string command, string userName, bool fromStdin, TextWriter error)
     {
-        if (fromStdin)
+        // --password-stdin typed at a terminal: there's nothing piped in,
+        // so ask as without it, hiding what's typed, rather than reading
+        // a visible line.
+        if (fromStdin && !InputIsTerminal)
         {
             var line = Input.ReadLine();
             if (string.IsNullOrEmpty(line))
@@ -71,7 +84,7 @@ internal static class PasswordInput
             return line;
         }
 
-        var prompter = Prompter ?? (Console.IsInputRedirected ? null : ReadHidden(error));
+        var prompter = Prompter ?? (InputIsTerminal ? ReadHidden(error) : null);
         if (prompter is null)
         {
             error.WriteLine($"wolfden {command}: there's no terminal to ask for a password in. Pipe it in with '{StdinFlag}'.");

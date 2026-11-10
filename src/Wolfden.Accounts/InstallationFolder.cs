@@ -40,7 +40,7 @@ public sealed class InstallationFolder
     public InstallationFolder(string path, InstallationSource source)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        Path = IOPath.GetFullPath(path);
+        Path = IOPath.TrimEndingDirectorySeparator(IOPath.GetFullPath(path));
         Source = source;
     }
 
@@ -87,20 +87,90 @@ public sealed class InstallationFolder
                 return null;
             }
 
-            return new InstallationFolder(given, InstallationSource.Option);
+            return Checked(new InstallationFolder(given, InstallationSource.Option), out error);
         }
 
+        InstallationFolder? folder = null;
         if (environment(EnvironmentVariable) is { Length: > 0 } home && !string.IsNullOrWhiteSpace(home))
         {
-            return new InstallationFolder(home, InstallationSource.Environment);
-        }
+            // Like a relative XDG_DATA_HOME, a relative WOLFDEN_HOME would
+            // follow the current folder, which may be a den.
+            if (!IOPath.IsPathFullyQualified(home))
+            {
+                error = $"{EnvironmentVariable} must be a full path, not '{home}'.";
+                return null;
+            }
 
-        if (DefaultPath(environment) is { } path)
+            folder = new InstallationFolder(home, InstallationSource.Environment);
+        }
+        else if (DefaultPath(environment) is { } path)
         {
-            return new InstallationFolder(path, InstallationSource.Default);
+            folder = new InstallationFolder(path, InstallationSource.Default);
+        }
+        else
+        {
+            error = $"couldn't find this computer account's data folder. Set {EnvironmentVariable}, or give --home <folder>.";
+            return null;
         }
 
-        error = $"couldn't find this computer account's data folder. Set {EnvironmentVariable}, or give --home <folder>.";
+        return Checked(folder, out error);
+    }
+
+    /// <summary><paramref name="folder"/>, or null with a reason when it's in a den (<see cref="DenProblem"/>).</summary>
+    private static InstallationFolder? Checked(InstallationFolder folder, out string? error)
+    {
+        error = folder.DenProblem();
+        return error is null ? folder : null;
+    }
+
+    /// <summary>
+    /// Why this folder can't be an installation, or null: it's a den, or
+    /// inside one (a <c>den.yaml</c> in it or a folder above). A den's
+    /// checkpoints would then record the password hashes and cookie keys.
+    /// </summary>
+    public string? DenProblem() =>
+        Above(Path, dir => File.Exists(IOPath.Combine(dir, "den.yaml"))) is { } den
+            ? $"the installation folder '{Path}' is {(den == Path ? "a den" : $"inside the den at '{den}'")}, whose checkpoints would record the accounts. Use a folder outside every den, with --home or {EnvironmentVariable}."
+            : null;
+
+    /// <summary>
+    /// The git working tree this folder is inside, or null. Not refused (a
+    /// home folder kept in git is common), but worth a warning: a plain
+    /// <c>git add</c> there could take <c>accounts.db</c>.
+    /// </summary>
+    public string? RepositoryAbove() =>
+        Above(Path, dir => Directory.Exists(IOPath.Combine(dir, ".git")) || File.Exists(IOPath.Combine(dir, ".git")));
+
+    /// <summary>
+    /// Outside Windows: a warning when the folder exists and other
+    /// accounts on this computer may open it (group or world bits set), or
+    /// null. Wolfden doesn't change an existing folder's permissions.
+    /// </summary>
+    public string? PermissionProblem()
+    {
+        if (OperatingSystem.IsWindows() || !Exists)
+        {
+            return null;
+        }
+
+        const UnixFileMode others = UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute
+            | UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute;
+        return (File.GetUnixFileMode(Path) & others) != 0
+            ? $"other accounts on this computer may open the installation folder '{Path}'. To keep them out: chmod 700 '{Path}'"
+            : null;
+    }
+
+    /// <summary>The nearest of <paramref name="start"/> and the folders above it that <paramref name="matches"/>, or null.</summary>
+    private static string? Above(string start, Func<string, bool> matches)
+    {
+        for (var dir = new DirectoryInfo(start); dir is not null; dir = dir.Parent)
+        {
+            if (matches(dir.FullName))
+            {
+                return IOPath.TrimEndingDirectorySeparator(dir.FullName);
+            }
+        }
+
         return null;
     }
 
@@ -141,8 +211,14 @@ public sealed class InstallationFolder
     /// is readable only by this computer account (0700). On Windows, a
     /// folder under <c>%LOCALAPPDATA%</c> already is.
     /// </summary>
+    /// <exception cref="AccountsException">The folder is a den or inside one (<see cref="DenProblem"/>).</exception>
     public void Create()
     {
+        if (DenProblem() is { } problem)
+        {
+            throw new AccountsException(problem);
+        }
+
         if (OperatingSystem.IsWindows())
         {
             Directory.CreateDirectory(Path);

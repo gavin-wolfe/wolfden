@@ -96,7 +96,74 @@ public class InstallationTests
         Assert.False(File.Exists(temp.Folder.SettingsFile + ".tmp"));
     }
 
+    [Fact]
+    [Trait("Scenario", "SC-ACCT-1")]
+    public void ARelativeWolfdenHomeIsRefused()
+    {
+        Assert.Null(InstallationFolder.Resolve(null, Env(("WOLFDEN_HOME", "."), ("HOME", Path.GetTempPath())), out var error));
+        Assert.Equal("WOLFDEN_HOME must be a full path, not '.'.", error);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-ACCT-9")]
+    public void AFolderInADenIsRefused()
+    {
+        using var temp = new TempHome();
+        var den = Path.Combine(temp.Root, "den");
+        Directory.CreateDirectory(Path.Combine(den, "notes"));
+        File.WriteAllText(Path.Combine(den, "den.yaml"), "format: 1\nname: Test\n");
+
+        Assert.Null(InstallationFolder.Resolve(den, Env(), out var asDen));
+        Assert.Equal($"the installation folder '{den}' is a den, whose checkpoints would record the accounts. Use a folder outside every den, with --home or WOLFDEN_HOME.", asDen);
+        Assert.Null(InstallationFolder.Resolve(null, Env(("WOLFDEN_HOME", Path.Combine(den, "notes", "wolfden"))), out var inside));
+        Assert.Contains($"is inside the den at '{den}'", inside, StringComparison.Ordinal);
+
+        // Built directly, it still won't be created there.
+        var direct = new InstallationFolder(Path.Combine(den, "home"), InstallationSource.Option);
+        Assert.Throws<AccountsException>(direct.Create);
+        Assert.False(Directory.Exists(direct.Path));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-ACCT-9")]
+    public void AFolderInARepositoryIsFoundForAWarning()
+    {
+        using var temp = new TempHome();
+        var repo = Path.Combine(temp.Root, "repo");
+        Directory.CreateDirectory(Path.Combine(repo, ".git"));
+        var worktree = Path.Combine(temp.Root, "worktree");
+        Directory.CreateDirectory(worktree);
+        File.WriteAllText(Path.Combine(worktree, ".git"), "gitdir: ../repo/.git/worktrees/x\n");
+
+        Assert.Equal(repo, new InstallationFolder(Path.Combine(repo, "a", "home"), InstallationSource.Option).RepositoryAbove());
+        Assert.Equal(worktree, new InstallationFolder(Path.Combine(worktree, "home"), InstallationSource.Option).RepositoryAbove());
+        Assert.Null(temp.Folder.RepositoryAbove());
+
+        // Allowed, unlike a den: a home folder kept in git is common.
+        Assert.NotNull(InstallationFolder.Resolve(Path.Combine(repo, "home"), Env(), out _));
+    }
+
+    [Fact]
+    public void AFolderOthersCanOpenIsWarnedAbout()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Skip("Windows folders have no Unix mode bits.");
+            return;
+        }
+
+        using var temp = new TempHome();
+        Assert.Null(temp.Folder.PermissionProblem());
+        temp.Folder.Create();
+        Assert.Null(temp.Folder.PermissionProblem());
+
+        File.SetUnixFileMode(temp.Folder.Path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute | UnixFileMode.GroupRead | UnixFileMode.GroupExecute);
+
+        Assert.Contains("other accounts on this computer may open the installation folder", temp.Folder.PermissionProblem(), StringComparison.Ordinal);
+    }
+
     [Theory]
+    [InlineData("{ \"login\": true, \"login\": false }")]
     [InlineData("not json")]
     [InlineData("[1, 2]")]
     [InlineData("{ \"login\": \"yes\" }")]

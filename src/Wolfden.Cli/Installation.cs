@@ -33,9 +33,26 @@ internal static class Installation
     internal static InstallationFolder? Resolve(string command, CommandLine line, TextWriter error)
     {
         var given = line.Value(HomeOption);
+        string? problem = null;
         var folder = given is null && TestHome is { } test
             ? new InstallationFolder(test, InstallationSource.Environment)
-            : InstallationFolder.Resolve(given, null, out var problem) ?? Fail(problem!);
+            : InstallationFolder.Resolve(given, null, out problem);
+        problem = folder is null ? problem : folder.DenProblem();
+        if (folder is null || problem is not null)
+        {
+            return Fail(problem ?? "couldn't find the installation folder.");
+        }
+
+        if (folder.RepositoryAbove() is { } repository)
+        {
+            error.WriteLine($"wolfden {command}: warning: the installation folder '{folder.Path}' is inside the git repository at '{repository}'. Keep it out of that repository's commits (add it to .gitignore), or use a folder outside it with --home or {InstallationFolder.EnvironmentVariable}.");
+        }
+
+        if (folder.PermissionProblem() is { } permissions)
+        {
+            error.WriteLine($"wolfden {command}: warning: {permissions}");
+        }
+
         return folder;
 
         InstallationFolder? Fail(string message)
@@ -51,5 +68,5 @@ internal static class Installation
     /// <summary>True for the failures reading or writing the installation can have, which a command reports and exits 2 for.</summary>
     internal static bool IsFailure(Exception e) =>
         e is IOException or UnauthorizedAccessException or SqliteException or InvalidDataException
-            or Microsoft.EntityFrameworkCore.DbUpdateException or InvalidOperationException;
+            or Microsoft.EntityFrameworkCore.DbUpdateException or AccountsException;
 }

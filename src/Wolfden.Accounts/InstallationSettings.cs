@@ -27,6 +27,9 @@ public sealed class InstallationSettings
         set => _json[LoginKey] = value;
     }
 
+    /// <summary>The defaults, login off, for replacing a file that doesn't read.</summary>
+    public static InstallationSettings Defaults() => new([]);
+
     /// <summary>
     /// Reads the installation's settings. A missing file is the defaults
     /// (login off). A file that isn't a JSON object, or whose <c>login</c>
@@ -44,11 +47,17 @@ public sealed class InstallationSettings
         JsonNode? node;
         try
         {
-            node = JsonNode.Parse(File.ReadAllText(folder.SettingsFile), documentOptions: new JsonDocumentOptions { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip });
+            node = JsonNode.Parse(
+                File.ReadAllText(folder.SettingsFile),
+                documentOptions: new JsonDocumentOptions { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip, AllowDuplicateProperties = false });
+
+            // JsonObject reads its properties lazily; read them now, so a
+            // repeated key fails here and not in whoever asks later.
+            _ = (node as JsonObject)?.Count;
         }
-        catch (JsonException e)
+        catch (Exception e) when (e is JsonException or ArgumentException)
         {
-            throw new InvalidDataException($"'{folder.SettingsFile}' isn't valid JSON: {e.Message}", e);
+            throw new InvalidDataException($"'{folder.SettingsFile}' isn't valid JSON, or names a setting twice: {e.Message}", e);
         }
 
         if (node is not JsonObject json)

@@ -64,6 +64,7 @@ public sealed class AccountStore : IAsyncDisposable, IDisposable
         try
         {
             await store.Db.Database.MigrateAsync(cancel).ConfigureAwait(false);
+            KeepPrivate(folder);
             return store;
         }
         catch
@@ -91,7 +92,7 @@ public sealed class AccountStore : IAsyncDisposable, IDisposable
     public Task<int> OwnerCountAsync(CancellationToken cancel = default)
     {
         var owner = AccountRole.Owner.Name();
-        return Db.Users.CountAsync(u => u.Role == owner, cancel);
+        return Db.Users.CountAsync(u => u.Role.Trim().ToLower() == owner, cancel);
     }
 
     /// <summary>Adds an account. Refused for a username that's taken (in any case) or breaks the rules, or a password that does.</summary>
@@ -154,7 +155,7 @@ public sealed class AccountStore : IAsyncDisposable, IDisposable
             return Unknown(userName);
         }
 
-        if (user.Role == role.Name())
+        if (AccountRoles.TryParse(user.Role, out var current) && current == role)
         {
             return AccountResult.Done($"'{user.UserName}' is already {Article(role)} {role.Name()}.", ToAccount(user));
         }
@@ -239,6 +240,27 @@ public sealed class AccountStore : IAsyncDisposable, IDisposable
         await _services.DisposeAsync().ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Outside Windows: makes <c>accounts.db</c>, and its <c>-wal</c> and
+    /// <c>-shm</c> files if there are any, readable and writable by this
+    /// computer account only (0600), whatever the folder or umask allows.
+    /// </summary>
+    internal static void KeepPrivate(InstallationFolder folder)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        foreach (var file in new[] { folder.AccountsDatabase, folder.AccountsDatabase + "-wal", folder.AccountsDatabase + "-shm", folder.AccountsDatabase + "-journal" })
+        {
+            if (File.Exists(file))
+            {
+                File.SetUnixFileMode(file, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            }
+        }
+    }
+
     private Task<WolfdenUser?> FindAsync(string userName)
     {
         ArgumentNullException.ThrowIfNull(userName);
@@ -246,7 +268,7 @@ public sealed class AccountStore : IAsyncDisposable, IDisposable
     }
 
     private async Task<bool> IsLastOwnerAsync(WolfdenUser user) =>
-        user.Role == AccountRole.Owner.Name() && await OwnerCountAsync().ConfigureAwait(false) <= 1;
+        AccountRoles.TryParse(user.Role, out var role) && role == AccountRole.Owner && await OwnerCountAsync().ConfigureAwait(false) <= 1;
 
     private static Account ToAccount(WolfdenUser user) =>
         new(user.UserName ?? string.Empty, AccountRoles.TryParse(user.Role, out var role) ? role : AccountRole.Viewer, LockedUntil(user));
@@ -265,7 +287,7 @@ public sealed class AccountStore : IAsyncDisposable, IDisposable
             PasswordRules.ErrorCode => AccountResult.Refused(PasswordRules.ErrorCode, error.Description),
             nameof(IdentityErrorDescriber.DuplicateUserName) => AccountResult.Refused("user_exists", "there's already an account with that name."),
             nameof(IdentityErrorDescriber.InvalidUserName) => AccountResult.Refused("bad_username", "use letters, digits, '.', '-' and '_' in a username, with no spaces."),
-            _ => throw new InvalidOperationException($"The accounts database refused the change: {string.Join(" ", result.Errors.Select(e => e.Description))}"),
+            _ => throw new AccountsException($"The accounts database refused the change: {string.Join(" ", result.Errors.Select(e => e.Description))}"),
         };
     }
 

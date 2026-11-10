@@ -1837,8 +1837,8 @@ account can use them, which is the same trust as opening the files.
 - **Locked out after failed tries:** after 5 wrong passwords in a row, an
   account is locked for 15 minutes. Anyone who can reach the login page can
   cause that by guessing, so `wolfden user unlock wren` ends it at once.
-- **The only owner forgot everything:** `wolfden user reset-password`, or
-  `wolfden login off`.
+- **The only owner forgot everything:** `wolfden user reset-password <name>`
+  (`wolfden user list` lists the names), or `wolfden login off`.
 
 In a script, pipe the password in with `--password-stdin` (its first line).
 A password is never a command-line argument, where it would land in your
@@ -1858,8 +1858,10 @@ cookies. It's never inside a den, and never in a checkpoint or a push.
 | Linux | `$XDG_DATA_HOME/wolfden`, or `~/.local/share/wolfden` |
 
 `wolfden user list` and `wolfden login` always say which folder they used.
-To use another, set `WOLFDEN_HOME`, or give `--home <folder>` to `user`,
-`login` and `serve`. A writer with a second pen name kept secret from the
+To use another, set `WOLFDEN_HOME` to a full path, or give `--home <folder>`
+to `user`, `login` and `serve`. A folder inside a den is refused, so your
+checkpoints never record the accounts. A folder inside a git repository
+works, with a warning: keep it out of that repository's commits. A writer with a second pen name kept secret from the
 first should give it its own installation this way, or better, its own
 computer account, so the two names' accounts never sit side by side.
 

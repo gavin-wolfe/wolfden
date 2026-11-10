@@ -352,13 +352,65 @@ public sealed class AccountCommandTests : IDisposable
     [Fact]
     public void ABrokenSettingsFileIsReportedNotIgnored()
     {
-        Directory.CreateDirectory(Home);
+        Folder.Create();
         File.WriteAllText(Path.Combine(Home, "settings.json"), "{ \"login\": maybe }");
 
         var (exitCode, _, error) = Run("login");
 
         Assert.Equal(CliApp.ExitUsage, exitCode);
         Assert.StartsWith($"wolfden login: couldn't use the installation at '{Path.GetFullPath(Home)}':", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-ACCT-6")]
+    public void LoginOffAlwaysWorksEvenWithASettingsFileThatDoesntRead()
+    {
+        Folder.Create();
+        File.WriteAllText(Path.Combine(Home, "settings.json"), "{ \"login\": true, \"login\": false }");
+
+        var list = Run("user", "list");
+        var (exitCode, output, error) = Run("login", "off");
+
+        Assert.Equal(CliApp.ExitUsage, list.ExitCode);
+        Assert.Contains("names a setting twice", list.Error, StringComparison.Ordinal);
+        Assert.Equal(CliApp.ExitOk, exitCode);
+        Assert.StartsWith("Login is off: the web pages no longer ask for a login.\n", output, StringComparison.Ordinal);
+        Assert.Contains("It's replaced with one that turns login off", error, StringComparison.Ordinal);
+        Assert.False(InstallationSettings.Load(Folder).Login);
+        Assert.Equal(CliApp.ExitOk, Run("user", "list").ExitCode);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-ACCT-9")]
+    public void AnInstallationInADenIsRefused()
+    {
+        using var den = TempDen.FromFiles(new Dictionary<string, string> { ["den.yaml"] = "format: 1\nname: Test\n" });
+        var inside = Path.Combine(den.Root, "wolfden-home");
+        PasswordInput.Input = new StringReader(Password + "\n");
+
+        var add = Cli.Run("user", "add", "wren", "--owner", "--password-stdin", "--home", inside);
+        var here = Cli.Run("login", "--home", den.Root);
+
+        Assert.Equal(CliApp.ExitUsage, add.ExitCode);
+        Assert.Equal($"wolfden user add: the installation folder '{Path.GetFullPath(inside)}' is inside the den at '{Path.GetFullPath(den.Root)}', whose checkpoints would record the accounts. Use a folder outside every den, with --home or WOLFDEN_HOME.\n", add.Error);
+        Assert.False(Directory.Exists(inside));
+        Assert.Equal(CliApp.ExitUsage, here.ExitCode);
+        Assert.Contains("is a den, whose checkpoints would record the accounts", here.Error, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(den.Root, "accounts.db")));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-ACCT-9")]
+    public void AnInstallationInARepositoryIsWarnedAbout()
+    {
+        var repository = Path.Combine(_root, "repo");
+        Directory.CreateDirectory(Path.Combine(repository, ".git"));
+        var home = Path.Combine(repository, "wolfden-home");
+
+        var (exitCode, _, error) = Cli.Run("user", "list", "--home", home);
+
+        Assert.Equal(CliApp.ExitOk, exitCode);
+        Assert.Equal($"wolfden user list: warning: the installation folder '{Path.GetFullPath(home)}' is inside the git repository at '{Path.GetFullPath(repository)}'. Keep it out of that repository's commits (add it to .gitignore), or use a folder outside it with --home or WOLFDEN_HOME.\n", error);
     }
 
     [Fact]
@@ -416,6 +468,28 @@ public sealed class ServeLoginWarningTests : IDisposable
         PasswordInput.Input = new StringReader("correct horse battery\n");
         Assert.Equal(CliApp.ExitOk, Cli.Run("user", "add", "wren", "--owner", "--password-stdin", "--home", home).ExitCode);
         Assert.Equal(CliApp.ExitOk, Cli.Run("login", "on", "--home", home).ExitCode);
+
+        var error = await Serve(home);
+
+        Assert.Contains($"wolfden serve: login is on for the installation at '{Path.GetFullPath(home)}', but this version doesn't ask for it yet", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-ACCT-6")]
+    public async Task ASettingsFileThatDoesntReadIsOnlyAWarning()
+    {
+        Directory.CreateDirectory(_home);
+        File.WriteAllText(Path.Combine(_home, "settings.json"), "{ \"login\": true, \"login\": false }");
+
+        var error = await Serve(_home);
+
+        Assert.Contains("wolfden serve: couldn't read the installation's login setting:", error, StringComparison.Ordinal);
+        Assert.Contains("names a setting twice", error, StringComparison.Ordinal);
+    }
+
+    /// <summary>Serves a copy of Dracula with <paramref name="home"/> until it has started, then stops it; returns standard error.</summary>
+    private static async Task<string> Serve(string home)
+    {
         using var den = TempDen.DraculaCopy();
         var token = TestContext.Current.CancellationToken;
         var started = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -435,6 +509,6 @@ public sealed class ServeLoginWarningTests : IDisposable
             ServeCommand.Started = null;
         }
 
-        Assert.Contains($"wolfden serve: login is on for the installation at '{Path.GetFullPath(home)}', but this version doesn't ask for it yet", error.ToString(), StringComparison.Ordinal);
+        return error.ToString();
     }
 }

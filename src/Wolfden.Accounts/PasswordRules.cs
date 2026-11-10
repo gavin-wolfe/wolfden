@@ -27,7 +27,11 @@ public sealed class PasswordRules : IPasswordValidator<WolfdenUser>
     public static string? Problem(string? userName, string password)
     {
         ArgumentNullException.ThrowIfNull(password);
-        var normalized = Normalize(password);
+        if (!TryNormalize(password, out var normalized))
+        {
+            return "a password can't hold a broken character (half of a character outside the basic set, such as an emoji).";
+        }
+
         var length = normalized.EnumerateRunes().Count();
         if (length < MinimumLength)
         {
@@ -39,7 +43,7 @@ public sealed class PasswordRules : IPasswordValidator<WolfdenUser>
             return $"a password can have at most {MaximumLength} characters, and this one has {length}.";
         }
 
-        if (userName is not null && string.Equals(normalized, Normalize(userName), StringComparison.OrdinalIgnoreCase))
+        if (userName is not null && string.Equals(normalized, TryNormalize(userName, out var name) ? name : userName, StringComparison.OrdinalIgnoreCase))
         {
             return "a password can't be the username.";
         }
@@ -52,9 +56,31 @@ public sealed class PasswordRules : IPasswordValidator<WolfdenUser>
         return null;
     }
 
-    /// <summary>The form a password is hashed and compared in: Unicode NFC, so the same characters typed on two keyboards match.</summary>
+    /// <summary>
+    /// The form a password is hashed and compared in: Unicode NFC, so the
+    /// same characters typed on two keyboards match. False for text that
+    /// isn't valid Unicode (a lone surrogate), which has no NFC form.
+    /// </summary>
+    public static bool TryNormalize(string password, out string normalized)
+    {
+        ArgumentNullException.ThrowIfNull(password);
+        try
+        {
+            normalized = password.IsNormalized(NormalizationForm.FormC) ? password : password.Normalize(NormalizationForm.FormC);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            normalized = password;
+            return false;
+        }
+    }
+
+    /// <summary>The NFC form of <paramref name="password"/>; throws <see cref="ArgumentException"/> for text that isn't valid Unicode.</summary>
     public static string Normalize(string password) =>
-        password.IsNormalized(NormalizationForm.FormC) ? password : password.Normalize(NormalizationForm.FormC);
+        TryNormalize(password, out var normalized)
+            ? normalized
+            : throw new ArgumentException("The password isn't valid Unicode.", nameof(password));
 
     /// <inheritdoc/>
     public Task<IdentityResult> ValidateAsync(UserManager<WolfdenUser> manager, WolfdenUser user, string? password) =>
@@ -75,8 +101,11 @@ public sealed class NormalizingPasswordHasher(IOptions<PasswordHasherOptions>? o
         base.HashPassword(user, PasswordRules.Normalize(password));
 
     /// <inheritdoc/>
+    /// <remarks>Text that isn't valid Unicode can't be a password the rules allowed, so it fails.</remarks>
     public override PasswordVerificationResult VerifyHashedPassword(WolfdenUser user, string hashedPassword, string providedPassword) =>
-        base.VerifyHashedPassword(user, hashedPassword, PasswordRules.Normalize(providedPassword));
+        PasswordRules.TryNormalize(providedPassword ?? string.Empty, out var normalized)
+            ? base.VerifyHashedPassword(user, hashedPassword, normalized)
+            : PasswordVerificationResult.Failed;
 }
 
 /// <summary>The username rules: 1 to 64 characters, letters, digits, '.', '-' and '_'.</summary>

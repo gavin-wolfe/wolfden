@@ -33,8 +33,11 @@ internal static class LoginCommand
 
     /// <summary>Said while nothing enforces the setting (until #315 PR 4b).</summary>
     internal const string NotEnforcedYet =
-        "This version of Wolfden records the setting but doesn't ask for a login yet: " +
-        "'wolfden serve' still answers anyone who can use this computer. A later version enforces it.";
+        """
+        This version of Wolfden records the setting but doesn't ask for a login yet:
+        'wolfden serve' still answers anyone who can use this computer. A later
+        version enforces it.
+        """;
 
     internal static readonly CommandSpec Spec = new(
         "login",
@@ -47,7 +50,11 @@ internal static class LoginCommand
         it's the way back in if every owner's password is lost.
 
         Login protects the web pages only, not the den's files; 'login on' says
-        what that means. {NotEnforcedYet}
+        what that means.
+
+        {NotEnforcedYet}
+
+        'login off' also replaces a settings.json it can't read, with login off.
 
         {Installation.HomeHelp}
           --json              print one JSON document instead of text
@@ -84,14 +91,36 @@ internal static class LoginCommand
 
         try
         {
-            var settings = InstallationSettings.Load(folder);
-            var owners = 0;
-            using (var store = AccountStore.OpenExistingAsync(folder).GetAwaiter().GetResult())
+            InstallationSettings settings;
+            string? replaced = null;
+            try
             {
-                if (store is not null)
-                {
-                    owners = store.OwnerCountAsync().GetAwaiter().GetResult();
-                }
+                settings = InstallationSettings.Load(folder);
+            }
+            catch (InvalidDataException e) when (turnOn is false)
+            {
+                // 'login off' is the way back in, so it always works: a
+                // settings file it can't read is replaced, with login off.
+                replaced = e.Message;
+                settings = InstallationSettings.Defaults();
+                settings.Save(folder);
+            }
+
+            // Only 'login on' needs the owners; 'login off' never depends on the accounts reading.
+            int? owners;
+            try
+            {
+                using var store = AccountStore.OpenExistingAsync(folder).GetAwaiter().GetResult();
+                owners = store is null ? 0 : store.OwnerCountAsync().GetAwaiter().GetResult();
+            }
+            catch (Exception e) when (turnOn is not true && Installation.IsFailure(e))
+            {
+                owners = null;
+            }
+
+            if (replaced is not null)
+            {
+                error.WriteLine($"wolfden login: {replaced} It's replaced with one that turns login off; any other settings in it are gone.");
             }
 
             string message;
@@ -115,7 +144,7 @@ internal static class LoginCommand
             }
             else if (turnOn is false)
             {
-                message = settings.Login ? "Login is off: the web pages no longer ask for a login." : "Login was already off.";
+                message = settings.Login || replaced is not null ? "Login is off: the web pages no longer ask for a login." : "Login was already off.";
                 if (settings.Login)
                 {
                     settings.Login = false;
@@ -144,7 +173,7 @@ internal static class LoginCommand
 
             if (settings.Login)
             {
-                output.WriteLine(NotEnforcedYet);
+                output.WriteLine(NotEnforcedYet.ReplaceLineEndings(output.NewLine));
             }
 
             if (turnOn is null && !settings.Login && owners == 0)
@@ -166,7 +195,7 @@ internal static class LoginCommand
     /// <param name="Version">The shape's version, 1.</param>
     /// <param name="Home">The installation folder.</param>
     /// <param name="Login">Whether login is on.</param>
-    /// <param name="Owners">How many owner accounts there are.</param>
+    /// <param name="Owners">How many owner accounts there are, or null if the accounts couldn't be read (only for <c>login</c> and <c>login off</c>).</param>
     /// <param name="Enforced">Whether this version's server asks for the login; false until the web's login lands.</param>
-    internal sealed record LoginReport(int Version, string Home, bool Login, int Owners, bool Enforced);
+    internal sealed record LoginReport(int Version, string Home, bool Login, int? Owners, bool Enforced);
 }

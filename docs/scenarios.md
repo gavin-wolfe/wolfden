@@ -4743,7 +4743,9 @@ Spec: design.md §6, "Turning history on" (#286). Covered by:
 
 Background: `wolfden serve` (design.md §7, §9, #23) hosts the web UI and
 its API on this computer only (127.0.0.1) and opens the default browser.
-v0 has no accounts, so it never listens on the network. The browsing,
+Accounts and the login setting exist (ACCT, #315), but nothing asks for
+a login until the web's login lands (#315 PR 4b), so it never listens on
+the network. The browsing,
 search, and history pages come in M3 (#24 to #27); their read API comes
 first, and SC-WEB-4 to SC-WEB-10 describe what it answers. SC-WEB-11
 to SC-WEB-17 describe the browsing pages, SC-WEB-18 to SC-WEB-21 the
@@ -7377,3 +7379,21 @@ A writer keeps a second, secret pen name in its own installation
 
 Spec: #315 §3.6, Flow 7. Covered by: `AccountCommandTests.ListingAnEmptyInstallationCreatesNothingAndNamesTheFolder`,
 `AccountCommandTests.WithoutHomeItUsesAnotherInstallation`.
+
+### SC-ACCT-9. I point the installation at my den by mistake
+
+The writer sets `WOLFDEN_HOME=.` in the den's folder, then tries `--home`
+with the den's folder, then with a folder inside a git repository.
+
+- A relative `WOLFDEN_HOME` is refused: it must be a full path. A folder
+  that is a den, or inside one (a `den.yaml` in it or above it), is refused
+  by every `user` and `login` command (exit 2), and nothing is created
+  there, so a checkpoint can never record the accounts. A folder inside a
+  git repository is allowed, with a warning to keep it out of that
+  repository's commits. Outside Windows, `accounts.db` is made 0600, and a
+  folder other accounts can open gets a warning.
+
+Spec: #315 §3.2, review of PR #350. Covered by: `InstallationTests.ARelativeWolfdenHomeIsRefused`,
+`InstallationTests.AFolderInADenIsRefused`, `InstallationTests.AFolderInARepositoryIsFoundForAWarning`,
+`AccountCommandTests.AnInstallationInADenIsRefused`, `AccountCommandTests.AnInstallationInARepositoryIsWarnedAbout`,
+`AccountStoreTests.TheDatabaseIsOnlyForThisAccountOutsideWindows`.

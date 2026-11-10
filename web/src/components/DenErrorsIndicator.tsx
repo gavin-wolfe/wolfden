@@ -5,6 +5,7 @@ import { count } from '../api'
 import { useRefreshHeld } from '../formHold'
 import { denErrorCountQuery, denErrorsQuery, fixElsewhere, leavesOut, type DenErrors, type DenErrorView } from '../denErrorsApi'
 import { usePosition } from '../hooks'
+import { useAccess } from '../access'
 import { trapTab } from './CheckpointIndicator'
 import '../denErrors.css'
 
@@ -141,6 +142,9 @@ function DenErrorsDialog({ errors, universe, onClose, onLeave }: { errors: DenEr
 function ErrorEntry({ error, universe, onLeave }: { error: DenErrorView; universe: string | undefined; onLeave: () => void }) {
   // A story position belongs to one universe, so it doesn't follow a link into another.
   const otherUniverse = error.universe !== null && error.universe !== universe
+  // Edit file is a writer's, and fixing den.yaml the owner's (#315 §4.6); the list itself is anyone's.
+  const { canWrite, isOwner } = useAccess()
+  const allowed = error.kind === 'den' ? isOwner : canWrite
   return (
     <>
       <p className="den-errors-where">
@@ -154,7 +158,7 @@ function ErrorEntry({ error, universe, onLeave }: { error: DenErrorView; univers
       <p>
         <span className="den-errors-label">Left out:</span> {leavesOut(error)}
       </p>
-      {error.canEdit ? (
+      {error.canEdit && !allowed ? null : error.canEdit ? (
         <p>
           <Link to="/file" search={(s) => ({ ...s, path: error.path, at: otherUniverse ? undefined : s.at })} onClick={onLeave}>
             Edit file

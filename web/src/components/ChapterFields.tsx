@@ -2,6 +2,7 @@ import { Fragment, useEffect, useId, useRef, useState, type KeyboardEvent, type 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiRequestError, positionsQuery, type PositionView, type ReaderMark } from '../api'
 import { useHoldRefresh, useShownError } from '../formHold'
+import { useAccess } from '../access'
 import {
   bookChapterFieldsQuery,
   chapterDefaultsQuery,
@@ -860,11 +861,15 @@ export function ReadersChapterFieldsSection({ universe, book, chapter, at }: { u
   )
 }
 
+/** Why a viewer's chapter fields and defaults can't be edited (#315 D6). */
+const VIEWER_LOCKED = 'Your account is a viewer: it can read this den but not change it.'
+
 /** A chapter's fields on its page, with what each inherits, editable unless the book is final. `marks` is as in {@link ChapterValueText}. */
 export function ChapterFieldsSection({ universe, book, chapter, label, marks }: { universe: string; book: string; chapter: string; label: string; marks?: ChapterFieldMarks }) {
   const fields = useQuery(bookChapterFieldsQuery(universe, book))
   const failed = useShownError(fields)
   const client = useQueryClient()
+  const { canWrite } = useAccess()
   if (fields.isPending) {
     return <Loading what="the chapter's fields" />
   }
@@ -879,7 +884,9 @@ export function ChapterFieldsSection({ universe, book, chapter, label, marks }: 
     return null
   }
 
-  const locked = data.final
+  const locked = !canWrite
+    ? VIEWER_LOCKED
+    : data.final
     ? "The book is final (frozen), so its chapters' fields can't be edited until it's unfrozen: use Unfreeze… on the book's page."
     : c.bare
       ? `book.md writes this chapter as a bare key (${c.key}), which has no place for fields. To give it fields, write it as { key: ${c.key} } in book.md first.`
@@ -916,6 +923,7 @@ export function ChapterDefaultsSection({ scope, name }: { scope: DefaultsScope; 
   const defaults = useQuery(chapterDefaultsQuery(scope))
   const failed = useShownError(defaults)
   const client = useQueryClient()
+  const { canWrite } = useAccess()
   const headingId = useId()
   if (defaults.isPending) {
     return null
@@ -960,7 +968,7 @@ export function ChapterDefaultsSection({ scope, name }: { scope: DefaultsScope; 
         fieldTypes={data.fieldTypes}
         values={data.fields}
         hash={data.hash}
-        locked={data.final ? "The book is final (frozen), so its defaults can't be edited until it's unfrozen: use Unfreeze… above." : null}
+        locked={!canWrite ? VIEWER_LOCKED : data.final ? "The book is final (frozen), so its defaults can't be edited until it's unfrozen: use Unfreeze… above." : null}
         label={`Chapter defaults of ${where}`}
       />
     </section>

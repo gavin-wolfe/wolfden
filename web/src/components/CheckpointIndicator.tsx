@@ -14,6 +14,7 @@ import {
   type CheckpointStatus,
   type TurnOnRequest,
 } from '../checkpointApi'
+import { useAccess } from '../access'
 import '../checkpoint.css'
 
 /**
@@ -37,7 +38,9 @@ export function CheckpointIndicator() {
   }
 
   const data = status.data
-  const visible = data !== undefined && (!data.available || data.count > 0)
+  // Turning history on is the owner's (#315 §4.6), so a writer isn't offered it.
+  const { isOwner } = useAccess()
+  const visible = data !== undefined && (data.available ? data.count > 0 : isOwner)
 
   // The status couldn't be read (git failed, or the server's gone): say so, quietly,
   // rather than hide the indicator as if nothing had changed.

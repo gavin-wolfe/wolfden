@@ -7,16 +7,20 @@ import react from '@vitejs/plugin-react'
 // 'npm run dev', and the dev server passes /api and /den-files on to it.
 const servePort = Number(process.env.WOLFDEN_PORT ?? 9653)
 
+const serveOrigin = `http://127.0.0.1:${servePort}`
+
 const toServe: ProxyOptions = {
-  target: `http://127.0.0.1:${servePort}`,
+  target: serveOrigin,
   configure: (proxy) => {
     // The server refuses an Origin other than its own port, and this
-    // page's port is Vite's: drop the Origin of this dev server's own
-    // page only. Any other Origin goes through, so the server refuses it.
+    // page's port is Vite's: the Origin of this dev server's own page
+    // becomes the server's. With login on, the server needs an Origin on
+    // every change, so it can't simply be dropped (#315). Any other Origin
+    // goes through, so the server refuses it.
     proxy.on('proxyReq', (proxyRequest, request) => {
       const origin = request.headers.origin
       if (typeof origin === 'string' && isDevServerOrigin(origin, request.headers.host)) {
-        proxyRequest.removeHeader('origin')
+        proxyRequest.setHeader('origin', serveOrigin)
       }
     })
   },

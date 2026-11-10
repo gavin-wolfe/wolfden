@@ -299,7 +299,7 @@ public sealed class AccountCommandTests : IDisposable
 
     [Fact]
     [Trait("Scenario", "SC-ACCT-6")]
-    public void LoginOnSaysWhatItDoesntProtectAndThatNothingEnforcesItYet()
+    public void LoginOnSaysWhatItDoesntProtectAndToRestartServe()
     {
         AddOwner();
 
@@ -310,7 +310,7 @@ public sealed class AccountCommandTests : IDisposable
         Assert.StartsWith("Login is on.\n\nWhat logging in protects:", output, StringComparison.Ordinal);
         Assert.Contains("What it doesn't protect: your notes are ordinary files in a folder.", output, StringComparison.Ordinal);
         Assert.Contains("an AI assistant you started\nwith 'wolfden mcp', the 'wolfden' command itself, a backup or sync program,", output, StringComparison.Ordinal);
-        Assert.Contains("doesn't ask for a login yet", output, StringComparison.Ordinal);
+        Assert.Contains("restart it for the change to apply", output, StringComparison.Ordinal);
         Assert.EndsWith($"Installation folder: {Path.GetFullPath(Home)} (set by --home)\n", output, StringComparison.Ordinal);
         Assert.True(InstallationSettings.Load(Folder).Login);
 
@@ -326,7 +326,7 @@ public sealed class AccountCommandTests : IDisposable
     }
 
     [Fact]
-    public void LoginJsonSaysItIsntEnforced()
+    public void LoginJsonSaysItIsEnforced()
     {
         AddOwner();
         Run("login", "on");
@@ -337,7 +337,7 @@ public sealed class AccountCommandTests : IDisposable
         Assert.Equal(["version", "home", "login", "owners", "enforced"], json.RootElement.EnumerateObject().Select(p => p.Name));
         Assert.True(json.RootElement.GetProperty("login").GetBoolean());
         Assert.Equal(1, json.RootElement.GetProperty("owners").GetInt32());
-        Assert.False(json.RootElement.GetProperty("enforced").GetBoolean());
+        Assert.True(json.RootElement.GetProperty("enforced").GetBoolean());
     }
 
     [Fact]
@@ -460,11 +460,13 @@ public sealed class AccountCommandTests : IDisposable
     }
 }
 
-/// <summary><c>serve</c> and the login setting; in the serve tests' collection, since they share <see cref="ServeCommand.Started"/>.</summary>
+/// <summary><c>serve</c> and the login setting (#315); in the serve tests' collection, since they share <see cref="ServeCommand.Started"/>.</summary>
 [Collection(nameof(ServeCommandTests))]
-public sealed class ServeLoginWarningTests : IDisposable
+public sealed class ServeLoginTests : IDisposable
 {
     private readonly string _home = Path.Combine(TempDen.TempRoot, "homes", Guid.NewGuid().ToString("N"));
+
+    private static CancellationToken Token => TestContext.Current.CancellationToken;
 
     public void Dispose()
     {
@@ -477,55 +479,126 @@ public sealed class ServeLoginWarningTests : IDisposable
         }
     }
 
-    [Fact]
-    [Trait("Scenario", "SC-ACCT-6")]
-    public async Task ServeWarnsThatLoginIsntEnforcedYet()
+    private void TurnLoginOn()
     {
-        var home = _home;
         PasswordInput.Input = new StringReader("correct horse battery\n");
-        Assert.Equal(CliApp.ExitOk, Cli.Run("user", "add", "wren", "--owner", "--password-stdin", "--home", home).ExitCode);
-        Assert.Equal(CliApp.ExitOk, Cli.Run("login", "on", "--home", home).ExitCode);
-
-        var error = await Serve(home);
-
-        Assert.Contains($"wolfden serve: login is on for the installation at '{Path.GetFullPath(home)}', but this version doesn't ask for it yet", error, StringComparison.Ordinal);
+        Assert.Equal(CliApp.ExitOk, Cli.Run("user", "add", "wren", "--owner", "--password-stdin", "--home", _home).ExitCode);
+        Assert.Equal(CliApp.ExitOk, Cli.Run("login", "on", "--home", _home).ExitCode);
     }
 
     [Fact]
     [Trait("Scenario", "SC-ACCT-6")]
-    public async Task ASettingsFileThatDoesntReadIsOnlyAWarning()
+    [Trait("Scenario", "SC-ACCT-10")]
+    public async Task WithLoginOnServeAsksForALogin()
+    {
+        TurnLoginOn();
+
+        var (exitCode, output, error) = await Serve(_home, async url =>
+        {
+            using var client = new HttpClient { BaseAddress = new Uri(url) };
+            using var den = await client.GetAsync("/api/den", Token);
+            Assert.Equal(System.Net.HttpStatusCode.Unauthorized, den.StatusCode);
+            var status = await client.GetStringAsync("/api/auth/status", Token);
+            Assert.Contains("\"login\":true", status, StringComparison.Ordinal);
+        });
+
+        Assert.Equal(CliApp.ExitOk, exitCode);
+        Assert.Contains($"Login is on: the page asks for a username and password (installation folder '{Path.GetFullPath(_home)}').", output, StringComparison.Ordinal);
+        Assert.DoesNotContain("doesn't ask for", error, StringComparison.Ordinal);
+
+        // The cookie's name comes from a random id, kept in settings.json so it stays the same.
+        var id = InstallationSettings.Load(new InstallationFolder(_home, InstallationSource.Option)).InstallationId;
+        Assert.True(InstallationSettings.IsInstallationId(id));
+        Assert.True(Directory.Exists(Path.Combine(_home, "keys")));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-ACCT-10")]
+    public async Task WithLoginOffServeAnswersAsBefore()
+    {
+        var (exitCode, output, _) = await Serve(_home, async url =>
+        {
+            using var client = new HttpClient { BaseAddress = new Uri(url) };
+            using var den = await client.GetAsync("/api/den", Token);
+            Assert.Equal(System.Net.HttpStatusCode.OK, den.StatusCode);
+        });
+
+        Assert.Equal(CliApp.ExitOk, exitCode);
+        Assert.DoesNotContain("Login is on", output, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(Path.Combine(_home, "keys")));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-ACCT-10")]
+    public async Task ASettingsFileThatDoesntReadStopsServe()
     {
         Directory.CreateDirectory(_home);
         File.WriteAllText(Path.Combine(_home, "settings.json"), "{ \"login\": true, \"login\": false }");
 
-        var error = await Serve(_home);
+        var (exitCode, _, error) = await Serve(_home, null);
 
-        Assert.Contains("wolfden serve: couldn't read the installation's login setting:", error, StringComparison.Ordinal);
+        Assert.Equal(CliApp.ExitUsage, exitCode);
+        Assert.Contains("wolfden serve: stopped, because it couldn't read the installation at", error, StringComparison.Ordinal);
         Assert.Contains("names a setting twice", error, StringComparison.Ordinal);
+        Assert.Contains("'wolfden login off'", error, StringComparison.Ordinal);
     }
 
-    /// <summary>Serves a copy of Dracula with <paramref name="home"/> until it has started, then stops it; returns standard error.</summary>
-    private static async Task<string> Serve(string home)
+    [Fact]
+    [Trait("Scenario", "SC-ACCT-10")]
+    public async Task LoginOnWithNoOwnerStopsServe()
+    {
+        Directory.CreateDirectory(_home);
+        File.WriteAllText(Path.Combine(_home, "settings.json"), "{ \"login\": true }");
+
+        var (exitCode, _, error) = await Serve(_home, null);
+
+        Assert.Equal(CliApp.ExitUsage, exitCode);
+        Assert.Contains("but it has no owner account, so nobody could log in", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-ACCT-10")]
+    public async Task AnInstallationFolderItCantUseStopsServe()
     {
         using var den = TempDen.DraculaCopy();
-        var token = TestContext.Current.CancellationToken;
+
+        var (exitCode, _, error) = await Serve(Path.Combine(den.Root, "accounts"), null);
+
+        Assert.Equal(CliApp.ExitUsage, exitCode);
+        Assert.Contains("whose checkpoints would record the accounts", error, StringComparison.Ordinal);
+        Assert.Contains("wolfden serve: stopped, because without the installation folder it can't tell whether login is on.", error, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Serves a copy of Dracula with <paramref name="home"/>; once it has
+    /// started, runs <paramref name="whileServing"/> with its address, then
+    /// stops it. With a null <paramref name="whileServing"/>, serve is
+    /// expected not to start.
+    /// </summary>
+    private static async Task<(int ExitCode, string Output, string Error)> Serve(string home, Func<string, Task>? whileServing)
+    {
+        using var den = TempDen.DraculaCopy();
         var started = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         ServeCommand.Started = url => started.TrySetResult(url);
         using var stop = new CancellationTokenSource();
+        var output = new StringWriter();
         var error = new StringWriter();
         try
         {
-            var serving = Task.Run(() => CliApp.RunUntil(["serve", den.Root, "--port", "0", "--no-open", "--no-watch", "--home", home], new StringWriter(), error, stop.Token), token);
-            await started.Task.WaitAsync(TimeSpan.FromSeconds(30), token);
-            await stop.CancelAsync();
-            Assert.Equal(CliApp.ExitOk, await serving.WaitAsync(TimeSpan.FromSeconds(30), token));
+            var serving = Task.Run(() => CliApp.RunUntil(["serve", den.Root, "--port", "0", "--no-open", "--no-watch", "--home", home], output, error, stop.Token), Token);
+            if (whileServing is not null)
+            {
+                await whileServing(await started.Task.WaitAsync(TimeSpan.FromSeconds(30), Token));
+                await stop.CancelAsync();
+            }
+
+            var exitCode = await serving.WaitAsync(TimeSpan.FromSeconds(30), Token);
+            return (exitCode, output.ToString(), error.ToString());
         }
         finally
         {
             await stop.CancelAsync();
             ServeCommand.Started = null;
         }
-
-        return error.ToString();
     }
 }

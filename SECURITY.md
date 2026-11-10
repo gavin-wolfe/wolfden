@@ -35,8 +35,9 @@ especially want:
 - Reading or writing files outside the den through the web UI, the API or
   the MCP server (path traversal, symbolic links, junctions).
 - Once login exists: getting past it, or a viewer account making changes.
-- Once the commit-identity check ([#311](https://github.com/gavin-wolfe/wolfden/issues/311)) exists: a commit recorded under a
-  name or email the den doesn't declare. Until then, the known limits are
+- Once the commit-identity check
+  ([#311](https://github.com/gavin-wolfe/wolfden/issues/311)) exists: a
+  commit recorded under a name or email the den doesn't declare. Until then, the known limits are
   listed under "Turning on history" in
   [the usage guide](docs/using-wolfden.md#turning-on-history) and in that issue.
 
@@ -51,13 +52,14 @@ especially want:
   while login is off. The server's help text says so. Login, which is
   planned, will be the fix.
 - Story-position reads that show too much. A position narrows what a read
-  returns, but it isn't a lock: an AI assistant that can open the den's
-  files can read everything. If a read at a position returns text from
+  returns, but it isn't a lock: an AI assistant can leave the position
+  out, and one that can open the den's files can read everything. If a read at a position returns text from
   past that position, that's a bug, so please open a normal issue.
 - Problems in a den's own git remote, sync service or backup program.
 
 ## Keeping your notes private on a shared computer
 
 Give each person their own computer account, and keep the den inside your
-own user folder (such as Documents), where other accounts can't read it.
+own user folder (such as Documents), where, on most systems, other
+accounts can't read it (an administrator account still can).
 Disk encryption protects the notes if the computer is lost or stolen.

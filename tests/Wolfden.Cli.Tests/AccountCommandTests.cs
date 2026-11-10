@@ -98,6 +98,26 @@ public sealed class AccountCommandTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "SC-ACCT-10")]
+    public void ACommonPasswordIsRefusedByAddAndResetPassword()
+    {
+        var typed = Run(["PasswordPassword", Password, Password], "user", "add", "wren", "--owner");
+        Assert.Equal(CliApp.ExitOk, typed.ExitCode);
+        Assert.Contains("That won't do: that password is too common. Try a few random words in a row, like \"copper lantern harbor\".", typed.Error, StringComparison.Ordinal);
+
+        PasswordInput.Input = new StringReader("qwertyuiop12345\n");
+        var piped = Run("user", "add", "ash", "--role", "writer", "--password-stdin");
+        Assert.Equal(CliApp.ExitUsage, piped.ExitCode);
+        Assert.Equal("wolfden user add: that password is too common. Try a few random words in a row, like \"copper lantern harbor\".\n", piped.Error);
+
+        PasswordInput.Input = new StringReader("Wolfden Wolfden 2026\n");
+        var reset = Run("user", "reset-password", "wren", "--password-stdin");
+        Assert.Equal(CliApp.ExitUsage, reset.ExitCode);
+        Assert.Equal("wolfden user reset-password: a password can't be the username or \"wolfden\", even repeated or with digits added.\n", reset.Error);
+        Assert.DoesNotContain("  ash  ", Run("user", "list").Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ThreeMissesAddNothing()
     {
         var (exitCode, output, error) = Run(["one password here", "another one here", "one password here", "x", "y"], "user", "add", "ash", "--role", "writer");

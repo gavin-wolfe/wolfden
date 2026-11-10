@@ -50,9 +50,10 @@ function source(hash: string, body: string): EntitySource {
 }
 
 /** A server with login on, whose session ends when the test says; edits answer `onPost`. */
-function stubSession(onPost: (hash: unknown) => Response) {
+function stubSession(onPost: (hash: unknown) => Response, accounts: Record<string, AuthStatus> = { wren: OWNER }) {
   const state = { auth: OWNER, file: source('h1', 'Old text.') }
   const posts: Record<string, unknown>[] = []
+  const logouts: string[] = []
   const pages = (): EntityPageResult => ({
     version: 1, view: 'full', position: null, inView: true, note: null, entity: page(mina, { lead: '# Mina Harker\n\nA schoolmistress.', sections: [overview] }),
   })
@@ -64,8 +65,15 @@ function stubSession(onPost: (hash: unknown) => Response) {
       }
 
       if (path === '/api/auth/login') {
-        state.auth = OWNER
-        return OWNER
+        const { username } = JSON.parse(String(init?.body)) as { username: string }
+        state.auth = accounts[username]
+        return state.auth
+      }
+
+      if (path === '/api/auth/logout') {
+        logouts.push(state.auth.user ?? '')
+        state.auth = LOGGED_OUT
+        return LOGGED_OUT
       }
 
       if (state.auth.role === null) {
@@ -85,7 +93,7 @@ function stubSession(onPost: (hash: unknown) => Response) {
       return undefined
     },
   })
-  return { state, posts }
+  return { state, posts, logouts }
 }
 
 async function openOverviewAndType(text: string) {
@@ -98,15 +106,17 @@ async function openOverviewAndType(text: string) {
 }
 
 /** Ends the session, lets a refresh find out, and logs in again at the form over the page. */
-async function sessionEndsThenLogInAgain(state: { auth: AuthStatus }, refresh: () => Promise<unknown>) {
+async function sessionEndsThenLogInAgain(state: { auth: AuthStatus }, refresh: () => Promise<unknown>, as = 'wren', expectGone = true) {
   state.auth = LOGGED_OUT
   await act(refresh)
   const form = await screen.findByRole('form', { name: 'Wolfden' })
   expect(within(form).getByText(/Your session ended/)).toBeTruthy()
-  fireEvent.change(within(form).getByLabelText('Username'), { target: { value: 'wren' } })
+  fireEvent.change(within(form).getByLabelText('Username'), { target: { value: as } })
   fireEvent.change(within(form).getByLabelText('Password'), { target: { value: 'correct horse battery' } })
   fireEvent.click(within(form).getByRole('button', { name: 'Log in' }))
-  await waitFor(() => expect(screen.queryByRole('form', { name: 'Wolfden' })).toBeNull())
+  if (expectGone) {
+    await waitFor(() => expect(screen.queryByRole('form', { name: 'Wolfden' })).toBeNull())
+  }
 }
 
 describe('SC-ACCT-18: my session ends while I’m editing', () => {
@@ -141,5 +151,66 @@ describe('SC-ACCT-18: my session ends while I’m editing', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     const conflict = await screen.findByRole('region', { name: /The note changed/ })
     expect(within(conflict).getByText('An agent wrote this.')).toBeTruthy()
+  })
+})
+
+const WRITTEN = () =>
+  Response.json({ version: 1, changed: true, path: mina.path, hash: 'h2', entity: mina, effects: [], pinnedCanon: [], warnings: [], files: null, idAdded: null })
+
+describe('SC-ACCT-18: someone else logs in over the page', () => {
+  it('asks, then drops the last person’s open editor', async () => {
+    const { state, posts } = stubSession(WRITTEN, { wren: OWNER, ash: { version: 1, login: true, user: 'ash', role: 'writer' } })
+    const confirm = vi.fn(() => true)
+    vi.stubGlobal('confirm', confirm)
+    const { queryClient } = renderApp('/u/dracula/e/E-MINA')
+    await openOverviewAndType('Wren’s draft.')
+
+    await sessionEndsThenLogInAgain(state, () => queryClient.refetchQueries({ queryKey: ['den-files'] }), 'ash')
+
+    expect(confirm).toHaveBeenCalledWith('Someone else was editing here. Discard their unsaved changes and continue?')
+    await screen.findByRole('button', { name: 'Edit “Overview”' })
+    expect(screen.queryByRole('group', { name: 'Markdown of the section “Overview”' })).toBeNull()
+    expect(screen.queryByText('Wren’s draft.')).toBeNull()
+    expect(posts).toEqual([])
+  })
+
+  it('logs the new session out again, keeping the draft, when they say no', async () => {
+    const { state, logouts } = stubSession(WRITTEN, { wren: OWNER, ash: { version: 1, login: true, user: 'ash', role: 'writer' } })
+    vi.stubGlobal('confirm', vi.fn(() => false))
+    const { queryClient } = renderApp('/u/dracula/e/E-MINA')
+    const { view } = await openOverviewAndType('Wren’s draft.')
+
+    await sessionEndsThenLogInAgain(state, () => queryClient.refetchQueries({ queryKey: ['den-files'] }), 'ash', false)
+
+    expect(await screen.findByText(/Nothing was discarded, and you’re not logged in/)).toBeTruthy()
+    expect(logouts).toEqual(['ash'])
+    expect(view.state.doc.toString()).toBe('Wren’s draft.')
+  })
+
+  it('keeps the editor for the same person, but offers no Save once their account is a viewer', async () => {
+    const { state } = stubSession(WRITTEN, { wren: { version: 1, login: true, user: 'wren', role: 'viewer' } })
+    const { queryClient } = renderApp('/u/dracula/e/E-MINA')
+    const { view, group } = await openOverviewAndType('Still mine.')
+
+    await sessionEndsThenLogInAgain(state, () => queryClient.refetchQueries({ queryKey: ['den-files'] }))
+
+    expect(view.state.doc.toString()).toBe('Still mine.')
+    expect(within(group.closest('form') ?? document.body).queryByRole('button', { name: 'Save' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
+    expect(screen.getAllByText('Your account can read this den but not change it.').length).toBeGreaterThan(0)
+  })
+})
+
+describe('SC-ACCT-19: the server must be restarted', () => {
+  it('shows the server’s words in a banner when any answer is restart_needed', async () => {
+    const message = 'Login was turned on. Restart wolfden serve: until then it answers nothing, so nobody can use the page without a login.'
+    stubApi({
+      override: (path) =>
+        path === '/api/auth/status' ? undefined : Response.json({ code: 'restart_needed', message }, { status: 503 }),
+    })
+    renderApp('/')
+
+    const banner = await screen.findByText(message, { selector: '.restart-needed' })
+    expect(banner.getAttribute('role')).toBe('alert')
   })
 })

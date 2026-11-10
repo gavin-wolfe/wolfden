@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useBlocker } from '@tanstack/react-router'
 import { EditError, postEdit, sourceQuery, type EditPath, type EntitySource, type WriteResult } from '../editApi'
 import { useHoldRefresh } from '../formHold'
-import { useAccess } from '../access'
+import { IfCanWrite, useAccess } from '../access'
 import type { SectionProblem } from '../api'
 import { addImage, type AddedImage } from '../imageApi'
 import { Markdown } from './Markdown'
@@ -630,9 +630,11 @@ export function PieceEditor({ target, what, file }: { target: TextTarget; what: 
       {error && <SaveError error={error} />}
       <DiscardPrompt />
       <p className="editor-actions">
+        <IfCanWrite>
         <button type="button" className="primary" onClick={() => void save()} disabled={saving || !dirty || addingImages}>
           {saving ? 'Saving…' : 'Save'}
         </button>
+        </IfCanWrite>
         <button type="button" onClick={cancel} disabled={saving || addingImages}>
           Cancel
         </button>

@@ -6,7 +6,7 @@ import { ErrorState, Loading } from '../components/States'
 import { FileEditError, fileSourceQuery, saveFile, type FileSource } from '../denErrorsApi'
 import { useHoldRefresh } from '../formHold'
 import { useDocumentTitle } from '../hooks'
-import { useAccess } from '../access'
+import { IfCanWrite, useAccess } from '../access'
 import type { WriteResult } from '../editApi'
 import '../denErrors.css'
 
@@ -233,9 +233,11 @@ function Editor({
           <MarkdownEditor value={text} onChange={setText} onSave={() => void save()} onCancel={goBack} label={`Text of ${path}`} universe={base.universe ?? ''} autoFocus minLines={20} />
           {error && <SaveError error={error} />}
           <p className="editor-actions">
+            <IfCanWrite>
             <button type="button" className="primary" onClick={() => void save()} disabled={saving || !dirty}>
               {saving ? 'Saving…' : 'Save'}
             </button>
+            </IfCanWrite>
             <button type="button" onClick={goBack} disabled={saving}>
               Close
             </button>

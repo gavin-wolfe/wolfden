@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { queryOptions, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { ApiRequestError, getJson } from './api'
 import { isRefreshHeld } from './formHold'
@@ -73,28 +73,52 @@ const LogOutContext = createContext<(status: AuthStatus) => void>(() => {})
  * *over* them, not in their place: the pages stay mounted, so an open
  * editor keeps its text (formHold.ts), and once logged in again the writer
  * can press Save, which is still checked against the file's hash. Only Log
- * out, which the person chose, takes the pages away.
+ * out, which the person chose, takes the pages away; so does someone else
+ * logging in at that form, after asking, since an open editor holds the
+ * last person's unsaved changes (PR 5 will record who saves what, and a
+ * draft must not be saved under another account).
+ *
+ * A server that must be restarted (login turned on after it started)
+ * answers everything with `restart_needed`; any such answer shows a banner.
  */
 export function AuthGate({ children }: { children: ReactNode }) {
   const client = useQueryClient()
   const auth = useQuery(authQuery)
   // True once the pages have been shown to someone logged in, until Log out.
   const [shown, setShown] = useState(false)
+  // Bumped to mount the pages afresh, dropping open editors, when someone else logs in over them.
+  const [generation, setGeneration] = useState(0)
+  const [restart, setRestart] = useState<string | null>(null)
+  // Who the pages were last shown to.
+  const lastUser = useRef<string | null>(null)
   const loggedIn = auth.data !== undefined && (!auth.data.login || auth.data.role !== null)
   if (loggedIn && !shown) {
     setShown(true)
   }
 
   useEffect(() => {
+    if (auth.data?.user) {
+      lastUser.current = auth.data.user
+    }
+  }, [auth.data?.user])
+
+  useEffect(() => {
     const recheck = () => void client.invalidateQueries({ queryKey: AUTH_KEY })
-    const queries = client.getQueryCache().subscribe((event) => {
-      if (event.type === 'updated' && event.action.type === 'error' && isUnauthenticated(event.action.error)) {
+    const seen = (error: unknown) => {
+      if (isUnauthenticated(error)) {
         recheck()
+      } else if (error instanceof ApiRequestError && error.code === 'restart_needed') {
+        setRestart(error.message)
+      }
+    }
+    const queries = client.getQueryCache().subscribe((event) => {
+      if (event.type === 'updated' && event.action.type === 'error') {
+        seen(event.action.error)
       }
     })
     const mutations = client.getMutationCache().subscribe((event) => {
-      if (event.type === 'updated' && event.action.type === 'error' && isUnauthenticated(event.action.error)) {
-        recheck()
+      if (event.type === 'updated' && event.action.type === 'error') {
+        seen(event.action.error)
       }
     })
     return () => {
@@ -106,30 +130,58 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const logOut = useCallback(
     (status: AuthStatus) => {
       setShown(false)
+      lastUser.current = null
       startAs(client, status)
     },
     [client],
   )
 
-  const restart = auth.error instanceof ApiRequestError && auth.error.code === 'restart_needed' ? auth.error.message : null
+  /**
+   * After a login at the form: the same person carries on with everything as
+   * it was; someone else gets the pages afresh, after saying so if an editor
+   * or form is open. Declining logs the new session out again. Returns false
+   * then, so the form stays.
+   */
+  const loggedInAs = useCallback(
+    async (status: AuthStatus): Promise<boolean> => {
+      const before = lastUser.current
+      const someoneElse = shown && before !== null && status.user !== null && before.toLowerCase() !== status.user.toLowerCase()
+      if (!someoneElse) {
+        resumeAs(client, status)
+        return true
+      }
+
+      if (isRefreshHeld() && !window.confirm('Someone else was editing here. Discard their unsaved changes and continue?')) {
+        await postAuth('logout').catch(() => undefined)
+        return false
+      }
+
+      setGeneration((g) => g + 1)
+      startAs(client, status)
+      return true
+    },
+    [client, shown],
+  )
+
+  const shownRestart = restart ?? (auth.error instanceof ApiRequestError && auth.error.code === 'restart_needed' ? auth.error.message : null)
   const loginNeeded = auth.data?.login === true && auth.data.role === null
   if (loginNeeded && !shown) {
-    return <LoginPage />
+    return <LoginPage onLoggedIn={loggedInAs} />
   }
 
   return (
     <LogOutContext.Provider value={logOut}>
-      {restart && (
+      {shownRestart && (
         <p className="restart-needed" role="alert">
-          {restart}
+          {shownRestart}
         </p>
       )}
-      <div className="auth-pages" inert={loginNeeded} aria-hidden={loginNeeded || undefined}>
+      <div key={generation} className="auth-pages" inert={loginNeeded} aria-hidden={loginNeeded || undefined}>
         {children}
       </div>
       {loginNeeded && (
         <div className="login-overlay">
-          <LoginPage again />
+          <LoginPage again onLoggedIn={loggedInAs} />
         </div>
       )}
     </LogOutContext.Provider>
@@ -180,8 +232,7 @@ async function postAuth(action: 'login' | 'logout', body?: unknown): Promise<Aut
  * `again` is the form shown over the pages when a session ended while they
  * were open.
  */
-export function LoginPage({ again = false }: { again?: boolean }) {
-  const client = useQueryClient()
+export function LoginPage({ again = false, onLoggedIn }: { again?: boolean; onLoggedIn: (status: AuthStatus) => Promise<boolean> }) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
@@ -200,7 +251,10 @@ export function LoginPage({ again = false }: { again?: boolean }) {
     setBusy(true)
     setError(null)
     try {
-      resumeAs(client, await postAuth('login', { username: username.trim(), password }))
+      if (!(await onLoggedIn(await postAuth('login', { username: username.trim(), password })))) {
+        setPassword('')
+        setError('Nothing was discarded, and you’re not logged in. Whoever was editing can log in again to carry on.')
+      }
     } catch (failure) {
       setPassword('')
       setError(failure instanceof Error ? failure.message : String(failure))
@@ -236,6 +290,12 @@ export function LoginPage({ again = false }: { again?: boolean }) {
       </form>
     </main>
   )
+}
+
+/** Shows `children` (a Save button) only to an account that may change the den; an open editor's form says why otherwise. */
+export function IfCanWrite({ children }: { children: ReactNode }) {
+  const { canWrite } = useAccess()
+  return canWrite ? <>{children}</> : <span className="muted">Your account can read this den but not change it.</span>
 }
 
 /** The top bar's account: who is logged in, their role, and Log out. Nothing with login off. */

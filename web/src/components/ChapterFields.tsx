@@ -2,7 +2,7 @@ import { Fragment, useEffect, useId, useRef, useState, type KeyboardEvent, type 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiRequestError, positionsQuery, type PositionView, type ReaderMark } from '../api'
 import { useHoldRefresh, useShownError } from '../formHold'
-import { useAccess } from '../access'
+import { IfCanWrite, useAccess } from '../access'
 import {
   bookChapterFieldsQuery,
   chapterDefaultsQuery,
@@ -770,9 +770,11 @@ function FieldForm({
       )}
       {error && <Refused error={error} />}
       <p className="editor-actions">
+        <IfCanWrite>
         <button type="submit" className="primary" disabled={saving || !dirty}>
           {saving ? 'Saving…' : 'Save'}
         </button>
+        </IfCanWrite>
         <button type="button" onClick={() => onDone(null)} disabled={saving}>
           Cancel
         </button>

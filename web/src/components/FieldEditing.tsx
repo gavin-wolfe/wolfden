@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { IfCanWrite } from '../access'
 import { useQuery } from '@tanstack/react-query'
 import { STATUSES, entitiesQuery, type PositionView } from '../api'
 import { EditError, postEdit, sourceQuery, type EntitySource, type SourceFieldType } from '../editApi'
@@ -428,9 +429,11 @@ export function FieldEditor({ name, positions }: { name: string; positions: Posi
         </div>
       )}
       <p className="editor-actions">
+        <IfCanWrite>
         <button type="submit" className="primary" disabled={saving || !dirty}>
           {saving ? 'Saving…' : 'Save'}
         </button>
+        </IfCanWrite>
         <button type="button" onClick={editing.cancel} disabled={saving}>
           Cancel
         </button>

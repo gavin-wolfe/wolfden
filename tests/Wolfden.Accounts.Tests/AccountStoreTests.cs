@@ -166,15 +166,15 @@ public class AccountStoreTests
 
     [Theory]
     [Trait("Scenario", "SC-ACCT-3")]
-    [InlineData("elevenchars", "at least 12 characters, and this one has 11")]
-    [InlineData("aaaaaaaaaaaaaa", "one character repeated")]
-    [InlineData("WrenCalder99", "can't be the username")]
+    [InlineData("fourteen chars", "at least 15 characters, and this one has 14")]
+    [InlineData("aaaaaaaaaaaaaaaa", "one character repeated")]
+    [InlineData("WrenCalder-2026", "can't be the username")]
     public async Task APasswordOutsideTheRulesIsRefused(string password, string expected)
     {
         using var temp = new TempHome();
         await using var store = await AccountStore.OpenAsync(temp.Folder, Token);
 
-        var result = await store.AddAsync("wrencalder99", password, AccountRole.Owner);
+        var result = await store.AddAsync("wrencalder-2026", password, AccountRole.Owner);
 
         Assert.Equal("bad_password", result.Code);
         Assert.Contains(expected, result.Message, StringComparison.Ordinal);
@@ -183,16 +183,21 @@ public class AccountStoreTests
 
     [Fact]
     [Trait("Scenario", "SC-ACCT-3")]
-    public void LengthCountsCharactersFrom12To256WithNoCompositionRules()
+    public void LengthCountsCharactersFrom15To256WithNoCompositionRules()
     {
-        Assert.Null(PasswordRules.Problem("wren", "twelve chars"));
-        Assert.Null(PasswordRules.Problem("wren", "alllowercase"));
+        Assert.Contains("has 14", PasswordRules.Problem("wren", "fourteen chars"), StringComparison.Ordinal);
+        Assert.Null(PasswordRules.Problem("wren", "fifteen chars!!"));
+        Assert.Null(PasswordRules.Problem("wren", "alllowercaseabc"));
         Assert.Null(PasswordRules.Problem("wren", new string('a', 255) + "b"));
         Assert.Contains("at most 256", PasswordRules.Problem("wren", new string('a', 256) + "b"), StringComparison.Ordinal);
 
-        // Eleven emoji are 22 UTF-16 units but 11 characters (NIST: each code point counts once).
-        Assert.Contains("has 11", PasswordRules.Problem("wren", string.Concat(Enumerable.Repeat("🐺", 10)) + "🌙"), StringComparison.Ordinal);
-        Assert.Null(PasswordRules.Problem("wren", string.Concat(Enumerable.Repeat("🐺", 11)) + "🌙"));
+        // Fourteen emoji are 28 UTF-16 units but 14 characters (NIST: each code point counts once).
+        Assert.Contains("has 14", PasswordRules.Problem("wren", string.Concat(Enumerable.Repeat("🐺", 13)) + "🌙"), StringComparison.Ordinal);
+        Assert.Null(PasswordRules.Problem("wren", string.Concat(Enumerable.Repeat("🐺", 14)) + "🌙"));
+
+        // Counted after NFC: "e" plus a combining accent is one character, so 14 here, not 15.
+        Assert.Contains("has 14", PasswordRules.Problem("wren", "café au lait!!"), StringComparison.Ordinal);
+        Assert.Null(PasswordRules.Problem("wren", "café au lait!!!"));
     }
 
     [Fact]

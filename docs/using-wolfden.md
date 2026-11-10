@@ -1762,9 +1762,11 @@ anyone who can use this computer, and says so when it starts with login on.
    wolfden user add wren --owner
    ```
 
-   A password needs 12 characters or more, up to 256. There are no other
-   rules: a few words in a row make a long one that's easy to remember. It
-   can't be the username, or one character repeated. No email is asked for,
+   A password needs 15 characters or more, up to 256. There are no other
+   rules: no digits or symbols required. A few random words in a row, such
+   as `lantern otter quietly brass`, make an easy passphrase: long, and easy
+   to remember. Pick words that don't go together, not a line you've
+   written. It can't be the username, or one character repeated. No email is asked for,
    so a pen name's address never reaches the accounts.
 2. **Turn it on:**
 

@@ -46,7 +46,7 @@ internal static class UserCommand
         $"""
         Adds an account to this installation. It asks for the password twice,
         without showing it. A password needs {PasswordRules.MinimumLength} to {PasswordRules.MaximumLength} characters, with no other rules:
-        a few words in a row make a good one. No email is asked for or stored.
+        a few random words in a row make a good one. No email is asked for or stored.
 
           <name>              the username: letters, digits, '.', '-' and '_', up to
                               {UserNameRules.MaximumLength} characters; case doesn't matter when logging in.

@@ -7299,18 +7299,21 @@ Spec: #315 §4.3, §4.4, Flow 5. Covered by: `AccountCommandTests.TheFirstOwnerI
 
 ### SC-ACCT-3. A password long enough, with no other rules
 
-The writer tries `elevenchars`, then `aaaaaaaaaaaaaa`, then the username,
-then `café au lait du matin`.
+The writer tries `fourteen chars`, then `aaaaaaaaaaaaaaaa`, then the
+username, then `café au lait du matin`.
 
-- The first three are refused: fewer than 12 characters, one character
-  repeated, the username. The last is accepted, and it matches whether the
-  `é` is typed as one character or as `e` plus an accent (both are hashed
-  in NFC). Length counts characters, not bytes, so eleven emoji are 11; at
-  most 256. There are no composition rules: `alllowercase` is fine.
+- The first three are refused: fewer than 15 characters (maintainer
+  decision, 2026-11-10: NIST's minimum when a password is the only factor,
+  as login always is), one character repeated, the username. The last is
+  accepted, and it matches whether the `é` is typed as one character or as
+  `e` plus an accent (both are hashed in NFC). Length counts characters
+  after NFC, not bytes, so fourteen emoji are 14, and `e` plus an accent is
+  one; at most 256. There are no composition rules: `alllowercaseabc` is
+  fine.
 
 Spec: #315 §7; NIST SP 800-63B rev. 4 §3.1.1.2. Covered by:
 `AccountStoreTests.APasswordOutsideTheRulesIsRefused`,
-`AccountStoreTests.LengthCountsCharactersFrom12To256WithNoCompositionRules`,
+`AccountStoreTests.LengthCountsCharactersFrom15To256WithNoCompositionRules`,
 `AccountStoreTests.APasswordMatchesWhicheverWayItsAccentsWereTyped`.
 
 ### SC-ACCT-4. I can't leave the installation without an owner

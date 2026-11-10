@@ -92,7 +92,7 @@ public sealed class AccountCommandTests : IDisposable
         var (exitCode, _, error) = Run(["short", Password, "something else entirely", Password, Password], "user", "add", "ash", "--role", "writer");
 
         Assert.Equal(CliApp.ExitOk, exitCode);
-        Assert.Contains("That won't do: a password needs at least 12 characters, and this one has 5.", error, StringComparison.Ordinal);
+        Assert.Contains("That won't do: a password needs at least 15 characters, and this one has 5.", error, StringComparison.Ordinal);
         Assert.Contains("Those didn't match.", error, StringComparison.Ordinal);
         Assert.DoesNotContain(Password, error, StringComparison.Ordinal);
     }

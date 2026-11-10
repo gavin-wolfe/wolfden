@@ -93,7 +93,7 @@ internal static class PasswordInput
 
         for (var attempt = 1; attempt <= Tries; attempt++)
         {
-            var first = prompter($"New password for '{userName}' ({PasswordRules.MinimumLength} characters or more; a few words in a row are fine): ");
+            var first = prompter($"New password for '{userName}' ({PasswordRules.MinimumLength} characters or more; a few random words in a row are fine): ");
             if (first is null)
             {
                 break;

@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 namespace Wolfden.Accounts;
 
 /// <summary>
-/// The password rules (#315 §7): 12 to 256 characters, counting each
+/// The password rules (#315 §7): 15 to 256 characters, counting each
 /// Unicode code point once after NFC normalization, with no composition
 /// rules (no "a digit and a symbol"), as NIST SP 800-63B rev. 4 §3.1.1.2
 /// asks. It refuses two passwords anyone could guess from the account
@@ -15,7 +15,7 @@ namespace Wolfden.Accounts;
 public sealed class PasswordRules : IPasswordValidator<WolfdenUser>
 {
     /// <summary>The fewest characters a password may have.</summary>
-    public const int MinimumLength = 12;
+    public const int MinimumLength = 15;
 
     /// <summary>The most characters a password may have.</summary>
     public const int MaximumLength = 256;
@@ -35,7 +35,7 @@ public sealed class PasswordRules : IPasswordValidator<WolfdenUser>
         var length = normalized.EnumerateRunes().Count();
         if (length < MinimumLength)
         {
-            return $"a password needs at least {MinimumLength} characters, and this one has {length}. A few words in a row make a long one that's easy to remember.";
+            return $"a password needs at least {MinimumLength} characters, and this one has {length}. A few random words in a row make a long one that's easy to remember.";
         }
 
         if (length > MaximumLength)

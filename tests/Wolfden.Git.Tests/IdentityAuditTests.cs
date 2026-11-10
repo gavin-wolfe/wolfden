@@ -29,7 +29,7 @@ public sealed class IdentityAuditTests
     private const string SshFingerprint = "SHA256:QMhN5KrTO8DtDSNiSP4a9qUre5+2TYBgnlgaELKBEPo";
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-24")]
+    [Trait("Scenario", "SC-HIST-28")]
     public void EveryNameAndEmailIsListedExactlyAsRecordedOnEveryBranchAndTag()
     {
         using var repo = TestRepo.Create();
@@ -89,7 +89,7 @@ public sealed class IdentityAuditTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-24")]
+    [Trait("Scenario", "SC-HIST-28")]
     public void ADenInALargerRepositoryIsAuditedForTheWholeRepository()
     {
         using var repo = TestRepo.Create("notes/den");
@@ -104,7 +104,7 @@ public sealed class IdentityAuditTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-24")]
+    [Trait("Scenario", "SC-HIST-28")]
     public void ADenWithNoRepositoryOrNoCommitsYetHasNothingRecorded()
     {
         var folder = TestRepo.NewFolder();
@@ -130,7 +130,7 @@ public sealed class IdentityAuditTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-24")]
+    [Trait("Scenario", "SC-HIST-28")]
     public void RemotesAreListedWithTheirAccountNameAndNeverAPassword()
     {
         using var repo = TestRepo.Create();
@@ -154,7 +154,7 @@ public sealed class IdentityAuditTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-25")]
+    [Trait("Scenario", "SC-HIST-29")]
     public void SignaturesAreCountedByKeyWithTheNamesEachKeySignedUnder()
     {
         using var repo = TestRepo.Create();
@@ -194,7 +194,7 @@ public sealed class IdentityAuditTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-25")]
+    [Trait("Scenario", "SC-HIST-29")]
     public void OwnersAreLookedUpForTenKeysAtMost()
     {
         using var repo = TestRepo.Create();
@@ -214,7 +214,7 @@ public sealed class IdentityAuditTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-25")]
+    [Trait("Scenario", "SC-HIST-29")]
     public void ARealSshSignedCheckpointIsReadWithItsKeyAndTheAllowedSignersName()
     {
         using var repo = TestRepo.Create();
@@ -260,7 +260,7 @@ public sealed class IdentityAuditTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-25")]
+    [Trait("Scenario", "SC-HIST-29")]
     public void ASignaturesKeyIsReadFromItsOwnBytes()
     {
         Assert.Equal([new SignatureKey(SignatureKind.Ssh, SshFingerprint)], SignatureKey.Read(SshSignature));
@@ -275,7 +275,7 @@ public sealed class IdentityAuditTests
     }
 
     [Theory]
-    [Trait("Scenario", "SC-HIST-24")]
+    [Trait("Scenario", "SC-HIST-28")]
     [InlineData("https://example.com/notes.git", "https://example.com/notes.git", null)]
     [InlineData("https://wren@example.com/notes.git", "https://wren@example.com/notes.git", "wren")]
     [InlineData("https://wren:pa55@example.com/notes.git", "https://wren:***@example.com/notes.git", "wren")]
@@ -300,7 +300,7 @@ public sealed class IdentityAuditTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-24")]
+    [Trait("Scenario", "SC-HIST-28")]
     public void AReplaceRefDoesntHideTheNameACommitRecords()
     {
         using var repo = TestRepo.Create();
@@ -316,7 +316,7 @@ public sealed class IdentityAuditTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-24")]
+    [Trait("Scenario", "SC-HIST-28")]
     public void ColourAndSignatureSettingsDontChangeWhatsRead()
     {
         using var repo = TestRepo.Create();
@@ -333,7 +333,7 @@ public sealed class IdentityAuditTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-24")]
+    [Trait("Scenario", "SC-HIST-28")]
     public void ATagOutsideRefsTagsAndATagOfATagAreRead()
     {
         using var repo = TestRepo.Create();
@@ -355,7 +355,7 @@ public sealed class IdentityAuditTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-25")]
+    [Trait("Scenario", "SC-HIST-29")]
     public void AMergedTagsSignatureAndTaggerAreReadPastAnIndentedLine()
     {
         using var repo = TestRepo.Create();
@@ -386,7 +386,7 @@ public sealed class IdentityAuditTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-24")]
+    [Trait("Scenario", "SC-HIST-28")]
     public void NamesInTagMessagesAreFound()
     {
         using var repo = TestRepo.Create();
@@ -414,7 +414,7 @@ public sealed class IdentityAuditTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-24")]
+    [Trait("Scenario", "SC-HIST-28")]
     public void ACommitMadeWhileTheAuditReadsIsReadOnASecondTry()
     {
         using var repo = TestRepo.Create();
@@ -442,7 +442,7 @@ public sealed class IdentityAuditTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-24")]
+    [Trait("Scenario", "SC-HIST-28")]
     public void ARepositoryThatKeepsChangingWhileItsReadFailsRatherThanReportTooLittle()
     {
         using var repo = TestRepo.Create();
@@ -463,7 +463,7 @@ public sealed class IdentityAuditTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-24")]
+    [Trait("Scenario", "SC-HIST-28")]
     public void ASigningKeyFileInTheHomeFolderIsShownWithATilde()
     {
         using var repo = TestRepo.Create();
@@ -477,7 +477,7 @@ public sealed class IdentityAuditTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-24")]
+    [Trait("Scenario", "SC-HIST-28")]
     public void NamesElsewhereInMessagesAreFound()
     {
         using var repo = TestRepo.Create();
@@ -503,7 +503,7 @@ public sealed class IdentityAuditTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-24")]
+    [Trait("Scenario", "SC-HIST-28")]
     public void NamesOnlyTheReflogsKeepAndThisCopysSettingsAreListedApart()
     {
         using var repo = TestRepo.Create();
@@ -526,7 +526,7 @@ public sealed class IdentityAuditTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-24")]
+    [Trait("Scenario", "SC-HIST-28")]
     public void AShallowCloneSaysSo()
     {
         using var repo = TestRepo.Create();
@@ -549,7 +549,7 @@ public sealed class IdentityAuditTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-25")]
+    [Trait("Scenario", "SC-HIST-29")]
     public void AKeyThatSignedOnlyTagsIsCheckedThroughTheTag()
     {
         using var repo = TestRepo.Create();
@@ -568,7 +568,7 @@ public sealed class IdentityAuditTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-25")]
+    [Trait("Scenario", "SC-HIST-29")]
     public void AnOwnerIsReadExactlyWhenGitIsSetToShowSignatures()
     {
         using var repo = TestRepo.Create();
@@ -583,7 +583,7 @@ public sealed class IdentityAuditTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-25")]
+    [Trait("Scenario", "SC-HIST-29")]
     public void SignaturesThatDontNameAKeyAreGroupedBySignerNotMergedIntoOneKey()
     {
         using var repo = TestRepo.Create();
@@ -604,7 +604,7 @@ public sealed class IdentityAuditTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-25")]
+    [Trait("Scenario", "SC-HIST-29")]
     public void EverySignatureInABlockIsRead()
     {
         var other = "FEDCBA9876543210FEDCBA9876543210FEDCBA98";
@@ -618,7 +618,7 @@ public sealed class IdentityAuditTests
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-25")]
+    [Trait("Scenario", "SC-HIST-29")]
     public void MalformedSignatureBytesEndQuicklyWithNoKey()
     {
         // A length far past the end, as in the review's repro.
@@ -646,7 +646,7 @@ public sealed class IdentityAuditTests
     }
 
     [Theory]
-    [Trait("Scenario", "SC-HIST-24")]
+    [Trait("Scenario", "SC-HIST-28")]
     [InlineData(@"D:\Homes\wren\dens\notes", @"D:\Homes\wren", @"~\dens\notes")]
     [InlineData("file:///D:/Homes/wren/backup.git", @"D:\Homes\wren", "file:///~/backup.git")]
     [InlineData("/home/wren/dens/notes", "/home/wren", "~/dens/notes")]

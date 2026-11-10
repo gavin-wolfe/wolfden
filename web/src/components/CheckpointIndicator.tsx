@@ -418,6 +418,11 @@ function Outcome({ made }: { made: CheckpointMade }) {
         Each note's History tab lists it.
       </p>
       {made.inProgress && <p className="banner checkpoint-warning">Git was in the middle of {made.inProgress}, so the checkpoint is part of it.</p>}
+      {(made.warnings ?? []).map((warning, i) => (
+        <p key={`${i}-${warning}`} className="banner checkpoint-warning">
+          {warning}
+        </p>
+      ))}
     </>
   )
 }

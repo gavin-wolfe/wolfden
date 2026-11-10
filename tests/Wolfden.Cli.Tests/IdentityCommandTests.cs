@@ -43,7 +43,7 @@ public sealed class IdentityCommandTests : IDisposable
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-24")]
+    [Trait("Scenario", "SC-HIST-28")]
     public void TheAuditListsEveryNameTheHistoryAndDenYamlHoldAndChangesNothing()
     {
         WithHistory();
@@ -74,7 +74,7 @@ public sealed class IdentityCommandTests : IDisposable
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-24")]
+    [Trait("Scenario", "SC-HIST-28")]
     public void JsonGivesTheSameAuditWithAVersion()
     {
         WithHistory();
@@ -101,7 +101,7 @@ public sealed class IdentityCommandTests : IDisposable
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-24")]
+    [Trait("Scenario", "SC-HIST-28")]
     public void ADenWithNoHistoryStillListsItsAuthors()
     {
         var (exitCode, output, error) = Cli.Run("identity", "audit", "--den", _den.Root);
@@ -117,7 +117,7 @@ public sealed class IdentityCommandTests : IDisposable
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-24")]
+    [Trait("Scenario", "SC-HIST-28")]
     public void ADenYamlThatDoesntParseStillGetsItsHistoryAudited()
     {
         WithHistory();
@@ -131,7 +131,7 @@ public sealed class IdentityCommandTests : IDisposable
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-25")]
+    [Trait("Scenario", "SC-HIST-29")]
     public void AKeyThatBelongsToAnotherNameIsCalledOut()
     {
         var audit = Audit(
@@ -171,7 +171,7 @@ public sealed class IdentityCommandTests : IDisposable
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-25")]
+    [Trait("Scenario", "SC-HIST-29")]
     public void SignaturesOnlyOnMergedTagsArentReportedAsNone()
     {
         var audit = Audit(
@@ -187,7 +187,7 @@ public sealed class IdentityCommandTests : IDisposable
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-24")]
+    [Trait("Scenario", "SC-HIST-28")]
     public void MentionsTheReflogsAndThisCopysSettingsAreShown()
     {
         var audit = Audit(commits: 1, annotatedTags: 0, mergedTags: 0, new Wolfden.Git.SigningSummary(0, 0, 0, [], [], 0)) with
@@ -224,7 +224,7 @@ public sealed class IdentityCommandTests : IDisposable
     }
 
     [Theory]
-    [Trait("Scenario", "SC-HIST-24")]
+    [Trait("Scenario", "SC-HIST-28")]
     [InlineData(new string[] { "identity" }, "wolfden identity: give a subcommand: audit.")]
     [InlineData(new string[] { "identity", "show" }, "wolfden identity: unknown subcommand 'show'; the subcommands are: audit.")]
     [InlineData(new string[] { "identity", "--json" }, "wolfden identity: unknown option '--json'.")]
@@ -239,7 +239,7 @@ public sealed class IdentityCommandTests : IDisposable
     }
 
     [Fact]
-    [Trait("Scenario", "SC-HIST-24")]
+    [Trait("Scenario", "SC-HIST-28")]
     public void EachLevelHasItsOwnHelp()
     {
         var (groupCode, group, _) = Cli.Run("identity", "--help");

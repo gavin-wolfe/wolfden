@@ -194,9 +194,10 @@ public sealed record GetChapterDefaultsResult(
 /// <param name="Checkpoint">The checkpoint recorded, or null.</param>
 /// <param name="WrittenBySession">Of the files recorded, the ones this session's write tools saved since the last checkpoint that recorded them.</param>
 /// <param name="ChangedOutsideSession">Of the files recorded, the ones that changed some other way, such as in the writer's editor: tell the writer they're in the checkpoint too.</param>
+/// <param name="Warnings">What to tell the writer about the checkpoint recorded, such as git's settings outside the den's own wanting to sign it when the den's don't (#311), or null for nothing.</param>
 public sealed record CheckpointResult(
     int Version, string Backend, bool Available, string? Reason, bool Recorded, HistoryEntryView? Checkpoint,
-    IReadOnlyList<string>? WrittenBySession = null, IReadOnlyList<string>? ChangedOutsideSession = null);
+    IReadOnlyList<string>? WrittenBySession = null, IReadOnlyList<string>? ChangedOutsideSession = null, IReadOnlyList<string>? Warnings = null);
 
 /// <summary>
 /// An entity's file as an editor needs it (the web UI's editing, #28): read

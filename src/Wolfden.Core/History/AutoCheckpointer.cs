@@ -272,6 +272,11 @@ public sealed class AutoCheckpointer : IDisposable
             }
 
             _log($"Made an automatic checkpoint after {AutoCheckpoint.Format(every)} without changes: {FirstLine(entry.Message)} ({ShortId(entry.Id)}).");
+            foreach (var warning in done.Result.Warnings)
+            {
+                _log(warning);
+            }
+
             return AutoCheckpointOutcome.Recorded;
         }
         catch (HistoryException e)

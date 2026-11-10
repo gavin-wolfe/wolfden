@@ -76,6 +76,8 @@ export interface CheckpointMade {
   inProgress: string | null
   changes: PendingChange[]
   otherUniverses: number
+  /** What to tell the writer about the checkpoint, such as git's settings wanting to sign it when the den's own don't (#311). */
+  warnings?: string[]
 }
 
 /**

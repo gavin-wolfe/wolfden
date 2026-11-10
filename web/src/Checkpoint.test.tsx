@@ -189,6 +189,31 @@ describe('SC-WEB-52: I name a checkpoint after a notes pass', () => {
     expect(screen.queryByRole('button', { name: /changed since/ })).toBeNull()
   })
 
+  it('SC-HIST-25: passes on a warning that git would have signed it differently', async () => {
+    const warning = "Git's settings would have signed this checkpoint, but this den's own .git/config says not to, so Wolfden didn't sign it."
+    stubCheckpoints(
+      () => status(),
+      (body) => ({
+        version: 1,
+        backend: 'git',
+        recorded: true,
+        checkpoint: { id: 'c3cccccccccccccccccccccccccccccccccccccc', when: '2026-10-27T09:00:00Z', author: 'Test Writer', message: body.message, files: 1 },
+        inProgress: null,
+        changes: [change(MINA)],
+        otherUniverses: 0,
+        warnings: [warning],
+      }),
+    )
+    renderApp('/u/dracula')
+    fireEvent.click(await screen.findByRole('button', { name: /3 notes changed/ }))
+    const dialog = await screen.findByRole('dialog', { name: 'Make a checkpoint' })
+    fireEvent.change(within(dialog).getByLabelText('Name this checkpoint'), { target: { value: 'Notes pass' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Checkpoint' }))
+
+    const done = await screen.findByRole('dialog', { name: 'Checkpoint made' })
+    expect(within(done).getByText(warning)).toBeTruthy()
+  })
+
   it('shows why git refused, and keeps the name to try again', async () => {
     stubCheckpoints(
       () => status(),

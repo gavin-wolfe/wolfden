@@ -544,21 +544,21 @@ public sealed class HistorySetupTests : IDisposable
     [InlineData("GIT_COMMITTER_NAME")]
     [InlineData("GIT_AUTHOR_EMAIL")]
     [InlineData("GIT_COMMITTER_EMAIL")]
-    public void AnEnvironmentVariableThatWouldBeatWhatsGivenRefusesWithNothingChanged(string variable)
+    public void AnEnvironmentVariableDoesntBeatWhatsGivenAndTheStepsSayItsSet(string variable)
     {
+        // The gate hands git the name and email in its environment, so the inherited one doesn't win (#311).
         var den = Den();
         var options = Without(Config("[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n"));
         options = options with { Environment = new Dictionary<string, string?>(options.Environment) { [variable] = "marek" } };
 
         var result = new GitHistorySetup(den, options).TurnOn(new HistorySetupRequest("Ash Calloway", "ash@example.invalid"), Token);
 
-        Assert.Equal(HistorySetupStatus.Refused, result.Status);
-        Assert.Equal(HistorySetupCodes.BadArgument, result.Code);
-        Assert.Contains(variable, result.Problem, StringComparison.Ordinal);
-        Assert.DoesNotContain("marek", result.Problem, StringComparison.OrdinalIgnoreCase);
-        Assert.EndsWith("Nothing was changed.", result.Problem, StringComparison.Ordinal);
-        Assert.False(Directory.Exists(Path.Combine(den, ".git")));
-        Assert.False(File.Exists(Path.Combine(den, ".gitignore")));
+        Assert.Equal(HistorySetupStatus.Done, result.Status);
+        Assert.Equal(AshOnly, FirstCommitIdentity(den, options));
+        Assert.Equal(AshOnly, LaterCommitIdentity(den, options));
+        var said = Assert.Single(result.Steps, s => s.Contains(variable, StringComparison.Ordinal));
+        Assert.Contains("git commands you run yourself use the environment's", said, StringComparison.Ordinal);
+        Assert.DoesNotContain(result.Steps, s => s.Contains("marek", StringComparison.OrdinalIgnoreCase));
     }
 
     [Theory]
@@ -893,7 +893,8 @@ public sealed class HistorySetupTests : IDisposable
                 if (key == "init")
                 {
                     RunGit(den, options, "init", "--quiet");
-                    RunGit(den, options, "commit", "--quiet", "--allow-empty", "-m", "Theirs");
+                    // As the writer would, by hand: not through Wolfden's gate.
+                    TestRepo.RunGit(den, options.Environment, "commit", "--quiet", "--allow-empty", "-m", "Theirs");
                 }
             },
         };
@@ -1047,7 +1048,7 @@ public sealed class HistorySetupTests : IDisposable
     [Trait("Scenario", "SC-HIST-21")]
     [InlineData("count")]
     [InlineData("parameters")]
-    public void ASettingFromTheEnvironmentThatBeatsWhatsSavedRefusesBeforeTheFirstCheckpoint(string how)
+    public void ANameFromConfigInTheEnvironmentDoesntBeatWhatsGiven(string how)
     {
         var den = Den();
         var options = Without(Config("[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n"));
@@ -1063,13 +1064,39 @@ public sealed class HistorySetupTests : IDisposable
             environment["GIT_CONFIG_PARAMETERS"] = "'user.name=Marek Env'";
         }
 
-        var result = new GitHistorySetup(den, options with { Environment = environment }).TurnOn(new HistorySetupRequest("Ash Calloway", "ash@example.invalid"), Token);
+        options = options with { Environment = environment };
 
-        Assert.Equal(HistorySetupStatus.Refused, result.Status);
-        Assert.Equal(HistorySetupCodes.BadArgument, result.Code);
+        // The gate works the name out from git's config files only (#311 round 1, M2), so this no longer refuses.
+        var result = new GitHistorySetup(den, options).TurnOn(new HistorySetupRequest("Ash Calloway", "ash@example.invalid"), Token);
+
+        Assert.Equal(HistorySetupStatus.Done, result.Status);
+        Assert.Equal(AshOnly, FirstCommitIdentity(den, options));
+        Assert.Equal(AshOnly, LaterCommitIdentity(den, options));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-HIST-21")]
+    public void ARepositoryTrustedOnlyThroughConfigInTheEnvironmentRefusesBeforeTheFirstCheckpoint()
+    {
+        var den = Den();
+        var options = Without(Config("[user]\n\tname = Marek Oswin\n\temail = marek@example.invalid\n"));
+        options = options with
+        {
+            Environment = new Dictionary<string, string?>(options.Environment)
+            {
+                ["GIT_TEST_ASSUME_DIFFERENT_OWNER"] = "1",
+                ["GIT_CONFIG_COUNT"] = "1",
+                ["GIT_CONFIG_KEY_0"] = "safe.directory",
+                ["GIT_CONFIG_VALUE_0"] = "*",
+            },
+        };
+
+        var result = new GitHistorySetup(den, options).TurnOn(new HistorySetupRequest("Ash Calloway", "ash@example.invalid"), Token);
+
+        Assert.NotEqual(HistorySetupStatus.Done, result.Status);
+        Assert.Contains("safe.directory", result.Problem, StringComparison.Ordinal);
         Assert.DoesNotContain("Marek", result.Problem, StringComparison.Ordinal);
-        Assert.EndsWith("Nothing was changed.", result.Problem, StringComparison.Ordinal);
-        Assert.False(Directory.Exists(Path.Combine(den, ".git")));
+        Assert.False(RepositoryHasCommits(den, options));
     }
 
     [Theory]

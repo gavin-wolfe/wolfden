@@ -1459,24 +1459,51 @@ A pen name given this way has limits worth knowing:
   starts with that computer's global name and email, and its checkpoints
   are recorded under them and signed with its key. Before the first one
   there, run the commands below in the clone.
-- **An environment variable still beats it.** If `GIT_AUTHOR_NAME` or one of
-  its relatives is set when `wolfden serve` or a later checkpoint runs, git
-  uses that, as it does in any repository.
-- **A signing setting added later can still sign under this name.** Wolfden
-  checks for one only while it turns history on. If a setting that turns
-  signing on is added later in the den's own `.git` folder (an `[include]` in
-  its `config` file, or a `config.worktree`) or in the environment
-  (`GIT_CONFIG_COUNT`, `GIT_CONFIG_PARAMETERS`) when `wolfden serve` or a
-  checkpoint runs, the next checkpoint is signed with that key under the den's
-  name, with no warning, and that can't be undone. The same goes after a
-  turn-on that stopped part way: the name stays saved, even if a later try to
-  finish is refused because of that setting, and the next checkpoint signs
-  under it. Turning signing on globally later doesn't do this, since the den's
-  own setting beats it. See #311.
+- **Git commands you run yourself don't get Wolfden's help.** Wolfden's own
+  checkpoints and tags are covered by the next two points; a `git commit` you
+  type in a terminal is plain git, with whatever git has then.
 - **It can't be added this way once there are checkpoints, or in a bigger
   repository.** Wolfden refuses, and says the name wasn't applied. With
   checkpoints, the commands below change it from then on; earlier
   checkpoints keep the name they have.
+
+#### What every checkpoint and tag records
+
+Every checkpoint and tag Wolfden makes, from the web UI, an automatic
+checkpoint, freezing and unfreezing, an AI assistant, or `wolfden init
+--git`, goes through the same check first (#311):
+
+- **The name and email come from git's settings for the den.** That's the
+  name saved for this den, or what git has globally, with an `includeIf
+  "gitdir:…"` counted. Wolfden hands them to git for that one commit, as
+  both author and committer, so a `GIT_AUTHOR_NAME`, `GIT_COMMITTER_EMAIL`,
+  `EMAIL`, or a name passed as config (`GIT_CONFIG_PARAMETERS`,
+  `GIT_CONFIG_COUNT`) in the environment that started `wolfden serve`
+  doesn't change what's recorded. If git's settings have no name or email, the
+  checkpoint is refused with nothing changed, rather than recorded under a
+  name git makes up from your computer account, which can be your real
+  name. The message says how to set them. It's refused too if git trusts
+  the den's folder only through `safe.directory` passed in the environment
+  (`GIT_CONFIG_COUNT`, `GIT_CONFIG_PARAMETERS`): add it to git's own
+  settings with `git config --global --add safe.directory <folder>`.
+- **Signing follows the den's own settings.** If the den's own
+  `.git/config` says whether to sign (`commit.gpgsign` for checkpoints,
+  `tag.gpgsign` and `tag.forceSignAnnotated` for freeze tags), Wolfden
+  passes that to git for each commit and tag, so something read later, such
+  as an `[include]` in that file, a `config.worktree`, or
+  `GIT_CONFIG_COUNT` or `GIT_CONFIG_PARAMETERS` in the environment, can't
+  sign under this den's name with another key. When git's own answer would
+  have differed, the checkpoint still goes ahead, and the result says so: in
+  the checkpoint dialog, the freeze message, the assistant's result, or the
+  server's log for an automatic checkpoint. If the den's own file doesn't
+  say, git decides, as before. Giving a name when you turn history on saves
+  signing as off there, so it always says. When the den's own file turns
+  signing on, git picks the key, and Wolfden can't check whose it is.
+
+This check covers what Wolfden records from now on. It doesn't cover a
+commit you make with git yourself, or checkpoints made before it. To see
+what the history already holds, run `wolfden identity audit`
+([What a copy of the history shows](#what-a-copy-of-the-history-shows)).
 
 To put a repository of its own under a name by hand, run these in its folder.
 The `author` and `committer` settings beat `user` if git has them, and the
@@ -1635,8 +1662,10 @@ a name too, and a commit message can name more people in lines such as
 `Co-Authored-By: Story Helper <helper@example.com>`. Anyone with a copy of
 the repository, or access to a remote you push it to, can read all of it.
 
-To see what's there before you share it or push it anywhere, run this in
-the den's folder:
+To see what's there before you share it or push it anywhere, or to check
+what the checks in
+[What every checkpoint and tag records](#what-every-checkpoint-and-tag-records)
+recorded, run this in the den's folder:
 
 ```text
 wolfden identity audit
@@ -1929,8 +1958,9 @@ in it, which Wolfden calls a checkpoint.
   of your computer. A pen name is fine, and the email can be a
   placeholder. What you give wins over what git has for this den, and
   turns signing off here, since git's key may be another name's. A clone doesn't
-  bring it along, and an environment variable such as `GIT_AUTHOR_NAME` still
-  beats it
+  bring it along. An environment variable such as `GIT_AUTHOR_NAME` doesn't
+  change what Wolfden's checkpoints record, but still applies to git
+  commands you run yourself
   ([Turning on history](#turning-on-history)).
 - **A push carries every name the history records.** Every checkpoint's
   name and email, its UTC offset, and its signing key go with any copy or

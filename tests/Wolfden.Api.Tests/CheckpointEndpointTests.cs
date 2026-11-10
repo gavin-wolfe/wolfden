@@ -85,6 +85,27 @@ public sealed class CheckpointEndpointTests : IDisposable
     }
 
     [Fact]
+    [Trait("Scenario", "SC-HIST-25")]
+    public async Task ACheckpointPassesOnTheGatesSigningWarning()
+    {
+        var den = Repository(TempDen.Dracula());
+        RunGit(den, "config", "--local", "commit.gpgsign", "false");
+
+        // If git did try to sign, it would fail at once rather than reach a real key.
+        RunGit(den, "config", "--local", "gpg.program", "wolfden-test-no-such-signer");
+        var git = Git with { Environment = new Dictionary<string, string?>(Git.Environment) { ["GIT_CONFIG_PARAMETERS"] = "'commit.gpgsign=true'" } };
+        await using var server = await Server.StartAsync(new WolfdenApiOptions(den.Root) { History = () => GitHistory.ForDen(den.Root, git) });
+
+        var (code, made) = await PostAsync(server, """{"message": "Notes pass"}""");
+
+        Assert.Equal(HttpStatusCode.OK, code);
+        Assert.True(made.GetProperty("recorded").GetBoolean());
+        var warning = Assert.Single(made.GetProperty("warnings").EnumerateArray()).GetString();
+        Assert.StartsWith("Git's settings would have signed this checkpoint, but this den's own .git/config says not to", warning, StringComparison.Ordinal);
+        Assert.Equal("Test Writer", RunGit(den, "log", "-1", "--format=%an").Trim());
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-WEB-50")]
     [Trait("Scenario", "SC-WEB-52")]
     public async Task TheStatusListsWhatChangedAndACheckpointRecordsItWithTheWritersMessage()
@@ -121,6 +142,7 @@ public sealed class CheckpointEndpointTests : IDisposable
         Assert.Equal("Test Writer", checkpoint.GetProperty("author").GetString());
         Assert.Equal(3, checkpoint.GetProperty("files").GetInt32());
         Assert.Equal(3, made.GetProperty("changes").GetArrayLength());
+        Assert.Equal(0, made.GetProperty("warnings").GetArrayLength());
 
         // No co-author: the writer made it. Only the den's files were committed.
         var id = checkpoint.GetProperty("id").GetString()!;

@@ -66,7 +66,7 @@ async function logIn(username: string, password: string) {
   fireEvent.click(within(form).getByRole('button', { name: 'Log in' }))
 }
 
-describe('SC-ACCT-10: with login on, the page asks who I am', () => {
+describe('SC-ACCT-11: with login on, the page asks who I am', () => {
   it('shows the login page, and after a login, the den and who I am', async () => {
     const { posts } = stubLogin(LOGGED_OUT, { wren: as('wren', 'owner') })
     renderApp('/')
@@ -112,7 +112,7 @@ describe('SC-ACCT-10: with login on, the page asks who I am', () => {
     state.auth = LOGGED_OUT
     await queryClient.refetchQueries({ queryKey: ['den'] })
 
-    expect(await screen.findByText('This den asks for a login.')).toBeTruthy()
+    expect(await screen.findByText(/Your session ended\. Log in again to carry on/)).toBeTruthy()
   })
 
   it('shows no account and no login with login off', async () => {
@@ -125,7 +125,7 @@ describe('SC-ACCT-10: with login on, the page asks who I am', () => {
   })
 })
 
-describe('SC-ACCT-11: a viewer sees no edit controls', () => {
+describe('SC-ACCT-12: a viewer sees no edit controls', () => {
   it('has no Edit buttons on a note, no New menu, and no checkpoint indicator', async () => {
     stubApi({
       auth: as('rook', 'viewer'),
@@ -163,7 +163,7 @@ describe('SC-ACCT-11: a viewer sees no edit controls', () => {
   })
 })
 
-describe('SC-ACCT-15: only an owner unfreezes', () => {
+describe('SC-ACCT-16: only an owner unfreezes', () => {
   const final = {
     version: 1,
     universe: 'dracula',

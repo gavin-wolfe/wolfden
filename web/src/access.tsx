@@ -1,6 +1,7 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { queryOptions, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { ApiRequestError, getJson } from './api'
+import { isRefreshHeld } from './formHold'
 import './login.css'
 
 /**
@@ -59,15 +60,30 @@ function isUnauthenticated(error: unknown): boolean {
   return error instanceof ApiRequestError && error.code === 'unauthenticated'
 }
 
+/** Lets the top bar's Log out start the pages afresh, unmounting them (AuthGate). */
+const LogOutContext = createContext<(status: AuthStatus) => void>(() => {})
+
 /**
  * Shows the login page while this installation asks for a login and nobody
  * is logged in, and the den's pages otherwise. When any request is refused
  * for want of a login (a session that ended, or a logout in another tab), it
- * asks again who is logged in, which brings the login page back.
+ * asks again who is logged in.
+ *
+ * A session that ends while the pages are open brings the login form back
+ * *over* them, not in their place: the pages stay mounted, so an open
+ * editor keeps its text (formHold.ts), and once logged in again the writer
+ * can press Save, which is still checked against the file's hash. Only Log
+ * out, which the person chose, takes the pages away.
  */
 export function AuthGate({ children }: { children: ReactNode }) {
   const client = useQueryClient()
   const auth = useQuery(authQuery)
+  // True once the pages have been shown to someone logged in, until Log out.
+  const [shown, setShown] = useState(false)
+  const loggedIn = auth.data !== undefined && (!auth.data.login || auth.data.role !== null)
+  if (loggedIn && !shown) {
+    setShown(true)
+  }
 
   useEffect(() => {
     const recheck = () => void client.invalidateQueries({ queryKey: AUTH_KEY })
@@ -87,17 +103,56 @@ export function AuthGate({ children }: { children: ReactNode }) {
     }
   }, [client])
 
-  if (auth.data?.login && auth.data.role === null) {
+  const logOut = useCallback(
+    (status: AuthStatus) => {
+      setShown(false)
+      startAs(client, status)
+    },
+    [client],
+  )
+
+  const restart = auth.error instanceof ApiRequestError && auth.error.code === 'restart_needed' ? auth.error.message : null
+  const loginNeeded = auth.data?.login === true && auth.data.role === null
+  if (loginNeeded && !shown) {
     return <LoginPage />
   }
 
-  return <>{children}</>
+  return (
+    <LogOutContext.Provider value={logOut}>
+      {restart && (
+        <p className="restart-needed" role="alert">
+          {restart}
+        </p>
+      )}
+      <div className="auth-pages" inert={loginNeeded} aria-hidden={loginNeeded || undefined}>
+        {children}
+      </div>
+      {loginNeeded && (
+        <div className="login-overlay">
+          <LoginPage again />
+        </div>
+      )}
+    </LogOutContext.Provider>
+  )
 }
 
-/** Starts the den's pages afresh as `status`: nothing cached from before the login or logout is kept. */
+/** Starts the den's pages afresh as `status`: nothing cached from before the logout is kept. */
 function startAs(client: QueryClient, status: AuthStatus) {
   client.removeQueries({ predicate: (query) => query.queryKey[0] !== AUTH_KEY[0] })
   client.setQueryData(AUTH_KEY, status)
+}
+
+/**
+ * Carries on as `status` after a login. Nothing is thrown away: while an
+ * editor or form is open nothing is asked again either (formHold.ts), so its
+ * text and the hash it was based on stay; otherwise every answer is asked
+ * again, now with the login.
+ */
+function resumeAs(client: QueryClient, status: AuthStatus) {
+  client.setQueryData(AUTH_KEY, status)
+  if (!isRefreshHeld()) {
+    void client.invalidateQueries({ predicate: (query) => query.queryKey[0] !== AUTH_KEY[0] })
+  }
 }
 
 /** Posts to `/api/auth/<action>`, returning the new status, or throwing the API's error. */
@@ -122,8 +177,10 @@ async function postAuth(action: 'login' | 'logout', body?: unknown): Promise<Aut
 /**
  * The login page (#315): a username and a password. A wrong password and an
  * unknown name get the same answer from the server, and so the same words here.
+ * `again` is the form shown over the pages when a session ended while they
+ * were open.
  */
-export function LoginPage() {
+export function LoginPage({ again = false }: { again?: boolean }) {
   const client = useQueryClient()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -131,15 +188,19 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (again) {
+      return
+    }
+
     document.title = 'Log in · Wolfden'
-  }, [])
+  }, [again])
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     setBusy(true)
     setError(null)
     try {
-      startAs(client, await postAuth('login', { username: username.trim(), password }))
+      resumeAs(client, await postAuth('login', { username: username.trim(), password }))
     } catch (failure) {
       setPassword('')
       setError(failure instanceof Error ? failure.message : String(failure))
@@ -152,7 +213,7 @@ export function LoginPage() {
     <main className="login-page">
       <form className="login-form" onSubmit={submit} aria-labelledby="login-heading">
         <h1 id="login-heading">Wolfden</h1>
-        <p>This den asks for a login.</p>
+        <p>{again ? 'Your session ended. Log in again to carry on: anything you were editing is still there, ready to save.' : 'This den asks for a login.'}</p>
         <label>
           Username
           <input name="username" autoComplete="username" required value={username} onChange={(e) => setUsername(e.target.value)} autoFocus />
@@ -179,7 +240,7 @@ export function LoginPage() {
 
 /** The top bar's account: who is logged in, their role, and Log out. Nothing with login off. */
 export function AccountMenu() {
-  const client = useQueryClient()
+  const logOut = useContext(LogOutContext)
   const auth = useQuery(authQuery)
   const [error, setError] = useState<string | null>(null)
   if (!auth.data?.login || auth.data.user === null) {
@@ -188,12 +249,17 @@ export function AccountMenu() {
 
   const logout = async () => {
     setError(null)
+    // Log out takes the pages away, so an open editor's text would go with them.
+    if (isRefreshHeld() && !window.confirm('You have an editor or form open. Log out anyway, and lose what you haven’t saved?')) {
+      return
+    }
+
     try {
-      startAs(client, await postAuth('logout'))
+      logOut(await postAuth('logout'))
     } catch (failure) {
       if (isUnauthenticated(failure)) {
         // The session had already ended.
-        startAs(client, { version: 1, login: true, user: null, role: null })
+        logOut({ version: 1, login: true, user: null, role: null })
       } else {
         setError(failure instanceof Error ? failure.message : String(failure))
       }

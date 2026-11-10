@@ -61,3 +61,24 @@
 .account-role {
   color: var(--text-muted);
 }
+
+/* The pages stay mounted under the login form when a session ends, so an open editor keeps its text. */
+.auth-pages {
+  display: contents;
+}
+
+.login-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow: auto;
+  background: var(--bg);
+}
+
+.restart-needed {
+  margin: 0;
+  padding: 0.5rem 1rem;
+  background: var(--banner-bg);
+  border-bottom: 1px solid var(--banner-border);
+  color: var(--text);
+}

@@ -21,6 +21,11 @@ function refreshHeld(): boolean {
   return holds > 0
 }
 
+/** True while an editor or form is open, read outside React (AuthGate, after a login). */
+export function isRefreshHeld(): boolean {
+  return refreshHeld()
+}
+
 function onRefreshHeldChange(listener: () => void): () => void {
   listeners.add(listener)
   return () => {

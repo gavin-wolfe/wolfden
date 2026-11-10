@@ -4738,6 +4738,69 @@ Spec: design.md §6, "Turning history on" (#286). Covered by:
 `HistorySetupTests.WhatBeatsSigningBeingOffGetsItAllTakenBackSoNoLaterCommitSignsTheNameGiven`,
 `InitHistoryTests.AGivenNameTurnsSigningOffForTheDenAndSaysSo`.
 
+### SC-HIST-24. Before I push, I check which names the history holds
+
+The writer keeps the den under the pen name Wren Calder. Before the first
+push, they run `wolfden identity audit` in the den's folder. Two checkpoints
+on a side branch were made under their everyday name, Ash Everyday, and an
+AI assistant's checkpoints name it in `Co-Authored-By`.
+
+- It lists every name and email the history records, exactly as recorded
+  (`juno pike` and `Juno Pike` are two), as author, committer, tagger, or in
+  a trailer such as `Co-Authored-By` or `Signed-off-by`, each with how often,
+  its UTC offsets, and its first and last date. A trailer named twice in one
+  commit counts once; a line such as `Closes: #12` names nobody.
+- It reads every branch and tag, not just the one checked out, so Ash
+  Everyday shows. A `.mailmap` doesn't hide a name.
+- It lists every UTC offset, the remotes with any account name in their
+  addresses (a password is never printed), and the authors in `den.yaml`
+  with every value they set, and ends: "All of this travels with any copy
+  or push of this den."
+- A den inside a larger repository is audited for that whole repository,
+  and the output says so. A den with no repository still lists its
+  `den.yaml` authors, and a `den.yaml` that doesn't parse doesn't stop the
+  history's audit.
+- It changes nothing, and `--json` gives the same as one document.
+
+Spec: design.md §6, "What a copy or push carries", and §7 (#315, design
+§3.6 item 2). Covered by:
+`IdentityAuditTests.EveryNameAndEmailIsListedExactlyAsRecordedOnEveryBranchAndTag`,
+`IdentityAuditTests.ADenInALargerRepositoryIsAuditedForTheWholeRepository`,
+`IdentityAuditTests.ADenWithNoRepositoryOrNoCommitsYetHasNothingRecorded`,
+`IdentityAuditTests.RemotesAreListedWithTheirAccountNameAndNeverAPassword`,
+`IdentityAuditTests.ARemoteAddressKeepsItsAccountNameAndLosesItsPassword`,
+`IdentityCommandTests.TheAuditListsEveryNameTheHistoryAndDenYamlHoldAndChangesNothing`,
+`IdentityCommandTests.JsonGivesTheSameAuditWithAVersion`,
+`IdentityCommandTests.ADenWithNoHistoryStillListsItsAuthors`,
+`IdentityCommandTests.ADenYamlThatDoesntParseStillGetsItsHistoryAudited`,
+`IdentityCommandTests.AMistakeOnTheCommandLineExitsTwo`,
+`IdentityCommandTests.EachLevelHasItsOwnHelp`.
+
+### SC-HIST-25. One key signed under both of my names
+
+The writer's git signed some checkpoints with their everyday key, under
+the pen name, and a tag with an SSH key.
+
+- The audit counts the signed checkpoints and annotated tags, and groups
+  them by key: an OpenPGP key by its fingerprint (a signature that names only
+  the key ID is counted with the fingerprint it ends), an SSH key by its
+  `SHA256:` fingerprint, an X.509 signature as a certificate it can't name.
+  Each key lists the names it signed under.
+- The key is read from each signature's own bytes, so a long history isn't
+  checked with gpg one commit at a time. One commit per key, for at most ten
+  keys, is checked, to say who the key belongs to as this computer reports
+  it (a real SSH signature's allowed-signers name, say). When that isn't one
+  of the names the key signed under, the output says anyone who checks the
+  signature can link the two.
+
+Spec: design.md §6, "What a copy or push carries" (#315, design §3.6 item
+2). Covered by:
+`IdentityAuditTests.SignaturesAreCountedByKeyWithTheNamesEachKeySignedUnder`,
+`IdentityAuditTests.OwnersAreLookedUpForTenKeysAtMost`,
+`IdentityAuditTests.ARealSshSignedCheckpointIsReadWithItsKeyAndTheAllowedSignersName`,
+`IdentityAuditTests.ASignaturesKeyIsReadFromItsOwnBytes`,
+`IdentityCommandTests.AKeyThatBelongsToAnotherNameIsCalledOut`.
+
 ## WEB: the den in a browser
 
 Background: `wolfden serve` (design.md §7, §9, #23) hosts the web UI and

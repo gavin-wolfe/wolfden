@@ -36,6 +36,28 @@ public sealed class FreezeTagTests
     }
 
     [Fact]
+    [Trait("Scenario", "SC-HIST-25")]
+    public void AFreezeTagCarriesTheGatesSigningWarning()
+    {
+        using var repo = TestRepo.Create();
+        repo.WriteDen("universes/vael/series/a/books/ember/book.md", "---\nstatus: final\n---\n");
+        repo.CommitAll("Freeze Ember");
+        repo.Git("config", "--local", "tag.gpgsign", "false");
+
+        // If git did try to sign, it would fail at once rather than reach a real key.
+        repo.Git("config", "--local", "gpg.program", "wolfden-test-no-such-signer");
+        var options = TestRepo.Options with
+        {
+            Environment = new Dictionary<string, string?>(TestRepo.Options.Environment) { ["GIT_CONFIG_PARAMETERS"] = "'tag.gpgsign=true'" },
+        };
+
+        var tagged = FreezeTag.Add(GitHistory.ForDen(repo.DenRoot, options, Token), "vael", "ember", cancellationToken: Token);
+
+        Assert.Equal(FreezeTagOutcome.Tagged, tagged.Outcome);
+        Assert.StartsWith("Git's settings would have signed this tag", Assert.Single(tagged.Warnings!), StringComparison.Ordinal);
+    }
+
+    [Fact]
     [Trait("Scenario", "SC-HIST-7")]
     public void EachFreezeAddsTheNextNumberAndNeverMovesATag()
     {

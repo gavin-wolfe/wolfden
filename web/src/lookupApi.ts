@@ -11,6 +11,10 @@ export interface LookupHit {
    * reaches this note and no other as links resolve; null where it wouldn't.
    */
   linkText: string | null
+  /** True for a match by a name readers learn partway through the story (`known_as`, #67). */
+  knownAs?: boolean | null
+  /** For a `known_as` match, where readers learn the name, as written, or null if no from places it. */
+  from?: string | null
 }
 
 export interface LookupResult {
@@ -45,9 +49,15 @@ export function lookupEntities(
   )
 }
 
-/** A match as a picker shows it: "Mina Harker", and for an alias match the alias it matched by. */
-export function matchLabel(hit: LookupHit): { name: string; alias: string | null } {
-  return { name: hit.entity.name, alias: hit.matchedBy === 'alias' ? hit.alias : null }
+/**
+ * A match as a picker shows it: "Mina Harker", and for an alias match the alias it matched by. For a name
+ * readers learn later (#67), `learned` says where, as written: an editor shows everything, so the row says
+ * it's a name readers aren't told until then, and `wolfden check` warns about a link by it in earlier text.
+ */
+export function matchLabel(hit: LookupHit): { name: string; alias: string | null; learned: string | null } {
+  const alias = hit.matchedBy === 'alias' ? hit.alias : null
+  const learned = alias !== null && hit.knownAs ? (hit.from ? `readers learn it at ${hit.from}` : 'readers never learn it: no from') : null
+  return { name: hit.entity.name, alias, learned }
 }
 
 /** Why a pick isn't linked: no link is sure to reach the note (`linkFor` gives none). */

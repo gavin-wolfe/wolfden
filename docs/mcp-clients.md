@@ -60,8 +60,10 @@ that den only
 Inside the clone, the sample is part of Wolfden's own repository, so
 `checkpoint` would commit to Wolfden and `get_history` would show
 Wolfden's commits. In a copy with its own repository, history is the
-den's. A checkpoint is a commit made with the git identity configured for
-that repository. A den without git still works; `get_history` and
+den's. A checkpoint is a commit made with the name and email in git's
+settings for that repository, handed to git for that commit only, so a
+`GIT_AUTHOR_NAME` in the environment that started the server doesn't
+change it. A den without git still works; `get_history` and
 `checkpoint` then say history isn't available.
 
 `samples/dracula` in the clone is fine for the read tools. The server
@@ -212,7 +214,7 @@ prompts. This list is for knowing what the assistant can do.
 | Tool | What it does |
 |---|---|
 | `create_entity` | A new entity from its type's template. If its name would take links from another entity, it's refused unless `allow_relinks`. |
-| `update_fields` | Set, add to, or remove anything in an entity's frontmatter (its fields, `status`, `from`), add aliases and `known_as` entries, set a `known_as` entry's `from` (`known_as.0.from`), and move a list item (`move`, though not a `known_as` entry), keeping its comments. |
+| `update_fields` | Set, add to, or remove anything in an entity's frontmatter (its fields, `status`, `from`), add aliases and `known_as` entries, set a `known_as` entry's `from` (`known_as.0.from`), `check_text`, and `allow_in` (which only the plain-text name check reads), and move a list item (`move`, though not a `known_as` entry), keeping its comments. |
 | `append_section` | Add text to a section, or add a new section. |
 | `add_idea` | Record undecided material with `status: idea`, as its own entity or as a section of one. A new idea entity whose name would take links from another entity is refused unless `allow_relinks`. An idea added to an existing `entity` creates nothing, so it refuses `allow_relinks`, as it does the new entity's `name`, `type`, `series`, `book`, and `fields`. |
 | `rename_section` | Rename a section and rewrite the links to it, den-wide. |
@@ -261,7 +263,8 @@ prompts. This list is for knowing what the assistant can do.
   story: a status that takes an entity out of canon views, a chapter left
   with no POV, the links a rename rewrote, and any link that would now
   reach a different entity (a change like that is refused unless the
-  assistant is told to allow it).
+  assistant is told to allow it). With spoiler checks on, they also warn
+  when the text written names someone by a name readers learn later.
 - **Your comments stay put.** A YAML comment you wrote on a field or a
   list item (`- "[[mina-harker]]"  # main`) is kept when the assistant
   changes something else. Moving or changing one list item in place
@@ -486,6 +489,19 @@ docs. The writer's own list is in
   reason to read with no position before replacing text. You can still write a
   link by a later name: it resolves, and `check` warns that it's ahead of its
   position, which you should tell the writer.
+- **A write's effects warn about a later name.** With `spoiler_checks` on, when the
+  text a write saves names someone by a name readers learn later than that text's
+  position, as plain words (F-NAME-1) or as a link (F-LINK-13), the result's
+  `effects` list the warning in `check`'s words, with the file and line:
+  `.../the-ledger.md:14: warning F-NAME-1: 'Mara Voss' is a name of 'The Courier'
+  that readers learn at ash:2, and this text is at ember:12. ...`. The write is
+  made anyway. Tell the writer, and if it's a slip, fix it: give the text a later
+  `from`, take the name out, or use the name readers know there. Only the notes the
+  write saved are looked at, and only warnings they didn't have before, so a name
+  already in the note at that position isn't repeated. Every write to a note says
+  this: `create_entity`, `update_fields`, `append_section`, `add_idea`,
+  `rename_section`, `rename_entity`, `change_alias` (for the links it rewrites),
+  `copy_entity`, and `move_entity`.
 - **A read at a position only goes by positions.** Text the writer put in a
   section or lead, a field the note's type doesn't define, or a `ref` field's
   value can still mention later events, and so can a later name written as plain
@@ -499,7 +515,13 @@ docs. The writer's own list is in
   was and the assistant as `co_author`. It records the whole den unless
   `paths` names some files, so tell the writer what's in
   `changed_outside_session`. After `move_entity`, `paths` needs both the
-  old and the new path.
+  old and the new path. The writer's name, or this den's, is the author,
+  never the assistant's. A `co_author` with the name or email from git's
+  global settings is refused when the den records another name, since
+  that may be the writer's other name and a `Co-Authored-By` line is
+  permanent: give your own. Pass on anything in `warnings`, which says
+  when git's settings would have signed the checkpoint differently from
+  the den's own.
 - **Pinned canon: check with the writer.** An edit to a pinned fact is
   made, and `pinned_canon` in the result lists it. Confirm it was meant.
 - **A pinned session sees one universe.** With `--universe`, every call

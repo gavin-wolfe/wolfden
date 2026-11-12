@@ -575,7 +575,9 @@ public sealed class ReadersSearchTests : IDisposable
         {
             Assert.Equal(
                 c.GetProperty("shown").GetString(),
-                ReadersLinks.Shown(c.GetProperty("label").GetString(), c.GetProperty("name").GetString(), c.GetProperty("target").GetString()!, c.GetProperty("heading").GetString()));
+                ReadersLinks.Shown(
+                    c.GetProperty("label").GetString(), c.GetProperty("name").GetString(), c.GetProperty("target").GetString()!, c.GetProperty("heading").GetString(),
+                    c.TryGetProperty("asWritten", out var asWritten) && asWritten.GetBoolean()));
         }
     }
 

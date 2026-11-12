@@ -118,9 +118,20 @@ public sealed record EntityRef(string Key, string? Id, string Name, string Type)
 /// <param name="Matches">For an ambiguous link, the entities it matches (as of a position, those the reader has met); otherwise null.</param>
 /// <param name="Problem">Why it doesn't resolve, or null.</param>
 /// <param name="InView">As of a position, false when it reaches an entity the reader hasn't met by then; otherwise null.</param>
+/// <param name="ByKnownName">
+/// True for a link written by a <c>known_as</c> name (format.md F-ENT-10) that the page shows as written rather than
+/// by the note's name (#67, §4): in the full and Author's views always, and in the Reader's view once readers know the
+/// name. Before that, the Reader's view has the link written by the note's name (F-VIEW-7). Left out otherwise.
+/// </param>
+/// <param name="NameMark">
+/// With <c>marksAt</c>, for an unlabelled link written by a name readers there haven't learned, which the Reader's
+/// view shows by the note's name: where they learn it (<c>ahead</c>), or <c>unplaced</c>. Left out otherwise.
+/// </param>
 public sealed record LinkView(
     string Text, string Target, string? Heading, string? Label, int Line, int Column, string Outcome, EntityRef? Entity, string? Section,
-    IReadOnlyList<EntityRef>? Matches, string? Problem, bool? InView);
+    IReadOnlyList<EntityRef>? Matches, string? Problem, bool? InView,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? ByKnownName = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReaderMark? NameMark = null);
 
 /// <summary>A field value on an entity page: <see cref="FieldView"/>, with its links.</summary>
 /// <param name="Name">See <see cref="FieldView"/>.</param>
@@ -239,11 +250,13 @@ public sealed record EntryView(string? Position, bool Inherited, string Descript
 /// <param name="Bookkeeping">True for a link in a bookkeeping section.</param>
 /// <param name="ReaderMark">With <c>marksAt</c>, what readers there don't know of what holds the link: its entry's or section's mark, else its note's, or for a chapter or outline, where it's written; left out when there's nothing to say, and always without <c>marksAt</c>.</param>
 /// <param name="LeftOut">True for a link in a section an error leaves out (format.md F-GEN-2), which only a read for the writer lists; otherwise left out.</param>
+/// <param name="NameMark">With <c>marksAt</c>, for a link written by a name readers there haven't learned: see <see cref="LinkView"/>.</param>
 public sealed record BacklinkView(
     EntityRef? Source, ContainerRef? Container, string Site, string Path, int Line, int Column, string Text, string? Field, string? Section,
     string? Chapter, string? OutlineRow, string? Status, bool Bookkeeping,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReaderMark? ReaderMark = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? LeftOut = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? LeftOut = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReaderMark? NameMark = null);
 
 /// <summary>
 /// An entity's page: what <c>get_entity</c> gives (<see cref="EntityView"/>),
@@ -272,11 +285,28 @@ public sealed record BacklinkView(
 /// <param name="Backlinks">The links that reach it, by path and place in the file; as of a position, only those in what the reader has met.</param>
 /// <param name="Frozen">Why it can't be edited, since it's filed in a final book (format.md F-BOOK-1), or null if it can be (#28).</param>
 /// <param name="ReaderMark">With <c>marksAt</c>, for a note readers meet after it; otherwise left out.</param>
+/// <param name="KnownAs">
+/// In the full view and the Author's view, the names readers learn partway through the story (format.md F-ENT-10),
+/// each with its <c>from</c>, and with <c>marksAt</c>, its mark; left out if it has none, and in the Reader's view,
+/// whose <paramref name="Aliases"/> list the names readers know there (F-VIEW-7).
+/// </param>
 public sealed record EntityPage(
     string Key, string? Id, string Name, string Type, string Status, string Universe, string ScopeKind, string ScopeKey, string Path, string? From,
     IReadOnlyList<string>? Aliases, string? Lead, PinnedFacts? Pinned, IReadOnlyList<PageField> Fields, IReadOnlyList<PageSection> Sections,
     string? Hash, IReadOnlyList<ContainerRef> Scope, EntryView Entry, IReadOnlyList<LinkView> LeadLinks, IReadOnlyList<BacklinkView> Backlinks,
     string? Frozen = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReaderMark? ReaderMark = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<PageKnownName>? KnownAs = null);
+
+/// <summary>A name readers learn partway through the story (format.md F-ENT-10), on an entity page.</summary>
+/// <param name="Value">The name as written.</param>
+/// <param name="From">Where readers learn it, as written, or null if the entry has none, so no position knows it.</param>
+/// <param name="ReaderMark">
+/// With <c>marksAt</c>, <c>ahead</c> if readers there haven't learned it yet, with where they do (the later of its
+/// <c>from</c> and the note's entry), or <c>unplaced</c> if no <c>from</c> places it; left out once they know it.
+/// </param>
+public sealed record PageKnownName(
+    string Value, string? From,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReaderMark? ReaderMark = null);
 
 /// <summary>The result of <c>GET /api/entity</c>: <see cref="GetEntityResult"/>, with the page.</summary>
@@ -321,6 +351,12 @@ public sealed record HistoryDiffResult(int Version, EntitySummary Entity, string
 /// <param name="Field">The field the match is in, or null.</param>
 /// <param name="Text">The excerpt without marks.</param>
 /// <param name="Matches">Where the matches are in <paramref name="Text"/>, in order, as offsets and lengths in UTF-16 code units (JavaScript string indexes).</param>
+/// <param name="HiddenIn">
+/// With <c>marksAt</c>, where the words are when a reader's page doesn't show them: <c>laterName</c> for a name of the note
+/// readers learn later (<c>known_as</c>, with <paramref name="NameMark"/>), <c>alias</c> for a linked note's alias a link stands
+/// for, or <c>linkTarget</c> for a labelled link's target.
+/// </param>
+/// <param name="NameMark">With <c>HiddenIn: laterName</c>, the mark of the name: where readers learn it, or <c>unplaced</c>.</param>
 public sealed record SearchPageHit(
     EntitySummary Entity, string? Section, int? Line, string Snippet, string Status, bool InCanon, bool InComment, string? Field, string Text,
     IReadOnlyList<TextMatch> Matches, bool? LeftOut = null,
@@ -332,7 +368,8 @@ public sealed record SearchPageHit(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] LaterLink? LaterLink = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? Met = null,
     [property: JsonIgnore] IReadOnlyList<string>? LinkedNotes = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? HiddenIn = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? HiddenIn = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ReaderMark? NameMark = null);
 
 /// <summary>
 /// For a field hit whose snippet shows the name or alias of a linked note readers

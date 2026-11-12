@@ -89,7 +89,7 @@ public class KnownAsTests
         var entity = Assert.Single(EntityCatalog.Load(source).Entities);
         Assert.False(Assert.Single(entity.KnownAs).IsLive);
         var warning = Assert.Single(check.Diagnostics, d => d.Path == Courier && d.Diagnostic.RuleId == "F-POS-4");
-        Assert.Contains("is a name no read at a story position knows", warning.Diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains("Until it resolves, readers don't learn the known_as name it belongs to at any point in the story", warning.Diagnostic.Message, StringComparison.Ordinal);
     }
 
     [Fact]

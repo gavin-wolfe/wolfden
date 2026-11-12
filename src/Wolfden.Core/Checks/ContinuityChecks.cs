@@ -494,11 +494,11 @@ internal static class ContinuityChecks
             {
                 var what = reference.Site switch
                 {
-                    PositionSite.FieldValue => "is kept, but not placed in story order",
-                    PositionSite.KnownAsFrom => "is a name no read at a story position knows",
-                    _ => "is left out of canon views",
+                    PositionSite.FieldValue => "the fact that uses it is kept, but not placed in story order",
+                    PositionSite.KnownAsFrom => "readers don't learn the known_as name it belongs to at any point in the story, so the name stays hidden everywhere",
+                    _ => "the fact that uses it is left out of canon views",
                 };
-                found.Add(diagnostic with { Message = $"{reference.Text}: {diagnostic.Message} Until it resolves, the fact that uses it {what}." });
+                found.Add(diagnostic with { Message = $"{reference.Text}: {diagnostic.Message} Until it resolves, {what}." });
             }
         }
     }

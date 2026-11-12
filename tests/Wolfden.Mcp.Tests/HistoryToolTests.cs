@@ -172,6 +172,34 @@ public sealed class HistoryToolTests : IDisposable
         Assert.False(again.Recorded);
     }
 
+    [Theory]
+    [Trait("Scenario", "SC-MCP-56")]
+    [InlineData("Test Writer <agent@example.com>")]
+    [InlineData("Claude <WRITER@example.com>")]
+    public void ACoAuthorWithGitsGlobalNameIsRefusedWhenTheDenRecordsAPenName(string coAuthor)
+    {
+        RunGit("init", "--quiet");
+        RunGit("config", "--local", "user.name", "Test Pen Name");
+        RunGit("config", "--local", "user.email", "pen@example.com");
+        var start = Commit("Start the Dracula notes");
+        var tools = new DenTools(_den.Root) { History = () => GitHistory.ForDen(_den.Root, Git) };
+        tools.CreateEntity("location", "Whitby Abbey");
+
+        var refused = Assert.Throws<DenToolException>(() => tools.Checkpoint("Whitby notes", coAuthor));
+
+        Assert.Equal(ToolErrorCodes.BadArgument, refused.Code);
+        Assert.Contains("git's global settings", refused.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("Test Writer", refused.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("writer@", refused.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(start, RunGit("rev-parse", "HEAD").Trim());
+
+        // The agent's own name goes through, under the den's name.
+        var made = tools.Checkpoint("Whitby notes", "Claude <noreply@anthropic.com>");
+        Assert.True(made.Recorded);
+        Assert.Null(made.Warnings);
+        Assert.Equal("Test Pen Name|pen@example.com", RunGit("log", "-1", "--format=%an|%ae").Trim());
+    }
+
     [Fact]
     [Trait("Scenario", "SC-MCP-22")]
     public void ACheckpointOfSomePathsRecordsOnlyThem()

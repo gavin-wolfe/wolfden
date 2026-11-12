@@ -48,6 +48,7 @@ of Book 3 (format.md §8).
 | STORE | Saving, moving, and deleting notes through Wolfden's den store |
 | HIST | Version history, checkpoints, and tags, with or without a history backend |
 | WEB | Reading the den in a browser through `wolfden serve` |
+| ACCT | Accounts, roles, and turning login on, in the installation folder (#315) |
 
 ## CANON: what's canon at a point in the story
 
@@ -1251,6 +1252,105 @@ Spec: format.md F-GEN-5 (#298). Covered by:
 `SharedFileWriteTests.ReadToolsSeeABookFileOpenElsewhere` (MCP),
 `SharedFileWriteTests.AWrongNameInEveryReadLookupDoesntBlameANoteOpenElsewhere` (MCP).
 
+### SC-CHECK-65. A name in plain text before its reveal
+
+The Courier has `known_as: [{ value: Mara Voss, from: "ash:2" }]`, and the den
+has `spoiler_checks: true`. A note says `Mara Voss signed it` in a section that
+readers reach at `ember:2`, or in its lead, at the start of the story.
+
+- `check` gives F-NAME-1 on that line, with both positions: "'Mara Voss' is a
+  name of 'The Courier' that readers learn at ash:2, and this text is at
+  ember:2." So do `Mara Voss's`, `**MARA VOSS**`, the name split over two
+  lines, `Mara <!-- x --> Voss`, and a link's label, `[[The Courier|Mara Voss]]`.
+- `Mara Vossler` doesn't, nor does the name in a code span or block, a comment,
+  a link's target, a section with `from=ash:2`, `## Session notes`, or a section
+  with `status=idea`.
+- The Courier's own lead, title, headings, and field values are checked too,
+  and so is any note's name and aliases: `name: Mara Voss's Letter` warns.
+- ``Mara Voss`'s` ship`` and `Mara Voss[[the-courier]]` warn: code or a link
+  touching the name doesn't hide it. Code after an HTML block stays code in a
+  CRLF note as in an LF one.
+- A name whose `from` is missing or doesn't resolve is one readers never learn,
+  so it warns in all canon text.
+- A name the raw text spells with a YAML escape (`"Amélie Roux"`) is found.
+- `Zoe Arkwright` matches `Zoë Arkwright`, and `Noël Várga` matches `Noel
+  Varga`. `Soren` doesn't match `Søren`.
+- Text in a note readers meet only at `ash:3` is at `ash:3`, whatever its
+  sections say.
+
+Spec: format.md F-NAME-1 (#67). Covered by:
+`NameCheckTests.ANameInPlainTextBeforeItsRevealIsAWarning`,
+`NameCheckTests.TheNotesOwnTextHeadingsTitleAndFieldValuesAreChecked`,
+`NameCheckTests.TextReadersReachOnlyAfterTheyMeetTheNoteIsAtThatEntry`,
+`NameCheckTests.ANameReadersLearnOnlyWhenTheyMeetTheNoteCountsFromThere`,
+`NameCheckTests.MatchingIgnoresAccentsBothWays`,
+`NameCheckTests.LettersThatDontDecomposeArentFolded`,
+`NameCheckTests.AnUnaccentedSpellingListedAsItsOwnEntryIsCheckedFromItsOwnFrom`,
+`NameCheckTests.ANotesNameAndAliasesAreChecked`,
+`NameCheckTests.CodeAfterAnHtmlBlockIsCodeWhateverTheLineBreaks`,
+`NameCheckTests.CodeOrALinkTouchingTheNameDoesntHideIt`,
+`NameCheckTests.ANameReadersNeverLearnIsLookedForEverywhere`,
+`NameCheckTests.ANameSpelledWithAYamlEscapeIsFound` (Core),
+`NameCheckToolTests.CheckListsBothRules` (MCP),
+`PerformanceTests.ALargeDenIsCheckedForNamesReadersLearnLaterQuickly` (Index).
+
+### SC-CHECK-66. A common one-word name
+
+The Courier has `{ value: Rose, from: "ember:2" }`.
+
+- It resolves and hides as any other `known_as` name, and `the rose bloomed` at
+  the start of the story has no warning.
+- With `check_text: true`, it's F-NAME-1. With `check_text: yes`, which isn't a
+  boolean, it's an F-ENT-10 warning, and the name is checked as if it said true.
+- `Rose Hale` is checked without `check_text`, and not with `check_text: false`.
+
+Spec: format.md F-ENT-10, F-NAME-1 (#67). Covered by:
+`NameCheckTests.AOneWordNameIsCheckedOnlyWhenTheEntrySaysSo`,
+`NameCheckTests.AOneWordNameThatIsntCheckedStillHides`,
+`NameCheckTests.ACheckTextThatIsntABooleanIsAWarningAndChecks` (Core).
+
+### SC-CHECK-67. A real false alarm
+
+A different `Mara Voss`, long dead, is in `the-old-ledger`.
+
+- `allow_in: [the-old-ledger]` on the entry silences every line of that note,
+  and elsewhere the name still warns.
+- `allow_in: [the-old-leger]`, a typo, is an F-ENT-10 warning that says it
+  reaches no note, and the old ledger still warns: a mistake fails safe.
+- An assistant can set it with `update_fields`
+  (`known_as.0.allow_in`, `known_as.0.check_text`), which changes no link.
+
+Spec: format.md F-ENT-10, F-NAME-1 (#67). Covered by:
+`NameCheckTests.AllowInSilencesAWholeNoteAndNoOther`,
+`NameCheckTests.AnAllowInThatReachesNoNoteIsAWarningAndKeepsChecking` (Core),
+`NameCheckToolTests.UpdateFieldsSetsAllowInAndCheckTextAndChangesNoLink` (MCP).
+
+### SC-CHECK-68. Spoiler checks off
+
+The same den with `spoiler_checks: false`.
+
+- `check` gives no F-NAME-1 or F-NAME-2, and no warning about `allow_in`.
+- `known_as` still hides the name at a position, since hiding isn't a check.
+- The web's list of the den's errors never runs these checks, on or off.
+
+Spec: format.md F-DEN-7, F-NAME-1 (#67). Covered by:
+`NameCheckTests.WithSpoilerChecksOffNothingIsCheckedAndTheNameStillHides`,
+`NameCheckTests.TheCheckThatOnlyWantsUnreadableFilesSkipsTheNames` (Core).
+
+### SC-CHECK-69. A file name holding the later name
+
+`mara-voss.md` has `name: The Courier` and `known_as: [{ value: Mara Voss, from: "ash:2" }]`.
+
+- `check` gives F-NAME-2, which says to rename the file. So does
+  `the-courier-mara-voss.md`, and `voss.md` for a one-word `Voss`, whatever
+  `check_text` says.
+- `the-courier.md` and `mara-vossler.md` don't, and neither does a note that
+  readers meet only at `ash:2`.
+
+Spec: format.md F-NAME-2 (#67). Covered by:
+`NameCheckTests.AFileNameThatHoldsTheLaterNameIsAWarning` (Core),
+`NameCheckToolTests.CheckListsBothRules` (MCP).
+
 ## RT: saving a note keeps what the writer wrote
 
 Background: the files are the writer's, and Wolfden is only one of the
@@ -1601,19 +1701,23 @@ in a field, a section readers reach early, and one they reach later.
 - `change_alias` from `Mara Voss` to `Mara Holt` rewrites all three links, at every
   position, and the entry keeps its `from`. With `keep_old_alias`, the new name goes
   beside the old, with the same `from`. Removed, its links get the note's name.
-- Given `plain: true`, the name becomes a plain alias, and no link changes; the effects
-  say a secret is given away. A name that's in `aliases` too only leaves `known_as`.
-  `from: ""` or a blank `from` counts as left out, so it changes nothing. Given a
-  position, a plain alias becomes a `known_as` name from there, or a `known_as`
-  name's `from` changes, and no link changes. A `from` that isn't a position the
-  universe has is `bad_position`, and `plain` with a `from` is `bad_argument`.
+- With `plain: true`, the name becomes a plain alias and no link changes. The effects
+  warn that this gives the secret away. If the name is also in `aliases`, it's only
+  taken out of `known_as`.
+- With a position in `from`, a plain alias becomes a `known_as` name from there, or a
+  `known_as` name gets that `from`. No link changes.
+- An empty or blank `from` is treated as no `from` at all, so on its own it changes
+  nothing. A `from` the universe doesn't have is `bad_position`, and `plain` with a
+  `from` is `bad_argument`.
 - A name kept beside a `known_as` entry with no `from` goes in `known_as` with no
   `from` too, so it stays hidden. In a flow list (`known_as: [{ ... }, { ... }]`)
   each tool finds the entry by its name.
 - `update_fields` doesn't move a `known_as` entry, and says why: the earliest `from`
   counts, not the order.
 - `rename_entity` to one of the note's own `known_as` names takes the entry out, and
-  says the name is known everywhere now. `create_entity` takes `known_as`.
+  says the name is known everywhere now. With `keep_old_name`, the effects say the
+  old name is a plain alias with no `from`, so readers know it wherever they know the
+  note. `create_entity` takes `known_as`.
 
 Spec: F-ENT-10, F-RT-5 (#67, §9). Covered by: `KnownAsWriteTests`.
 
@@ -3778,6 +3882,52 @@ doesn't have.
 
 Spec: F-ENT-10, F-VIEW-7 (#67). Covered by: `McpStaysStrictTests`, `KnownAsTests`.
 
+### SC-MCP-55. My assistant writes the name before readers learn it
+
+With `spoiler_checks: true`, The Courier has `known_as: [{ value: Mara Voss, from:
+"ash:2" }]`, and the ledger, met at `ember:1`, already says `Mara Voss signed it.`
+
+- `append_section` adds `Mara Voss paid, and [[Mara Voss]] left.` to the ledger. It's
+  written, and `effects` has two warnings, word for word what `check` says of that
+  line: F-NAME-1 (`'Mara Voss' is a name of 'The Courier' that readers learn at ash:2,
+  and this text is at ember:1.`) and F-LINK-13. The mention already there isn't said
+  again.
+- Text without the name, or in a section with `from=ash:3`, says nothing.
+- `create_entity` with the name in its text, `update_fields` setting a field to it,
+  the web's **Edit file**, `copy_entity` of the ledger, and a note saved back into the
+  den each say it. An idea isn't canon text, so `add_idea` doesn't.
+- `change_alias` from `Mara Voss` to `Mara Holt` warns about each link it rewrites
+  that's now ahead of its position. Moving the reveal to `ash:3` with `update_fields`
+  warns about The Courier's own text at `ash:2`.
+- `rename_entity` of the ledger to `Mara Voss` says nothing, as `check` does: those
+  words are the ledger's own name from its entry.
+- Renaming The Courier to The Envoy, with `rename_entity` or by changing `name:` in
+  **Edit file**, repeats none of the ledger's warnings, since only the display name
+  changed. Moving a reveal also says to run `check` for other notes.
+- A new mention added above an old one at the same position is said at its own line.
+- A line added above an existing mention, or a move that keeps views, says nothing new.
+  With `spoiler_checks: false`, or no `known_as`, nothing is said, and the write
+  loads nothing more.
+
+Spec: F-NAME-1, F-NAME-2, F-LINK-13 (#67, design §7). Covered by:
+`LaterNameEffectTests` (MCP), `WrittenTextCheckTests` (Core),
+`WriteEndpointTests.EditFileSaysWhenTheTextNamesSomeoneBeforeReadersLearnTheName`.
+
+### SC-MCP-56. My assistant uses my everyday name as co-author
+
+The den records checkpoints as Test Pen Name. Git's global settings hold
+the writer's everyday name. The assistant, which has seen that name
+somewhere, passes it, or its email, as `co_author`.
+
+- `checkpoint` is refused with `bad_argument`, saying a co-author from
+  git's global settings isn't allowed when the den records another name,
+  without repeating it. Nothing is recorded.
+- With its own name, the checkpoint is recorded under Test Pen Name, with
+  the assistant's `Co-Authored-By` line.
+
+Spec: design.md §6, "One gate for every commit and tag" (decision D9).
+Covered by: `HistoryToolTests.ACoAuthorWithGitsGlobalNameIsRefusedWhenTheDenRecordsAPenName`.
+
 ## STORE: Wolfden saves, moves, and deletes notes
 
 Background: the den store (design.md §6, #121) is how Wolfden writes a
@@ -4498,22 +4648,24 @@ is for what they write as Ash Calloway, so they run `wolfden init --git
 
 - The name and email given win, for this den only. They're saved with `git
   config --local` before the first checkpoint, so that checkpoint has Ash
-  Calloway as both author and committer, and so do later ones, as long as
-  nothing stronger is set when they're made: `GIT_AUTHOR_NAME` in the
-  environment of `wolfden serve` or a later run still beats them, as it does
-  for any git repository. The global settings aren't changed, and the
-  output doesn't repeat them.
+  Calloway as both author and committer, and so do later ones, even with
+  `GIT_AUTHOR_NAME` in the environment of `wolfden serve` or a later run
+  (SC-HIST-24). The global settings aren't changed, and the output doesn't
+  repeat them.
 - The same goes for a name git gives only inside a repository (`includeIf
   "gitdir:…"`), for global `author.name` or `committer.email` settings,
   which git otherwise prefers to `user.name` and `user.email`, and for a
   repository with no checkpoints yet that has a name of its own already.
-- An environment variable such as `GIT_AUTHOR_NAME` beats every setting, so
-  it would defeat what was given. That's refused, naming the variable but
-  not its value, with nothing changed. So is `GIT_DIR` or `GIT_COMMON_DIR`,
-  which would save them in another repository.
-- Once they're saved, git is asked what it would record. If something it
-  reads later still beats them (`GIT_CONFIG_COUNT`, `GIT_CONFIG_PARAMETERS`,
-  `extensions.worktreeConfig`, an `[include]` in the repository's config),
+- An environment variable such as `GIT_AUTHOR_NAME` doesn't defeat what was
+  given: Wolfden's checkpoints don't use it. The output names the variable,
+  not its value, and says git commands run by hand still use it.
+  `GIT_DIR` or `GIT_COMMON_DIR`, which would save them in another
+  repository, is refused with nothing changed.
+- Once they're saved, git is asked what it would record, from its config
+  files (a name passed as config in the environment, `GIT_CONFIG_COUNT` or
+  `GIT_CONFIG_PARAMETERS`, isn't used by Wolfden's commits, so it doesn't
+  refuse). If something it reads later still beats them
+  (`extensions.worktreeConfig`, an `[include]` in the repository's config),
   no checkpoint is made and the value isn't repeated. A repository this run
   made is taken away again. In one that was already there, what this try saved
   is put back as it was, so the next commit from anywhere isn't the pen name
@@ -4527,8 +4679,8 @@ Spec: design.md §6, "Turning history on" (maintainer decision, 2026-11-03,
 `HistorySetupTests.AGivenNameAndEmailWinOverOnesGitGivesOnlyInsideTheRepository`,
 `HistorySetupTests.AGivenNameAndEmailWinOverAuthorAndCommitterSettings`,
 `HistorySetupTests.AGivenNameAndEmailReplaceOnesInARepositoryWithNoCheckpointsYet`,
-`HistorySetupTests.AnEnvironmentVariableThatWouldBeatWhatsGivenRefusesWithNothingChanged`,
-`HistorySetupTests.ASettingFromTheEnvironmentThatBeatsWhatsSavedRefusesBeforeTheFirstCheckpoint`,
+`HistorySetupTests.AnEnvironmentVariableDoesntBeatWhatsGivenAndTheStepsSayItsSet`,
+`HistorySetupTests.ANameFromConfigInTheEnvironmentDoesntBeatWhatsGiven`,
 `HistorySetupTests.ALaterSettingInTheRepositoryThatBeatsWhatsSavedStopsBeforeTheFirstCheckpoint`,
 `HistorySetupTests.WhatBeatsSigningBeingOffGetsItAllTakenBackSoNoLaterCommitSignsTheNameGiven`,
 `HistorySetupTests.CharactersGitStripsFromWhatsGivenArentTakenForSomethingBeatingIt`,
@@ -4612,11 +4764,215 @@ Spec: design.md §6, "Turning history on" (#286). Covered by:
 `HistorySetupTests.WhatBeatsSigningBeingOffGetsItAllTakenBackSoNoLaterCommitSignsTheNameGiven`,
 `InitHistoryTests.AGivenNameTurnsSigningOffForTheDenAndSaysSo`.
 
+### SC-HIST-24. My shell has my everyday name in the environment
+
+The den's repository is set to Test Pen Name. The terminal that starts
+`wolfden serve` has `GIT_AUTHOR_NAME`, `GIT_COMMITTER_EMAIL` and `EMAIL`
+set to the writer's everyday name and email, or passes them as config in
+`GIT_CONFIG_PARAMETERS` or `GIT_CONFIG_COUNT`.
+
+- Every checkpoint and freeze tag Wolfden makes records Test Pen Name, as
+  author and committer, or as an annotated tag's tagger. The environment's
+  values aren't used.
+- The committer is the author, even if git's settings give a different
+  `committer.name`.
+- If git's settings have no name or email for the den, the checkpoint is
+  refused with nothing changed, not even a new file marked, and the
+  message says how to set them. So is one in a repository git trusts only
+  through `safe.directory` passed in the environment: the message says how
+  to trust it in git's own settings, and repeats no name. It doesn't use the environment's, or one git
+  would make up from the computer's account, and doesn't repeat either.
+
+Spec: design.md §6, "One gate for every commit and tag" (#311). Covered by:
+`CommitGateTests.AnInheritedNameAndEmailDontWinAtACheckpointOrATag`,
+`CommitGateTests.ANameAndEmailPassedAsConfigInTheEnvironmentArentUsed`,
+`HistorySetupTests.ANameFromConfigInTheEnvironmentDoesntBeatWhatsGiven`,
+`CommitGateTests.TheCommitterIsTheAuthorAsGitsSettingsGiveIt`,
+`CommitGateTests.ARepositoryTrustedOnlyThroughConfigInTheEnvironmentIsRefused`,
+`HistorySetupTests.ARepositoryTrustedOnlyThroughConfigInTheEnvironmentRefusesBeforeTheFirstCheckpoint`,
+`CommitGateTests.WithNoNameInGitsSettingsNothingIsGuessedAndNothingChanges`,
+`HistorySetupTests.AnEnvironmentVariableDoesntBeatWhatsGivenAndTheStepsSayItsSet`.
+
+### SC-HIST-25. Something outside the den's own settings turns signing on
+
+The den's own `.git/config` says `commit.gpgsign = false` and
+`tag.gpgsign = false`. Later, an `[include]` in that file, a
+`config.worktree`, or `GIT_CONFIG_COUNT` or `GIT_CONFIG_PARAMETERS` in the
+environment turns signing on, with a key of another name's.
+
+- The next checkpoint and freeze tag aren't signed. Each result has a
+  warning that git's settings would have signed it but the den's own
+  settings say not to, naming the kinds of setting that do this but not
+  the key. The checkpoint isn't refused.
+- The other way round, the den's own file saying sign wins over an
+  environment that says not to, and the result says so too.
+- When the den's own file doesn't say, git decides, as before, and nothing
+  is said. A key in that file with no value counts as on. A lightweight tag
+  is never signed.
+
+Spec: design.md §6, "One gate for every commit and tag" (#311, decision
+D4). Covered by:
+`CommitGateTests.SigningTurnedOnOutsideTheDensOwnFileDoesntSignAndTheResultSaysSo`,
+`CommitGateTests.TheDensOwnFileSayingSignWinsOverAnEnvironmentThatSaysNot`,
+`CommitGateTests.WithNothingInTheDensOwnFileGitDecidesAsBeforeAndNothingIsSaid`,
+`CommitGateTests.AValueWithoutAnEqualsSignInTheDensOwnFileIsPinnedAsOn`,
+`CheckpointEndpointTests.ACheckpointPassesOnTheGatesSigningWarning`,
+`FreezeTagTests.AFreezeTagCarriesTheGatesSigningWarning`,
+`Checkpoint.test.tsx` (web).
+
+### SC-HIST-26. A new way to commit can't skip the gate
+
+A developer adds a new feature that makes a commit or a tag.
+
+- Running any git command that makes commits or tags (`commit`, `tag`,
+  `commit-tree`, `merge`, `cherry-pick`, `rebase`, `replay`, `subtree`,
+  `notes` and the like) without what the gate decided fails before git
+  starts, so the new path fails its first test. So does passing an alias,
+  an `include` or an `includeIf` with `-c` or `--config-env`, which could
+  hide or bring in one.
+- Wolfden starts no git process except through that one place.
+
+Spec: design.md §6, "One gate for every commit and tag" (#311). Covered by:
+`CommitGateTests.AGitCommandThatMakesCommitsOrTagsRunsOnlyThroughTheGate`,
+`CommitGateTests.NothingInWolfdenRunsGitExceptThroughGitProcess`.
+
+### SC-HIST-27. A co-author with my everyday name
+
+Git's global settings hold the writer's everyday name and email. The den
+records checkpoints as Test Pen Name. A checkpoint asks for a co-author
+with the everyday name, or its email, in any case or spacing.
+
+- It's refused with nothing changed, and the message repeats neither the
+  co-author nor git's value. A global `author.name` counts too, and so does
+  one in a file the global config includes with a plain `[include]`. A pen
+  name the global config gives only inside the den's folder (`includeIf
+  "gitdir:…"`) is the den's name, not a global one.
+- A co-author with the den's own name, when git's global name is that name
+  too, isn't refused. Nor is any co-author when there's no global config.
+
+Spec: design.md §6, "One gate for every commit and tag" (decision D9).
+Covered by:
+`CommitGateTests.ACoAuthorWithGitsGlobalNameOrEmailIsRefusedWhenTheDenRecordsAnother`,
+`CommitGateTests.ACoAuthorWithGitsGlobalNameIsntRefusedWhenTheDenRecordsThatNameToo`,
+`CommitGateTests.WithNoGlobalConfigAtAllACoAuthorIsntRefused`,
+`CommitGateTests.ACoAuthorWithAGlobalNameFromAPlainIncludeIsRefused`,
+`CommitGateTests.APenNameFromIncludeIfIsTheDensNameNotAGlobalOne`,
+`HistoryToolTests.ACoAuthorWithGitsGlobalNameIsRefusedWhenTheDenRecordsAPenName`
+(SC-MCP-56).
+
+### SC-HIST-28. Before I push, I check which names the history holds
+
+The writer keeps the den under the pen name Wren Calder. Before the first
+push, they run `wolfden identity audit` in the den's folder. Two checkpoints
+on a side branch were made under their everyday name, Ash Everyday, one
+more was amended away, and an AI assistant's checkpoints name it in
+`Co-Authored-By`.
+
+- It lists every name and email the history records, exactly as recorded
+  (`juno pike` and `Juno Pike` are two), as author, committer, tagger, or on
+  a `Key: Name <email>` line anywhere in a checkpoint's or tag's message (`Co-Authored-By`,
+  `Signed-off-by`, one in a paragraph git wouldn't call trailers, one with a
+  comment after it), each with how often, its UTC offsets, and its first and
+  last date. A line repeated in one commit counts once, whatever its key's
+  case; a line such as `Closes: #12` names nobody.
+- Other message lines that may name someone are listed apart: a
+  `Signed-off-by:` without an email, a `Reviewed-by:` with a bare email, a
+  line of the body with an email in it.
+- It reads every branch, tag, and other ref, not just the one checked out,
+  so Ash Everyday shows. Tags are read under any ref, a tag of a tag to the
+  end, and a merge commit's embedded tag too. A `.mailmap` or a replace ref
+  doesn't hide a name, and colour, signature, or decoration settings don't
+  change what's read. If what it read doesn't add up to git's own count, it
+  reads once more (a checkpoint may have landed meanwhile), and stops with
+  an error if it still doesn't, rather than report too little.
+- It lists every UTC offset and the authors in `den.yaml` with every value
+  they set. Then a section only a copy of the folder carries: the remotes,
+  with any account name in their addresses (a password, a token used as a
+  user name, or a query string is never printed); names only the reflogs
+  keep (Ash Everyday, from the amended checkpoint); and this copy's own name
+  settings. It ends by saying what a push or a clone carries, and that a copy
+  of the folder carries the last section too.
+- A den inside a larger repository is audited for that whole repository,
+  and the output says so; a shallow clone says it holds only part of the
+  history. A den with no repository still lists its `den.yaml` authors, and
+  a `den.yaml` that doesn't parse doesn't stop the history's audit. The home
+  folder is shown as `~`.
+- It changes nothing, and `--json` gives the same as one document.
+
+It's also how to check what the commit gate (SC-HIST-24 to SC-HIST-27)
+recorded, and what was recorded before it.
+
+Spec: design.md §6, "What a copy or push carries", and §7 (#315, design
+§3.6 item 2). Covered by:
+`IdentityAuditTests.EveryNameAndEmailIsListedExactlyAsRecordedOnEveryBranchAndTag`,
+`IdentityAuditTests.ADenInALargerRepositoryIsAuditedForTheWholeRepository`,
+`IdentityAuditTests.ADenWithNoRepositoryOrNoCommitsYetHasNothingRecorded`,
+`IdentityAuditTests.RemotesAreListedWithTheirAccountNameAndNeverAPassword`,
+`IdentityAuditTests.ARemoteAddressKeepsItsAccountNameAndLosesItsPassword`,
+`IdentityAuditTests.AReplaceRefDoesntHideTheNameACommitRecords`,
+`IdentityAuditTests.ColourAndSignatureSettingsDontChangeWhatsRead`,
+`IdentityAuditTests.ATagOutsideRefsTagsAndATagOfATagAreRead`,
+`IdentityAuditTests.NamesElsewhereInMessagesAreFound`,
+`IdentityAuditTests.NamesOnlyTheReflogsKeepAndThisCopysSettingsAreListedApart`,
+`IdentityAuditTests.AShallowCloneSaysSo`,
+`IdentityAuditTests.TheHomeFolderIsShownAsATilde`,
+`IdentityAuditTests.NamesInTagMessagesAreFound`,
+`IdentityAuditTests.ACommitMadeWhileTheAuditReadsIsReadOnASecondTry`,
+`IdentityAuditTests.ARepositoryThatKeepsChangingWhileItsReadFailsRatherThanReportTooLittle`,
+`IdentityAuditTests.ASigningKeyFileInTheHomeFolderIsShownWithATilde`,
+`IdentityCommandTests.TheAuditListsEveryNameTheHistoryAndDenYamlHoldAndChangesNothing`,
+`IdentityCommandTests.JsonGivesTheSameAuditWithAVersion`,
+`IdentityCommandTests.ADenWithNoHistoryStillListsItsAuthors`,
+`IdentityCommandTests.ADenYamlThatDoesntParseStillGetsItsHistoryAudited`,
+`IdentityCommandTests.MentionsTheReflogsAndThisCopysSettingsAreShown`,
+`IdentityCommandTests.AMistakeOnTheCommandLineExitsTwo`,
+`IdentityCommandTests.EachLevelHasItsOwnHelp`.
+
+### SC-HIST-29. One key signed under both of my names
+
+The writer's git signed some checkpoints with their everyday key, under
+the pen name, a tag with an SSH key, and a release tag they merged.
+
+- The audit counts the signed checkpoints, annotated tags, and merged tags,
+  and groups them by key: an OpenPGP key by its fingerprint (a signature that
+  names only the key ID is counted with the fingerprint it ends), an SSH key
+  by its `SHA256:` fingerprint. A block with several signatures counts each
+  key. Each key lists the names it signed under. Signatures that don't name
+  a key (X.509) are counted by signer, never merged into one "key".
+- Signatures only on merged tags still count: the output never says nothing
+  is signed when something is. A merged tag's message with indented lines
+  doesn't cut its signature off.
+- The key is read from each signature's own bytes, so a long history isn't
+  checked with gpg one commit at a time, and malformed bytes end quickly
+  with no key, never a hang. One commit or tag per key, for at most ten
+  keys, is checked, to say who the key belongs to as this computer reports
+  it (a real SSH signature's allowed-signers name, say), whatever
+  `log.showSignature` says. When that isn't one of the names the key signed
+  under, the output says anyone who checks the signature can link the two.
+  A key it couldn't check says "owner not checked".
+
+Spec: design.md §6, "What a copy or push carries" (#315, design §3.6 item
+2). Covered by:
+`IdentityAuditTests.SignaturesAreCountedByKeyWithTheNamesEachKeySignedUnder`,
+`IdentityAuditTests.OwnersAreLookedUpForTenKeysAtMost`,
+`IdentityAuditTests.ARealSshSignedCheckpointIsReadWithItsKeyAndTheAllowedSignersName`,
+`IdentityAuditTests.ASignaturesKeyIsReadFromItsOwnBytes`,
+`IdentityAuditTests.AMergedTagsSignatureAndTaggerAreReadPastAnIndentedLine`,
+`IdentityAuditTests.AKeyThatSignedOnlyTagsIsCheckedThroughTheTag`,
+`IdentityAuditTests.AnOwnerIsReadExactlyWhenGitIsSetToShowSignatures`,
+`IdentityAuditTests.SignaturesThatDontNameAKeyAreGroupedBySignerNotMergedIntoOneKey`,
+`IdentityAuditTests.EverySignatureInABlockIsRead`,
+`IdentityAuditTests.MalformedSignatureBytesEndQuicklyWithNoKey`,
+`IdentityCommandTests.AKeyThatBelongsToAnotherNameIsCalledOut`,
+`IdentityCommandTests.SignaturesOnlyOnMergedTagsArentReportedAsNone`.
+
 ## WEB: the den in a browser
 
 Background: `wolfden serve` (design.md §7, §9, #23) hosts the web UI and
 its API on this computer only (127.0.0.1) and opens the default browser.
-v0 has no accounts, so it never listens on the network. The browsing,
+Accounts and the login setting exist (ACCT, #315), but nothing asks for
+a login until the web's login lands (#315 PR 4b), so it never listens on
+the network. The browsing,
 search, and history pages come in M3 (#24 to #27); their read API comes
 first, and SC-WEB-4 to SC-WEB-10 describe what it answers. SC-WEB-11
 to SC-WEB-17 describe the browsing pages, SC-WEB-18 to SC-WEB-21 the
@@ -7042,3 +7398,261 @@ I'm at Dracula chapter 3 with `?readers=1`.
 
 Spec: design.md §9 (#300). Covered by: `web/src/ReaderBookPages.test.tsx`,
 `ReadersBookPagesTests.MovingForwardGivesOnlyTheOnePosition`.
+
+### SC-WEB-112. The Author sees a name readers learn later
+
+The Courier has `known_as: [{ value: Mara Voss, from: "ash:2" }]`, and The post book
+says `Signed by [[Mara Voss]].` I'm at `ember:3`.
+
+- In the Author's view, The Courier's names list `Mara Voss` with `from` beside it,
+  tagged `readers learn this at` ash chapter 2. At `ash:2` it has no tag. With no
+  position, each `known_as` name shows its `from`. A name can't be learned before its
+  note is met, so one whose `from` is earlier is tagged with the note's entry; one with
+  no `from`, or one the universe doesn't have, says readers never learn it.
+- The post book's link shows `Mara Voss`, as written, tagged `a name readers learn at`
+  ash chapter 2, since the Reader's view shows The Courier there. A labelled link has no
+  tag. The Courier's **Linked from** tags that line too.
+- Searching `Voss` finds The Courier, tagged `only in a name readers learn at` ash
+  chapter 2, after what readers can find. So is The post book's lead, found only by its
+  link `[[Mara Voss]]`; its labelled `[[Mara Voss|The stranger]]` is `only in a link's
+  target`. The Reader's view finds nothing, and its page lists only `the Messenger`.
+- A hidden name doesn't raise a note in the Reader's search: two notes alike but for a
+  later name that repeats the word come in path order.
+
+Spec: #67 §4, §13 (PR 3). Covered by: `KnownAsWebTests` (API), `web/src/KnownAs.test.tsx`.
+
+### SC-WEB-113. A note filed under a description
+
+`The man in the grey coat` has `known_as: [{ value: Corin Hask, from: "ash:2" }]`, and a
+section of the dock log from `ash:2` says `[[Corin Hask]] signed it.`
+
+- In the Reader's view at `ash:2`, the page title is unchanged, its names list `Corin
+  Hask`, and the link shows `Corin Hask`, as written, not the note's name. The Reader's
+  search finds the dock log by "Hask signed", and not by "grey coat signed".
+- No badge says the note is unfinished, with or without a `known_as`.
+- What a link shows is one rule in two places, the page's `linkText` and the server's
+  `ReadersLinks.Shown`, kept equal by `tests/shared/link-text-cases.json`.
+
+Spec: #67 §4. Covered by: `KnownAsWebTests.ALinkByANameReadersKnowShowsAsWrittenInTheReadersView`,
+`ReadersSearchTests.TheServersRuleForWhatALinkShowsIsThePages`, `web/src/linkText.test.ts`,
+`web/src/KnownAs.test.tsx`.
+
+### SC-WEB-114. They until the reveal
+
+A character's `pronouns` are `{ value: they/them, until: "ash:3" }` then
+`{ value: he/him, from: "ash:3" }`. At `ember:3`, the Reader's view shows `they/them`
+and nothing of `he/him`. The Author's view shows both, with `he/him` tagged as ahead
+of readers until `ash:3`.
+
+Spec: #67 §11. Covered by: `KnownAsWebTests.PronounsUntilTheRevealReadPlainlyToReadersAndMarkedToTheAuthor`.
+
+### SC-WEB-115. I edit a note's other names on its page
+
+**Other names**, beside **Edit file**, lists the note's aliases (`always known`) and
+`known_as` names (with their `from`).
+
+- **Rename** rewrites the links that use the name, in every note; a `known_as` name
+  keeps its `from`.
+- **When readers learn it** with a chapter makes an alias a `known_as` name, or moves
+  its `from`, and changes no link. **Always** makes a `known_as` name an alias, after a
+  warning that a secret would show at every position.
+- **Remove** asks, then takes it out; links that use it get the note's name. An empty
+  rename doesn't remove anything (`/api/edit/name` needs `remove: true`).
+- **Add a name** adds an alias, or with a chapter, a `known_as` entry. A `known_as`
+  entry with no `from` is refused (**Type a position** left blank, even when it opened on a
+  `from` the book doesn't list), as are a `from` the universe doesn't have
+  (`bad_position`), a `from` on a plain alias, and a name the note already goes by.
+  Nothing changes. A name is trimmed.
+- Each goes through `change_alias` or `update_fields`, the writes an AI assistant uses.
+
+Spec: #67 §9. Covered by: `KnownAsWebTests.TheEditorAddsANameWithWhereReadersLearnItAndRefusesOneWithout`,
+`KnownAsWebTests.TheEditorRenamesMovesAndRemovesANameThroughChangeAlias`, `web/src/KnownAs.test.tsx`.
+
+### SC-WEB-116. The link picker finds a note by a later name
+
+Typing `mara` in a link picker finds The Courier, and the row says `as Mara Voss`, with
+`readers learn it at ash:2`. A plain alias says nothing more. Picking it links by that
+name: an editor shows everything, and `wolfden check` warns about text readers reach
+first.
+
+Spec: #67 §4. Covered by: `KnownAsWebTests.TheLinkLookupSaysWhichNameMatchedAndWhereReadersLearnIt`,
+`web/src/KnownAs.test.tsx`.
+
+## ACCT: accounts and login
+
+Background: accounts belong to an *installation*, one computer account's
+Wolfden folder, never to a den (#315, D5). They're ASP.NET Core Identity's
+tables in `accounts.db` there, beside `settings.json`, which says whether
+login is on. A role is what an account may do (owner, writer, viewer); the
+Reader's view is a filter, not a role (D6). This version records the login
+setting; the web's login, which enforces it, comes later (#315 PR 4b).
+Invented names only.
+
+### SC-ACCT-1. My accounts live outside every den
+
+The writer runs `wolfden user list` on Windows, then with `WOLFDEN_HOME`
+set, then with `--home D:\juno-wolfden`.
+
+- The first names `%LOCALAPPDATA%\Wolfden` ("the default for this computer
+  account"); on macOS it's `~/Library/Application Support/Wolfden`, and on
+  Linux `$XDG_DATA_HOME/wolfden` or `~/.local/share/wolfden` (a relative
+  `XDG_DATA_HOME` is ignored). `WOLFDEN_HOME` moves it, and `--home` beats
+  both. The folder holds `accounts.db`, `settings.json` and `keys/`; none of
+  it is in a den, a checkpoint, or a push. A new folder outside Windows is
+  readable only by the computer account (0700).
+
+Spec: #315 §3.2. Covered by: `InstallationTests.HomeBeatsTheEnvironmentWhichBeatsTheDefault`,
+`InstallationTests.TheDefaultIsTheAccountsOwnDataFolder`.
+
+### SC-ACCT-2. I add myself as the owner
+
+The writer runs `wolfden user add wren --owner` and types a password twice.
+
+- It says `Added 'wren' as an owner.`, that login is off and how to turn it
+  on, and the installation folder. `wolfden user list` lists `wren  owner`.
+  A password that doesn't match, or breaks a rule, is asked for again, up to
+  three times; nothing typed is shown or printed. `--password-stdin` reads
+  the first line of standard input instead, for scripts, and a `--password`
+  argument doesn't exist. No role, an unknown role, a username with a space
+  or `@`, or a name that's taken in any case adds nothing; a taken name is
+  said before a password is asked for. `accounts.db` has no email or phone
+  column.
+
+Spec: #315 §4.3, §4.4, Flow 5. Covered by: `AccountCommandTests.TheFirstOwnerIsAddedWithAPasswordTypedTwice`,
+`AccountCommandTests.APasswordThatDoesntMatchOrBreaksTheRulesIsAskedForAgain`,
+`AccountCommandTests.AScriptPipesThePasswordInAndNeverPutsItOnTheCommandLine`,
+`AccountStoreTests.AnAccountIsAddedAndListedInTheInstallationNotADen`,
+`AccountStoreTests.NoEmailOrPhoneColumnIsStored`.
+
+### SC-ACCT-3. A password long enough, with no other rules
+
+The writer tries `fourteen chars`, then `aaaaaaaaaaaaaaaa`, then the
+username, then `café au lait du matin`.
+
+- The first three are refused: fewer than 15 characters (maintainer
+  decision, 2026-11-10: NIST's minimum when a password is the only factor,
+  as login always is), one character repeated, the username. The last is
+  accepted, and it matches whether the `é` is typed as one character or as
+  `e` plus an accent (both are hashed in NFC). Length counts characters
+  after NFC, not bytes, so fourteen emoji are 14, and `e` plus an accent is
+  one; at most 256. There are no composition rules: `alllowercaseabc` is
+  fine.
+
+Spec: #315 §7; NIST SP 800-63B rev. 4 §3.1.1.2. Covered by:
+`AccountStoreTests.APasswordOutsideTheRulesIsRefused`,
+`AccountStoreTests.LengthCountsCharactersFrom15To256WithNoCompositionRules`,
+`AccountStoreTests.APasswordMatchesWhicheverWayItsAccentsWereTyped`.
+
+### SC-ACCT-4. I can't leave the installation without an owner
+
+With `wren` the only owner, the writer runs `wolfden user remove wren`, then
+`wolfden user set-role wren writer`.
+
+- Both are refused (exit 2), saying `wren` is the only owner and to make
+  another account an owner first. Once `juno` is an owner too, either works.
+
+Spec: #315 §4.4. Covered by: `AccountCommandTests.TheLastOwnerStays`,
+`AccountStoreTests.TheLastOwnerCantBeRemovedOrDemoted`.
+
+### SC-ACCT-5. I forgot my password, or someone guessed at it
+
+After 5 wrong passwords in a row, `wren` is locked.
+
+- `wolfden user list` shows `locked until <time>` and the unlock command;
+  the lockout lasts 15 minutes. `wolfden user unlock wren` ends it at once.
+  `wolfden user reset-password wren` asks for a new password twice, ends
+  every session (a new security stamp), and ends a lockout. An unknown name
+  is said before a password is asked for.
+
+Spec: #315 §4.4, §7. Covered by: `AccountCommandTests.AForgottenPasswordIsResetAndALockoutUndoneLocally`,
+`AccountStoreTests.FiveFailuresLockAnAccountForFifteenMinutesAndUnlockEndsIt`,
+`AccountStoreTests.ANewPasswordEndsSessionsAndALockout`.
+
+### SC-ACCT-6. I turn login on
+
+The writer runs `wolfden login on` before adding anyone, then after
+`wolfden user add wren --owner`, then starts `wolfden serve`.
+
+- Before there's an owner, it's refused (exit 2) and lists the two steps in
+  order; `settings.json` isn't written. After, it says `Login is on.`, then
+  what login protects and what it doesn't (the files, the `wolfden`
+  command, `wolfden mcp`, backups and sync), that this version doesn't ask
+  for a login yet, and the installation folder. `serve` warns once that
+  login is on but not asked for yet, and serves as before. `wolfden login
+  off` always works. A `settings.json` that doesn't read is reported, not
+  ignored.
+
+Spec: #315 §4.1, Flow 5. Covered by: `AccountCommandTests.LoginOnNeedsAnOwnerFirst`,
+`AccountCommandTests.LoginOnSaysWhatItDoesntProtectAndThatNothingEnforcesItYet`,
+`ServeLoginWarningTests.ServeWarnsThatLoginIsntEnforcedYet`,
+`InstallationTests.SettingsDefaultToLoginOffAndKeepKeysTheyDontKnow`.
+
+### SC-ACCT-7. I add an editor as a viewer
+
+The writer runs `wolfden user add rook --role viewer`.
+
+- It adds the account and says a viewer sees everything a writer sees,
+  spoilers included, and can't change anything; the Reader's view is a
+  filter, not a limit. `set-role … viewer` says the same. A writer's or an
+  owner's account doesn't get that line.
+
+Spec: #315 D6, §7. Covered by: `AccountCommandTests.AViewerIsToldTheySeeEverythingAWriterSees`.
+
+### SC-ACCT-8. I can see which installation I'm using
+
+A writer keeps a second, secret pen name in its own installation
+(`WOLFDEN_HOME`).
+
+- `wolfden user list` and `wolfden login` always print the installation
+  folder and where it came from, so two names sharing one is visible. Listing
+  an installation that has nothing yet creates nothing.
+
+Spec: #315 §3.6, Flow 7. Covered by: `AccountCommandTests.ListingAnEmptyInstallationCreatesNothingAndNamesTheFolder`,
+`AccountCommandTests.WithoutHomeItUsesAnotherInstallation`.
+
+### SC-ACCT-9. I point the installation at my den by mistake
+
+The writer sets `WOLFDEN_HOME=.` in the den's folder, then tries `--home`
+with the den's folder, then with a folder inside a git repository.
+
+- A relative `WOLFDEN_HOME` is refused: it must be a full path. A folder
+  that is a den, or inside one (a `den.yaml` in it or above it, also
+  through a link or junction), is refused
+  by every `user` and `login` command (exit 2), and nothing is created
+  there, so a checkpoint can never record the accounts. A folder inside a
+  git repository is allowed, with a warning to keep it out of that
+  repository's commits. Outside Windows, `accounts.db` is made 0600, and a
+  folder other accounts can open gets a warning.
+
+Spec: #315 §3.2, review of PR #350. Covered by: `InstallationTests.ARelativeWolfdenHomeIsRefused`,
+`InstallationTests.AFolderInADenIsRefused`, `InstallationTests.AFolderInARepositoryIsFoundForAWarning`,
+`AccountCommandTests.AnInstallationInADenIsRefused`, `AccountCommandTests.AnInstallationInARepositoryIsWarnedAbout`,
+`AccountStoreTests.TheDatabaseIsOnlyForThisAccountOutsideWindows`, `InstallationTests.ALinkIntoADenIsInTheDen`.
+
+### SC-ACCT-10. A password anyone would guess is refused
+
+The writer, adding `wren`, tries `PasswordPassword`, then `qwertyuiop12345`,
+then `Wolfden Wolfden 2026`, then `copper lantern harbor`.
+
+- The first two are refused with `that password is too common. Try a few
+  random words in a row, like "copper lantern harbor".`, which never says
+  what matched; the third says a password can't be the username or
+  `wolfden`, even repeated or with digits added. The last is accepted. The
+  list is nearly 10,000 common passwords, public domain, built into Wolfden
+  and read once, the first time a password is checked; nothing goes online.
+  Passwords are compared in NFKC (so fullwidth `ｐａｓｓｗｏｒｄ` is
+  `password`), ignoring case, spaces and punctuation, with any decimal
+  digits read as ASCII ones, and one is refused when it's a list entry, the
+  username or `wolfden`, said once or several times, optionally followed by
+  digits no longer than the whole part before them (so `2000` followed by
+  twelve random digits is fine). The same goes for
+  `user add` (typed or `--password-stdin`) and `user reset-password`.
+
+Spec: #354; NIST SP 800-63B rev. 4 §3.1.1.2. Covered by:
+`CommonPasswordTests.ACommonPasswordIsRefusedWhateverItsCase`,
+`CommonPasswordTests.AnUncommonPassphraseIsAccepted`,
+`CommonPasswordTests.TheUsernameOrWolfdenRepeatedOrWithDigitsIsRefused`,
+`CommonPasswordTests.TheRefusalNeverSaysWhichEntryMatched`,
+`CommonPasswordTests.CompatibilityFormsAndOtherDigitsCompareAsTheirPlainForms`,
+`CommonPasswordTests.TheStoreRefusesACommonPasswordOnAddAndReset`,
+`AccountCommandTests.ACommonPasswordIsRefusedByAddAndResetPassword`.

@@ -262,7 +262,11 @@ public sealed partial class DenTools
     /// which is written exactly so. The web UI sends numbers so, since a browser's JSON loses
     /// <c>2.50</c>'s last digit and a long number's precision.
     /// </param>
-    public WriteResult UpdateFields(string entity, string expectedHash, JsonElement changes, string? universe = null, bool numbersAsText = false)
+    /// <param name="refuseNamesItHas">
+    /// True to refuse adding an alias or a <c>known_as</c> name the entity already goes by (its name or another
+    /// of its names, under F-LINK-4), as the web's Other names does; otherwise it's added as asked.
+    /// </param>
+    public WriteResult UpdateFields(string entity, string expectedHash, JsonElement changes, string? universe = null, bool numbersAsText = false, bool refuseNamesItHas = false)
     {
         var hash = RequireHash(expectedHash);
         var ops = Changes(changes, chapter: false, numbersAsText);
@@ -304,7 +308,16 @@ public sealed partial class DenTools
                     added.Add(KnownAsAdded(op.RawValue));
                 }
 
-                if (path[0] == "known_as" && op.Op == "set" && op.RawValue is not { ValueKind: JsonValueKind.String })
+                // The web's Other names refuses a name the note goes by already, which it couldn't then show or remove.
+                if (refuseNamesItHas && path[0] is "aliases" or "known_as" && op.Op == "add" && added.Count > 0
+                    && (LinkText.Matches(catalog.Name, added[^1]) || catalog.AllAliases.Any(a => LinkText.Matches(a, added[^1]))))
+                {
+                    throw new DenToolException(
+                        ToolErrorCodes.BadArgument,
+                        $"'{catalog.Name}' already goes by '{added[^1]}' ({(LinkText.Matches(catalog.Name, added[^1]) ? "its name" : "another of its names")}), so nothing was added.");
+                }
+
+                if (path[0] == "known_as" && op.Op == "set" && path[^1] == "from" && op.RawValue is not { ValueKind: JsonValueKind.String })
                 {
                     throw new DenToolException(
                         ToolErrorCodes.BadArgument,
@@ -466,6 +479,7 @@ public sealed partial class DenTools
             var idAdded = AddMissingId(target, files);
             var check = Check(den, structure, files);
             RefuseUnreadable(den);
+            var early = WrittenTextChecks.LaterNames(catalog, new OverlayDenSource(den, files), files.Keys);
             Save(files, plan.Originals, created: null);
             var after = EntityCatalog.ReadEntityFile(check.Structure, path, files[path]).Entity!;
             var effects = new List<string>
@@ -499,6 +513,7 @@ public sealed partial class DenTools
                     : $"'{newName}' isn't a standard section of type '{type.Key}', so it's now a custom section, which never hands over to a later one (F-SEC-8).");
             }
 
+            effects.AddRange(LaterNameEffects(early));
             return new WriteResult(
                 DenReader.ResultVersion, true, path, HashOf(files[path]), Summary(after), effects, pinned, Warnings(check),
                 files.OrderBy(p => p.Key == path ? 0 : 1).ThenBy(p => p.Key, StringComparer.Ordinal).Select(p => new WrittenFileView(p.Key, HashOf(p.Value))).ToList(),
@@ -692,7 +707,8 @@ public sealed partial class DenTools
                     DenReader.ResultVersion, history.Name, true, null, true,
                     new HistoryEntryView(e.Id, e.When, e.Author, e.Message, e.Changes.Select(c => new HistoryChangeView(c.Kind.ToString().ToLowerInvariant(), c.Path, c.OldPath)).ToList()),
                     done.Written,
-                    done.ChangedElsewhere);
+                    done.ChangedElsewhere,
+                    done.Result.Warnings.Count == 0 ? null : done.Result.Warnings);
             }
             catch (ArgumentException e)
             {
@@ -731,7 +747,7 @@ public sealed partial class DenTools
         using (EnterWrite())
         {
             // Every link is resolved again with the new entity there, so nothing can be missing (#284).
-            var (den, structure, _, links) = LoadWholeDen();
+            var (den, structure, catalog, links) = LoadWholeDen();
             var u = structure.FindUniverse(universeKey) ?? throw Gone($"universes/{universeKey}");
             Container scope = filter is null ? u
                 : filter.Kind == CanonFilterKind.Series ? u.Series.Single(s => s.Key == filter.Key)
@@ -790,8 +806,9 @@ public sealed partial class DenTools
 
             // A new name can take links from the entity they reach now (F-LINK-7: the nearest scope wins):
             // refused unless allow_relinks, as for a copy (maintainer decision on #29, 2026-10-28).
-            var (_, _, changed) = CheckNewEntityLinks(
+            var (_, afterLinks, changed) = CheckNewEntityLinks(
                 den, links, check, files, allowRelinks, "created", "create it with those links moving to it", "the new entity");
+            var early = WrittenTextChecks.LaterNames(catalog, afterLinks.Catalog, files.Keys);
             Save(files, null, created: made.Path);
             var effects = new List<string> { $"Created {made.Path} from the '{type.Key}' template, with id {id}." };
             if (!entity.Status.IsInCanon())
@@ -806,6 +823,7 @@ public sealed partial class DenTools
 
             // Links elsewhere that reach it now: ones that reached nothing, and with allow_relinks, ones taken from another entity.
             effects.AddRange(ChangedLinkEffects(changed));
+            effects.AddRange(LaterNameEffects(early));
 
             var warnings = Warnings(check);
             if (scope is Book home && entity.FromResolution?.Resolved is { } entry && entry.Book != home
@@ -1158,7 +1176,7 @@ public sealed partial class DenTools
         string entity, string? universe, string hash,
         Func<MarkdownFile, CatalogEntity, List<string>, (MarkdownFile File, Func<CatalogEntity, CatalogEntity, IEnumerable<string>> Effects)> edit)
     {
-        var (path, ids) = Locate(entity, universe);
+        var (path, ids, laterNames) = LocateForEdit(entity, universe, view: false, askLaterNames: true);
         using (EnterWrite())
         {
             var tracked = new TrackingDenSource(Snapshot());
@@ -1195,8 +1213,15 @@ public sealed partial class DenTools
             var check = Check(den, structure, files);
             var after = EntityCatalog.ReadEntityFile(check.Structure, path, bytes).Entity!;
             CheckWrittenPositions(before, after, tracked);
+
+            // Only the universe's notes can say whether the text gives a name away early, so they're
+            // loaded only if one of them has a name readers learn later, or this note does now.
+            var early = structure.SpoilerChecks && (laterNames || before.KnownAs.Count > 0 || after.KnownAs.Count > 0)
+                ? WrittenTextChecks.LaterNames(den, structure, files)
+                : [];
             Save(files, new Dictionary<string, byte[]>(StringComparer.Ordinal) { [path] = original }, created: null);
             var said = effects(before, after).ToList();
+            said.AddRange(LaterNameEffects(early));
             if (idAdded is not null)
             {
                 said.Add($"The file had no id, so it was given {idAdded} (F-ID-6).");
@@ -1211,6 +1236,17 @@ public sealed partial class DenTools
 
     /// <summary>The entity's path in the index, and every id the den uses (for a missing id, F-ID-6).</summary>
     private (string Path, HashSet<string> Ids) Locate(string entity, string? universe, bool view = false)
+    {
+        var (path, ids, _) = LocateForEdit(entity, universe, view, askLaterNames: false);
+        return (path, ids);
+    }
+
+    /// <summary>
+    /// <see cref="Locate"/>, and, if <paramref name="askLaterNames"/>, whether any note of the
+    /// entity's universe has a name readers learn later (F-ENT-10), so a write that loads only
+    /// its own file knows whether its effects need the rest of the universe (#67).
+    /// </summary>
+    private (string Path, HashSet<string> Ids, bool LaterNames) LocateForEdit(string entity, string? universe, bool view, bool askLaterNames)
     {
         if (string.IsNullOrWhiteSpace(entity))
         {
@@ -1233,7 +1269,8 @@ public sealed partial class DenTools
             var ids = db.Entities.Where(e => e.Ulid != null).Select(e => e.Ulid!).ToList()
                 .Concat(db.Containers.Where(c => c.Ulid != null).Select(c => c.Ulid!))
                 .ToHashSet(StringComparer.Ordinal);
-            return (path, ids);
+            var laterNames = askLaterNames && db.Aliases.Any(a => a.IsKnownAs && db.Entities.Any(e => e.Id == a.EntityId && e.UniverseId == u.Id));
+            return (path, ids, laterNames);
         }, view);
     }
 
@@ -1990,6 +2027,9 @@ public sealed partial class DenTools
             case "known_as" when op == "set" && path[^1] == "from" && path.Count == (IsIndex(path[1]) ? 3 : 2):
                 // Where readers learn a name is an ordinary edit: links don't depend on it (#67, §9).
                 break;
+            case "known_as" when path.Count > 1 && path.Count > (IsIndex(path[1]) ? 2 : 1) && path[IsIndex(path[1]) ? 2 : 1] is "check_text" or "allow_in":
+                // Only the plain-text check reads these (F-NAME-1), so no link depends on them.
+                break;
             case "known_as":
                 throw new DenToolException(
                     ToolErrorCodes.UnsupportedEdit,
@@ -2127,6 +2167,25 @@ public sealed partial class DenTools
             : $"'{alias}' is also the {o.Tier} of '{o.Name}' ({o.Path}), so a link [[{alias}]] still reaches '{o.Name}': a {o.Tier} matches before an alias (F-LINK-6).").ToList();
     }
 
+    /// <summary>
+    /// The spoiler warnings a write adds to the notes it saves (#67, <see cref="WrittenTextChecks"/>),
+    /// as effects, in <c>check</c>'s words: a name readers learn later, written as plain text
+    /// (F-NAME-1) or in a file name (F-NAME-2), or linked by (F-LINK-13), before they learn it.
+    /// They never refuse a write.
+    /// </summary>
+    private List<string> LaterNameEffects(IReadOnlyList<DenDiagnostic> added)
+    {
+        var effects = added.Take(ListedLinkChanges)
+            .Select(d => $"{d.Path}{(d.Diagnostic.Line is int n ? $":{n}" : "")}: warning {d.Diagnostic.RuleId}: {d.Diagnostic.Message}")
+            .ToList();
+        if (added.Count > ListedLinkChanges)
+        {
+            effects.Add($"And {added.Count - ListedLinkChanges} more warning(s) like these in the text written. {ToolWords.Cap(Words.CheckDen)} to see them.");
+        }
+
+        return effects;
+    }
+
     private List<(string Name, string Path, string? Tier)> AliasMatches(CatalogEntity entity, string normalized) =>
         WithIndex(index =>
         {
@@ -2160,6 +2219,13 @@ public sealed partial class DenTools
             yield return fromAfter is null
                 ? $"It no longer has a 'from', so it enters canon at {after.Scope.StartDescription} (F-ENT-6)."
                 : $"It now enters canon at {fromAfter}: views before that leave it out (F-ENT-6).";
+        }
+
+        // A name readers learn later that's new, or whose from changed (#67).
+        var moved = after.KnownAs.Where(k => !before.KnownAs.Any(b => b.Value == k.Value && b.From == k.From)).Select(k => $"'{k.Value}'").Distinct().ToList();
+        if (moved.Count > 0)
+        {
+            yield return $"Where readers learn {string.Join(", ", moved)} is set now (known_as).{LaterTextElsewhere}";
         }
 
         if (before.Type != after.Type)

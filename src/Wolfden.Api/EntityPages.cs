@@ -77,10 +77,23 @@ internal static class EntityPages
                     : all.Select(k => targets.GetValueOrDefault(k)).OfType<EntityRecord>()
                         .Where(e => canon is null || canon.ContainsKey(e.Path)).Select(Ref).ToList();
                 var text = TextOf(l);
+                var rewritten = !ReferenceEquals(text, l.Text);
+
+                // A link by a known_as name shows as written (#67, §4): in the Reader's view once readers know the name, as
+                // until then it reads by the note's name; and in the writer's views always, marked if readers don't know it yet.
+                var byKnownName = !rewritten && ReadersLinks.ByKnownName(l.NameFromOrdinal, readers ? horizon?.Point : null);
                 return new LinkView(
-                    text, ReferenceEquals(text, l.Text) ? l.Target : LinkSyntax.FindLinks(text)[0].Target, readers && knownSection is null ? null : l.Heading, l.Label, l.Line, l.Column, l.Outcome, reached is null ? null : Ref(reached),
-                    reached is null ? null : readers && knownSection is not null ? shown!.Text(reached.Id, knownSection) : knownSection, matches, Problem(l, view.Universe, canon is not null, reader.PinnedUniverse is not null, matches, all.Count), inView);
+                    text, rewritten ? LinkSyntax.FindLinks(text)[0].Target : l.Target, readers && knownSection is null ? null : l.Heading, l.Label, l.Line, l.Column, l.Outcome, reached is null ? null : Ref(reached),
+                    reached is null ? null : readers && knownSection is not null ? shown!.Text(reached.Id, knownSection) : knownSection, matches, Problem(l, view.Universe, canon is not null, reader.PinnedUniverse is not null, matches, all.Count), inView,
+                    byKnownName ? true : null, marks?.OfLinkName(l, target));
             }
+
+            // The names readers learn later, in the writer's views, each marked where readers there don't know it yet.
+            var knownAs = view.KnownAs is null
+                ? null
+                : db.Aliases.Where(a => a.EntityId == record.Id && a.IsKnownAs).OrderBy(a => a.Order).ToList()
+                    .Select(a => new PageKnownName(a.Alias, a.FromText, marks?.OfName(record, a.FromOrdinal, a.FromText)))
+                    .ToList();
 
             var bySection = links.Where(l => l.SourceSectionId is not null).ToLookup(l => sectionLines.GetValueOrDefault(l.SourceSectionId!.Value));
             var byEntry = links.Where(l => l.Field is not null && l.SourceSectionId is null)
@@ -103,7 +116,8 @@ internal static class EntityPages
                 links.Where(l => l.Site == "entity_lead" && (!readers || (view.Lead ?? "").Contains(TextOf(l), StringComparison.Ordinal))).Select(Link).ToList(),
                 Backlinks(index, record, containers, canon, asOf is null ? null : index.PointOf(view.Universe, asOf), marks, shown, horizon),
                 Frozen(record, containers),
-                noteMarks?.Note);
+                noteMarks?.Note,
+                knownAs);
             return new EntityPageResult(ReadEndpoints.ResultVersion, found.View, found.Position, found.InView, found.Note, page, marksAt);
         });
     }
@@ -244,7 +258,8 @@ internal static class EntityPages
                 // The index keeps a heading's name as written, and a comment or a link in one is part of it (F-SEC-3, F-VIEW-6).
                 l.SourceSectionId is { } s ? (shown is not null ? shown.Text(l.SourceEntityId!.Value, sections[s].Name) : sections[s].Name) : null,
                 l.ChapterId is { } c ? $"{containers[chapters[c].BookId].Key}:{chapters[c].Key}" : null,
-                l.OutlineRow, l.Status, l.IsBookkeeping, Mark(l), l.SourceSectionId is { } held && sections[held].LeftOutJson is not null ? true : null))
+                l.OutlineRow, l.Status, l.IsBookkeeping, Mark(l), l.SourceSectionId is { } held && sections[held].LeftOutJson is not null ? true : null,
+                marks?.OfLinkName(l, entity)))
             .ToList();
     }
 

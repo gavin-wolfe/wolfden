@@ -641,18 +641,19 @@ Refused with nothing changed: one given without the other, always, even if
 it's what git has, since it would be recorded beside what git has for the
 other (a pen name with the everyday email; maintainer decision, 2026-11-04,
 #286; the CLI refuses it before anything is made, a new den included; the API
-answers `identity_needed`, saying which is needed); one that an environment
-variable such as `GIT_AUTHOR_NAME` would beat; and any given while `GIT_DIR` or
-`GIT_COMMON_DIR` points git at another repository. None of these messages
+answers `identity_needed`, saying which is needed); and any given while `GIT_DIR` or
+`GIT_COMMON_DIR` points git at another repository. An environment variable
+such as `GIT_AUTHOR_NAME` doesn't refuse: Wolfden's commits don't use it
+(below), and the result says it's set, since git run by hand does. None of these messages
 repeats what git has. A save that fails in a repository the run
 made takes the repository away again; in one that was there, what was saved
 is taken back if it can be, and the result names what couldn't be. Once saved, git is asked what it would
-record (`git var GIT_AUTHOR_IDENT` and `GIT_COMMITTER_IDENT`) and whether
+record (`git var GIT_AUTHOR_IDENT` and `GIT_COMMITTER_IDENT`, without the
+environment's name, email or config, as the gate below asks it) and whether
 it would sign; anything that still beats them refuses before any commit, with
 what was saved taken back as for a failed save, since left saved, the next
 commit would record the name given and sign it with another key.
-A later `GIT_AUTHOR_NAME`, when `wolfden serve` or a checkpoint runs, still
-wins, and a clone has none of this, as with any git setting. When a name and
+A clone has none of this, as with any git setting. When a name and
 email are given, signing is saved as off in that repository too, always
 (`commit.gpgsign`, `tag.gpgsign`, `tag.forceSignAnnotated`, `push.gpgSign`;
 maintainer decision, 2026-11-04, #286), even if they're what git has or the
@@ -698,6 +699,90 @@ asks for the den's history provider on each request, so checkpoints, the
 History tab, freezing, and automatic checkpoints work at once, without a
 restart; while a turn-on runs, an automatic checkpoint skips its poll.
 
+**One gate for every commit and tag** (#311; the #311/#315 design, §3.4
+steps 3 and 4, D4). Every checkpoint and tag Wolfden makes, from any
+surface, passes `CommitGate` in `Wolfden.Git` first, and `GitProcess`
+refuses to run a command that makes commits or tags without what the gate
+decided, so a new path can't skip it. The gate:
+
+- works out the name and email from git's settings for the den (`git var
+  GIT_AUTHOR_IDENT` with `user.useConfigOnly` on and `GIT_AUTHOR_*`,
+  `GIT_COMMITTER_*`, `EMAIL`, `GIT_CONFIG_PARAMETERS` and `GIT_CONFIG_COUNT`
+  taken out of its environment, so only git's config files count), and refuses,
+  with nothing changed, when there are none, rather than let git guess one
+  from the computer's account. It first checks that git finds the den's
+  repository without that config too (`git rev-parse --absolute-git-dir`,
+  the same folder either way), and refuses otherwise: a repository trusted
+  only through `safe.directory` in `GIT_CONFIG_COUNT` or
+  `GIT_CONFIG_PARAMETERS` would have `git var` answer from outside it;
+- hands them to that one git process as `GIT_AUTHOR_NAME`,
+  `GIT_AUTHOR_EMAIL`, `GIT_COMMITTER_NAME` and `GIT_COMMITTER_EMAIL`, over
+  anything inherited, so an inherited `GIT_AUTHOR_NAME` doesn't win, the
+  committer (or an annotated tag's tagger) is the author, and no config is
+  written;
+- pins `commit.gpgsign`, `tag.gpgsign` and `tag.forceSignAnnotated` with
+  `-c` to the den's own `.git/config` (`git config --local`, which doesn't
+  follow includes), for each one that file sets, so an `[include]`, a
+  `config.worktree`, `GIT_CONFIG_COUNT` or `GIT_CONFIG_PARAMETERS` can't
+  turn signing on, or off. When git's own answer for that write differs,
+  the write goes ahead and its result carries a warning (maintainer
+  decision D4, 2026-11-09: pin and warn, never refuse). One the file
+  doesn't set is left to git. The pin doesn't choose a key.
+
+A co-author (MCP `checkpoint`'s `co_author`) whose name or email equals one
+of git's global `user.*`, `author.*` or `committer.*` settings (read without
+includes, and with them from a folder outside any repository, so a plain
+`[include]` counts but an `includeIf "gitdir:…"` doesn't), compared
+without case, is refused when the den records another name (D9): an agent
+that has learned the writer's other name could write it into a permanent
+trailer. Neither value is repeated in the message. The gate decides only what new commits and tags record; `wolfden
+identity audit`, below, shows what the history already holds, including
+what was recorded before the gate or by the writer's own git.
+
+**What a copy or push carries** (#315; v0 behaviour). A push or a clone
+carries the whole repository, and a copy of the folder (a zip, a synced
+folder, a disk backup) carries its `.git` folder too. A history can tie two
+names to one person: both recorded in one repository, the same UTC offset
+on both, or one key signing under both. `wolfden identity audit` lists it
+before the writer shares anything, and it's also how to check what the gate
+above recorded. It reads every ref of the repository the
+den is in (`git log --all`: branches, tags, remote-tracking branches, notes,
+the stash), the whole repository when the den is part of a larger one, with
+`GIT_NO_REPLACE_OBJECTS=1` and `--no-use-mailmap`, since a replace ref or a
+`.mailmap` changes only how a commit is shown, and with options that keep
+the user's log settings (colour, signatures, notes, decorations) out of what
+it parses. The commits it read must match `git rev-list --all --count`; on
+a mismatch it reads them once more, since a ref can move meanwhile (an
+automatic checkpoint), and a second mismatch fails rather than report too
+little. It lists every name and email
+exactly as recorded: as author, committer, tagger (of every annotated tag
+object any ref reaches, a tag of a tag followed to the end, and a merge
+commit's embedded tag), or on a `Key: Name <email>` line anywhere in a
+commit's, an annotated tag's, or a merged tag's message. Other message lines that may name someone (a `…-by:` line
+without an email, a `Key:` line with a bare email, any line with an email)
+are listed apart. With each name, how often, its UTC offsets, and its first
+and last date. Then every offset; the signed commits, annotated tags, and
+merged tags, grouped by key, with the names each key signed under. The key
+is read from the signature's own bytes (every OpenPGP signature packet's
+issuer fingerprint or key ID, an SSH key's fingerprint), since verifying
+every commit with gpg takes about a tenth of a second each; signatures that
+don't name a key (X.509) are grouped by signer instead, never merged into
+one key. One commit or tag per key, for at most ten keys, is verified for
+the key's owner as this computer reports it (`%GS`, or `git verify-tag
+--raw`); a key that signed only merged tags isn't, and the output says
+"owner not checked". Then the authors in `den.yaml`, and a section only a
+copy of the folder carries: the remotes (`git remote -v`), with a password,
+a token used as a user name, and a query or fragment replaced by `***`;
+names that only the reflogs keep (who moved a ref, and the author and
+committer of a commit only a reflog reaches, such as an amended one), where
+the history doesn't already hold them; and the name, email, and signing key
+settings in the clone's own `.git/config` (a key file's path with the home
+folder as `~`). Unreachable objects no reflog
+names aren't read. Paths show the home folder as `~`. Every git command it
+runs is a read, stopped at the read time limit (#143). It's CLI only for
+now; the MCP server has no tool for it, since its output can hold the names
+a writer keeps apart, and #312's first push will run the same summary.
+
 **Git or a synced folder, not both.** A git repository inside a synced
 folder (Dropbox, OneDrive, iCloud) can be corrupted when two machines
 sync while git is writing. Use git with a private remote, or a synced
@@ -714,7 +799,8 @@ With git as the backend:
   "Checkpoints in the web UI"), naming it ("Notes pass after drafting
   ch 12"), or when an AI agent asks through the MCP `checkpoint` tool.
   Commits made by AI agents through MCP record the agent as
-  `Co-Authored-By`. Automatic checkpoints are opt-in, below.
+  `Co-Authored-By`; the den's name, from the gate above, is the author.
+  Automatic checkpoints are opt-in, below.
 - **Automatic checkpoints** (#30; opt-in is the maintainer's decision,
   the rest v0 behaviour). With `auto_checkpoint: 30m` in `den.yaml`
   (format.md F-DEN-9; from `5m` to `24h`), a running `wolfden serve`
@@ -909,21 +995,40 @@ reference and continuity checks all build on it.
 - Duplicate IDs (for example, from copying files by hand).
 - **Spoiler checks**, off by default: a link to an entity the reader
   hasn't met yet at the link's position, such as a reference from an
-  earlier book to an entity that first appears in a later one.
+  earlier book to an entity that first appears in a later one, and a name
+  readers learn later written as plain text before they learn it.
 
 **Decided (#68): spoiler checks are opt-in.** The positions on facts record
 where the reader learns each one, so a writer can pace the reveals. Not
 every writer tracks that, so the check that helps them is off unless
 `den.yaml` sets `spoiler_checks: true` (format.md F-DEN-7). It sees links,
 not prose, so summary prose that runs ahead of the story is the writer's
-to place (format.md §9.5).
+to place (format.md §9.5). The one exception is a name readers learn later
+(#67): with spoiler checks on, `check` also looks for a `known_as` name written
+as plain words before its `from`, and for a file name that holds one
+(F-NAME-1, F-NAME-2). Names of one word are looked for only on request, and
+`allow_in` silences a note. A first look at each file's raw text for the names'
+longest words keeps it cheap, and the pass over the den runs only in `check`,
+never on a write or an index update, nor when the web reads the den's errors.
+A write runs the same code on the notes it saves, and nothing else: its
+`effects` list the F-NAME-1, F-NAME-2, and F-LINK-13 (by a later name) warnings
+those notes didn't have before. They're compared by rule, the note the name
+belongs to (by path, so renaming it changes nothing), the name, where readers
+learn it, the text's position, and a link's text, not by line; repeats are
+paired by their lines' text first, so a new mention above an old one is the one
+said. A `change_alias` that renames a later name says each early link it
+rewrites again under the new name, a departure from §9's "the same warning as
+before" in #67's design, since the writer may not know those links are there.
+It never refuses the write. With spoiler checks off, or no `known_as` in the
+universe, it reads nothing more: a write that loads only its own note asks the
+index, in the lookup it already makes, whether the universe has any `known_as`.
 
 Later rules: a character appearing after their death, travel times that
 don't fit the timeline, and open threads at a frozen book's end.
 
 ### The command line (v0)
 
-**v0 behaviour, not a recorded decision** (#17). The CLI has eleven
+**v0 behaviour, not a recorded decision** (#17). The CLI has fourteen
 commands, and `wolfden <command> --help` describes each one:
 
 | Command | What it does |
@@ -939,7 +1044,10 @@ commands, and `wolfden <command> --help` describes each one:
 | `wolfden freeze <book> [--universe <key>]` | Freezes a finished book (§5, #31): `status: final` in its `book.md`, then, when the den has git history, a checkpoint of the whole den and a tag on it, `book/<universe>/<book>/final` (or `final-2`, `final-3`, … for a book frozen before). `--universe` names the book's universe, when the den has several (see "Which universe" below). Freezing a book that's already final finishes a freeze whose checkpoint or tag failed, and otherwise does nothing. It prints the result's message, and exits 0 when the book is frozen (with its snapshot, or with no history to take one in), and 2 when it's refused (no such book, or a section an error leaves out, F-GEN-2) or a step in the history failed; then the message, on standard error, says what to do. |
 | `wolfden unfreeze <book> [--universe <key>]` | Unfreezes a book (§5, #31): `status: draft` in its `book.md`, then a checkpoint, with no tag, when the den has history. A book that isn't final is left as it is. It exits 0 when the book is unfrozen (or wasn't frozen), and 2 when it's refused or the checkpoint failed. |
 | `wolfden new-id [<count>]` | Prints new ids for files made by hand (format.md F-ID-5). |
-| `wolfden serve [<den>] [--universe <key>] [--port <n>] [--no-open] [--no-watch]` | Serves the web UI and the API on 127.0.0.1 (§9, #23), opens the default browser unless `--no-open`, and runs until Ctrl+C. The port is 9653 by default (WOLF on a phone keypad); `--port 0` picks a free one, and the address is printed either way. A port in use, or one the system won't let it use (reserved, or below 1024 on Linux), exits 2 and says so. `--universe` serves only that universe, as `mcp --universe` pins one; a key the den doesn't have exits 2. It hosts the same watcher as `mcp`, unless `--no-watch`. It's the one command that makes automatic checkpoints, when `den.yaml` sets `auto_checkpoint` (§6). Without a built UI, the API still works and the page says how to build the UI. |
+| `wolfden identity audit [--den <den>] [--json]` | Lists what the den's history would show anyone with a copy of it (#315, §6, "What a copy or push carries"): every name and email recorded as author, committer, tagger, or on a `Key: Name <email>` line in a message, other message lines that may name someone, the UTC offsets, signatures and their keys, and the authors in `den.yaml`; then, only in this folder, the remotes, names only the reflogs keep, and the clone's own name settings. Read-only. It exits 0 when the audit is done, a den with no history included, and 2 when there's no den or git can't read the history. `identity` is a group: showing and choosing the name the next checkpoint records come later, as its other subcommands (#311). |
+| `wolfden serve [<den>] [--universe <key>] [--port <n>] [--no-open] [--no-watch] [--home <folder>]` | Serves the web UI and the API on 127.0.0.1 (§9, #23), opens the default browser unless `--no-open`, and runs until Ctrl+C. The port is 9653 by default (WOLF on a phone keypad); `--port 0` picks a free one, and the address is printed either way. A port in use, or one the system won't let it use (reserved, or below 1024 on Linux), exits 2 and says so. `--universe` serves only that universe, as `mcp --universe` pins one; a key the den doesn't have exits 2. It hosts the same watcher as `mcp`, unless `--no-watch`. It's the one command that makes automatic checkpoints, when `den.yaml` sets `auto_checkpoint` (§6). Without a built UI, the API still works and the page says how to build the UI. When the installation (`--home`, see `user`) has login on, it warns once that this version doesn't ask for a login yet (#315); it never stops for that. |
+| `wolfden user add <name> (--role <role> \| --owner) [--password-stdin]`, `user list`, `user remove <name>`, `user set-role <name> <role>`, `user reset-password <name> [--password-stdin]`, `user unlock <name>`, each with `[--home <folder>] [--json]` | The accounts of this installation (#315): ASP.NET Core Identity's stores in `accounts.db`, in the **installation folder**, never in a den and never pushed. That folder is `%LOCALAPPDATA%\Wolfden` on Windows, `~/Library/Application Support/Wolfden` on macOS, and `$XDG_DATA_HOME/wolfden` (or `~/.local/share/wolfden`) elsewhere; `WOLFDEN_HOME` (a full path; a relative one is refused) moves it, and `--home` beats both. A folder that is a den or inside one is refused, by name and by where any symbolic link or junction along its path really leads, so a checkpoint can't record the accounts; one inside a git repository is allowed with a warning. Outside Windows, `accounts.db` is made 0600, and a folder other accounts can open gets a warning. It also holds `settings.json` (whether login is on) and, later, the cookie keys. A role is owner, writer or viewer: what the account may do, not what it sees (the Reader's view stays a filter anyone can turn on). `add` needs a role (`--owner` is `--role owner`), and asks for the password twice without echo, or reads one line from standard input with `--password-stdin`; a password is never a command-line argument. A password is 15 to 256 characters (15 is NIST SP 800-63B rev. 4's minimum for a single factor; maintainer decision, 2026-11-10), counted as Unicode code points after NFC normalization (which is also the form hashed), with no composition rules; the username itself and one character repeated are refused, and so is (#354) a common password from a public-domain list of nearly 10,000 built into `Wolfden.Accounts` (`src/Wolfden.Accounts/CommonPasswords/README.md` says where it comes from; no network calls), the username, or `wolfden`, compared (NFKC, ignoring case, spaces and punctuation, any decimal digits read as ASCII; comparison only, never hashed) and refused when said once or repeated, optionally followed by digits no longer than the whole part before them. A username is 1 to 64 letters, digits, `.`, `-` and `_`, compared without regard to case. No email or phone is stored: those columns aren't in the database. `add --role viewer` and `set-role … viewer` say that a viewer sees everything a writer sees, spoilers included. Removing or demoting the last owner is refused. `set-role` and `reset-password` end the account's sessions (a new security stamp); `reset-password` also ends a lockout. After 5 failed logins an account is locked for 15 minutes, and `unlock` ends that at once. `list` names the installation folder and whether login is on, and creates nothing. Each exits 0 when it did its job and 2 when it's refused or the installation can't be read. |
+| `wolfden login [on \| off] [--home <folder>] [--json]` | Turns login for this installation's web pages on or off in its `settings.json`, or with neither says whether it's on; it always names the installation folder. `on` is refused (exit 2) while there's no owner, so nobody can turn it on and lock themselves out, and prints what login protects and what it doesn't (the files, the CLI, stdio MCP, backups and sync). `off` always works: a `settings.json` that `login` refuses is first copied to `settings.json.broken`, then, if it's still one JSON object, only its `login` is set to false and its other keys are kept; otherwise (bad JSON, or a setting named twice) it's replaced with one that turns login off. It says which. Nothing enforces the setting until the web's login lands (#315 PR 4b): `login` and `serve` say so, and `--json` reports `enforced: false`. |
 | `wolfden mcp [<den>] [--universe <key>] [--no-watch]` | Runs the MCP server over stdio for an AI client (§8, #20) until the client disconnects or Ctrl+C. `--universe` pins the session to one universe (§8); a key the den doesn't have exits 2. Standard output carries only the protocol; log messages go to standard error. It exits 2 if there's no den and 3 if it stops because of a failure after it started, but serves a den whose `den.yaml` doesn't load, so the client can call `check` to find out why. |
 
 They share one surface:
@@ -1772,6 +1880,13 @@ docs/
     which of a `position` field's values are later than the position, and which
     can't be compared (F-VIEW-5), as written, since only some of a list may be.
     An assistant at the position gets neither. The field keeps its whole `value`.
+  - **Names readers learn later** (`known_as`, #67). The page's `knownAs` lists each
+    with its `from`, in the full view too, and with `marksAt`, a `readerMark` until
+    readers know it: `ahead` at the later of its `from` and the note's entry, or
+    `unplaced` if no `from` places it. An unlabelled link written by one gets a
+    `nameMark` the same way, on the page's links and in **Linked from**, since the
+    Reader's view shows the note's name for it there. A search hit found only by one
+    has `hiddenIn: "laterName"` and a `nameMark`, and comes after what readers can find.
   - **`marksAt`** on the answer repeats the position.
   - **A later `until` on a fact in effect has no mark.** The read gives the
     `until`, and the page's `isAheadOf` tags it from the position, as it already
@@ -1904,7 +2019,9 @@ docs/
   and for the snippet (`ReadersLinks`, from the index's link rows): its label, else the
   note it reaches if readers have met it, else its target as written, with `: heading`
   if it has no label and readers know that section. So a link written by an alias or key finds by the name it shows, not by what
-  was written; a label hides its target, even a met note's; and a later note's name
+  was written. A link written by a `known_as` name readers know there is the exception: it
+  shows as written (`byKnownName` on `/api/entity`'s links, #67 §4), so text after a reveal
+  keeps the real name. A label hides its target, even a met note's; and a later note's name
   doesn't match until readers meet it. `get_entity` gives links as written, so this is in
   the search, and MCP's reads don't change. The rule is written twice, as `linkText` in
   `Links.tsx` and `ReadersLinks.Shown`, since the server can't call the web. Both are
@@ -2340,7 +2457,11 @@ docs/
     level of the one it goes before, or 2 at the end),
     `/api/edit/section/rename` (`index`, `name`, `newName`),
     `/api/edit/section/remove` (`index`, `name`), and `/api/edit/file`
-    (`text`). Part b adds `/api/edit/field` beside them (below). Each answers the
+    (`text`). Part b adds `/api/edit/field` beside them (below). #67 adds a note's
+    other names: `/api/edit/name/add` (`name`, `knownAs`, `from`; `update_fields`'s
+    add to `aliases` or `known_as`, and a `known_as` name needs a `from`) and
+    `/api/edit/name` (`name`, and one of `newName` with `keepOld`, `from`, `plain`,
+    or `remove: true` alone; `change_alias`). Each answers the
     write tools' `WriteResult`. Errors add 409 for `stale_file`,
     `frozen`, `ambiguous_section`, and `already_exists`; 422 for
     `invalid_edit` and `unsupported_edit`; 404 for `unknown_section`;

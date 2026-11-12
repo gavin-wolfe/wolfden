@@ -121,6 +121,9 @@ internal static class GitProcess
 {
     private static readonly UTF8Encoding Utf8 = new(false);
 
+    /// <summary>Settings never passed to git with <c>-c</c> or <c>--config-env</c>, by prefix.</summary>
+    private static readonly string[] RefusedSettings = ["alias.", "include.", "includeif."];
+
     /// <summary>
     /// How long to wait for a <see cref="GitCallKind.MustFinish"/> command's
     /// output, and any command's standard error, after git exits. The pipes
@@ -146,8 +149,14 @@ internal static class GitProcess
     /// command checks it only before git starts.
     /// </param>
     /// <param name="kind">Whether git may be stopped part way.</param>
+    /// <param name="clearance">
+    /// For a command that makes commits or tags (<see cref="CommitGate.IsGated"/>), what the gate
+    /// decided for it: its name and email go in git's environment last, over anything else, and its
+    /// signing settings go before the command's own arguments. Such a command is refused without one.
+    /// </param>
     /// <exception cref="GitNotFoundException">Git couldn't be started.</exception>
     /// <exception cref="GitTimeoutException">Git didn't finish in time.</exception>
+    /// <exception cref="InvalidOperationException">A command that makes commits or tags was given no <paramref name="clearance"/>.</exception>
     public static GitRun Run(
         GitOptions options,
         string folder,
@@ -155,12 +164,33 @@ internal static class GitProcess
         string? input = null,
         IReadOnlyDictionary<string, string?>? environment = null,
         CancellationToken cancellationToken = default,
-        GitCallKind kind = GitCallKind.Stoppable)
+        GitCallKind kind = GitCallKind.Stoppable,
+        CommitClearance? clearance = null)
     {
+        var argList = args.ToList();
+
+        // Only git's own options, before the command, can set config: what comes after, such as a
+        // den file named '-calias.md' after '--', is the command's.
+        var globalOptions = argList.Take(CommandIndex(argList)).ToList();
+        if (globalOptions.Select((arg, i) => (arg is "-c" or "--config-env") && i + 1 < globalOptions.Count ? globalOptions[i + 1]
+                : arg.StartsWith("--config-env=", StringComparison.Ordinal) ? arg["--config-env=".Length..]
+                : arg.StartsWith("-c", StringComparison.Ordinal) && arg.Length > 2 && !arg.StartsWith("--", StringComparison.Ordinal) ? arg[2..]
+                : null)
+            .Any(setting => setting is not null && RefusedSettings.Any(prefix => setting.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))))
+        {
+            // An alias could hide a commit behind another name, past the check below, and an include could bring one in.
+            throw new InvalidOperationException("Wolfden never passes git an alias, include or includeIf with -c: one could run a commit or tag past CommitGate.");
+        }
+
+        if (clearance is null && CommitGate.IsGated(argList))
+        {
+            // Every commit and tag passes the gate (#311): a new path that doesn't fails here, in its first test.
+            throw new InvalidOperationException($"git {CommandName(argList)} makes commits or tags, so it runs only through CommitGate, with a CommitClearance.");
+        }
+
         cancellationToken.ThrowIfCancellationRequested();
         var stoppable = kind == GitCallKind.Stoppable;
         var timeout = stoppable ? options.ReadTimeout : options.WriteTimeout;
-        var argList = args.ToList();
         var start = new ProcessStartInfo(options.Executable)
         {
             WorkingDirectory = folder,
@@ -176,7 +206,8 @@ internal static class GitProcess
 
         // Settings that only keep git from waiting on a person or a terminal.
         // The user's own configuration (signing, hooks, safe.directory) still applies.
-        foreach (var arg in new[] { "-c", "core.quotepath=false", "-c", "color.ui=false" }.Concat(argList))
+        // A clearance's signing settings come next, so the command's own -c can still narrow them.
+        foreach (var arg in new[] { "-c", "core.quotepath=false", "-c", "color.ui=false" }.Concat(clearance?.Settings ?? []).Concat(argList))
         {
             start.ArgumentList.Add(arg);
         }
@@ -196,6 +227,12 @@ internal static class GitProcess
         if (environment is not null)
         {
             Apply(start, environment);
+        }
+
+        if (clearance is not null)
+        {
+            // Last: what the gate decided beats whatever was inherited or passed (E8).
+            Apply(start, clearance.Environment);
         }
 
         var process = new Process { StartInfo = start };
@@ -315,22 +352,33 @@ internal static class GitProcess
         return seconds == 1 ? "1 second" : string.Create(CultureInfo.InvariantCulture, $"{seconds:0.###} seconds");
     }
 
-    /// <summary>The git command in <paramref name="args"/>: the first argument that isn't an option, or the value of <c>-c</c>.</summary>
-    internal static string CommandName(IReadOnlyList<string> args)
+    /// <summary>The git command in <paramref name="args"/>: the first argument that isn't an option, or the value of an option that takes the next one.</summary>
+    internal static string CommandName(IReadOnlyList<string> args) => CommandIndex(args) is var i && i < args.Count ? args[i] : "command";
+
+    /// <summary>
+    /// Where the git command is in <paramref name="args"/>: the first argument that isn't an option
+    /// or the value of one, or the end if there's none. A <c>--</c> ends git's own options too.
+    /// </summary>
+    internal static int CommandIndex(IReadOnlyList<string> args)
     {
         for (var i = 0; i < args.Count; i++)
         {
-            if (args[i] == "-c")
+            if (args[i] == "--")
+            {
+                return i;
+            }
+
+            if (args[i] is "-c" or "-C" or "--git-dir" or "--work-tree" or "--namespace" or "--config-env")
             {
                 i++;
             }
             else if (!args[i].StartsWith('-'))
             {
-                return args[i];
+                return i;
             }
         }
 
-        return "command";
+        return args.Count;
     }
 
     /// <summary>What git did, from its exit code and what was read of its output.</summary>

@@ -184,7 +184,9 @@ public sealed class WolfdenTools
         " The edit goes to the den's files only (nothing is committed until checkpoint), and is checked as the den would read it: " +
         "an edit that would leave an error is refused (invalid_edit), and nothing is written. Nothing in a final (frozen) book can be " +
         "changed (frozen). The result gives the file's new hash, what the edit means where that depends on more than the text written " +
-        "('effects'), any pinned canon it touched ('pinned_canon': check those with the writer), and warnings about the file.";
+        "('effects'), any pinned canon it touched ('pinned_canon': check those with the writer), and warnings about the file. With spoiler " +
+        "checks on, effects also warn, in check's words, where a note's text the edit wrote names someone, or links to them, by a name " +
+        "readers learn later than that text's position (F-NAME-1, F-LINK-13). The edit is still made: tell the writer.";
 
     private const string HashHelp =
         "The hash of the file your edit is based on: 'hash' from get_entity, or from your last write's result. If the file has changed " +
@@ -230,7 +232,7 @@ public sealed class WolfdenTools
         "('fields.pov.1') changes that item in place, keeping a comment on it. A path is dotted: 'status', 'from', 'aliases', 'fields.born', " +
         "'fields.rank.1.from' (item numbers from 0). An entry is {\"value\": x, \"from\": \"book:chapter\", \"until\": ..., \"status\": ..., \"pin\": true}. " +
         "The id never changes. Aliases can be added and moved here, known_as entries added, and a known_as entry's from set ('known_as.0.from'), " +
-        "which changes no link; to rename the entity, or change or remove an alias or a known_as name, use rename_entity or " +
+        "check_text set, or allow_in changed ('known_as.0.allow_in'), which changes no link; to rename the entity, or change or remove an alias or a known_as name, use rename_entity or " +
         "change_alias, which rewrite the links that used the old text. A 'from', 'until', or position field value you set must be a position the " +
         "universe has (bad_position otherwise); null leaves it out. Read without as_of before changing a field: a read with as_of leaves out a position " +
         "field's later values, so a field missing from it may be set in the note, and its list item numbers may not match the note's, " +
@@ -492,10 +494,12 @@ public sealed class WolfdenTools
         "saved since they were last recorded ('written_by_session') apart from those that changed some other way " +
         "('changed_outside_session'); a file you wrote that was changed after, say in the writer's editor, is in both. Tell the writer " +
         "about the second list. If nothing changed since the last checkpoint, nothing is recorded. After move_entity, 'paths' must name " +
-        "both the old and the new path to record the move. If the den has no history, the result says so ('available' false) and the edits are still saved in the files.")]
+        "both the old and the new path to record the move. If the den has no history, the result says so ('available' false) and the edits are still saved in the files. " +
+        "The checkpoint is recorded under the den's own name; a co-author with the name or email git has in its global settings, when the den records " +
+        "another, is refused, since a Co-Authored-By line is permanent. Pass on anything in 'warnings' to the writer.")]
     public CallToolResult Checkpoint(
         [Description("What the checkpoint is, such as 'End of chapter 14 session: Lucy's timeline'.")] string message,
-        [Description("You, as 'Name <email>' on one line, such as 'Claude <noreply@anthropic.com>'.")] string co_author,
+        [Description("You, as 'Name <email>' on one line, such as 'Claude <noreply@anthropic.com>'. Never the writer's name.")] string co_author,
         [Description("Only these files or folders, relative to the den root. Leave it out for the whole den.")] string[]? paths = null,
         CancellationToken cancellationToken = default) =>
         Write(() => _tools.Checkpoint(message, co_author, paths), cancellationToken);

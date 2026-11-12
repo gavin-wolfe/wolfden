@@ -365,6 +365,21 @@ public class MarkdownCommentsReviewTests
 
     [Fact]
     [Trait("Scenario", "SC-MCP-49")]
+    public void ACommentCannotPairWithAMarkerInTheNextSection()
+    {
+        // check reads the same pieces a read strips, so an open in one section stays
+        // unclosed even when a --> sits in the next (review of #344).
+        var markdown = "# Alpha\n\nText <!-- open\n\n## Beta\n\nArrow --> here\n";
+
+        var diagnostics = Check(markdown);
+
+        var warning = Assert.Single(diagnostics, d => d.Message.Contains("Unclosed HTML comment", StringComparison.Ordinal));
+        Assert.Equal(3, warning.Line);
+        Assert.DoesNotContain(diagnostics, d => d.Message.Contains("Nested-looking", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-49")]
     public void LineNumbersCountFromTheSourceWithAnOffsetBody()
     {
         const string source = "Title\n\nKeep. <!-- unclosed\n";

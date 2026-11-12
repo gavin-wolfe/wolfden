@@ -145,4 +145,25 @@ public sealed record KnownName(string Value, StoryPosition? From, PositionResolu
 
     /// <summary>True if the entry has a <c>from</c> that resolves, so readers learn the name there.</summary>
     public bool IsLive => Point is not null;
+
+    /// <summary>
+    /// The entry's <c>check_text</c>: true or false as written, null if it has
+    /// none. A value that isn't a boolean is a warning and reads as true, so the
+    /// name is still checked (format.md F-ENT-10, F-NAME-1).
+    /// </summary>
+    public bool? CheckText { get; init; }
+
+    /// <summary>
+    /// The entry's <c>allow_in</c> as written: notes, by slug, name, alias, or
+    /// id, whose text F-NAME-1 doesn't check for this name. Items that aren't
+    /// text are left out, with a warning.
+    /// </summary>
+    public IReadOnlyList<string> AllowIn { get; init; } = [];
+
+    /// <summary>
+    /// True if F-NAME-1 looks for the name in plain text: as <see cref="CheckText"/>
+    /// says, or without it, if the name has two or more words as search splits
+    /// them, so a common one-word name such as <c>Rose</c> doesn't fire across a den.
+    /// </summary>
+    public bool IsTextChecked => CheckText ?? Text.SearchTokens.Tokens(Value).Count >= 2;
 }

@@ -116,7 +116,7 @@ export function sourceQuery(universe: string, entity: string) {
 }
 
 /** The edits, by their path under /api/edit. */
-export type EditPath = 'lead' | 'section' | 'section/add' | 'section/rename' | 'section/remove' | 'file' | 'field'
+export type EditPath = 'lead' | 'section' | 'section/add' | 'section/rename' | 'section/remove' | 'file' | 'field' | 'name' | 'name/add'
 
 /** Sends an edit as JSON (the API takes nothing else), and returns its result, or throws an EditError. */
 export async function postEdit(path: EditPath, body: Record<string, unknown>): Promise<WriteResult> {

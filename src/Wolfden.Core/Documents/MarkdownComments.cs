@@ -118,21 +118,94 @@ public static partial class MarkdownComments
             return [];
         }
 
-        var scan = new CommentScan(markdown, document ?? BodyLinkScanner.Parse(markdown, 0, BodyLinkScanner.Plain));
-        var warnings = scan.Warnings();
-        var diagnostics = new List<Diagnostic>(warnings.Count);
-        foreach (var (offset, message) in warnings.OrderBy(w => w.Offset))
+        // A read strips the lead, each section's own text, and each heading name one at
+        // a time (F-VIEW-6), so the scan runs over those same pieces: a comment open in
+        // one section can't be paired with a marker in the next (review of #344).
+        var diagnostics = new List<Diagnostic>();
+        foreach (var (offset, length) in Pieces(markdown, document ?? BodyLinkScanner.Parse(markdown, 0, BodyLinkScanner.Plain)))
         {
-            var line = source.LineIndexOf(bodyStart + offset) + 1;
-            if (skipLines?.Contains(line - 1) == true)
+            var piece = markdown.Substring(offset, length);
+            if (!piece.Contains("<!--", StringComparison.Ordinal) && !piece.Contains("-->", StringComparison.Ordinal))
             {
                 continue;
             }
 
-            diagnostics.Add(new Diagnostic("F-SEC-11", DiagnosticSeverity.Warning, line, message));
+            var scan = new CommentScan(piece, BodyLinkScanner.Parse(piece, 0, BodyLinkScanner.Plain));
+            foreach (var (warningOffset, message) in scan.Warnings().OrderBy(w => w.Offset))
+            {
+                var line = source.LineIndexOf(bodyStart + offset + warningOffset) + 1;
+                if (skipLines?.Contains(line - 1) == true)
+                {
+                    continue;
+                }
+
+                diagnostics.Add(new Diagnostic("F-SEC-11", DiagnosticSeverity.Warning, line, message));
+            }
         }
 
         return diagnostics;
+    }
+
+    /// <summary>
+    /// The lead and each section's own text, as offsets into the body. A read strips
+    /// those pieces one at a time (F-VIEW-6), so a comment can't pair across a heading.
+    /// </summary>
+    private static List<(int Offset, int Length)> Pieces(string markdown, MarkdownDocument? document)
+    {
+        if (document is null)
+        {
+            return [(0, markdown.Length)];
+        }
+
+        var pieces = new List<(int Offset, int Length)>();
+        var at = 0;
+        foreach (var heading in document.Descendants<HeadingBlock>().OrderBy(h => h.Span.Start))
+        {
+            var start = Math.Clamp(heading.Span.Start, at, markdown.Length);
+            if (start > at)
+            {
+                pieces.Add((at, start - at));
+            }
+
+            pieces.Add((start, 0));
+            at = start;
+        }
+
+        // One piece per heading, from its start to the next heading's.
+        for (var i = 0; i < pieces.Count; i++)
+        {
+            var next = i + 1 < pieces.Count ? pieces[i + 1].Offset : markdown.Length;
+            pieces[i] = (pieces[i].Offset, next - pieces[i].Offset);
+        }
+
+        if (pieces.Count == 0)
+        {
+            return [(0, markdown.Length)];
+        }
+
+        var leadLength = pieces[0].Offset;
+        if (leadLength == 0)
+        {
+            return pieces;
+        }
+
+        pieces.Insert(0, (0, leadLength));
+        return pieces;
+    }
+
+    /// Where <paramref name="markdown"/> holds what doesn't count as its prose, for
+    /// the plain-text name check (format.md F-NAME-1): each HTML comment, read as
+    /// widely as <see cref="Strip"/> reads it, since no read at a position shows it
+    /// (F-VIEW-6); and each code span, code block, and fence's info string, whose
+    /// text is code, not story. A body too deep to parse (F-FM-2) has no code.
+    /// </summary>
+    /// <returns>The comments' ranges and the code's, each from start to just past the end.</returns>
+    internal static (List<(int Start, int End)> Comments, List<(int Start, int End)> Code) NotProse(string markdown)
+    {
+        ArgumentNullException.ThrowIfNull(markdown);
+        var scan = new CommentScan(markdown, BodyLinkScanner.Parse(markdown, 0, BodyLinkScanner.Plain));
+        var comments = markdown.Contains("<!--", StringComparison.Ordinal) ? scan.Comments().ConvertAll(c => (c.Start, c.End)) : [];
+        return (comments, scan.Code());
     }
 
     private static string Without(string markdown, List<FoundComment> comments)
@@ -304,6 +377,9 @@ public static partial class MarkdownComments
         }
 
         public long Steps { get; private set; }
+
+        /// <summary>The code spans and blocks, and the fences' info strings.</summary>
+        public List<(int Start, int End)> Code() => [.. _code.All, .. _fenceLines.All];
 
         public List<FoundComment> Comments()
         {
@@ -685,6 +761,8 @@ public static partial class MarkdownComments
         {
             private readonly List<(int Start, int End)> _ranges = [];
             private List<int>? _starts;
+
+            public IReadOnlyList<(int Start, int End)> All => _ranges;
 
             public void Add(int start, int end)
             {

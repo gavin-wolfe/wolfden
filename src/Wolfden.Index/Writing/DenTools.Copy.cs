@@ -128,9 +128,11 @@ public sealed partial class DenTools
 
             var (links, afterLinks, changed) = CheckNewEntityLinks(den, beforeLinks, check, files, allowRelinks, "copied", "make the copy anyway", "the copy");
 
+            var early = Core.Checks.WrittenTextChecks.LaterNames(catalog, afterLinks.Catalog, files.Keys);
             Save(files, null, created: newPath);
             var after = afterLinks.Catalog.FindByPath(newPath) ?? EntityCatalog.ReadEntityFile(check.Structure, newPath, bytes).Entity!;
             var effects = CopyEffects(source, after, scope, id, retitled, droppedComments, check, links, afterLinks, changed);
+            effects.AddRange(LaterNameEffects(early));
             return new WriteResult(
                 DenReader.ResultVersion, true, newPath, HashOf(bytes), Summary(after), effects, [], Warnings(check),
                 [new WrittenFileView(newPath, HashOf(bytes), Created: true)]);

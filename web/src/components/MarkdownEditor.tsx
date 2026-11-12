@@ -347,8 +347,8 @@ export function noteLinks(universe: string, others: () => readonly { path: strin
     const closed = context.state.sliceDoc(context.pos, context.pos + 2) === ']]'
     const notes = others()
     const options = result.matches.map((hit): Completion => {
-      const { name, alias } = matchLabel(hit)
-      const detail = alias !== null ? `as ${alias} · ${hit.entity.type}` : hit.entity.type
+      const { name, alias, learned } = matchLabel(hit)
+      const detail = alias !== null ? `as ${alias}${learned !== null ? ` (${learned})` : ''} · ${hit.entity.type}` : hit.entity.type
       const text = hit.linkText ?? linkFor(hit.entity, notes)?.slice(2, -2) ?? null
       if (text === null) {
         // No link is sure to reach it: never write one that may reach another note. Picking it leaves the text as typed.

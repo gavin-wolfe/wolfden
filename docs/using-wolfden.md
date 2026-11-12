@@ -777,6 +777,9 @@ the pages don't have a form for it yet. The rules are in
 - **Edit file** opens the whole note, frontmatter and all, for anything
   the other controls don't do, such as a section's
   `<!-- wolfden: ... -->` comment.
+- **Other names** edits the note's aliases and the names readers learn later,
+  rewriting the links that use a renamed one
+  ([Editing names on the page](#other-names-aliases-and-known_as)).
 - **While you edit, you see everything.** The page shows the whole note,
   and says "Editing shows everything". With a story position picked, that's the
   Author's view, tags included. The Reader's view can't be edited.
@@ -859,9 +862,10 @@ you're in is always highlighted.
 
   **Search** finds everything. Notes with something a reader could find come first, then
   a dashed line, then the rest, with tags saying why. Hits in a comment say `in a
-  comment`, and `only in an alias` or `only in a link's target` means a reader's search
-  wouldn't find it there. If you find a note by the name or alias of a note it links to,
-  and readers haven't met that one, the hit says where they do.
+  comment`, and `only in a name readers learn at chapter 38`, `only in an alias`, or `only
+  in a link's target` means a reader's search wouldn't find it there. If you find a note
+  by the name or alias of a note it links to, and readers haven't met that one, the hit
+  says where they do.
 - **The Reader's view** shows what a reader at that chapter knows, and nothing else:
   no tags, no later dates, no comments, and no sections with an error. A note they
   haven't met says where they first meet it. It's read-only, and it has no history,
@@ -881,7 +885,8 @@ you're in is always highlighted.
   `[[halden-pike|the stranger]]` is found by "stranger" and never by "pike", even once
   they've met him, which is why the tip above works. With no label, a link to a note
   they've met is found by that note's name, however you wrote it, and one to a note
-  they haven't met is found as you wrote it. A note is found by its name and the other
+  they haven't met is found as you wrote it. A link written by a `known_as` name readers
+  have reached is the exception: it shows, and is found, as you wrote it. A note is found by its name and the other
   names readers know it by at that point, which its page lists: its aliases, and each
   `known_as` name they've reached ([Other names](#other-names-aliases-and-known_as)).
   A type's default values aren't searched. A comment inside a field's value isn't hidden, here or on the page: comments
@@ -1015,9 +1020,16 @@ drafting there, is told:
   chapter 12, reads `[[The Courier]] signed it` there, so the link doesn't hand
   over the name. The file isn't changed.
 - **From `ember:38`**, it's listed with the note's other names, like an alias,
-  with no date beside it, and found by search.
-- **In the Author's view and with no position**, you see everything:
-  `known_as` with each `from`.
+  with no date beside it, and found by search. A link you wrote with it shows as
+  you wrote it, `Mara Voss`, not as the note's name.
+- **In the Author's view and with no position**, you see everything: each
+  `known_as` name with its `from` beside it, such as `from Ember chapter 38`. In
+  the Author's view before chapter 38, the name is also tagged `readers learn this
+  at Ember chapter 38`. A link you wrote with it shows as written, tagged `a name
+  readers learn at Ember chapter 38`, since the Reader's view shows the note's name
+  there, and so does its line in **Linked from**. A search hit found only by that
+  name says `only in a name readers learn at Ember chapter 38`, and comes after what
+  readers can find.
 
 **A secret written as a plain alias shows at every position.** If a name is a
 reveal, it goes in `known_as`, never `aliases`: an alias is listed on the note's
@@ -1051,8 +1063,9 @@ which `wolfden check` reports.
 **When a note's name is the secret,** file it under what readers first know it
 by, `name: The man in the grey coat`, with the real name in `known_as`, and give
 the file the same name (`the-man-in-the-grey-coat.md`): a file name shows in
-every read, so `corin-hask.md` would give it away. Nothing warns about a note
-that never gets a real name.
+every read, so `corin-hask.md` would give it away, and with spoiler checks on,
+`check` warns about it (see [Catching the name in plain text](#catching-the-name-in-plain-text)).
+Nothing warns about a note that never gets a real name.
 
 **What to watch for.**
 
@@ -1067,16 +1080,137 @@ that never gets a real name.
   by a `known_as` name in text readers reach before its `from`, even in a note
   with no `from` of its own, such as a universe-level note. A labelled link
   (`[[Mara Voss|the stranger]]`) shows only its label, so it isn't flagged.
+  Saving such a link warns too (see [As you save](#catching-the-name-in-plain-text)).
 - It hides names, not prose. `Mara Voss` typed as plain words in an early
-  section shows there, so read summary sections for it as for any reveal.
+  section shows there. With spoiler checks on, `check` finds it (next section),
+  but a nickname or a description that gives her away is still yours to watch.
 - There's no `until`: readers who have learned a name don't forget it.
-- For now, the web editor doesn't edit `known_as`: use **Edit file**, or ask an
-  AI assistant. In Obsidian, `known_as` is a property it doesn't know, so edit
-  it in Source mode, as with `fields`.
+- In Obsidian, `known_as` is a property it doesn't know, so edit it in Source mode,
+  as with `fields`.
 - To move a reveal earlier or later, change its `from`: no link changes, since
   links don't depend on where you are in the story. An assistant can do it with
   `update_fields`, and its `change_alias` can move a name between `aliases` and
   `known_as`, or rename one, rewriting the links that use it.
+
+**Editing names on the page.** In the Author's view, or with no position,
+**Other names** beside **Edit file** opens a list of the note's aliases and
+`known_as` names, each with when readers learn it (`always known` for an alias).
+Each change is saved as soon as you make it:
+
+- **Rename** changes the name and rewrites every link that uses it, in every note.
+  A `known_as` name keeps its `from`.
+- **When readers learn it** picks the book and chapter. Choosing **Always** makes it
+  a plain alias, and the page warns first that a secret would show at every position.
+  Picking a chapter for an alias makes it a `known_as` name from there. No link
+  changes either way.
+- **Remove** takes the name out, and links that use it change to the note's name.
+- **Add a name** adds one: with **Always**, as an alias; with a chapter, as a
+  `known_as` name from there. A name readers learn later needs its chapter: **Type a
+  position** left blank is refused, rather than adding the name as an alias.
+
+The link pickers find a note by its `known_as` names too, and say so:
+`Mina Harker, as Mrs. Harker readers learn it at dracula:5`. An editor shows
+everything, so it links by that name if you pick it; with spoiler checks on, the
+save and `wolfden check` warn if readers reach that text before the name's `from`.
+
+#### Catching the name in plain text
+
+`known_as` keeps a name out of a read until its `from`, but it can't take the
+name out of your own prose. If an early section says "The Courier, really Mara
+Voss", that sentence shows at that chapter. `wolfden check` can look for this.
+Turn it on in `den.yaml`, along with the other spoiler checks:
+
+```yaml
+spoiler_checks: true
+```
+
+Then `check` (and an assistant's `check` tool) warns wherever a `known_as` name
+appears as plain words in text readers reach before its `from`:
+
+```text
+universes/starfall/entities/notes/the-ledger.md:14: warning F-NAME-1: 'Mara Voss' is a name of 'The Courier' that readers learn at ember:38, and this text is at ember:12. ...
+```
+
+What it catches:
+
+- The name's words side by side, ignoring case and Latin accents, with only
+  spaces, punctuation, or markup between them, not other letters or digits:
+  `Mara Voss's ship`, `**MARA VOSS**`, the
+  name split over two lines, and `Zoe Arkwright` for `Zoë Arkwright`. Not
+  `Mara Vossler`.
+- A note's name and aliases, leads, titles, section headings and text, field
+  values, and a link's label
+  (`[[The Courier|Mara Voss]]`), each at the position readers reach it. Text at
+  the start of the story counts, so a universe-level note with no `from` that
+  names her is caught. So is The Courier's own `## Overview`.
+- Not comments, code, a link's target (a link with no label is the link check's
+  job), bookkeeping sections like `## Session notes`, or out-of-canon text.
+- A file name that holds the name, such as `mara-voss.md` for The Courier: a
+  file name shows in every read, so rename the file after the name it's filed
+  under, with **Edit file** or by hand.
+
+Spellings follow search, not links: `Zoe` matches `Zoë`, `José` matches `Jose`,
+and `Çelik` matches `Celik`, but `Søren` doesn't match `Soren`, `Łucja` doesn't
+match `Lucja`, and `Đorđe` doesn't match `Djordje`, and Cyrillic and Latin never
+match each other. So list each spelling you use as its own `known_as` entry, as
+above: each one is hidden, and looked for, from its own `from`.
+
+**Names of one word.** A name of two or more words is looked for by default. A
+name of one word isn't, since `Rose`, `Hope`, or `Will` would fire all over a den.
+To have one looked for, say so on its entry, and to stop a longer one, say `false`:
+
+```yaml
+known_as:
+  - { value: Mara Voss, from: "ember:38" }                  # looked for
+  - { value: Voss, from: "ember:38" }                       # hidden, but not looked for
+  - { value: Quillon, from: "ash:2", check_text: true }     # an unusual name: looked for
+  - { value: The Harbour Company, from: "ember:9", check_text: false }
+```
+
+Words are counted as search splits them, so `Jean-Luc` and `O'Brien` count as
+two. If you type the short form alone and haven't set `check_text: true`, nothing
+warns.
+
+**When a warning is wrong.** In this order:
+
+1. Give the text the position it really has: a `from=` on the section is
+   usually the real fix, since the warning is right that the text shows there.
+2. Move it out of canon text: into an HTML comment, a bookkeeping section, or
+   a section with `status=idea`.
+3. If the note means someone else with the same name, list it in the entry's
+   `allow_in`, by its file name, name, alias, or id. That silences the whole
+   note for this name, so a real slip there later won't be caught either.
+
+   ```yaml
+   known_as:
+     - { value: Mara Voss, from: "ember:38", allow_in: [the-old-ledger] }
+   ```
+
+There's no warning when the words are already a name readers know at that
+point, such as an alias of another note they've met, since the text may well
+mean that one.
+
+A mistake in either key fails safe, with a warning, and the name is still
+looked for: a `check_text` that isn't `true` or `false` counts as `true`, and an
+`allow_in` item that doesn't reach a note silences nothing. An assistant can set
+both with `update_fields` (`known_as.0.check_text`, `known_as.0.allow_in`).
+
+These warnings come from `wolfden check` and the assistant's `check` tool. The
+web's list of a den's problems shows errors, not warnings, so they don't appear
+there.
+
+**As you save.** A save also says, in the same words, what it adds: when you save
+a note in the web (**Edit file**, a section, the lead, a field), or an assistant
+writes one, and the text written names someone, or links to them, by a name
+readers learn later than that text's position, the save's result lists the
+warning under what the save did. Only the note's own text is looked at, not the
+whole den, and only warnings it didn't already have, so a name that was already
+there at the same position isn't repeated, and neither is one whose note was only
+renamed. The save always goes ahead: it's a warning. Renaming a later name says
+so too, for the links it rewrites to the new name, and so do a copy, a move,
+and a new note. A change to a name's `from` lists the note's own text that it
+now gives away, and says to run `check` for text in other notes.
+Nothing is said with `spoiler_checks` off.
 
 ## Images
 
@@ -1325,24 +1459,51 @@ A pen name given this way has limits worth knowing:
   starts with that computer's global name and email, and its checkpoints
   are recorded under them and signed with its key. Before the first one
   there, run the commands below in the clone.
-- **An environment variable still beats it.** If `GIT_AUTHOR_NAME` or one of
-  its relatives is set when `wolfden serve` or a later checkpoint runs, git
-  uses that, as it does in any repository.
-- **A signing setting added later can still sign under this name.** Wolfden
-  checks for one only while it turns history on. If a setting that turns
-  signing on is added later in the den's own `.git` folder (an `[include]` in
-  its `config` file, or a `config.worktree`) or in the environment
-  (`GIT_CONFIG_COUNT`, `GIT_CONFIG_PARAMETERS`) when `wolfden serve` or a
-  checkpoint runs, the next checkpoint is signed with that key under the den's
-  name, with no warning, and that can't be undone. The same goes after a
-  turn-on that stopped part way: the name stays saved, even if a later try to
-  finish is refused because of that setting, and the next checkpoint signs
-  under it. Turning signing on globally later doesn't do this, since the den's
-  own setting beats it. See #311.
+- **Git commands you run yourself don't get Wolfden's help.** Wolfden's own
+  checkpoints and tags are covered by the next two points; a `git commit` you
+  type in a terminal is plain git, with whatever git has then.
 - **It can't be added this way once there are checkpoints, or in a bigger
   repository.** Wolfden refuses, and says the name wasn't applied. With
   checkpoints, the commands below change it from then on; earlier
   checkpoints keep the name they have.
+
+#### What every checkpoint and tag records
+
+Every checkpoint and tag Wolfden makes, from the web UI, an automatic
+checkpoint, freezing and unfreezing, an AI assistant, or `wolfden init
+--git`, goes through the same check first (#311):
+
+- **The name and email come from git's settings for the den.** That's the
+  name saved for this den, or what git has globally, with an `includeIf
+  "gitdir:…"` counted. Wolfden hands them to git for that one commit, as
+  both author and committer, so a `GIT_AUTHOR_NAME`, `GIT_COMMITTER_EMAIL`,
+  `EMAIL`, or a name passed as config (`GIT_CONFIG_PARAMETERS`,
+  `GIT_CONFIG_COUNT`) in the environment that started `wolfden serve`
+  doesn't change what's recorded. If git's settings have no name or email, the
+  checkpoint is refused with nothing changed, rather than recorded under a
+  name git makes up from your computer account, which can be your real
+  name. The message says how to set them. It's refused too if git trusts
+  the den's folder only through `safe.directory` passed in the environment
+  (`GIT_CONFIG_COUNT`, `GIT_CONFIG_PARAMETERS`): add it to git's own
+  settings with `git config --global --add safe.directory <folder>`.
+- **Signing follows the den's own settings.** If the den's own
+  `.git/config` says whether to sign (`commit.gpgsign` for checkpoints,
+  `tag.gpgsign` and `tag.forceSignAnnotated` for freeze tags), Wolfden
+  passes that to git for each commit and tag, so something read later, such
+  as an `[include]` in that file, a `config.worktree`, or
+  `GIT_CONFIG_COUNT` or `GIT_CONFIG_PARAMETERS` in the environment, can't
+  sign under this den's name with another key. When git's own answer would
+  have differed, the checkpoint still goes ahead, and the result says so: in
+  the checkpoint dialog, the freeze message, the assistant's result, or the
+  server's log for an automatic checkpoint. If the den's own file doesn't
+  say, git decides, as before. Giving a name when you turn history on saves
+  signing as off there, so it always says. When the den's own file turns
+  signing on, git picks the key, and Wolfden can't check whose it is.
+
+This check covers what Wolfden records from now on. It doesn't cover a
+commit you make with git yourself, or checkpoints made before it. To see
+what the history already holds, run `wolfden identity audit`
+([What a copy of the history shows](#what-a-copy-of-the-history-shows)).
 
 To put a repository of its own under a name by hand, run these in its folder.
 The `author` and `committer` settings beat `user` if git has them, and the
@@ -1371,6 +1532,9 @@ A few things to know:
   then `git push -u origin HEAD --tags`. A backup only has what you've
   pushed, so run `git push origin HEAD --tags` again after later
   checkpoints. `--tags` includes your freeze tags.
+  Before the first push, run `wolfden identity audit` to see what the
+  history would show
+  ([What a copy of the history shows](#what-a-copy-of-the-history-shows)).
 - **A den that's part of a bigger repository** already has history there,
   so there's nothing to turn on, and Wolfden says so.
 - **If a step fails** (a git hook refuses the first checkpoint, say),
@@ -1488,6 +1652,138 @@ checkpoints don't record the `.gitignore` itself, so a clone doesn't have
 it. It does nothing for a file that's already in the history. And Wolfden
 doesn't go by it when it reads notes: a git-ignored note is still indexed,
 still found by search, and still there for an AI assistant.
+
+### What a copy of the history shows
+
+A den's history keeps more than your notes. Every checkpoint records a
+name and an email, the time with your computer's UTC offset (`+0100`,
+`-0500`), and, if git signs your commits, which key signed it. Tags record
+a name too, and a commit message can name more people in lines such as
+`Co-Authored-By: Story Helper <helper@example.com>`. Anyone with a copy of
+the repository, or access to a remote you push it to, can read all of it.
+
+To see what's there before you share it or push it anywhere, or to check
+what the checks in
+[What every checkpoint and tag records](#what-every-checkpoint-and-tag-records)
+recorded, run this in the den's folder:
+
+```text
+wolfden identity audit
+```
+
+```text
+The den's history: 42 checkpoints, 3 tags, 3 annotated tag objects under any ref, on every branch, tag, and other ref.
+
+Names and emails it records:
+  Wren Calder <wren@example.com>
+    author of 40 checkpoints, committer of 40 checkpoints, tagger of 3 tags
+    from 2026-01-05 to 2026-03-30, UTC offset +0100
+  Story Helper <helper@example.com>
+    in Co-Authored-By of 12 messages
+  Ash Everyday <ash@example.com>
+    author of 2 checkpoints, committer of 2 checkpoints
+    on 2026-02-11, UTC offset +0100
+
+Elsewhere in checkpoint and tag messages, lines that may name someone:
+  Signed-off-by: Ash Everyday  (1 message)
+
+UTC offsets: +0100 (87 dates)
+
+Signatures: none of its checkpoints or tags are signed.
+
+Authors in den.yaml:
+  wren-calder: name: Wren Calder
+
+Only in this folder (not pushed or cloned):
+  Remotes:
+    origin  https://github.com/wren-calder/notes.git  (fetch, push)
+  Names only the reflogs keep (who moved a branch, or a checkpoint since amended or reset away):
+    Ash Everyday <ash@work.example>: 2 reflog entries, 1 checkpoint only a reflog keeps
+  Name settings in this copy's git config:
+    user.name = Wren Calder
+    user.email = wren@example.com
+  Objects nothing points to any more (git collects them in time) aren't read.
+
+A push or a clone carries the history and den.yaml above. A copy of the folder itself
+(a zip, a synced folder, a disk backup) carries all of it, the last part included.
+```
+
+Here two checkpoints were recorded under the writer's everyday name, which
+is easy to miss. One more, under their work email, was amended away, but
+this folder still keeps it.
+It lists:
+
+- **Every name and email**, as the author or committer of a checkpoint, the
+  tagger of a tag (under any branch, tag, or other ref, and tags merged into
+  a checkpoint), or on a line such as `Co-Authored-By: Name <email>`
+  anywhere in a checkpoint's or a tag's message, with how often and when. They're
+  shown exactly as git recorded them, so `Wren Calder` and `wren calder` are
+  two entries.
+- **Other lines of messages that may name someone,** such as
+  `Signed-off-by: Ash Everyday` without an email, or any line with an email
+  in it.
+- **Every UTC offset.** The same offset on two names is a hint that
+  they're one person.
+- **Signatures**, by key, with the names each key signed under and, when
+  your computer knows the key, who it belongs to ("owner not checked" when
+  it couldn't look). A key that signs under two names ties them together,
+  and once a key is on a keyserver, its own names are public too.
+- **The authors in `den.yaml`,** which every copy has as well.
+- **Only in this folder:** the remotes, with any account name in an address
+  (a password or a token in one is never printed); names only the reflogs
+  keep, git's record of where each branch has been, such as a checkpoint
+  you amended under another name; and the name settings in this copy's own
+  git config. A push or a clone doesn't carry these, but a copy of the
+  folder does, so zip or sync the den's folder only after checking them.
+
+It reads every branch, tag, and other ref, not only the one you're on. If
+the den is part of a larger repository, it reads that whole repository,
+since a push or a clone carries all of it. A `.mailmap` or a `git replace`
+doesn't hide a name from it. If this copy is shallow (cloned with
+`--depth`), it says so, since the full history may hold more. It changes
+nothing. Your home folder is shown as `~`.
+
+What it prints can include a name you keep apart from this den, so don't
+paste it into an issue or a chat. `--json` gives the same as one JSON
+document.
+
+Wolfden doesn't rewrite history, so a name that's already recorded stays in
+earlier checkpoints, and in every copy and backup already made. Rewriting
+history changes every checkpoint after it and breaks any copy or backup,
+which is why it's best to check before the first push.
+
+### Keeping two pen names apart
+
+If you write under two names and don't want readers to link them, keep
+them apart everywhere a history can show them:
+
+1. **Best: a separate account on your computer** for the second name. Its
+   git settings, keys, browser, and folders are then separate already.
+2. **Otherwise, on one computer account:**
+   - A separate den for each name, each in its own repository, never
+     one den or one repository for both. Each den's `den.yaml` lists only
+     its own name in `authors`.
+   - A separate remote for each, under a separate account on the hosting
+     site.
+   - A name in git for each folder, with git's `includeIf`, so a commit
+     you make by hand there records the right one. In your global git
+     settings (`~/.gitconfig`):
+
+     ```text
+     [includeIf "gitdir/i:~/dens/juno/"]
+         path = ~/dens/juno.gitconfig
+     ```
+
+     `gitdir/i:` matches the folder ignoring case, which is what you want on
+     Windows and macOS, where `Dens` and `dens` are the same folder.
+
+     and in `~/dens/juno.gitconfig`, that name's `[user]` `name` and
+     `email`, and its own signing key or `[commit] gpgsign = false`.
+   - A separate browser profile for each name's `wolfden serve`.
+3. **Before the first push, and now and then after:** run `wolfden identity
+   audit` in each den, and check that only that den's name shows.
+
+Wolfden can't tell that two dens belong to one person, and doesn't try.
 
 ## Freezing a finished book
 
@@ -1608,6 +1904,140 @@ out and has no page. Fix it and save.
 
 AI assistants hear about it too: see [the MCP guide](mcp-clients.md).
 
+## Accounts and login
+
+Login is for when someone else can reach your den's web pages: another
+person on this computer, or later another device. Working alone on your own
+computer account, you don't need it.
+
+**This version records the setting but doesn't ask for a login yet.** The
+accounts and the `login` setting are here, so you can set them up; the login
+page itself comes in a later version. Until then, `wolfden serve` answers
+anyone who can use this computer, and says so when it starts with login on.
+
+### Turning login on
+
+1. **Add yourself as the owner.** It asks for a password twice, without
+   showing what you type:
+
+   ```sh
+   wolfden user add wren --owner
+   ```
+
+   A password needs 15 characters or more, up to 256. There are no other
+   rules: no digits or symbols required. A few random words in a row, such
+   as `lantern otter quietly brass`, make an easy passphrase: long, and easy
+   to remember. Pick words that don't go together, not a line you've
+   written. It can't be one character repeated, or a password anyone would
+   guess: a common one (Wolfden carries a list of nearly 10,000 and never goes
+   online to check), the username, or `wolfden`, even said twice or with a
+   few digits on the end, so `passwordpassword` and `wolfden 2026!!!!` are
+   refused. Case, spaces and punctuation don't help there. No email is asked for,
+   so a pen name's address never reaches the accounts.
+2. **Turn it on:**
+
+   ```sh
+   wolfden login on
+   ```
+
+   It's refused while there's no owner, so nobody can turn it on and lock
+   themselves out. It prints what login protects and what it doesn't
+   (below), and which installation folder it used.
+3. **Restart `wolfden serve`,** and log in, once your version has the
+   login page.
+
+`wolfden login` on its own says whether it's on. `wolfden login off` turns it
+off, and always works.
+
+### What login protects, and what it doesn't
+
+**What logging in protects.** With login on, the web pages ask for a
+username and password before they show or change anything. That keeps out
+other people who can reach the page: someone else using this computer
+under another account, or another device, once you've set up network
+access.
+
+**What it doesn't protect.** Your notes are ordinary files in a folder.
+Anyone, or any program, that can open that folder can read and change
+them without logging in. That includes you in your editor, an AI assistant
+you started with `wolfden mcp`, the `wolfden` command itself, a backup or
+sync program, and anyone who uses your computer account. Login doesn't
+encrypt anything. To keep notes from other people on this computer, give
+each person their own computer account, and turn on disk encryption.
+
+### Accounts and roles
+
+```sh
+wolfden user add ash --role writer
+wolfden user add rook --role viewer
+wolfden user list
+```
+
+A role is what an account may do. It isn't what it sees: the Reader's view
+is a filter anyone can turn on.
+
+| Role | May |
+|---|---|
+| owner | Everything, including unfreezing a book and turning history on |
+| writer | Read and edit notes, make checkpoints, freeze a book |
+| viewer | Read everything a writer reads, spoilers included, and change nothing |
+
+A viewer suits an editor checking continuity, an illustrator, or an
+audiobook narrator. It doesn't hide spoilers: a beta reader who mustn't see
+past chapter 12 should get the chapters themselves for now.
+
+A username is letters, digits, `.`, `-` and `_`, and case doesn't matter
+when logging in. It's never written into a den or its history, but the
+installation's owners can see it, so on a shared installation don't use
+your real name unless you're happy for them to.
+
+`wolfden user set-role ash viewer` changes a role, and `wolfden user remove
+ash` removes an account. There's always at least one owner: removing the
+last one, or giving it another role, is refused.
+
+### Forgotten passwords and lockouts
+
+These are local commands. Anyone who can run `wolfden` as your computer
+account can use them, which is the same trust as opening the files.
+
+- **A forgotten password:** `wolfden user reset-password wren`. It asks for
+  a new one, logs the account out everywhere, and ends any lockout.
+- **Locked out after failed tries:** after 5 wrong passwords in a row, an
+  account is locked for 15 minutes. Anyone who can reach the login page can
+  cause that by guessing, so `wolfden user unlock wren` ends it at once.
+- **The only owner forgot everything:** `wolfden user reset-password <name>`
+  (`wolfden user list` lists the names), or `wolfden login off`.
+
+In a script, pipe the password in with `--password-stdin` (its first line).
+A password is never a command-line argument, where it would land in your
+shell's history.
+
+### Where accounts live
+
+Accounts belong to an *installation*, not a den: one folder of Wolfden's own
+for your computer account. It holds `accounts.db` (the accounts),
+`settings.json` (whether login is on) and, later, the keys that sign login
+cookies. It's never inside a den, and never in a checkpoint or a push.
+
+| On | It's |
+|---|---|
+| Windows | `%LOCALAPPDATA%\Wolfden` |
+| macOS | `~/Library/Application Support/Wolfden` |
+| Linux | `$XDG_DATA_HOME/wolfden`, or `~/.local/share/wolfden` |
+
+`wolfden user list` and `wolfden login` always say which folder they used.
+To use another, set `WOLFDEN_HOME` to a full path, or give `--home <folder>`
+to `user`, `login` and `serve`. A folder inside a den is refused, so your
+checkpoints never record the accounts. A folder inside a git repository
+works, with a warning: keep it out of that repository's commits. A writer with a second pen name kept secret from the
+first should give it its own installation this way, or better, its own
+computer account, so the two names' accounts never sit side by side.
+
+Deleting the folder loses the accounts and turns login off. It loses no
+notes and no history: run the steps above again. Copying it to another
+computer copies the accounts, and later the ability to sign a login cookie,
+so treat it like a password.
+
 ## Gotchas
 
 Things that surprise people, with what happens, why, and what to do.
@@ -1621,9 +2051,10 @@ Each links to the section with the details.
   run build` in the clone's `web/` folder, then publish again and
   restart `serve` ([Getting started](#getting-started), step 1).
 - **Anyone using this computer can open the page.** `wolfden serve`
-  listens on this computer only, never the network, but this version has
-  no accounts, so anyone else signed in to the same computer can open it
-  while it runs. Stop it with Ctrl+C when you're done.
+  listens on this computer only, never the network, but this version
+  doesn't ask for a login yet, even with `wolfden login on`, so anyone
+  else signed in to the same computer can open it while it runs. Stop it
+  with Ctrl+C when you're done ([Accounts and login](#accounts-and-login)).
 - **A new den has no books.** `wolfden init` makes the den and, with
   `--universe`, a first universe. Add series and books with `wolfden new
   series` and `wolfden new book`, or **New series** and **New book** in
@@ -1662,9 +2093,14 @@ in it, which Wolfden calls a checkpoint.
   of your computer. A pen name is fine, and the email can be a
   placeholder. What you give wins over what git has for this den, and
   turns signing off here, since git's key may be another name's. A clone doesn't
-  bring it along, and an environment variable such as `GIT_AUTHOR_NAME` still
-  beats it
+  bring it along. An environment variable such as `GIT_AUTHOR_NAME` doesn't
+  change what Wolfden's checkpoints record, but still applies to git
+  commands you run yourself
   ([Turning on history](#turning-on-history)).
+- **A push carries every name the history records.** Every checkpoint's
+  name and email, its UTC offset, and its signing key go with any copy or
+  push. `wolfden identity audit` lists them, so run it before the first
+  push ([What a copy of the history shows](#what-a-copy-of-the-history-shows)).
 - **Not in a synced folder.** Git and Dropbox, OneDrive, or iCloud
   together can corrupt the history when two computers sync while git is
   writing. Use one or the other: git with a private remote for a backup,
@@ -1780,7 +2216,8 @@ in it, which Wolfden calls a checkpoint.
   **Edit file** or in your editor leaves the links that used the old
   name broken. The web UI can't rename a note yet. An AI assistant
   working through Wolfden can, and rewrites the links, or keeps the old
-  name as an alias.
+  name as an alias. A note's other names you can rename on its page, with
+  **Other names**, and their links follow.
 - **Moving a note's file can change where links go.** Since the nearest
   note of a name wins, a file moved to another book, or up to the
   universe, can take links from another note, or lose its own. An AI

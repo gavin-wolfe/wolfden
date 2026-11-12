@@ -303,3 +303,79 @@ public class MarkdownCommentsTests
         Assert.Empty(diagnostics);
     }
 }
+
+/// <summary>The review of #344: warnings derived from what Strip pairs.</summary>
+public class MarkdownCommentsReviewTests
+{
+    private static List<Diagnostic> Check(string markdown, int bodyStart = 0) =>
+        MarkdownComments.Check(markdown, Wolfden.Core.Text.SourceText.FromText(markdown, false), bodyStart);
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-49")]
+    public void TheCasesTheIssueWasFiledForWarn()
+    {
+        // An open in a paragraph, blank lines, then a --> far below: the read
+        // hides to the end of that block, so the writer must be told.
+        var markdown = "Keep. <!-- forgot\n\nTwo canon paragraphs...\n\nMore canon...\n\nVesta --> Ardent\n";
+
+        Assert.Contains(
+            Check(markdown),
+            d => d.Message.Contains("Unclosed HTML comment", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [Trait("Scenario", "SC-MCP-49")]
+    [InlineData(@"Escaped \<!-- literal -->")] // escaped opening: its --> is text, not stray
+    [InlineData("<!-->")]                      // complete comments in CommonMark 0.31.2
+    [InlineData("<!--->")]
+    [InlineData("## Heading <!-- note -->\n\nBody.")]
+    public void CasesThatMustStayQuietDoNotWarn(string markdown)
+    {
+        Assert.Empty(Check(markdown));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-49")]
+    public void AMarkerAfterAClosedCommentIsStray()
+    {
+        var diagnostics = Check("<!-- a --> b -->");
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Message.Contains("Stray '-->'", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-49")]
+    public void CrlfBlankLinesEndTheBlockTheySeparate()
+    {
+        // A blank line between the opens makes the first one unclosed; reading
+        // the \r as part of the line would pair it with the later --> instead.
+        var markdown = "Keep. <!-- a\r\n\r\n<!-- b -->\r\n\r\nAfter\r\n";
+
+        var diagnostics = Check(markdown);
+
+        Assert.Contains(
+            diagnostics,
+            d => d.Message.Contains("Unclosed HTML comment", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            diagnostics,
+            d => d.Message.Contains("Nested-looking", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    [Trait("Scenario", "SC-MCP-49")]
+    public void LineNumbersCountFromTheSourceWithAnOffsetBody()
+    {
+        const string source = "Title\n\nKeep. <!-- unclosed\n";
+        const int bodyStart = 7;
+
+        var diagnostics = MarkdownComments.Check(
+            source[bodyStart..],
+            Wolfden.Core.Text.SourceText.FromText(source, false),
+            bodyStart);
+
+        var warning = Assert.Single(diagnostics);
+        Assert.Equal(3, warning.Line);
+    }
+}

@@ -255,6 +255,13 @@ public static partial class MarkdownComments
     /// <param name="AfterListMarker">True if a list item starts on its line, before it.</param>
     private readonly record struct FoundComment(int Start, int End, bool AfterListMarker);
 
+    /// <param name="Start">Where its <c>&lt;!--</c> is.</param>
+    /// <param name="End">Just past where it ends.</param>
+    /// <param name="AfterListMarker">True if a list item starts on its line, before it.</param>
+    /// <param name="Closed">True when a <c>--&gt;</c> ended it, not the end of its block.</param>
+    /// <param name="Close">Where that <c>--&gt;</c> is, or -1.</param>
+    private readonly record struct FoundSpan(int Start, int End, bool AfterListMarker, bool Closed, int Close);
+
     /// <summary>
     /// Finds what to strip. Everything's looked up once, in sorted lists, so a note full
     /// of badly formed comments costs about what a note of well-formed ones does.
@@ -301,88 +308,103 @@ public static partial class MarkdownComments
         public List<FoundComment> Comments()
         {
             var comments = new List<FoundComment>();
-            var at = 0;
-            foreach (var open in _opens)
+            foreach (var found in ScanComments(out _, unclosedAcrossBlocks: false))
             {
-                Steps++;
-                if (open >= at && !IsEscaped(open))
-                {
-                    at = EndOf(open);
-                    comments.Add(new FoundComment(open, at, AfterAListMarker(open)));
-                }
+                comments.Add(new FoundComment(found.Start, found.End, found.AfterListMarker));
             }
 
             return comments;
         }
 
+        /// <summary>
+        /// What <see cref="Comments"/> finds, with whether a <c>--&gt;</c> closed it and
+        /// which markers are text because a backslash escaped their opening. The
+        /// warnings are derived from this walk, so they can't disagree with what a
+        /// read strips.
+        /// </summary>
+        private List<FoundSpan> ScanComments(out HashSet<int> textCloses, bool unclosedAcrossBlocks)
+        {
+            var found = new List<FoundSpan>();
+            textCloses = [];
+            var at = 0;
+            foreach (var open in _opens)
+            {
+                Steps++;
+                if (open < at)
+                {
+                    continue;
+                }
+
+                if (IsEscaped(open))
+                {
+                    // The opening is text, and so is the --> that text pairs with.
+                    if (CloseOf(open) is { } escaped)
+                    {
+                        textCloses.Add(escaped);
+                    }
+
+                    continue;
+                }
+
+                var (end, closed, close) = EndAndClosure(open, unclosedAcrossBlocks);
+                at = end;
+                found.Add(new FoundSpan(open, end, AfterAListMarker(open), closed, close));
+            }
+
+            return found;
+        }
+
         public List<(int Offset, string Message)> Warnings()
         {
             var warnings = new List<(int Offset, string Message)>();
-            var matchedCloses = new HashSet<int>();
+            var found = ScanComments(out var textCloses, unclosedAcrossBlocks: true);
 
-            foreach (var open in _opens)
+            foreach (var comment in found)
             {
-                if (IsEscaped(open))
+                if (!comment.Closed)
                 {
+                    warnings.Add((comment.Start, "Unclosed HTML comment '<!--': add '-->' to close it."));
                     continue;
                 }
 
-                if (_fenceLines.Find(open, this) is { } fenceLine)
+                var inner = FirstAtOrAfter(_innerOpens, comment.Start + 4);
+                if (inner >= 0 && inner < comment.End)
                 {
-                    var close = _markdown.IndexOf("-->", open + 2, fenceLine.End - (open + 2), StringComparison.Ordinal);
-                    if (close < 0)
-                    {
-                        warnings.Add((open, "Unclosed HTML comment '<!--': add '-->' to close it."));
-                    }
-                    else
-                    {
-                        matchedCloses.Add(close);
-                    }
-
-                    continue;
-                }
-
-                var endComment = EndOfComment(open);
-                if (endComment is null)
-                {
-                    warnings.Add((open, "Unclosed HTML comment '<!--': add '-->' to close it."));
-                }
-                else
-                {
-                    if (string.CompareOrdinal(_markdown, open + 2, "-->", 0, 3) == 0)
-                    {
-                        matchedCloses.Add(open + 2);
-                    }
-                    else if (string.CompareOrdinal(_markdown, open + 3, "-->", 0, 3) == 0)
-                    {
-                        matchedCloses.Add(open + 3);
-                    }
-                    else
-                    {
-                        var firstClose = FirstAtOrAfter(_closes, open + 4);
-                        if (firstClose >= 0)
-                        {
-                            var inner = FirstAtOrAfter(_innerOpens, open + 4);
-                            if (inner >= 0 && inner < firstClose)
-                            {
-                                warnings.Add((inner, "Nested-looking HTML comment: HTML comments can't be nested, and this can hide text unexpectedly."));
-                            }
-
-                            var closingIndex = _balanced.TryGetValue(open, out var balanced) && !HasBlankLine(firstClose, balanced)
-                                ? balanced - 3
-                                : firstClose;
-                            matchedCloses.Add(closingIndex);
-                        }
-                    }
+                    warnings.Add((inner, "Nested-looking HTML comment: HTML comments can't be nested, and this can hide text unexpectedly."));
                 }
             }
 
+            // A --> no comment covers is stray, unless a backslash made its <!-- text
+            // or it ended a pair that the block boundary had already closed.
+            var consumed = new HashSet<int>(textCloses);
+            foreach (var comment in found)
+            {
+                if (comment.Close >= 0)
+                {
+                    consumed.Add(comment.Close);
+                }
+            }
+
+            var next = 0;
             foreach (var close in _closes)
             {
-                if (!matchedCloses.Contains(close))
+                if (consumed.Contains(close))
                 {
-                    warnings.Add((close, "Stray '-->' with no HTML comment open before it."));
+                    continue;
                 }
+
+                while (next < found.Count && found[next].End <= close)
+                {
+                    Steps++;
+                    next++;
+                }
+
+                if (next < found.Count && close >= found[next].Start)
+                {
+                    continue;
+                }
+
+                warnings.Add((close, "Stray '-->' with no HTML comment open before it."));
             }
 
             return warnings;
@@ -439,7 +461,9 @@ public static partial class MarkdownComments
             {
                 var lineBreak = _markdown.IndexOf('\n', start);
                 var end = lineBreak < 0 ? _markdown.Length : lineBreak;
-                if (BlankLine().IsMatch(_markdown.AsSpan(start, end - start)))
+                // CRLF: the \r is part of the line break, not of the line.
+                var lineEnd = end > start && _markdown[end - 1] == '\r' ? end - 1 : end;
+                if (BlankLine().IsMatch(_markdown.AsSpan(start, lineEnd - start)))
                 {
                     _blankLines.Add(start);
                 }
@@ -514,15 +538,45 @@ public static partial class MarkdownComments
             return slashes % 2 == 1;
         }
 
-        private int EndOf(int open)
+        /// <summary>
+        /// Where the comment at <paramref name="open"/> ends, whether a <c>--&gt;</c>
+        /// closed it, and where that <c>--&gt;</c> is. A comment nothing closes runs to
+        /// the end of its block, which is the unclosed case.
+        /// </summary>
+        private (int End, bool Closed, int Close) EndAndClosure(int open, bool unclosedAcrossBlocks)
         {
             if (_fenceLines.Find(open, this) is { } fenceLine)
             {
                 var close = _markdown.IndexOf("-->", open + 2, fenceLine.End - (open + 2), StringComparison.Ordinal);
-                return close < 0 ? fenceLine.End : close + 3;
+                return close < 0 ? (fenceLine.End, false, -1) : (close + 3, true, close);
             }
 
-            return EndOfComment(open) ?? EndOfBlock(open);
+            if (EndOfComment(open) is { } end)
+            {
+                // A --> across a blank line is not a comment to CommonMark: a read
+                // hides to the end of the block, so this is the unclosed case rather
+                // than a pair. The --> still isn't stray - it is prose, not a marker.
+                if (unclosedAcrossBlocks && !_startsACommentBlock.Contains(open) && HasBlankLine(open, end))
+                {
+                    return (EndOfBlock(open), false, end - 3);
+                }
+
+                return (end, true, end - 3);
+            }
+
+            return (EndOfBlock(open), false, -1);
+        }
+
+        /// <summary>Where the <c>--&gt;</c> ending the opening at <paramref name="open"/> is, if one does.</summary>
+        private int? CloseOf(int open)
+        {
+            if (_fenceLines.Find(open, this) is { } fenceLine)
+            {
+                var close = _markdown.IndexOf("-->", open + 2, fenceLine.End - (open + 2), StringComparison.Ordinal);
+                return close < 0 ? null : close;
+            }
+
+            return EndOfComment(open) is { } end ? end - 3 : null;
         }
 
         /// <summary>

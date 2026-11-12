@@ -1133,7 +1133,7 @@ public sealed partial class DenTools
                 $"The entity has no section '{name}'{(line is null ? "" : $" at line {line}")}. Its sections: " +
                 // Without a heading's comments, since whoever gets this may have read the note at a position (F-VIEW-6).
                 (file.Sections.Count == 0 ? "none." : string.Join(", ", file.Sections.Select(s => $"'{MarkdownComments.Strip(s.Name)}' (line {s.Line})")) + ".") +
-                (candidates.Any(s => LinkText.Matches(MarkdownComments.Strip(s.Name), name.Trim()))
+                (candidates.Any(s => s.Name != MarkdownComments.Strip(s.Name) && LinkText.Matches(MarkdownComments.Strip(s.Name), name.Trim()))
                     ? " That section has an HTML comment in its heading; read without as_of for the full name."
                     : "")),
             1 => matches[0],

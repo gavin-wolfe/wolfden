@@ -1258,6 +1258,12 @@ are, including directly under a heading. A comment inside a code block or
 code span is just text. An AI assistant's read at a position leaves out every
 comment (F-VIEW-6).
 
+`wolfden check` warns about a comment that may not be what the writer meant,
+and never changes it: an `<!--` that nothing closes before the end of its
+block, an `<!--` inside a comment, and a `-->` with no comment before it. A
+marker in a code block, code span, or after a backslash is text and gets no
+warning. These are warnings, so they never fail a check.
+
 **F-SEC-12.** A **bookkeeping** section records work on the notes rather
 than the story: a change log or session notes. A section is bookkeeping if
 its comment has `canon=false`, or if its name matches a **bookkeeping

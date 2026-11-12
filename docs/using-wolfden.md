@@ -1740,9 +1740,10 @@ in it, which Wolfden calls a checkpoint.
   in it. With a comment on the way, only the rest of that paragraph is hidden. A
   comment with another inside it, `<!-- old <!-- older -->`, also hides any text
   up to a second `-->`, as long as there's no blank line first, and the page may
-  look fine. `wolfden check` doesn't warn about either yet, so if an assistant
-  seems not to know something, read the note with no position or look for a stray
-  marker.
+  look fine. `wolfden check` warns about both, naming the line: an unclosed `<!--`
+  and a comment inside a comment. It also warns about a `-->` with no comment
+  before it. The warnings change nothing, so if an assistant still seems not to
+  know something, read the note with no position or look for a stray marker.
 - **Copying a note's file by hand makes a duplicate.** Both files have
   the same `id`, so Wolfden leaves both out of views, and links to them
   break, until one gets a new id. Copy with `wolfden copy`, or ask an AI

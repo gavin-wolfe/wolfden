@@ -185,6 +185,7 @@ public sealed class CommentsAtAPositionTests : IDisposable
         var text = Assert.IsType<TextContentBlock>(Assert.Single(result.Content)).Text;
         Assert.Contains("unknown_section", text, StringComparison.Ordinal);
         Assert.Contains("'Binding style'", text, StringComparison.Ordinal);
+        Assert.Contains("read without as_of for the full name", text, StringComparison.Ordinal);
         Assert.DoesNotContain("Wraithmoor", text, StringComparison.Ordinal);
     }
 

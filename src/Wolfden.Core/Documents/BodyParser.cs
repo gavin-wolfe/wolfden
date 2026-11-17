@@ -173,6 +173,7 @@ internal static partial class BodyParser
         }
 
         FindMisplacedComments(source, document, bodyStart, commentLines, diagnostics, isOutline);
+        diagnostics.AddRange(MarkdownComments.Check(body, source, bodyStart, document, commentLines));
         var leadEnd = sections.Count > 0 ? sections[0].HeadingStart : text.Length;
         return new Result(sections, title, titleLine, leadEnd, titleSpan);
     }

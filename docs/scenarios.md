@@ -3757,9 +3757,17 @@ My assistant is drafting `ember:3`, and reads at that position.
   instructions tell it to read with no position first, or it deletes comments it never saw.
 - To get guidance to the assistant while it drafts, I write visible text, or ask it to
   read with no position.
+- `wolfden check` warns about the comments I may have got wrong, and changes nothing: an
+  `<!--` that nothing closes before its block ends, an `<!--` inside a comment, and a
+  `-->` with no comment before it. The worst case above is the first: the warning says
+  the comment is unclosed even though a `-->` exists further down, because that marker
+  belongs to prose and the read hides to the end of the block. A marker in code or after
+  a backslash gets no warning, `<!-->` and `<!--->` are complete comments, and a heading
+  comment is fine. A `-->` after a closed comment is reported as stray.
+- Warnings are warnings: they name the line in the source, and `check` still exits clean.
 
 Spec: F-SEC-11, F-VIEW-6 (#306). Covered by: `CommentsAtAPositionTests`,
-`MarkdownCommentsTests`, `McpStaysStrictTests`.
+`MarkdownCommentsTests`, `MarkdownCommentsReviewTests`, `McpStaysStrictTests`.
 
 ### SC-MCP-50. Searching and listing at a chapter
 

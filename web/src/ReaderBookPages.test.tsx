@@ -20,6 +20,8 @@ const LATER = ['Letters', 'Lucy', 'Quincey']
  * between them, a word readers don't know isn't in anything these pages ask for. Anything new has to go there too.
  */
 const READERS_REQUESTS = [
+  // Who is logged in, and their role (#315): nothing from the den.
+  /^\/api\/auth\/status$/,
   /^\/api\/den$/,
   /^\/api\/den\/files$/,
   /^\/api\/den\/errors\?countOnly=true$/,

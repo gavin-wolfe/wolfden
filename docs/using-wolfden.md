@@ -1910,10 +1910,10 @@ Login is for when someone else can reach your den's web pages: another
 person on this computer, or later another device. Working alone on your own
 computer account, you don't need it.
 
-**This version records the setting but doesn't ask for a login yet.** The
-accounts and the `login` setting are here, so you can set them up; the login
-page itself comes in a later version. Until then, `wolfden serve` answers
-anyone who can use this computer, and says so when it starts with login on.
+With login off, which is how a new installation starts, `wolfden serve`
+answers anyone who can use this computer, as it always has. With it on, the
+page asks for a username and password first, and each account may do only
+what its role allows.
 
 ### Turning login on
 
@@ -1943,11 +1943,56 @@ anyone who can use this computer, and says so when it starts with login on.
    It's refused while there's no owner, so nobody can turn it on and lock
    themselves out. It prints what login protects and what it doesn't
    (below), and which installation folder it used.
-3. **Restart `wolfden serve`,** and log in, once your version has the
-   login page.
+3. **Restart `wolfden serve`,** and log in. `serve` reads the setting
+   when it starts, and says `Login is on` when it does. If you turn login
+   on while it's running, it stops answering (except to say "Restart
+   wolfden serve") until you restart it, so nobody carries on without a
+   login. If you turn it off while it's running, it keeps asking for a
+   login until you restart it.
 
 `wolfden login` on its own says whether it's on. `wolfden login off` turns it
-off, and always works.
+off, and always works. Restart `serve` after either.
+
+If `serve` can't read the installation folder, so it can't tell whether
+login is on, it doesn't start, and says why; so does login on with no
+owner account. It never quietly serves without the login you asked for.
+
+### Logging in
+
+The page asks for your username and password. Once you're in, the top bar
+shows your username and role, and **Log out**.
+
+- **A session lasts 14 days** on this computer, and each visit extends it,
+  so you rarely log in again. **Log out** ends the session in this
+  browser. `wolfden user reset-password` or `set-role` ends every session
+  for that account, in every browser, at once, as does removing it.
+- **If a session ends while you're editing,** the login form comes up over
+  the page. What you were editing is still there underneath: log in again
+  and press Save. If someone else logs in there instead, Wolfden asks
+  before it discards what you hadn't saved, and gives them the pages
+  afresh, so nobody saves another person's draft as their own. An account
+  that's become a viewer keeps its open editor but gets no Save.
+- **If `serve` must be restarted** (login was turned on while it ran), the
+  page says so in a banner at the top.
+- **A wrong password and an unknown username get the same answer,** so the
+  page never tells a stranger which usernames exist. After 5 wrong tries in
+  a row the account is locked for 15 minutes, and the answer still looks the
+  same; `wolfden user unlock` ends a lockout at once.
+- **At most 10 tries a minute for one username,** whoever tries. More are
+  refused with "Too many login attempts"; wait a minute. On this computer
+  there's no limit per address: every request comes from the same one
+  (127.0.0.1), so such a limit would let anyone signed in here keep you
+  from logging in. The per-username limit and the lockout guard the login
+  instead. `wolfden user unlock` clears a lockout; if someone keeps
+  trying, `wolfden login off` (or restarting `serve`) gets you in.
+- **The login cookie is this installation's own.** Its name includes a
+  short random id, so two installations open in one browser (on two ports
+  of `localhost`) don't log each other out. It's signed and encrypted with
+  keys kept in the installation's `keys/` folder.
+- **Who a checkpoint records doesn't change yet.** With login on or off,
+  checkpoints are recorded under the name this copy of the den uses, as
+  before; your username is never written into the history. Recording each
+  person's own name comes in a later version.
 
 ### What login protects, and what it doesn't
 
@@ -1978,13 +2023,20 @@ is a filter anyone can turn on.
 
 | Role | May |
 |---|---|
-| owner | Everything, including unfreezing a book and turning history on |
-| writer | Read and edit notes, make checkpoints, freeze a book |
+| owner | Everything, including unfreezing a book, turning history on, and fixing a `den.yaml` that won't load |
+| writer | Read and edit notes, add series, books, chapters and images, make checkpoints, freeze a book |
 | viewer | Read everything a writer reads, spoilers included, and change nothing |
+
+A viewer's pages have no edit controls: no Edit buttons, no New menu, no
+checkpoint or Freeze. The server refuses a change from a viewer's account
+anyway, so hiding them is only tidiness. A writer doesn't see Unfreeze, or
+Turn on history. Managing accounts and login is for the `wolfden` command,
+not the web pages.
 
 A viewer suits an editor checking continuity, an illustrator, or an
 audiobook narrator. It doesn't hide spoilers: a beta reader who mustn't see
-past chapter 12 should get the chapters themselves for now.
+past chapter 12 should get the chapters themselves for now. Any account can
+turn on the Reader's view for itself; it's a filter, not a lock.
 
 A username is letters, digits, `.`, `-` and `_`, and case doesn't matter
 when logging in. It's never written into a den or its history, but the
@@ -2016,8 +2068,10 @@ shell's history.
 
 Accounts belong to an *installation*, not a den: one folder of Wolfden's own
 for your computer account. It holds `accounts.db` (the accounts),
-`settings.json` (whether login is on) and, later, the keys that sign login
-cookies. It's never inside a den, and never in a checkpoint or a push.
+`settings.json` (whether login is on, and the installation's id) and `keys/`,
+the keys that sign and encrypt login cookies (on Windows, they're also
+protected with your Windows account's own encryption). It's never inside a
+den, and never in a checkpoint or a push.
 
 | On | It's |
 |---|---|
@@ -2033,10 +2087,12 @@ works, with a warning: keep it out of that repository's commits. A writer with a
 first should give it its own installation this way, or better, its own
 computer account, so the two names' accounts never sit side by side.
 
-Deleting the folder loses the accounts and turns login off. It loses no
-notes and no history: run the steps above again. Copying it to another
-computer copies the accounts, and later the ability to sign a login cookie,
-so treat it like a password.
+Deleting the folder loses the accounts, turns login off, and logs everyone
+out. It loses no notes and no history: run the steps above again. Copying it
+to another computer copies the accounts, so treat it like a password. On
+macOS and Linux it also copies the keys that sign login cookies; on Windows
+those keys are locked to your Windows account, so a copy can't use them,
+and logging in again on the other computer makes new ones.
 
 ## Gotchas
 
@@ -2051,10 +2107,16 @@ Each links to the section with the details.
   run build` in the clone's `web/` folder, then publish again and
   restart `serve` ([Getting started](#getting-started), step 1).
 - **Anyone using this computer can open the page.** `wolfden serve`
-  listens on this computer only, never the network, but this version
-  doesn't ask for a login yet, even with `wolfden login on`, so anyone
-  else signed in to the same computer can open it while it runs. Stop it
-  with Ctrl+C when you're done ([Accounts and login](#accounts-and-login)).
+  listens on this computer only, never the network, but with login off
+  (the default), anyone else signed in to the same computer can open it
+  while it runs. Turn login on, or stop `serve` with Ctrl+C when you're
+  done ([Accounts and login](#accounts-and-login)).
+- **`wolfden serve` won't start, about the installation folder.** With a
+  `--home` or `WOLFDEN_HOME` it can't use, or a `settings.json` it can't
+  read, it can't tell whether login is on, so it stops rather than serve
+  without a login you asked for. Fix the folder, or run `wolfden login off`,
+  which repairs a settings file it can't read ([Turning login
+  on](#turning-login-on)).
 - **A new den has no books.** `wolfden init` makes the den and, with
   `--universe`, a first universe. Add series and books with `wolfden new
   series` and `wolfden new book`, or **New series** and **New book** in

@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useId, useRef, useState } from 'react'
+import { IfCanWrite } from '../access'
 import { useQuery } from '@tanstack/react-query'
 import type { EntityPage, PositionView, ReaderMark } from '../api'
 import { EditError, postEdit, sourceQuery, type EditPath } from '../editApi'
@@ -245,9 +246,11 @@ export function NamesEditor({ entity, positions }: { entity: EntityPage; positio
                     )}
                     {here.kind === 'remove' && <p>Remove “{n.value}”? Links that use it change to the note's name, {entity.name}.</p>}
                     <p className="editor-actions">
+                      <IfCanWrite>
                       <button type="submit" className={here.kind === 'remove' ? 'danger' : 'primary'} disabled={saving || !source.data}>
                         {saving ? 'Saving…' : here.kind === 'rename' ? 'Rename' : here.kind === 'remove' ? 'Remove name' : makesPlain ? 'Make it an alias' : 'Save'}
                       </button>
+                      </IfCanWrite>
                       <button type="button" onClick={() => open(null)} disabled={saving}>
                         Cancel
                       </button>

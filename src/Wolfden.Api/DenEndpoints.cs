@@ -84,9 +84,12 @@ public static class DenEndpoints
         ArgumentNullException.ThrowIfNull(endpoints);
         ArgumentNullException.ThrowIfNull(options);
         var api = endpoints.MapGroup("/api");
-        api.MapGet("/health", () => new HealthResult("ok", options.Version));
-        api.MapGet("/den", () => Den(options));
-        api.MapGet("/den/files", () => new DenFilesResult(DenResultVersion, AutoCheckpointer.FilesFingerprint(options.DenRoot)));
+
+        // Every endpoint declares what it needs (#315 §4.5): a permission, or, for these few that hold no den content, no login.
+        api.MapGet("/health", () => new HealthResult("ok", options.Version)).AllowAnonymous();
+        AuthEndpoints.Map(api);
+        api.MapGet("/den", () => Den(options)).RequireWolfden(Permission.Read);
+        api.MapGet("/den/files", () => new DenFilesResult(DenResultVersion, AutoCheckpointer.FilesFingerprint(options.DenRoot))).RequireWolfden(Permission.Read);
         ReadEndpoints.Map(api, options);
         WriteEndpoints.Map(api, options);
         CheckpointEndpoints.Map(api, options);
@@ -105,7 +108,8 @@ public static class DenEndpoints
                     || CreateEndpoints.PostPaths.Contains(path, StringComparer.OrdinalIgnoreCase)
                     || ImageEndpoints.PostPaths.Contains(path, StringComparer.OrdinalIgnoreCase)
                     || ContainerEndpoints.PostPaths.Contains(path, StringComparer.OrdinalIgnoreCase)
-                    || HistorySetupEndpoints.PostPaths.Contains(path, StringComparer.OrdinalIgnoreCase) ? "POST"
+                    || HistorySetupEndpoints.PostPaths.Contains(path, StringComparer.OrdinalIgnoreCase)
+                    || AuthEndpoints.PostPaths.Contains(path, StringComparer.OrdinalIgnoreCase) ? "POST"
                 : null;
             if (method is not null)
             {
@@ -117,12 +121,12 @@ public static class DenEndpoints
             }
 
             return Error(StatusCodes.Status404NotFound, "not_found", $"There's no API endpoint '/api/{rest}'.");
-        });
+        }).RequireWolfden(Permission.Read); // So a stranger learns nothing of which paths exist: with login on, every unknown path is a 401.
         return endpoints;
     }
 
     /// <summary>The paths under <c>/api</c> that answer GET.</summary>
-    private static readonly string[] GetPaths = ["health", "den", "den/files", .. ReadEndpoints.Paths, .. WriteEndpoints.GetPaths, .. CreateEndpoints.GetPaths, .. ContainerEndpoints.GetPaths, .. FileEndpoints.GetPaths];
+    private static readonly string[] GetPaths = ["health", "den", "den/files", .. ReadEndpoints.Paths, .. WriteEndpoints.GetPaths, .. CreateEndpoints.GetPaths, .. ContainerEndpoints.GetPaths, .. FileEndpoints.GetPaths, .. AuthEndpoints.GetPaths];
 
     /// <summary>The den's name and its universes, or the pinned one.</summary>
     internal static IResult Den(WolfdenApiOptions options)

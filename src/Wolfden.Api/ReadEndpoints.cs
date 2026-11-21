@@ -82,13 +82,13 @@ public static class ReadEndpoints
         {
             CheckReaders(q.Position("asOf"), null, q.Bool("readers"));
             return AsReaders(q, () => Hierarchy(reader, q.Text("universe"), q.Position("asOf"), q.Bool("readers")));
-        }));
+        })).RequireWolfden(Permission.Read);
         api.MapGet("/positions", (HttpContext c) => Answer(c, ["universe", "asOf", "readers"], q =>
         {
             CheckReadersOnly(q.Position("asOf"), q.Bool("readers"));
             return AsReaders(q, () => Positions(reader, q.Text("universe"), q.Bool("readers") ? q.Position("asOf") : null));
-        }));
-        api.MapGet("/positions/next", (HttpContext c) => Answer(c, ["universe", "after", "step"], q => NextPosition(reader, q.Text("universe"), q.Position("after"), q.Text("step"))));
+        })).RequireWolfden(Permission.Read);
+        api.MapGet("/positions/next", (HttpContext c) => Answer(c, ["universe", "after", "step"], q => NextPosition(reader, q.Text("universe"), q.Position("after"), q.Text("step")))).RequireWolfden(Permission.Read);
         api.MapGet("/entities", (HttpContext c) => Answer<object>(
             c,
             ["universe", "type", "status", "series", "book", "asOf", "limit", "marksAt", "readers"],
@@ -99,17 +99,17 @@ public static class ReadEndpoints
                     ? (object)MarkedList(reader, marksAt, q.Position("asOf"), q.Text("universe"), q.Text("type"), q.Text("status"), q.Text("series"), q.Text("book"), q.Int("limit", 200))
                     : AsReaders(q, () => reader.ListEntities(
                         q.Text("universe"), q.Text("type"), q.Text("status"), q.Text("series"), q.Text("book"), q.Int("limit", 200), q.Position("asOf")));
-            }));
+            })).RequireWolfden(Permission.Read);
         api.MapGet("/entities/lookup", (HttpContext c) => Answer(
             c,
             ["query", "universe", "type", "asOf", "limit"],
-            q => reader.LookupEntities(q.Text("query") ?? "", q.Text("universe"), Types(q.Text("type")), q.Position("asOf"), q.Int("limit", 20))));
+            q => reader.LookupEntities(q.Text("query") ?? "", q.Text("universe"), Types(q.Text("type")), q.Position("asOf"), q.Int("limit", 20)))).RequireWolfden(Permission.Read);
         api.MapGet("/entity", (HttpContext c) => Answer(
-            c, ["entity", "universe", "asOf", "marksAt", "readers"], q => AsReaders(q, () => EntityPages.Get(reader, q.Text("entity"), q.Text("universe"), q.Position("asOf"), q.Position("marksAt"), q.Bool("readers")))));
+            c, ["entity", "universe", "asOf", "marksAt", "readers"], q => AsReaders(q, () => EntityPages.Get(reader, q.Text("entity"), q.Text("universe"), q.Position("asOf"), q.Position("marksAt"), q.Bool("readers"))))).RequireWolfden(Permission.Read);
         api.MapGet("/canon", (HttpContext c) => Answer(
             c,
             ["universe", "asOf", "series", "book", "type", "brief"],
-            q => reader.CanonAsOf(q.Text("universe"), q.Position("asOf"), q.Text("series"), q.Text("book"), q.Text("type"), q.Bool("brief"))));
+            q => reader.CanonAsOf(q.Text("universe"), q.Position("asOf"), q.Text("series"), q.Text("book"), q.Text("type"), q.Bool("brief")))).RequireWolfden(Permission.Read);
         api.MapGet("/search", (HttpContext c) => Answer(
             c,
             ["query", "universe", "type", "status", "series", "book", "canonOnly", "asOf", "limit", "field", "marksAt", "readers"],
@@ -127,19 +127,19 @@ public static class ReadEndpoints
                     : SearchPage(reader.Search(
                         q.Text("query") ?? "", q.Text("universe"), q.Text("type"), q.Bool("canonOnly"), q.Int("limit", 20),
                         q.Text("status"), q.Text("series"), q.Text("book"), q.Position("asOf"), q.Text("field")));
-            }));
+            })).RequireWolfden(Permission.Read);
         api.MapGet("/fields", (HttpContext c) => Answer(
             c, ["universe", "asOf", "readers"],
             q =>
             {
                 CheckReaders(q.Position("asOf"), null, q.Bool("readers"));
                 return AsReaders(q, () => reader.FieldNames(q.Text("universe"), q.Position("asOf"), q.Bool("readers")));
-            }));
+            })).RequireWolfden(Permission.Read);
         api.MapGet("/history", (HttpContext c) => Answer(
-            c, ["entity", "universe", "limit", "before"], q => History(reader, q.Text("entity"), q.Text("universe"), q.Int("limit", 20), q.Text("before"))));
+            c, ["entity", "universe", "limit", "before"], q => History(reader, q.Text("entity"), q.Text("universe"), q.Int("limit", 20), q.Text("before")))).RequireWolfden(Permission.Read);
         api.MapGet("/history/diff", (HttpContext c) => Answer(
             c, ["entity", "universe", "checkpoint", "from", "to"],
-            q => HistoryDiff(reader, q.Text("entity"), q.Text("universe"), q.Text("checkpoint"), q.Text("from"), q.Text("to"))));
+            q => HistoryDiff(reader, q.Text("entity"), q.Text("universe"), q.Text("checkpoint"), q.Text("from"), q.Text("to")))).RequireWolfden(Permission.Read);
     }
 
     /// <summary>

@@ -9,6 +9,7 @@ import { FreezeControl } from '../components/FreezeControl'
 import { NewMenu } from '../components/NewEntity'
 import { ErrorState, Loading } from '../components/States'
 import { useShownError } from '../formHold'
+import { useAccess } from '../access'
 import { useDocumentTitle, useEntitiesInView, usePosition } from '../hooks'
 import { MARKS_LEGEND, notReachedWords } from '../readerWords'
 import { chapterLabel, isAheadOf } from '../story'
@@ -137,6 +138,7 @@ function WritersBookPage({ universe, book }: { universe: string; book: string })
   const failed = useShownError(hierarchy)
   const fields = useQuery(bookChapterFieldsQuery(universe, book))
   const view = useEntitiesInView(universe)
+  const { canWrite } = useAccess()
   const { at, positions: known } = view
   useDocumentTitle(hierarchy.data ? findBook(hierarchy.data.universe, book)?.book.name : undefined)
 
@@ -173,7 +175,7 @@ function WritersBookPage({ universe, book }: { universe: string; book: string })
       <h1>{b.name}</h1>
       <FreezeControl universe={universe} book={b.key} />
       {/* A final book takes nothing new, so it has no New note menu, as it has no Add chapter (#203). */}
-      {b.status !== 'final' && (
+      {b.status !== 'final' && canWrite && (
         <div className="editor-actions">
           <NewMenu universe={universe} place={{ scope: { kind: 'book', key: b.key }, name: b.name }} />
         </div>
@@ -206,7 +208,7 @@ function WritersBookPage({ universe, book }: { universe: string; book: string })
           </ol>
         </>
       )}
-      <AddChapter key={`add-chapter:${b.key}`} universe={universe} book={b.key} bookName={b.name} chapters={b.chapters.length} final={b.status === 'final'} />
+      {canWrite && <AddChapter key={`add-chapter:${b.key}`} universe={universe} book={b.key} bookName={b.name} chapters={b.chapters.length} final={b.status === 'final'} />}
       <ChapterDefaultsSection key={`chapter-defaults:${b.key}`} scope={{ universe, book: b.key }} name={b.name} />
       <Counts counts={b.entities} title="Filed in this book" met={met} />
     </div>

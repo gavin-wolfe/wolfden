@@ -52,9 +52,9 @@ internal static class FileEndpoints
     /// <summary>Maps the endpoints onto <paramref name="api"/>, through <paramref name="tools"/>, so a save takes its turn with the other writes.</summary>
     public static void Map(RouteGroupBuilder api, DenTools tools)
     {
-        api.MapGet("/den/errors", (HttpContext c) => ReadEndpoints.Answer(c, ["countOnly"], q => q.Bool("countOnly") ? Errors(tools) with { Errors = [], Truncated = false } : Errors(tools)));
-        api.MapGet("/file/source", (HttpContext c) => ReadEndpoints.Answer(c, ["path"], q => tools.GetFileSource(q.Text("path") ?? "")));
-        api.MapPost("/file/edit", (Func<HttpContext, Task<IResult>>)(c => Edit(c, tools)));
+        api.MapGet("/den/errors", (HttpContext c) => ReadEndpoints.Answer(c, ["countOnly"], q => q.Bool("countOnly") ? Errors(tools) with { Errors = [], Truncated = false } : Errors(tools))).RequireWolfden(Permission.Read);
+        api.MapGet("/file/source", (HttpContext c) => ReadEndpoints.Answer(c, ["path"], q => tools.GetFileSource(q.Text("path") ?? ""))).RequireWolfden(Permission.Read);
+        api.MapPost("/file/edit", (Func<HttpContext, Task<IResult>>)(c => Edit(c, tools))).RequireWolfden(Permission.Write);
     }
 
     private static DenErrorsResult Errors(DenTools tools)
@@ -113,6 +113,13 @@ internal static class FileEndpoints
 
             var body = WriteEndpoints.Body.Of(context, json, ["path", "text", "expectedHash"]);
             path = body.Text("path");
+
+            // den.yaml decides how every file reads, so fixing it is the owner's (#315 §4.6). Only its exact path names it (CheckEditable).
+            if (DenErrors.KindOf(path) == DenFileKinds.Den && !Access.Allows(context, Permission.Owner))
+            {
+                return Access.Forbidden(context, Permission.Owner);
+            }
+
             var text = body.Text("text");
             var hash = body.Text("expectedHash");
             using (tools.CancelWith(context.RequestAborted))

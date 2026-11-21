@@ -34,7 +34,8 @@ especially want:
   the content security policy should block.
 - Reading or writing files outside the den through the web UI, the API or
   the MCP server (path traversal, symbolic links, junctions).
-- Once login exists: getting past it, or a viewer account making changes.
+- With login on: getting past it, or an account doing what its role
+  doesn't allow (a viewer making changes, or a writer unfreezing a book).
 - Once the commit-identity check
   ([#311](https://github.com/gavin-wolfe/wolfden/issues/311)) exists: a
   commit recorded under a name or email the den doesn't declare. Until then, the known limits are
@@ -49,8 +50,8 @@ especially want:
   and change them, login or not. Wolfden doesn't encrypt notes. (A den you
   received from someone else is different: see above.)
 - Other programs or accounts on the same computer reaching `wolfden serve`
-  while login is off. The server's help text says so. Login, which is
-  planned, will be the fix.
+  while login is off. The server's help text says so. Turning login on
+  (`wolfden login on`) is the fix.
 - Story-position reads that show too much. A position narrows what a read
   returns, but it isn't a lock: an AI assistant can leave the position
   out, and one that can open the den's files can read everything. If a read at a position returns text from

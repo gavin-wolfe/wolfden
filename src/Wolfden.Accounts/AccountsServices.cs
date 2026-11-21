@@ -27,7 +27,8 @@ public static class AccountsServices
         services.AddDbContext<AccountsDbContext>(o => o.UseSqlite(AccountsDbContext.ConnectionString(folder.AccountsDatabase)));
         var builder = services
             .AddIdentityCore<WolfdenUser>(Configure)
-            .AddEntityFrameworkStores<AccountsDbContext>();
+            .AddEntityFrameworkStores<AccountsDbContext>()
+            .AddClaimsPrincipalFactory<WolfdenClaimsPrincipalFactory>();
 
         // Only Wolfden's password rules: Identity's own validator would add
         // composition rules and count UTF-16 units, not characters.

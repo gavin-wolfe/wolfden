@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useHoldRefresh } from '../formHold'
+import { useAccess } from '../access'
 import { useNavigate, useParams } from '@tanstack/react-router'
 import { ApiRequestError } from '../api'
 import { createContainer, worksQuery, type ContainerCreateResult } from '../containerApi'
@@ -101,8 +102,13 @@ export function NewContainerProvider({ universe, children }: { universe: string 
 /** A page's **New series** or **New book** button. */
 export function NewContainerButton({ kind, series, inName }: { kind: Kind; series?: string; inName: string }) {
   const open = useContext(NewContainerContext)
+  const { canWrite } = useAccess()
   if (!open) {
     throw new Error('NewContainerButton is used outside NewContainerProvider.')
+  }
+
+  if (!canWrite) {
+    return null
   }
 
   const label = kind === 'series' ? 'New series' : 'New book'

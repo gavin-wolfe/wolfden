@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, Outlet, useRouterState } from '@tanstack/react-router'
 import { denQuery } from '../api'
+import { AccountMenu, useAccess } from '../access'
 import { usePosition, useUniverseKey } from '../hooks'
 import { CheckpointIndicator } from './CheckpointIndicator'
 import { DenErrorsIndicator, ReadersErrorCount } from './DenErrorsIndicator'
@@ -30,6 +31,7 @@ export function Layout() {
   })
   const routeUniverse = useUniverseKey()
   const { readers } = usePosition()
+  const { canWrite } = useAccess()
   const universe = routeUniverse ?? (den.data?.universes.some((u) => u.key === fileUniverse) ? fileUniverse : undefined)
   const [treeOpen, setTreeOpen] = useState(false)
   const appRef = useRef<HTMLDivElement>(null)
@@ -95,13 +97,15 @@ export function Layout() {
               {den.data?.name ?? 'Wolfden'}
             </Link>
             {/* The Reader's view is read-only, and this asks for every note's name to know where a new one would go. */}
-            {universe && !readers && <NewMenu universe={universe} />}
+            {/* A viewer's account changes nothing (#315 D6), so it has no New menu either. */}
+            {universe && !readers && canWrite && <NewMenu universe={universe} />}
             <SearchBox universe={universe} />
             <PositionBar universe={universe} />
             {/* The Reader's view is read-only, and the list of problems and of what's changed name files, whatever readers know (#300). */}
             {readers ? <ReadersErrorCount /> : <DenErrorsIndicator universe={universe} />}
-            {!readers && <CheckpointIndicator />}
+            {!readers && canWrite && <CheckpointIndicator />}
             <LiveRefresh />
+            <AccountMenu />
           </header>
           <div className="body">
             <aside id="sidebar" className="sidebar" data-open={treeOpen} ref={sidebarRef} tabIndex={-1}>

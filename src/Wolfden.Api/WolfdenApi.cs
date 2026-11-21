@@ -22,9 +22,9 @@ namespace Wolfden.Api;
 /// </summary>
 /// <remarks>
 /// <para>
-/// v0 is local-first and single-user, with no accounts and no
-/// authentication, so the server listens on 127.0.0.1 only, never on
-/// another network interface. No configuration can add a listener: not
+/// The server listens on 127.0.0.1 only, never on another network
+/// interface (network access comes through a reverse proxy, in a later
+/// change: #315 D8). No configuration can add a listener: not
 /// environment variables (<c>ASPNETCORE_URLS</c> is overridden, with a
 /// warning), a command line, or an <c>appsettings.json</c>. It answers only requests addressed to
 /// <c>localhost</c> or <c>127.0.0.1</c>, which keeps a web page on another
@@ -34,8 +34,15 @@ namespace Wolfden.Api;
 /// CORS headers, so a browser never lets another site read an answer.
 /// Every response has a Content-Security-Policy (<see cref="PagePolicy"/>, #180).
 /// The den's images are served under <c>/den-files</c> (<see cref="DenFiles"/>, #186).
-/// Hosting for several users is a later phase (design.md §10), with its own
-/// authentication.
+/// </para>
+/// <para>
+/// Login is optional (#315). With it off (<see cref="WolfdenApiOptions.Login"/>
+/// null), every request acts as the owner, as before accounts. With it on,
+/// every endpoint needs a logged-in account whose role has the endpoint's
+/// permission (<see cref="Access"/>, <see cref="AuthEndpoints"/>), and a
+/// request that changes anything must carry this server's <c>Origin</c>.
+/// Either way, every endpoint declares its permission, and one that
+/// doesn't needs a login.
 /// </para>
 /// </remarks>
 public static class WolfdenApi
@@ -86,8 +93,13 @@ public static class WolfdenApi
         {
             builder.Logging.AddProvider(new TextWriterLoggerProvider(log)).SetMinimumLevel(LogLevel.Warning)
                 // A failure to start, such as a port in use, is thrown from StartAsync for the caller to report.
-                .AddFilter("Microsoft.Extensions.Hosting.Internal.Host", LogLevel.None);
+                .AddFilter("Microsoft.Extensions.Hosting.Internal.Host", LogLevel.None)
+
+                // Outside Windows, Data Protection warns that its keys aren't encrypted: they're in the account's own folder, and the guide says so.
+                .AddFilter("Microsoft.AspNetCore.DataProtection", LogLevel.Error);
         }
+
+        builder.Services.AddWolfdenLogin(options.Login);
 
         // First of all, ahead of the host's own host filtering, so every
         // response the app sends gets the headers, its errors included.
@@ -96,8 +108,19 @@ public static class WolfdenApi
         var app = builder.Build();
         app.UseExceptionHandler(errors => errors.Run(InternalError));
         app.UseHostFiltering();
+        if (options.LoginSetting is { } setting)
+        {
+            var watch = new LoginWatch(options.Login is not null, setting, options.Time, options.LoginSettingEvery, options.Log);
+            app.Use(watch.Guard);
+        }
+
         app.UseWhen(context => context.Request.Path.StartsWithSegments("/api"), api => api.Use(CrossSiteGuard));
         MapWebUi(app, options.WebRoot);
+
+        // After the UI's static files, which hold no den content; before every endpoint.
+        app.UseAuthentication();
+        app.UseAuthorization();
+        app.UseRateLimiter();
         app.MapWolfdenApi(options);
         app.MapDenFiles(options);
         if (options.AutoCheckpoints)
@@ -135,37 +158,54 @@ public static class WolfdenApi
     }
 
     /// <summary>
-    /// Refuses an API request a browser says comes from another site:
-    /// <c>Sec-Fetch-Site: cross-site</c>, or an <c>Origin</c> that isn't
-    /// this server (<c>localhost</c> or <c>127.0.0.1</c> on the port the
-    /// request came in on). Requests without either header, such as
-    /// <c>curl</c>'s, and the browser's same-origin requests pass. The Vite
-    /// dev server's proxy drops the <c>Origin</c> of its own page, which has
-    /// another port, and passes any other on (web/vite.config.ts).
+    /// Refuses an API request a browser says comes from anywhere but this
+    /// server's own pages: a <c>Sec-Fetch-Site</c> other than
+    /// <c>same-origin</c> or <c>none</c> (so <c>same-site</c>, such as a
+    /// page on another port of <c>localhost</c>, is refused too: #315 §4.5),
+    /// or an <c>Origin</c> that isn't this server (<c>localhost</c> or
+    /// <c>127.0.0.1</c> on the port the request came in on). Requests
+    /// without either header, such as <c>curl</c>'s, and the browser's
+    /// same-origin requests pass. With login on, a request that may change
+    /// something (anything but GET and HEAD) must also carry this server's
+    /// <c>Origin</c>: browsers always send one, and other clients have no
+    /// cookie. The Vite dev server's proxy puts this server's <c>Origin</c>
+    /// in place of its own page's, which has another port, and passes any
+    /// other on (web/vite.config.ts).
     /// </summary>
     internal static Task CrossSiteGuard(HttpContext context, RequestDelegate next)
     {
-        if (!IsCrossSite(context))
+        if (IsCrossSite(context))
         {
-            return next(context);
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return context.Response.WriteAsJsonAsync(new ApiError(
+                "cross_site", "Wolfden's API answers only its own pages, not requests from another site."));
         }
 
-        context.Response.StatusCode = StatusCodes.Status403Forbidden;
-        return context.Response.WriteAsJsonAsync(new ApiError(
-            "cross_site", "Wolfden's API answers only its own pages, not requests from another site."));
+        if (LoginState.Of(context).On && !HttpMethods.IsGet(context.Request.Method) && !HttpMethods.IsHead(context.Request.Method)
+            && context.Request.Headers.Origin.Count == 0)
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return context.Response.WriteAsJsonAsync(new ApiError(
+                "origin_required", "With login on, a request that changes anything must come from Wolfden's own page, which sends its Origin."));
+        }
+
+        return next(context);
     }
 
     /// <summary>
-    /// True if a browser says the request comes from another site, as
-    /// <see cref="CrossSiteGuard"/> decides it. The den's files
-    /// (<see cref="DenFiles"/>) refuse such a request too, with a 404.
+    /// True if a browser says the request comes from anywhere but this
+    /// server's own pages, as <see cref="CrossSiteGuard"/> decides it. The
+    /// den's files (<see cref="DenFiles"/>) refuse such a request too, with a 404.
     /// </summary>
     internal static bool IsCrossSite(HttpContext context)
     {
         var headers = context.Request.Headers;
-        var crossSite = string.Equals(headers["Sec-Fetch-Site"], "cross-site", StringComparison.OrdinalIgnoreCase);
+        var site = headers["Sec-Fetch-Site"].ToString();
+        var otherSite = site.Length > 0
+            && !site.Equals("same-origin", StringComparison.OrdinalIgnoreCase)
+            && !site.Equals("none", StringComparison.OrdinalIgnoreCase);
         var origin = headers.Origin.ToString();
-        return crossSite || (origin.Length > 0 && !IsThisServer(origin, context.Connection.LocalPort));
+        return otherSite || (origin.Length > 0 && !IsThisServer(origin, context.Connection.LocalPort));
 
         static bool IsThisServer(string origin, int port) =>
             Uri.TryCreate(origin, UriKind.Absolute, out var uri)
@@ -190,6 +230,13 @@ public static class WolfdenApi
                 {
                     response.Headers[HeaderNames.XContentTypeOptions] = "nosniff";
                     AddContentSecurityPolicy(response, denRoot);
+
+                    // The API's answers are for its own pages only: no other site may even load them (#315 §4.5).
+                    if (context.Request.Path.StartsWithSegments("/api"))
+                    {
+                        response.Headers["Cross-Origin-Resource-Policy"] = "same-origin";
+                    }
+
                     return Task.CompletedTask;
                 });
                 return rest(context);
@@ -294,7 +341,7 @@ public static class WolfdenApi
                 context.Response.Headers.CacheControl = "no-cache";
                 context.Response.Headers.ContentSecurityPolicy = NotBuiltPagePolicy;
                 return Results.Content(NotBuiltPage, "text/html; charset=utf-8");
-            });
+            }).AllowAnonymous();
             return;
         }
 
@@ -307,13 +354,15 @@ public static class WolfdenApi
         };
         app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = files });
         app.UseStaticFiles(staticFiles);
-        app.MapFallbackToFile("index.html", staticFiles);
+
+        // The UI holds no den content, so it needs no login: it shows its own login page.
+        app.MapFallbackToFile("index.html", staticFiles).AllowAnonymous();
 
         // The UI's own pages are under /u, and an entity without an id is
         // named by its path, such as .../e/universes/dracula/entities/x.md.
         // The fallback above skips paths that look like files, so these get
         // index.html whatever they end in.
-        app.MapFallbackToFile("/u/{**path}", "index.html", staticFiles);
+        app.MapFallbackToFile("/u/{**path}", "index.html", staticFiles).AllowAnonymous();
     }
 
     private static void NoCacheForPages(StaticFileResponseContext file)

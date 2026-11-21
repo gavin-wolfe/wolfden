@@ -44,8 +44,8 @@ public static class CreateEndpoints
     /// <summary>Maps the endpoints onto <paramref name="api"/>, writing through <paramref name="tools"/>, the server's one set of write tools.</summary>
     internal static void Map(RouteGroupBuilder api, DenTools tools)
     {
-        api.MapGet("/types", (HttpContext c) => ReadEndpoints.Answer(c, [], _ => tools.ListTypes()));
-        api.MapPost("/entity/create", (Func<HttpContext, Task<IResult>>)(c => Create(c, tools)));
+        api.MapGet("/types", (HttpContext c) => ReadEndpoints.Answer(c, [], _ => tools.ListTypes())).RequireWolfden(Permission.Read);
+        api.MapPost("/entity/create", (Func<HttpContext, Task<IResult>>)(c => Create(c, tools))).RequireWolfden(Permission.Write);
     }
 
     private static async Task<IResult> Create(HttpContext context, DenTools tools)

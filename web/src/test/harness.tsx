@@ -19,6 +19,7 @@ import type {
 import type { TypeListResult, TypeView } from '../createApi'
 import type { BookChapterFields, ChapterDefaultsSource, ChapterValueView, ReadersChapterFields } from '../chapterFieldsApi'
 import type { SourceFieldType } from '../editApi'
+import type { AuthStatus } from '../access'
 
 // A small den for the UI's tests, from Dracula (public domain): one book of
 // five chapters and a closing note, and a few of its notes.
@@ -251,7 +252,9 @@ export type Responder = (path: string, params: URLSearchParams, init?: RequestIn
  * before it enters, or with `marksAt`, marked if it enters later.
  * `override` answers anything first, if it returns a value.
  */
-export function stubApi(options: { entityPage?: (key: string, at: string | null) => EntityPageResult; override?: Responder; den?: DenSummary } = {}) {
+export function stubApi(
+  options: { entityPage?: (key: string, at: string | null) => EntityPageResult; override?: Responder; den?: DenSummary; auth?: AuthStatus } = {},
+) {
   const calls: string[] = []
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), 'http://127.0.0.1')
@@ -280,6 +283,9 @@ function answer(path: string, params: URLSearchParams, at: string | null, option
   }
 
   switch (path) {
+    case '/api/auth/status':
+      // Login is off, so the page is the owner's, as before accounts (#315).
+      return options.auth ?? { version: 1, login: false, user: null, role: 'owner' }
     case '/api/den/files':
       return { version: 1, fingerprint: 'files-1' }
     case '/api/den':

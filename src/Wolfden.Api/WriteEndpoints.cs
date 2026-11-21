@@ -105,7 +105,7 @@ public static partial class WriteEndpoints
         FileEndpoints.Map(api, tools);
 
         api.MapGet("/entity/source", (HttpContext c) => ReadEndpoints.Answer(
-            c, ["entity", "universe"], q => tools.GetSource(Entity(q.Text("entity")), q.Text("universe"))));
+            c, ["entity", "universe"], q => tools.GetSource(Entity(q.Text("entity")), q.Text("universe")))).RequireWolfden(Permission.Read);
 
         MapEdit(api, "/edit/lead", tools, ["text"], (b, entity, universe, hash) =>
             tools.ReplaceLead(entity, b.Text("text"), hash, universe));
@@ -248,7 +248,7 @@ public static partial class WriteEndpoints
 
     /// <summary>Maps <c>POST</c> on <paramref name="path"/> to an edit (<see cref="Edit"/>).</summary>
     private static void MapEdit(RouteGroupBuilder api, string path, DenTools tools, string[] members, Func<Body, string, string?, string, WriteResult> edit) =>
-        api.MapPost(path, (Func<HttpContext, Task<IResult>>)(c => Edit(c, tools, members, edit)));
+        api.MapPost(path, (Func<HttpContext, Task<IResult>>)(c => Edit(c, tools, members, edit))).RequireWolfden(Permission.Write);
 
     private static string Entity(string? entity)
     {
